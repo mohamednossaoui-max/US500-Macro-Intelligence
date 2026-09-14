@@ -1,987 +1,342 @@
-# fed_intelligence.py
-# ============================================================
-# US500 Macro Intelligence
-# Federal Reserve Intelligence Engine - Phase 1
-#
-# Sources:
-#   Federal Reserve official website
-#
-# Analyzes:
-#   1. FOMC Statement
-#   2. Powell Press Conference / FOMC communication
-#   3. FOMC Minutes
-#   4. SEP / Projection Materials
-#   5. Beige Book
-#
-# IMPORTANT:
-# This module is an analytical layer.
-# It does NOT execute trades.
-# It does NOT automatically modify the Decision Engine.
-# ============================================================
-
+"""Federal Reserve Intelligence Engine - Phase 2A.
+Analytical only: no trade execution and no Decision Engine integration.
+"""
 from __future__ import annotations
 
+import io
 import re
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from datetime import date, datetime
+from typing import Dict, Optional
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+try:
+    from pypdf import PdfReader
+except Exception:
+    PdfReader = None
 
-# ============================================================
-# CONFIG
-# ============================================================
-
-FED_BASE = "https://www.federalreserve.gov"
-
-FOMC_CALENDAR_URL = (
-    "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
-)
-
-BEIGE_BOOK_URL = (
-    "https://www.federalreserve.gov/monetarypolicy/"
-    "publications/beige-book-default.htm"
-)
-
-REQUEST_TIMEOUT = 20
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/139.0 Safari/537.36"
-    )
-}
+FED = "https://www.federalreserve.gov"
+CALENDAR = f"{FED}/monetarypolicy/fomccalendars.htm"
+HEADERS = {"User-Agent": "Mozilla/5.0 US500-Macro-Intelligence/2.0"}
+TIMEOUT = 30
 
 
-# ============================================================
-# HTTP HELPERS
-# ============================================================
-
-def fetch_html(url: str) -> str:
-    """
-    Download an official Federal Reserve HTML page.
-    Returns empty string if the request fails.
-    """
+def get(url: str) -> Optional[requests.Response]:
     try:
-        response = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=REQUEST_TIMEOUT,
-        )
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r.raise_for_status()
+        return r
+    except Exception:
+        return None
 
-        response.raise_for_status()
 
-        return response.text
+def absolute(href: str) -> str:
+    if not href:
+        return ""
+    if href.startswith("http://") or href.startswith("https://"):
+        return href
+    if href.startswith("/"):
+        return FED + href
+    return FED + "/" + href.lstrip("./")
 
+
+def clean_html(html: str) -> str:
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    for x in soup(["script", "style", "noscript", "svg"]):
+        x.decompose()
+    return re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).strip()
+
+
+def pdf_text(url: str) -> str:
+    if not url or PdfReader is None:
+        return ""
+    r = get(url)
+    if r is None:
+        return ""
+    try:
+        reader = PdfReader(io.BytesIO(r.content))
+        return re.sub("\\s+", " ", " ".join((p.extract_text() or "") for p in reader.pages)).strip()
     except Exception:
         return ""
 
 
-def clean_text(html: str) -> str:
-    """
-    Convert HTML into normalized plain text.
-    """
-    if not html:
-        return ""
-
-    soup = BeautifulSoup(html, "html.parser")
-
-    for tag in soup(
-        ["script", "style", "noscript", "svg"]
-    ):
-        tag.decompose()
-
-    text = soup.get_text(" ", strip=True)
-
-    text = re.sub(r"\s+", " ", text)
-
-    return text.strip()
-
-
-# ============================================================
-# TEXT ANALYSIS
-# ============================================================
-
-HAWKISH_TERMS = [
-    "higher for longer",
-    "restrictive",
-    "restrictive policy",
-    "inflation remains elevated",
-    "inflation remains high",
-    "persistent inflation",
-    "inflation pressures",
-    "upside risks to inflation",
-    "upside risk to inflation",
-    "additional tightening",
-    "tighten policy",
-    "tightening policy",
-    "rate increase",
-    "rate increases",
-    "raise the target range",
-    "higher policy rate",
-    "higher policy rates",
-    "strong labor market",
-    "strong economic activity",
-    "robust economic activity",
-]
-
-DOVISH_TERMS = [
-    "rate cut",
-    "rate cuts",
-    "lower rates",
-    "lower policy rate",
-    "lower policy rates",
-    "easing policy",
-    "ease policy",
-    "easing financial conditions",
-    "dovish",
-    "weaker labor market",
-    "labor market has cooled",
-    "labor market cooling",
-    "economic activity slowed",
-    "economic activity weakened",
-    "growth slowed",
-    "growth weakened",
-    "downside risks",
-    "downside risk",
-    "inflation has eased",
-    "inflation eased",
-    "inflation moving lower",
-]
-
-INFLATION_TERMS = [
-    "inflation",
-    "price pressures",
-    "price pressure",
-    "prices",
-    "pce inflation",
-    "core pce",
-    "consumer prices",
-]
-
-LABOR_TERMS = [
-    "employment",
-    "labor market",
-    "labour market",
-    "unemployment",
-    "job gains",
-    "payroll",
-    "wages",
-    "wage growth",
-]
-
-GROWTH_TERMS = [
-    "economic activity",
-    "economic growth",
-    "growth",
-    "consumer spending",
-    "household spending",
-    "business investment",
-    "manufacturing",
-    "services",
-]
-
-FINANCIAL_TERMS = [
-    "financial conditions",
-    "financial stability",
-    "credit conditions",
-    "banking",
-    "credit",
-    "liquidity",
-    "financial markets",
-]
-
-
-def count_terms(text: str, terms: List[str]) -> int:
-    """
-    Count occurrences of a group of keywords.
-    """
-    if not text:
-        return 0
-
-    text_lower = text.lower()
-
-    score = 0
-
-    for term in terms:
-        score += text_lower.count(term.lower())
-
-    return score
-
-
-def tone_score(text: str) -> int:
-    """
-    Basic document tone score.
-
-    Positive = hawkish
-    Negative = dovish
-    Zero = neutral
-
-    This is deliberately transparent and rule-based in Phase 1.
-    """
-
-    if not text:
-        return 0
-
-    hawkish = count_terms(
-        text,
-        HAWKISH_TERMS,
-    )
-
-    dovish = count_terms(
-        text,
-        DOVISH_TERMS,
-    )
-
-    raw = hawkish - dovish
-
-    # Prevent one long document from producing an enormous score.
-    if raw > 20:
-        raw = 20
-
-    if raw < -20:
-        raw = -20
-
-    return raw
-
-
-def classify_tone(score: int) -> str:
-    """
-    Convert raw tone score into a readable classification.
-    """
-
-    if score >= 8:
-        return "HAWKISH"
-
-    if score >= 3:
-        return "MODERATELY HAWKISH"
-
-    if score <= -8:
-        return "DOVISH"
-
-    if score <= -3:
-        return "MODERATELY DOVISH"
-
-    return "NEUTRAL"
-
-
-# ============================================================
-# DOCUMENT PROFILE
-# ============================================================
-
-def analyze_document(
-    name: str,
-    text: str,
-) -> Dict:
-
-    if not text:
-        return {
-            "name": name,
-            "available": False,
-            "tone_score": None,
-            "tone": "UNAVAILABLE",
-            "inflation_mentions": 0,
-            "labor_mentions": 0,
-            "growth_mentions": 0,
-            "financial_mentions": 0,
-        }
-
-    score = tone_score(text)
-
-    return {
-        "name": name,
-        "available": True,
-        "tone_score": score,
-        "tone": classify_tone(score),
-        "inflation_mentions": count_terms(
-            text,
-            INFLATION_TERMS,
-        ),
-        "labor_mentions": count_terms(
-            text,
-            LABOR_TERMS,
-        ),
-        "growth_mentions": count_terms(
-            text,
-            GROWTH_TERMS,
-        ),
-        "financial_mentions": count_terms(
-            text,
-            FINANCIAL_TERMS,
-        ),
-        "text_length": len(text),
-    }
-
-
-# ============================================================
-# FOMC CALENDAR DISCOVERY
-# ============================================================
-
-def get_fomc_links() -> Dict[str, str]:
-    """
-    Discover useful FOMC links from the official calendar.
-
-    Returns the latest links that can be identified from
-    the Federal Reserve calendar page.
-    """
-
-    html = fetch_html(FOMC_CALENDAR_URL)
-
-    if not html:
-        return {}
-
-    soup = BeautifulSoup(
-        html,
-        "html.parser",
-    )
-
-    links = {}
-
-    for a in soup.find_all("a", href=True):
-
-        href = a.get("href", "").strip()
-
-        text = a.get_text(
-            " ",
-            strip=True,
-        ).lower()
-
-        if not href:
-            continue
-
-        if href.startswith("/"):
-            full_url = FED_BASE + href
-        elif href.startswith("http"):
-            full_url = href
-        else:
-            continue
-
-        # Minutes
-        if (
-            "minutes" in text
-            or "fomcminutes" in href.lower()
-        ):
-            links.setdefault(
-                "minutes",
-                full_url,
-            )
-
-        # Press conference
-        if (
-            "press conference" in text
-            or "fomcpresconf" in href.lower()
-        ):
-            links.setdefault(
-                "press_conference",
-                full_url,
-            )
-
-        # Projection materials / SEP
-        if (
-            "projection" in text
-            or "fomcproj" in href.lower()
-        ):
-            links.setdefault(
-                "sep",
-                full_url,
-            )
-
-        # FOMC statement
-        if (
-            "statement" in text
-            or "fomcstmt" in href.lower()
-        ):
-            links.setdefault(
-                "statement",
-                full_url,
-            )
-
-    return links
-
-
-# ============================================================
-# FOMC DOCUMENT FETCHING
-# ============================================================
-
-def fetch_fomc_statement() -> Dict:
-
-    links = get_fomc_links()
-
-    url = links.get("statement")
-
-    if not url:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    html = fetch_html(url)
-
-    text = clean_text(html)
-
-    return {
-        "available": bool(text),
-        "url": url,
-        "text": text,
-    }
-
-
-def fetch_fomc_minutes() -> Dict:
-
-    links = get_fomc_links()
-
-    url = links.get("minutes")
-
-    if not url:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    html = fetch_html(url)
-
-    text = clean_text(html)
-
-    return {
-        "available": bool(text),
-        "url": url,
-        "text": text,
-    }
-
-
-def fetch_press_conference() -> Dict:
-
-    links = get_fomc_links()
-
-    url = links.get("press_conference")
-
-    if not url:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    html = fetch_html(url)
-
-    text = clean_text(html)
-
-    return {
-        "available": bool(text),
-        "url": url,
-        "text": text,
-    }
-
-
-def fetch_sep() -> Dict:
-
-    links = get_fomc_links()
-
-    url = links.get("sep")
-
-    if not url:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    html = fetch_html(url)
-
-    text = clean_text(html)
-
-    return {
-        "available": bool(text),
-        "url": url,
-        "text": text,
-    }
-
-
-# ============================================================
-# BEIGE BOOK
-# ============================================================
-
-def fetch_beige_book() -> Dict:
-    """
-    Fetch the official Beige Book index and identify the
-    latest available report.
-    """
-
-    html = fetch_html(
-        BEIGE_BOOK_URL
-    )
-
-    if not html:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    soup = BeautifulSoup(
-        html,
-        "html.parser",
-    )
-
-    # Find links that point to Beige Book summaries.
-    candidates = []
-
-    for a in soup.find_all("a", href=True):
-
-        href = a.get("href", "")
-
-        text = a.get_text(
-            " ",
-            strip=True,
-        )
-
-        if (
-            "beigebook" in href.lower()
-            and (
-                "html" in text.lower()
-                or "pdf" in text.lower()
-            )
-        ):
-
-            if href.startswith("/"):
-                href = FED_BASE + href
-
-            candidates.append(
-                (
-                    text,
-                    href,
-                )
-            )
-
-    # Prefer the first HTML report found.
-    selected_url = None
-
-    for label, url in candidates:
-
-        if "html" in label.lower():
-            selected_url = url
-            break
-
-    if selected_url is None and candidates:
-        selected_url = candidates[0][1]
-
-    if not selected_url:
-        return {
-            "available": False,
-            "url": None,
-            "text": "",
-        }
-
-    report_html = fetch_html(
-        selected_url
-    )
-
-    text = clean_text(
-        report_html
-    )
-
-    return {
-        "available": bool(text),
-        "url": selected_url,
-        "text": text,
-    }
-
-
-# ============================================================
-# DOCUMENT SHIFT
-# ============================================================
-
-def calculate_shift(
-    current_score: Optional[int],
-    previous_score: Optional[int],
-) -> Dict:
-
-    if (
-        current_score is None
-        or previous_score is None
-    ):
-        return {
-            "available": False,
-            "delta": None,
-            "classification": "UNAVAILABLE",
-        }
-
-    delta = (
-        current_score
-        - previous_score
-    )
-
-    if delta >= 5:
-        classification = "HAWKISH SHIFT"
-
-    elif delta >= 2:
-        classification = "SLIGHTLY HAWKISH"
-
-    elif delta <= -5:
-        classification = "DOVISH SHIFT"
-
-    elif delta <= -2:
-        classification = "SLIGHTLY DOVISH"
-
-    else:
-        classification = "NO MAJOR SHIFT"
-
-    return {
-        "available": True,
-        "delta": delta,
-        "classification": classification,
-    }
-
-
-# ============================================================
-# FED INTELLIGENCE SCORE
-# ============================================================
-
-def weighted_fed_score(
-    document_scores: Dict[str, int]
-) -> Optional[int]:
-
-    """
-    Initial Phase-1 weighted score.
-
-    IMPORTANT:
-    These weights are provisional.
-    They must be validated with historical backtesting
-    before they influence trade decisions.
-    """
-
-    weights = {
-        "fomc": 0.25,
-        "powell": 0.25,
-        "sep": 0.25,
-        "minutes": 0.15,
-        "beige_book": 0.10,
-    }
-
-    available_weight = 0.0
-    weighted_sum = 0.0
-
-    for key, weight in weights.items():
-
-        value = document_scores.get(
-            key
-        )
-
-        if value is None:
-            continue
-
-        available_weight += weight
-
-        weighted_sum += (
-            value * weight
-        )
-
-    if available_weight == 0:
+def date_from_href(href: str) -> Optional[date]:
+    m = re.search(r"(20\d{6})", href or "")
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y%m%d").date()
+    except Exception:
         return None
 
-    score = (
-        weighted_sum
-        / available_weight
-    )
 
-    # Convert raw keyword score to
-    # approximately -10 to +10.
-    normalized = round(
-        score / 2
-    )
-
-    normalized = max(
-        -10,
-        min(10, normalized),
-    )
-
-    return normalized
-
-
-def classify_fed_score(
-    score: Optional[int]
-) -> str:
-
-    if score is None:
-        return "UNAVAILABLE"
-
-    if score >= 6:
-        return "STRONGLY HAWKISH"
-
-    if score >= 3:
-        return "MODERATELY HAWKISH"
-
-    if score <= -6:
-        return "STRONGLY DOVISH"
-
-    if score <= -3:
-        return "MODERATELY DOVISH"
-
-    return "NEUTRAL / MIXED"
-
-
-# ============================================================
-# FULL FED INTELLIGENCE ANALYSIS
-# ============================================================
-
-def build_fed_intelligence() -> Dict:
-    """
-    Main entry point.
-
-    Fetches available Federal Reserve documents and
-    produces a transparent analytical structure.
-    """
-
-    result = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "source": FED_BASE,
-        "documents": {},
-        "fed_score": None,
-        "fed_classification": "UNAVAILABLE",
-        "links": {},
-    }
-
-    # --------------------------------------------------------
-    # FOMC Statement
-    # --------------------------------------------------------
-
-    statement = fetch_fomc_statement()
-
-    statement_analysis = analyze_document(
-        "FOMC Statement",
-        statement.get(
-            "text",
-            "",
-        ),
-    )
-
-    result["documents"]["fomc"] = (
-        statement_analysis
-    )
-
-    if statement.get("url"):
-        result["links"]["fomc"] = (
-            statement["url"]
-        )
-
-    # --------------------------------------------------------
-    # Powell
-    # --------------------------------------------------------
-
-    press = fetch_press_conference()
-
-    press_analysis = analyze_document(
-        "Powell Press Conference",
-        press.get(
-            "text",
-            "",
-        ),
-    )
-
-    result["documents"]["powell"] = (
-        press_analysis
-    )
-
-    if press.get("url"):
-        result["links"]["powell"] = (
-            press["url"]
-        )
-
-    # --------------------------------------------------------
-    # Minutes
-    # --------------------------------------------------------
-
-    minutes = fetch_fomc_minutes()
-
-    minutes_analysis = analyze_document(
-        "FOMC Minutes",
-        minutes.get(
-            "text",
-            "",
-        ),
-    )
-
-    result["documents"]["minutes"] = (
-        minutes_analysis
-    )
-
-    if minutes.get("url"):
-        result["links"]["minutes"] = (
-            minutes["url"]
-        )
-
-    # --------------------------------------------------------
-    # SEP
-    # --------------------------------------------------------
-
-    sep = fetch_sep()
-
-    sep_analysis = analyze_document(
-        "SEP",
-        sep.get(
-            "text",
-            "",
-        ),
-    )
-
-    result["documents"]["sep"] = (
-        sep_analysis
-    )
-
-    if sep.get("url"):
-        result["links"]["sep"] = (
-            sep["url"]
-        )
-
-    # --------------------------------------------------------
-    # Beige Book
-    # --------------------------------------------------------
-
-    beige = fetch_beige_book()
-
-    beige_analysis = analyze_document(
-        "Beige Book",
-        beige.get(
-            "text",
-            "",
-        ),
-    )
-
-    result["documents"]["beige_book"] = (
-        beige_analysis
-    )
-
-    if beige.get("url"):
-        result["links"]["beige_book"] = (
-            beige["url"]
-        )
-
-    # --------------------------------------------------------
-    # Combined Score
-    # --------------------------------------------------------
-
-    document_scores = {}
-
-    for key, data in result[
-        "documents"
-    ].items():
-
-        document_scores[key] = data.get(
-            "tone_score"
-        )
-
-    fed_score = weighted_fed_score(
-        document_scores
-    )
-
-    result["fed_score"] = fed_score
-
-    result["fed_classification"] = (
-        classify_fed_score(
-            fed_score
-        )
-    )
-
+def discover_links() -> Dict[str, Dict[date, str]]:
+    """Discover official FOMC document links indexed by document date."""
+    result = {"statement": {}, "minutes": {}, "press": {}, "sep": {}}
+    r = get(CALENDAR)
+    if r is None:
+        return result
+    soup = BeautifulSoup(r.text, "html.parser")
+    for a in soup.find_all("a", href=True):
+        href = a.get("href", "")
+        url = absolute(href)
+        d = date_from_href(href)
+        if not d:
+            continue
+        h = href.lower()
+        label = a.get_text(" ", strip=True).lower()
+        if "fomcstmt" in h or "statement" in label:
+            result["statement"][d] = url
+        elif "fomcminutes" in h or "minutes" in label:
+            result["minutes"][d] = url
+        elif "fomcpresconf" in h or "press conference" in label:
+            result["press"][d] = url
+        elif "fomcproj" in h or "projection materials" in label:
+            result["sep"][d] = url
     return result
 
 
-# ============================================================
-# SIMPLE SUMMARY
-# ============================================================
+def latest_completed_fomc(links: Dict[str, Dict[date, str]]) -> Optional[date]:
+    dates = set(links.get("statement", {})) | set(links.get("minutes", {})) | set(links.get("press", {}))
+    done = [d for d in dates if d <= date.today()]
+    return max(done) if done else None
 
-def fed_summary(
-    analysis: Dict
-) -> Dict:
 
-    documents = analysis.get(
-        "documents",
-        {},
-    )
+def latest_sep(links: Dict[str, Dict[date, str]], as_of: Optional[date] = None) -> Optional[date]:
+    as_of = as_of or date.today()
+    ds = [d for d in links.get("sep", {}) if d <= as_of]
+    return max(ds) if ds else None
 
-    summary = []
 
-    for key in [
-        "fomc",
-        "powell",
-        "sep",
-        "minutes",
-        "beige_book",
-    ]:
+def previous_sep(links: Dict[str, Dict[date, str]], current: date) -> Optional[date]:
+    ds = [d for d in links.get("sep", {}) if d < current]
+    return max(ds) if ds else None
 
-        item = documents.get(
-            key,
-            {},
-        )
 
-        summary.append(
-            {
-                "document": item.get(
-                    "name",
-                    key,
-                ),
-                "tone": item.get(
-                    "tone",
-                    "UNAVAILABLE",
-                ),
-                "score": item.get(
-                    "tone_score"
-                ),
-            }
-        )
+def fetch_document(url: str) -> str:
+    if not url:
+        return ""
+    if url.lower().endswith(".pdf"):
+        return pdf_text(url)
+    r = get(url)
+    return clean_html(r.text) if r is not None else ""
+
+
+def press_page_data(url: str) -> Dict:
+    if not url:
+        return {"page_url": None, "pdf_url": None, "text": ""}
+    r = get(url)
+    if r is None:
+        return {"page_url": url, "pdf_url": None, "text": ""}
+    soup = BeautifulSoup(r.text, "html.parser")
+    pdf = ""
+    for a in soup.find_all("a", href=True):
+        label = a.get_text(" ", strip=True).lower()
+        href = absolute(a.get("href", ""))
+        if href.lower().endswith(".pdf") and ("transcript" in label or "press conference" in label):
+            pdf = href
+            break
+    text = pdf_text(pdf) if pdf else clean_html(r.text)
+    return {"page_url": url, "pdf_url": pdf or None, "text": text}
+
+
+# ---------------- SEP ----------------
+
+def _num(x):
+    if x is None:
+        return None
+    m = re.search(r"-?\d+(?:\.\d+)?", str(x).replace("â", "-"))
+    return float(m.group()) if m else None
+
+
+def _norm(x):
+    return re.sub(r"[^a-z0-9]", "", str(x).lower())
+
+
+def extract_sep(url: str, sep_date: date) -> Dict:
+    """Read the official accessible SEP HTML tables; PDF fallback if needed."""
+    out = {"sep_date": sep_date.isoformat(), "url": url, "available": False,
+           "year": sep_date.year, "gdp": None, "unemployment": None,
+           "pce": None, "core_pce": None, "fed_funds": None}
+    if not url:
+        return out
+
+    try:
+        tables = pd.read_html(url)
+    except Exception:
+        tables = []
+
+    targets = {
+        "gdp": "changeinrealgdp",
+        "unemployment": "unemploymentrate",
+        "pce": "pceinflation",
+        "core_pce": "corepceinflation",
+        "fed_funds": "federalfundsrate",
+    }
+
+    for df in tables:
+        if df.empty:
+            continue
+        for _, row in df.iterrows():
+            first = _norm(row.iloc[0])
+            for field, target in targets.items():
+                if out[field] is not None:
+                    continue
+                if target in first:
+                    # The first numeric cell after the row label is the
+                    # current-year median in the official accessible table.
+                    vals = [_num(v) for v in row.iloc[1:].tolist()]
+                    vals = [v for v in vals if v is not None]
+                    if vals:
+                        out[field] = vals[0]
+
+    # Accessible SEP may be unavailable in a transient environment.
+    if any(out[k] is not None for k in targets):
+        out["available"] = True
+        return out
+
+    text = fetch_document(url)
+    out["available"] = bool(text)
+    if not text:
+        return out
+
+    # Conservative label-based fallback. Never invent a value.
+    patterns = {
+        "gdp": r"Change in real GDP.{0,120}?\b(\d+\.\d)\b",
+        "unemployment": r"Unemployment rate.{0,120}?\b(\d+\.\d)\b",
+        "pce": r"PCE inflation.{0,120}?\b(\d+\.\d)\b",
+        "core_pce": r"Core PCE inflation.{0,120}?\b(\d+\.\d)\b",
+        "fed_funds": r"Federal funds rate.{0,120}?\b(\d+\.\d)\b",
+    }
+    for field, pat in patterns.items():
+        m = re.search(pat, text, re.I)
+        if m:
+            out[field] = float(m.group(1))
+    out["available"] = any(out[k] is not None for k in targets)
+    return out
+
+
+def sep_shift(current: Dict, previous: Dict) -> Dict:
+    fields = ["gdp", "unemployment", "pce", "core_pce", "fed_funds"]
+    result = {}
+    hawkish = dovish = 0
+    for f in fields:
+        c, p = current.get(f), previous.get(f)
+        change = round(c - p, 2) if c is not None and p is not None else None
+        result[f] = {"current": c, "previous": p, "change": change}
+        if change is None or change == 0:
+            continue
+        if f in ("pce", "core_pce", "fed_funds"):
+            hawkish += change > 0
+            dovish += change < 0
+        elif f == "gdp":
+            hawkish += change > 0
+            dovish += change < 0
+        elif f == "unemployment":
+            dovish += change > 0
+            hawkish += change < 0
+    classification = "HAWKISH SHIFT" if hawkish > dovish else "DOVISH SHIFT" if dovish > hawkish else "MIXED / NEUTRAL SHIFT"
+    return {"classification": classification, "hawkish_points": int(hawkish), "dovish_points": int(dovish), "fields": result}
+
+
+# ---------------- tone ----------------
+HAWKISH = ["higher for longer", "restrictive", "inflation remains elevated", "persistent inflation", "upside risks to inflation", "additional tightening", "rate increase", "raise the target range", "higher policy rate"]
+DOVISH = ["rate cut", "rate cuts", "lower rates", "easing policy", "labor market has cooled", "economic activity slowed", "growth slowed", "downside risks", "inflation has eased", "inflation eased"]
+
+
+def count_terms(text: str, terms) -> int:
+    low = text.lower()
+    return sum(low.count(t) for t in terms)
+
+
+def tone_score(text: str) -> int:
+    if not text:
+        return 0
+    return max(-20, min(20, count_terms(text, HAWKISH) - count_terms(text, DOVISH)))
+
+
+def tone(score: int) -> str:
+    if score >= 8: return "HAWKISH"
+    if score >= 3: return "MODERATELY HAWKISH"
+    if score <= -8: return "DOVISH"
+    if score <= -3: return "MODERATELY DOVISH"
+    return "NEUTRAL"
+
+
+def analyze(name: str, text: str) -> Dict:
+    if not text:
+        return {"name": name, "available": False, "tone": "UNAVAILABLE", "tone_score": None}
+    s = tone_score(text)
+    return {"name": name, "available": True, "tone": tone(s), "tone_score": s,
+            "inflation_mentions": count_terms(text, ["inflation", "prices", "price pressures"]),
+            "labor_mentions": count_terms(text, ["employment", "labor market", "unemployment", "job gains", "wages"]),
+            "growth_mentions": count_terms(text, ["economic activity", "economic growth", "growth", "consumer spending"]),
+            "financial_mentions": count_terms(text, ["financial conditions", "financial stability", "credit conditions", "banking", "liquidity"]),
+            "text_length": len(text)}
+
+
+def build_fed_intelligence() -> Dict:
+    links = discover_links()
+    meeting = latest_completed_fomc(links)
+    if not meeting:
+        return {"available": False, "error": "No completed FOMC meeting found."}
+
+    statement_url = links["statement"].get(meeting, "")
+    minutes_url = links["minutes"].get(meeting, "")
+    press_url = links["press"].get(meeting, "")
+
+    statement_text = fetch_document(statement_url)
+    minutes_text = fetch_document(minutes_url)
+    press = press_page_data(press_url)
+
+    current_sep_date = latest_sep(links, meeting)
+    prev_sep_date = previous_sep(links, current_sep_date) if current_sep_date else None
+    current_sep = extract_sep(links["sep"].get(current_sep_date, ""), current_sep_date) if current_sep_date else {}
+    previous = extract_sep(links["sep"].get(prev_sep_date, ""), prev_sep_date) if prev_sep_date else {}
+    shift = sep_shift(current_sep, previous) if current_sep and previous else {}
 
     return {
-        "fed_score": analysis.get(
-            "fed_score"
-        ),
-        "classification": analysis.get(
-            "fed_classification",
-            "UNAVAILABLE",
-        ),
-        "documents": summary,
+        "available": True,
+        "latest_fomc": meeting.isoformat(),
+        "statement": analyze("FOMC Statement", statement_text),
+        "statement_source": statement_url,
+        "minutes": analyze("FOMC Minutes", minutes_text),
+        "minutes_source": minutes_url,
+        "powell": analyze("Powell Press Conference", press["text"]),
+        "powell_page": press["page_url"],
+        "powell_pdf": press["pdf_url"],
+        "latest_sep_date": current_sep_date.isoformat() if current_sep_date else None,
+        "previous_sep_date": prev_sep_date.isoformat() if prev_sep_date else None,
+        "sep_current": current_sep,
+        "sep_previous": previous,
+        "sep_shift": shift,
     }
 
 
-# ============================================================
-# TEST
-# ============================================================
+def fed_summary(data: Dict) -> str:
+    if not data.get("available"):
+        return "FED INTELLIGENCE unavailable: " + str(data.get("error", "unknown error"))
+    lines = [
+        "FED INTELLIGENCE",
+        "================",
+        f"Latest FOMC: {data['latest_fomc']}",
+        f"Statement: {data['statement']['tone']}",
+        f"Powell: {data['powell']['tone']}",
+        f"Minutes: {data['minutes']['tone']}",
+        f"Latest SEP: {data.get('latest_sep_date')}",
+        f"Previous SEP: {data.get('previous_sep_date')}",
+    ]
+    if data.get("sep_shift"):
+        lines.append(f"SEP Shift: {data['sep_shift']['classification']}")
+        for k, v in data["sep_shift"]["fields"].items():
+            lines.append(f"{k}: {v['previous']} -> {v['current']} ({v['change']})")
+    return "\n".join(lines)
+
 
 if __name__ == "__main__":
-
-    print(
-        "Running Federal Reserve Intelligence Engine..."
-    )
-
-    analysis = build_fed_intelligence()
-
-    summary = fed_summary(
-        analysis
-    )
-
-    print()
-    print(
-        "FED SCORE:",
-        summary["fed_score"],
-    )
-
-    print(
-        "CLASSIFICATION:",
-        summary["classification"],
-    )
-
-    print()
-
-    for item in summary[
-        "documents"
-    ]:
-
-        print(
-            f'{item["document"]}: '
-            f'{item["tone"]} '
-            f'({item["score"]})'
-        )
+    result = build_fed_intelligence()
+    print(fed_summary(result))
