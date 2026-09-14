@@ -29,3 +29,5 @@ BLS_SERIES = {
     "UNEMPLOYMENT":"LNS14000000", "NFP":"CES0000000001",
     "HOURLY_EARNINGS":"CES0500000003"
 }
+FED_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+DB_PATH = "us500_macro_intelligence.db"
