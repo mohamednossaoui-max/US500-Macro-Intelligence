@@ -1,13 +1,10 @@
-import os
 import streamlit as st
 import pandas as pd
 import numpy as np
-
 from datetime import date, datetime
 
 from config import MARKET_TICKER, FRED_API_KEY, REFRESH_MINUTES
 from data import fred_all, bls_all, market, fomc_page, parse_fomc
-
 from engine import (
     latest,
     state,
@@ -17,37 +14,42 @@ from engine import (
     sl_tp,
     PULLBACKS,
 )
-
 from db import init, save_snapshot, save_alert, history, alerts
 
 
 # ============================================================
-# PAGE
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="US500 Macro Intelligence PRODUCTION",
+    page_title="US500 Macro Intelligence — PRODUCTION",
     layout="wide"
 )
 
 init()
 
+
+# ============================================================
+# TITLE
+# ============================================================
+
 st.title("US500 Macro Intelligence — PRODUCTION")
 
 st.caption(
-    "Macro → Early Warning → Regime → Pullback → Risk/Reward | Decision support only"
+    "Macro → Early Warning → Regime → Technical → "
+    "Pullback → Risk/Reward | Decision support only"
 )
 
 
 # ============================================================
-# SAFE DATA HELPERS
+# HELPER FUNCTIONS
 # ============================================================
 
 def safe_value(x):
 
     try:
 
-        if x is None or len(x) == 0:
+        if x is None or x.empty:
             return np.nan
 
         value = float(x.iloc[-1]["value"])
@@ -69,13 +71,13 @@ def safe_delta(x, n=1):
         if x is None or len(x) <= n:
             return np.nan
 
-        a = float(x.iloc[-1]["value"])
-        b = float(x.iloc[-1-n]["value"])
+        current = float(x.iloc[-1]["value"])
+        previous = float(x.iloc[-1-n]["value"])
 
-        if np.isnan(a) or np.isnan(b):
+        if np.isnan(current) or np.isnan(previous):
             return np.nan
 
-        return a - b
+        return current - previous
 
     except Exception:
 
@@ -89,13 +91,16 @@ def safe_pct_change(x, n=1):
         if x is None or len(x) <= n:
             return np.nan
 
-        a = float(x.iloc[-1]["value"])
-        b = float(x.iloc[-1-n]["value"])
+        current = float(x.iloc[-1]["value"])
+        previous = float(x.iloc[-1-n]["value"])
 
-        if np.isnan(a) or np.isnan(b) or b == 0:
+        if np.isnan(current) or np.isnan(previous):
             return np.nan
 
-        return (a / b - 1) * 100
+        if previous == 0:
+            return np.nan
+
+        return (current / previous - 1) * 100
 
     except Exception:
 
@@ -109,11 +114,17 @@ def safe_pct_change(x, n=1):
 def early_warning(f):
 
     scores = {
+
         "Credit": 0,
+
         "Labor": 0,
+
         "Yield Curve": 0,
+
         "Financial Conditions": 0,
+
         "Market Risk": 0,
+
         "Macro Momentum": 0,
     }
 
@@ -129,19 +140,25 @@ def early_warning(f):
     if not np.isnan(hy):
 
         if hy >= 6:
+
             scores["Credit"] += 12
+
             reasons.append(
                 "HY credit spread is at a severe stress level."
             )
 
         elif hy >= 5:
+
             scores["Credit"] += 9
+
             reasons.append(
                 "HY credit spread is significantly elevated."
             )
 
         elif hy >= 4:
+
             scores["Credit"] += 5
+
             reasons.append(
                 "HY credit spread is elevated."
             )
@@ -155,19 +172,25 @@ def early_warning(f):
     if not np.isnan(hy_change):
 
         if hy_change >= 30:
+
             scores["Credit"] += 8
+
             reasons.append(
                 "HY spread has widened sharply."
             )
 
         elif hy_change >= 15:
+
             scores["Credit"] += 5
+
             reasons.append(
                 "HY spread is widening."
             )
 
         elif hy_change >= 8:
+
             scores["Credit"] += 3
+
             reasons.append(
                 "HY spread shows increasing stress."
             )
@@ -180,13 +203,17 @@ def early_warning(f):
     if not np.isnan(corp):
 
         if corp >= 3:
+
             scores["Credit"] += 5
+
             reasons.append(
                 "Corporate OAS is highly elevated."
             )
 
         elif corp >= 2.5:
+
             scores["Credit"] += 3
+
             reasons.append(
                 "Corporate OAS is elevated."
             )
@@ -210,19 +237,25 @@ def early_warning(f):
     if not np.isnan(claims):
 
         if claims >= 8:
+
             scores["Labor"] += 12
+
             reasons.append(
                 "Initial claims trend is deteriorating materially."
             )
 
         elif claims >= 5:
+
             scores["Labor"] += 8
+
             reasons.append(
                 "Initial claims trend is weakening."
             )
 
         elif claims >= 3:
+
             scores["Labor"] += 4
+
             reasons.append(
                 "Initial claims show early deterioration."
             )
@@ -236,13 +269,17 @@ def early_warning(f):
     if not np.isnan(unemployment):
 
         if unemployment >= 0.2:
+
             scores["Labor"] += 8
+
             reasons.append(
                 "Unemployment has risen materially."
             )
 
         elif unemployment >= 0.1:
+
             scores["Labor"] += 4
+
             reasons.append(
                 "Unemployment is trending higher."
             )
@@ -265,13 +302,17 @@ def early_warning(f):
     if not np.isnan(curve):
 
         if curve < -0.50:
+
             scores["Yield Curve"] += 10
+
             reasons.append(
                 "Yield curve is deeply inverted."
             )
 
         elif curve < 0:
+
             scores["Yield Curve"] += 7
+
             reasons.append(
                 "Yield curve remains inverted."
             )
@@ -285,13 +326,17 @@ def early_warning(f):
     if not np.isnan(curve_change):
 
         if curve_change <= -0.50:
+
             scores["Yield Curve"] += 5
+
             reasons.append(
                 "Yield curve has deteriorated significantly."
             )
 
         elif curve_change <= -0.25:
+
             scores["Yield Curve"] += 3
+
             reasons.append(
                 "Yield curve is becoming less supportive."
             )
@@ -314,19 +359,25 @@ def early_warning(f):
     if not np.isnan(nfci):
 
         if nfci >= 1:
+
             scores["Financial Conditions"] += 12
+
             reasons.append(
                 "Financial conditions are severely tight."
             )
 
         elif nfci >= 0.5:
+
             scores["Financial Conditions"] += 8
+
             reasons.append(
                 "Financial conditions are materially tight."
             )
 
         elif nfci > 0:
+
             scores["Financial Conditions"] += 4
+
             reasons.append(
                 "Financial conditions are tighter than average."
             )
@@ -340,19 +391,25 @@ def early_warning(f):
     if not np.isnan(nfci_change):
 
         if nfci_change >= 0.30:
+
             scores["Financial Conditions"] += 8
+
             reasons.append(
                 "Financial conditions are tightening rapidly."
             )
 
         elif nfci_change >= 0.15:
+
             scores["Financial Conditions"] += 5
+
             reasons.append(
                 "Financial conditions are tightening."
             )
 
         elif nfci_change >= 0.08:
+
             scores["Financial Conditions"] += 2
+
             reasons.append(
                 "Financial conditions show early tightening."
             )
@@ -375,25 +432,33 @@ def early_warning(f):
     if not np.isnan(vix):
 
         if vix >= 35:
+
             scores["Market Risk"] += 15
+
             reasons.append(
                 "VIX is at a severe risk level."
             )
 
         elif vix >= 30:
+
             scores["Market Risk"] += 10
+
             reasons.append(
                 "VIX is highly elevated."
             )
 
         elif vix >= 25:
+
             scores["Market Risk"] += 6
+
             reasons.append(
                 "VIX is elevated."
             )
 
         elif vix >= 20:
+
             scores["Market Risk"] += 3
+
             reasons.append(
                 "VIX is above the normal low-risk zone."
             )
@@ -407,13 +472,17 @@ def early_warning(f):
     if not np.isnan(vix_change):
 
         if vix_change >= 50:
+
             scores["Market Risk"] += 5
+
             reasons.append(
                 "VIX has risen sharply."
             )
 
         elif vix_change >= 25:
+
             scores["Market Risk"] += 3
+
             reasons.append(
                 "VIX is rising significantly."
             )
@@ -427,13 +496,17 @@ def early_warning(f):
     if not np.isnan(dxy_change):
 
         if dxy_change >= 8:
+
             scores["Market Risk"] += 3
+
             reasons.append(
                 "DXY has strengthened materially."
             )
 
         elif dxy_change >= 5:
+
             scores["Market Risk"] += 2
+
             reasons.append(
                 "DXY is showing a strong upward trend."
             )
@@ -524,10 +597,446 @@ def early_warning(f):
 
 
     return {
+
         "score": total,
+
         "level": level,
+
         "reasons": reasons,
+
         "details": scores,
+    }
+
+
+# ============================================================
+# TECHNICAL CONFIRMATION
+# ============================================================
+
+def technical_confirmation(m):
+
+    if m is None or m.empty:
+
+        return {
+
+            "score": 0,
+
+            "level": "UNAVAILABLE",
+
+            "reasons": [
+                "Market data unavailable."
+            ],
+
+            "details": {}
+        }
+
+
+    x = m.copy()
+
+
+    required = {
+        "close",
+        "high",
+        "low"
+    }
+
+
+    if not required.issubset(
+        set(x.columns)
+    ):
+
+        return {
+
+            "score": 0,
+
+            "level": "UNAVAILABLE",
+
+            "reasons": [
+                "Required OHLC columns are unavailable."
+            ],
+
+            "details": {}
+        }
+
+
+    # --------------------------------------------------------
+    # MOVING AVERAGES
+    # --------------------------------------------------------
+
+    x["SMA50"] = (
+        x["close"]
+        .rolling(50)
+        .mean()
+    )
+
+    x["SMA200"] = (
+        x["close"]
+        .rolling(200)
+        .mean()
+    )
+
+
+    score = 0
+
+    reasons = []
+
+    details = {}
+
+
+    price = float(
+        x["close"].iloc[-1]
+    )
+
+
+    sma50 = (
+
+        float(x["SMA50"].iloc[-1])
+
+        if pd.notna(
+            x["SMA50"].iloc[-1]
+        )
+
+        else np.nan
+    )
+
+
+    sma200 = (
+
+        float(x["SMA200"].iloc[-1])
+
+        if pd.notna(
+            x["SMA200"].iloc[-1]
+        )
+
+        else np.nan
+    )
+
+
+    # --------------------------------------------------------
+    # 1 — PRICE > SMA200
+    # --------------------------------------------------------
+
+    if not np.isnan(sma200):
+
+        if price > sma200:
+
+            score += 1
+
+            details[
+                "Price > SMA200"
+            ] = "PASS"
+
+            reasons.append(
+                "Price is above SMA200."
+            )
+
+        else:
+
+            details[
+                "Price > SMA200"
+            ] = "FAIL"
+
+            reasons.append(
+                "Price is below SMA200."
+            )
+
+    else:
+
+        details[
+            "Price > SMA200"
+        ] = "UNAVAILABLE"
+
+
+    # --------------------------------------------------------
+    # 2 — SMA50 > SMA200
+    # --------------------------------------------------------
+
+    if (
+        not np.isnan(sma50)
+        and
+        not np.isnan(sma200)
+    ):
+
+        if sma50 > sma200:
+
+            score += 1
+
+            details[
+                "SMA50 > SMA200"
+            ] = "PASS"
+
+            reasons.append(
+                "SMA50 is above SMA200."
+            )
+
+        else:
+
+            details[
+                "SMA50 > SMA200"
+            ] = "FAIL"
+
+            reasons.append(
+                "SMA50 is below SMA200."
+            )
+
+    else:
+
+        details[
+            "SMA50 > SMA200"
+        ] = "UNAVAILABLE"
+
+
+    # --------------------------------------------------------
+    # 3 — HIGHER LOW
+    # --------------------------------------------------------
+
+    if len(x) >= 20:
+
+        recent = x.iloc[-10:-1]
+
+        previous = x.iloc[-20:-10]
+
+
+        recent_low = float(
+            recent["low"].min()
+        )
+
+        previous_low = float(
+            previous["low"].min()
+        )
+
+
+        if recent_low > previous_low:
+
+            score += 1
+
+            details[
+                "Higher Low"
+            ] = "PASS"
+
+            reasons.append(
+                "Recent price structure shows a higher low."
+            )
+
+        else:
+
+            details[
+                "Higher Low"
+            ] = "FAIL"
+
+            reasons.append(
+                "No clear higher-low structure."
+            )
+
+    else:
+
+        details[
+            "Higher Low"
+        ] = "UNAVAILABLE"
+
+
+    # --------------------------------------------------------
+    # 4 — CONFIRMATION CANDLE
+    # --------------------------------------------------------
+
+    if len(x) >= 2:
+
+        last = x.iloc[-1]
+
+        previous = x.iloc[-2]
+
+
+        if (
+            float(last["close"])
+            >
+            float(previous["high"])
+        ):
+
+            score += 1
+
+            details[
+                "Confirmation Candle"
+            ] = "PASS"
+
+            reasons.append(
+                "Latest completed candle closed above the previous high."
+            )
+
+        else:
+
+            details[
+                "Confirmation Candle"
+            ] = "FAIL"
+
+            reasons.append(
+                "No close above the previous candle high."
+            )
+
+    else:
+
+        details[
+            "Confirmation Candle"
+        ] = "UNAVAILABLE"
+
+
+    # --------------------------------------------------------
+    # 5 — ATR VOLATILITY FILTER
+    # --------------------------------------------------------
+
+    if len(x) >= 30:
+
+        previous_close = (
+            x["close"]
+            .shift(1)
+        )
+
+
+        tr = pd.concat(
+
+            [
+
+                (
+                    x["high"]
+                    -
+                    x["low"]
+                ).abs(),
+
+                (
+                    x["high"]
+                    -
+                    previous_close
+                ).abs(),
+
+                (
+                    x["low"]
+                    -
+                    previous_close
+                ).abs(),
+
+            ],
+
+            axis=1
+        ).max(axis=1)
+
+
+        atr14 = (
+            tr
+            .rolling(14)
+            .mean()
+        )
+
+
+        current_atr = (
+
+            float(
+                atr14.iloc[-1]
+            )
+
+            if pd.notna(
+                atr14.iloc[-1]
+            )
+
+            else np.nan
+        )
+
+
+        historical_atr = (
+            atr14.iloc[-30:-1]
+        )
+
+
+        median_atr = (
+
+            float(
+                historical_atr.median()
+            )
+
+            if historical_atr.notna().any()
+
+            else np.nan
+        )
+
+
+        if (
+            not np.isnan(current_atr)
+            and
+            not np.isnan(median_atr)
+            and
+            median_atr > 0
+        ):
+
+            ratio = (
+                current_atr
+                /
+                median_atr
+            )
+
+
+            if ratio <= 1.8:
+
+                score += 1
+
+                details[
+                    "ATR Filter"
+                ] = f"PASS ({ratio:.2f}x)"
+
+                reasons.append(
+                    "ATR is not in an extreme volatility regime."
+                )
+
+            else:
+
+                details[
+                    "ATR Filter"
+                ] = f"FAIL ({ratio:.2f}x)"
+
+                reasons.append(
+                    "ATR is unusually elevated."
+                )
+
+        else:
+
+            details[
+                "ATR Filter"
+            ] = "UNAVAILABLE"
+
+    else:
+
+        details[
+            "ATR Filter"
+        ] = "UNAVAILABLE"
+
+
+    # --------------------------------------------------------
+    # TECHNICAL CLASSIFICATION
+    # --------------------------------------------------------
+
+    if score >= 4:
+
+        level = "CONFIRMED"
+
+    elif score >= 2:
+
+        level = "PARTIAL"
+
+    else:
+
+        level = "WEAK"
+
+
+    details[
+        "Technical Score"
+    ] = f"{score}/5"
+
+
+    return {
+
+        "score": score,
+
+        "level": level,
+
+        "reasons": reasons,
+
+        "details": details,
     }
 
 
@@ -540,7 +1049,9 @@ def decision_engine(
     early_level,
     macro_score,
     regime,
-    drawdown
+    drawdown,
+    technical_score,
+    technical_level
 ):
 
     regime_text = str(regime)
@@ -553,13 +1064,18 @@ def decision_engine(
     if early_score >= 75:
 
         return {
-            "decision": "CRITICAL — NO NEW TRADE",
-            "color": "red",
-            "reason": (
-                "Early Warning is CRITICAL. "
-                "The strategy should not assume that a deep pullback "
-                "is automatically a buying opportunity."
-            )
+
+            "decision":
+                "CRITICAL — NO NEW TRADE",
+
+            "color":
+                "red",
+
+            "reason":
+                (
+                    "Early Warning is CRITICAL. "
+                    "Systemic stress overrides technical signals."
+                )
         }
 
 
@@ -570,26 +1086,39 @@ def decision_engine(
     if regime_text.startswith("E"):
 
         return {
-            "decision": "DEFENSIVE",
-            "color": "red",
-            "reason": (
-                "Macro regime indicates recession / bear risk."
-            )
+
+            "decision":
+                "DEFENSIVE",
+
+            "color":
+                "red",
+
+            "reason":
+                (
+                    "Macro regime indicates "
+                    "recession / bear risk."
+                )
         }
 
 
     # --------------------------------------------------------
-    # FINANCIAL SHOCK
+    # FINANCIAL / LIQUIDITY SHOCK
     # --------------------------------------------------------
 
     if regime_text.startswith("F"):
 
         return {
-            "decision": "DEFENSIVE",
-            "color": "red",
-            "reason": (
-                "Financial/liquidity stress is detected."
-            )
+
+            "decision":
+                "DEFENSIVE",
+
+            "color":
+                "red",
+
+            "reason":
+                (
+                    "Financial/liquidity stress is detected."
+                )
         }
 
 
@@ -600,28 +1129,40 @@ def decision_engine(
     if early_score >= 50:
 
         return {
-            "decision": "WAIT / CONFIRM",
-            "color": "orange",
-            "reason": (
-                "Multiple leading indicators are showing "
-                "meaningful deterioration."
-            )
+
+            "decision":
+                "WAIT / CONFIRM",
+
+            "color":
+                "orange",
+
+            "reason":
+                (
+                    "Multiple leading indicators are showing "
+                    "meaningful deterioration."
+                )
         }
 
 
     # --------------------------------------------------------
-    # MODERATE WARNING
+    # MODERATE EARLY WARNING
     # --------------------------------------------------------
 
     if early_score >= 25:
 
         return {
-            "decision": "CAUTION",
-            "color": "yellow",
-            "reason": (
-                "Early warning indicators are deteriorating. "
-                "A pullback should not be treated as automatically healthy."
-            )
+
+            "decision":
+                "CAUTION",
+
+            "color":
+                "yellow",
+
+            "reason":
+                (
+                    "Early warning indicators are deteriorating. "
+                    "Technical confirmation is required."
+                )
         }
 
 
@@ -632,12 +1173,18 @@ def decision_engine(
     if regime_text.startswith("C"):
 
         return {
-            "decision": "WAIT / CONFIRM",
-            "color": "orange",
-            "reason": (
-                "Inflation/rates pressure is elevated. "
-                "Wait for technical confirmation."
-            )
+
+            "decision":
+                "WAIT / CONFIRM",
+
+            "color":
+                "orange",
+
+            "reason":
+                (
+                    "Inflation/rates pressure is elevated. "
+                    "Wait for technical confirmation."
+                )
         }
 
 
@@ -648,60 +1195,155 @@ def decision_engine(
     if regime_text.startswith("D"):
 
         return {
-            "decision": "WAIT / CONFIRM",
-            "color": "orange",
-            "reason": (
-                "Growth and inflation signals are mixed. "
-                "Technical confirmation is required."
-            )
+
+            "decision":
+                "WAIT / CONFIRM",
+
+            "color":
+                "orange",
+
+            "reason":
+                (
+                    "Growth and inflation signals are mixed. "
+                    "Technical confirmation is required."
+                )
         }
 
 
     # --------------------------------------------------------
-    # LARGE DRAWDOWN
+    # VERY DEEP DRAWDOWN
     # --------------------------------------------------------
 
     if drawdown <= -20:
 
         return {
-            "decision": "WAIT / CONFIRM",
-            "color": "orange",
-            "reason": (
-                "Drawdown is very deep. "
-                "Depth alone does not justify a buy."
-            )
+
+            "decision":
+                "WAIT / CONFIRM",
+
+            "color":
+                "orange",
+
+            "reason":
+                (
+                    "Drawdown is very deep. "
+                    "Depth alone does not justify a buy."
+                )
         }
 
 
     # --------------------------------------------------------
-    # MODERATE DRAWDOWN
+    # TECHNICAL WEAK
+    # --------------------------------------------------------
+
+    if technical_level == "WEAK":
+
+        return {
+
+            "decision":
+                "WAIT / CONFIRM",
+
+            "color":
+                "yellow",
+
+            "reason":
+                (
+                    "Technical confirmation is weak."
+                )
+        }
+
+
+    # --------------------------------------------------------
+    # DEEP PULLBACK
     # --------------------------------------------------------
 
     if drawdown <= -10:
 
+        if (
+            technical_level == "CONFIRMED"
+            and
+            macro_score >= 3
+        ):
+
+            return {
+
+                "decision":
+                    "SUPPORTIVE / CONFIRMED",
+
+                "color":
+                    "green",
+
+                "reason":
+                    (
+                        "Deep pullback with supportive macro "
+                        "conditions and confirmed technical structure."
+                    )
+            }
+
+
         return {
-            "decision": "SUPPORTIVE / CONFIRM",
-            "color": "green",
-            "reason": (
-                "Macro conditions remain relatively supportive, "
-                "but the depth of the correction requires confirmation."
-            )
+
+            "decision":
+                "SUPPORTIVE / CONFIRM",
+
+            "color":
+                "yellow",
+
+            "reason":
+                (
+                    "Macro conditions remain relatively supportive, "
+                    "but technical confirmation is incomplete."
+                )
         }
 
 
     # --------------------------------------------------------
-    # NORMAL PULLBACK
+    # NORMAL PULLBACK + FULL CONFIRMATION
     # --------------------------------------------------------
 
-    if early_score < 25 and macro_score >= 3:
+    if (
+        early_score < 25
+        and
+        macro_score >= 3
+        and
+        technical_level == "CONFIRMED"
+    ):
 
         return {
-            "decision": "SUPPORTIVE",
-            "color": "green",
-            "reason": (
-                "Macro conditions are supportive and "
-                "early-warning stress remains low."
-            )
+
+            "decision":
+                "BUY SETUP",
+
+            "color":
+                "green",
+
+            "reason":
+                (
+                    "Macro, early-warning and technical "
+                    "conditions are aligned."
+                )
+        }
+
+
+    # --------------------------------------------------------
+    # PARTIAL TECHNICAL
+    # --------------------------------------------------------
+
+    if technical_level == "PARTIAL":
+
+        return {
+
+            "decision":
+                "CAUTION",
+
+            "color":
+                "yellow",
+
+            "reason":
+                (
+                    "Macro conditions are acceptable, "
+                    "but technical confirmation is only partial."
+                )
         }
 
 
@@ -710,12 +1352,18 @@ def decision_engine(
     # --------------------------------------------------------
 
     return {
-        "decision": "CAUTION",
-        "color": "yellow",
-        "reason": (
-            "Signals are not sufficiently strong to classify "
-            "the environment as clearly supportive."
-        )
+
+        "decision":
+            "CAUTION",
+
+        "color":
+            "yellow",
+
+        "reason":
+            (
+                "Signals are not sufficiently strong "
+                "to classify the environment as a confirmed setup."
+            )
     }
 
 
@@ -726,25 +1374,39 @@ def decision_engine(
 with st.sidebar:
 
     key = st.text_input(
+
         "FRED API key",
+
         value=FRED_API_KEY,
+
         type="password",
-        help="يمكن حفظه في Streamlit Secrets باسم FRED_API_KEY."
+
+        help=(
+            "يمكن حفظه في Streamlit Secrets "
+            "باسم FRED_API_KEY."
+        )
     )
 
+
     start = st.date_input(
+
         "History start",
+
         date(2015, 1, 1)
     )
 
+
     fed = st.selectbox(
+
         "Fed stance (temporary manual input)",
+
         [
             "Neutral",
             "Dovish",
             "Hawkish"
         ]
     )
+
 
     if st.button(
         "REFRESH NOW",
@@ -753,24 +1415,29 @@ with st.sidebar:
 
         st.session_state.force = True
 
+
     st.caption(
-        f"Market feed: {MARKET_TICKER} | Refresh target: {REFRESH_MINUTES} min"
+
+        f"Market feed: {MARKET_TICKER} | "
+        f"Refresh target: {REFRESH_MINUTES} min"
     )
 
 
 # ============================================================
-# DATA
+# DATA UPDATE
 # ============================================================
 
 if (
     "force" in st.session_state
-    or "f" not in st.session_state
+    or
+    "f" not in st.session_state
 ):
 
     if not key:
 
         st.info(
-            "ضع FRED_API_KEY في Secrets/Environment أو أدخل المفتاح هنا ثم REFRESH NOW."
+            "ضع FRED_API_KEY في Secrets/Environment "
+            "أو أدخل المفتاح هنا ثم REFRESH NOW."
         )
 
         st.stop()
@@ -782,24 +1449,36 @@ if (
             "Updating official macro + market data..."
         ):
 
-            st.session_state.f = fred_all(
-                key,
-                start
+            st.session_state.f = (
+                fred_all(
+                    key,
+                    start
+                )
             )
 
-            st.session_state.b = bls_all(
-                start.year,
-                date.today().year
+
+            st.session_state.b = (
+                bls_all(
+                    start.year,
+                    date.today().year
+                )
             )
 
-            st.session_state.m = market(
-                start
+
+            st.session_state.m = (
+                market(start)
             )
 
-            st.session_state.ts = datetime.now()
 
-            st.session_state.fomc = parse_fomc(
-                fomc_page()
+            st.session_state.ts = (
+                datetime.now()
+            )
+
+
+            st.session_state.fomc = (
+                parse_fomc(
+                    fomc_page()
+                )
             )
 
 
@@ -819,7 +1498,7 @@ if (
 
 
 # ============================================================
-# ENGINE
+# LOAD DATA
 # ============================================================
 
 f = st.session_state.f
@@ -827,8 +1506,16 @@ f = st.session_state.f
 m = st.session_state.m
 
 
+# ============================================================
+# MARKET STATE
+# ============================================================
+
 price, ath, dd, atr = state(m)
 
+
+# ============================================================
+# MACRO ENGINE
+# ============================================================
 
 score, reg, meta = analyze(
     f,
@@ -849,54 +1536,93 @@ pb = classify(
 )
 
 
+# ============================================================
 # EARLY WARNING
+# ============================================================
 
-ew = early_warning(
-    f
-)
-
+ew = early_warning(f)
 
 ew_score = ew["score"]
 
 ew_level = ew["level"]
 
 
-# DECISION ENGINE
+# ============================================================
+# TECHNICAL CONFIRMATION
+# ============================================================
 
-final_decision = decision_engine(
-    ew_score,
-    ew_level,
-    score,
-    reg,
-    dd
+tech = technical_confirmation(m)
+
+tech_score = tech["score"]
+
+tech_level = tech["level"]
+
+
+# ============================================================
+# FINAL DECISION
+# ============================================================
+
+decision_result = decision_engine(
+
+    early_score=ew_score,
+
+    early_level=ew_level,
+
+    macro_score=score,
+
+    regime=reg,
+
+    drawdown=dd,
+
+    technical_score=tech_score,
+
+    technical_level=tech_level
 )
 
 
-dec = final_decision["decision"]
+dec = decision_result["decision"]
+
+dec_color = decision_result["color"]
+
+dec_reason = decision_result["reason"]
 
 
 # ============================================================
-# DATABASE
+# SAVE SNAPSHOT
 # ============================================================
 
 save_snapshot(
+
     (
         st.session_state.ts.isoformat(),
+
         price,
+
         ath,
+
         dd,
+
         score,
+
         reg,
+
         dec,
+
         str(meta)
     )
 )
 
 
+# ============================================================
+# ALERTS
+# ============================================================
+
 if score <= -3:
 
     save_alert(
+
         "MACRO",
+
         f"Macro score {score}: {reg}"
     )
 
@@ -904,7 +1630,9 @@ if score <= -3:
 if dd <= -10:
 
     save_alert(
+
         "DRAWDOWN",
+
         f"US500 drawdown {dd:.2f}%"
     )
 
@@ -912,16 +1640,18 @@ if dd <= -10:
 if ew_score >= 50:
 
     save_alert(
+
         "EARLY_WARNING",
+
         f"Early Warning {ew_score}/100 — {ew_level}"
     )
 
 
 # ============================================================
-# DASHBOARD
+# TOP DASHBOARD
 # ============================================================
 
-cols = st.columns(8)
+cols = st.columns(9)
 
 
 dashboard = [
@@ -962,18 +1692,25 @@ dashboard = [
     ),
 
     (
+        "Technical",
+        f"{tech_score}/5"
+    ),
+
+    (
         "Decision",
         dec
-    ),
+    )
 ]
 
 
-for c, (label, value) in zip(
+for column, item in zip(
     cols,
     dashboard
 ):
 
-    c.metric(
+    label, value = item
+
+    column.metric(
         label,
         value
     )
@@ -983,82 +1720,50 @@ for c, (label, value) in zip(
 # DECISION BANNER
 # ============================================================
 
-if (
-    dec == "CRITICAL — NO NEW TRADE"
-):
+if dec_color == "red":
 
     st.error(
-        "🚨 CRITICAL — NO NEW TRADE"
+        f"🔴 {dec}"
     )
 
-    st.write(
-        final_decision["reason"]
+elif dec_color == "orange":
+
+    st.warning(
+        f"🟠 {dec}"
     )
 
-
-elif (
-    dec == "DEFENSIVE"
-):
-
-    st.error(
-        "🔴 DEFENSIVE — لا نفترض أن الهبوط فرصة شراء."
-    )
-
-    st.write(
-        final_decision["reason"]
-    )
-
-
-elif (
-    dec == "WAIT / CONFIRM"
-    or dec == "SUPPORTIVE / CONFIRM"
-):
+elif dec_color == "yellow":
 
     st.warning(
         f"🟡 {dec}"
     )
 
-    st.write(
-        final_decision["reason"]
-    )
-
-
-elif (
-    dec == "CAUTION"
-):
-
-    st.warning(
-        "🟠 CAUTION"
-    )
-
-    st.write(
-        final_decision["reason"]
-    )
-
-
 else:
 
     st.success(
-        "🟢 SUPPORTIVE"
+        f"🟢 {dec}"
     )
 
-    st.write(
-        final_decision["reason"]
-    )
+
+st.write(
+    dec_reason
+)
 
 
 # ============================================================
 # TABS
 # ============================================================
 
-t1, t2, t3, t4, t5, t6 = st.tabs(
+tabs = st.tabs(
+
     [
         "LIVE",
         "EARLY WARNING",
+        "TECHNICAL",
         "MACRO",
         "TRADING",
         "EVENTS",
-        "HISTORY",
+        "HISTORY"
     ]
 )
 
@@ -1067,54 +1772,53 @@ t1, t2, t3, t4, t5, t6 = st.tabs(
 # LIVE
 # ============================================================
 
-with t1:
+with tabs[0]:
 
     st.subheader(
         "الخلاصة التنفيذية"
     )
 
+
     st.write(
         f"**Macro Regime:** {reg}"
     )
+
 
     st.write(
         f"**Pullback:** {pb}"
     )
 
+
     st.write(
-        f"**Early Warning:** {ew_score}/100 — {ew_level}"
+        f"**Early Warning:** "
+        f"{ew_score}/100 — {ew_level}"
     )
+
+
+    st.write(
+        f"**Technical:** "
+        f"{tech_score}/5 — {tech_level}"
+    )
+
 
     st.write(
         f"**Final Decision:** {dec}"
     )
 
-    st.write(
-        f"**Why:** "
-        f"Macro score={score:+d}, "
-        f"Drawdown={dd:.2f}%, "
-        f"VIX={meta['vix']:.2f}, "
-        f"HY spread={meta['credit']:.2f}"
-    )
 
     st.divider()
 
-    st.subheader(
-        "لماذا اتخذ النظام هذا القرار؟"
-    )
-
-    st.write(
-        final_decision["reason"]
-    )
-
-    st.divider()
 
     st.write(
         "**الفلسفة:**"
     )
 
+
     st.write(
-        "Drawdown + Macro Regime + Early Warning + Technical Structure = Trading Decision"
+
+        "Drawdown + Macro Regime + "
+        "Early Warning + Technical Structure "
+        "= Trading Decision"
     )
 
 
@@ -1122,82 +1826,107 @@ with t1:
 # EARLY WARNING
 # ============================================================
 
-with t2:
+with tabs[1]:
 
     st.subheader(
         "🚨 Early Warning Score"
     )
 
+
     c1, c2 = st.columns(2)
+
 
     c1.metric(
         "Score",
         f"{ew_score}/100"
     )
 
+
     c2.metric(
         "Risk Level",
         ew_level
     )
 
+
     st.progress(
-        min(
-            ew_score,
-            100
-        ) / 100
+        min(ew_score, 100) / 100
     )
 
-    st.divider()
 
     st.subheader(
         "Component Breakdown"
     )
 
+
     maximums = {
+
         "Credit": 20,
+
         "Labor": 20,
+
         "Yield Curve": 15,
+
         "Financial Conditions": 20,
+
         "Market Risk": 15,
-        "Macro Momentum": 10,
+
+        "Macro Momentum": 10
     }
+
 
     rows = []
 
-    for name, value in ew["details"].items():
+
+    for name, value in ew[
+        "details"
+    ].items():
 
         maximum = maximums[name]
 
+
         rows.append(
+
             [
+
                 name,
+
                 value,
+
                 maximum,
+
                 f"{value / maximum * 100:.0f}%"
             ]
         )
 
 
     st.dataframe(
+
         pd.DataFrame(
+
             rows,
+
             columns=[
+
                 "Component",
+
                 "Score",
+
                 "Maximum",
+
                 "Stress"
             ]
         ),
+
         use_container_width=True,
+
         hide_index=True
     )
 
 
-    st.divider()
-
     st.subheader(
         "Current Warning Indicators"
     )
+
 
     indicators = [
 
@@ -1254,7 +1983,7 @@ with t2:
         (
             "PCE",
             "PCE"
-        ),
+        )
     ]
 
 
@@ -1264,8 +1993,11 @@ with t2:
     for name, key_name in indicators:
 
         indicator_rows.append(
+
             [
+
                 name,
+
                 safe_value(
                     f.get(key_name)
                 )
@@ -1274,19 +2006,22 @@ with t2:
 
 
     st.dataframe(
+
         pd.DataFrame(
+
             indicator_rows,
+
             columns=[
                 "Indicator",
                 "Latest"
             ]
         ),
+
         use_container_width=True,
+
         hide_index=True
     )
 
-
-    st.divider()
 
     st.subheader(
         "Why is the warning score rising?"
@@ -1308,47 +2043,172 @@ with t2:
         )
 
 
-    st.divider()
+# ============================================================
+# TECHNICAL
+# ============================================================
+
+with tabs[2]:
 
     st.subheader(
-        "Interpretation"
+        "📈 Technical Confirmation"
+    )
+
+
+    c1, c2 = st.columns(2)
+
+
+    c1.metric(
+        "Technical Score",
+        f"{tech_score}/5"
+    )
+
+
+    c2.metric(
+        "Technical Status",
+        tech_level
+    )
+
+
+    st.progress(
+        tech_score / 5
+    )
+
+
+    st.info(
+
+        "Technical confirmation uses Daily OHLC data "
+        "as a confirmation filter. It is not an "
+        "automatic trade execution signal."
+    )
+
+
+    st.subheader(
+        "Technical Factors"
+    )
+
+
+    technical_rows = []
+
+
+    for factor, status in tech[
+        "details"
+    ].items():
+
+        technical_rows.append(
+
+            [
+                factor,
+                status
+            ]
+        )
+
+
+    st.dataframe(
+
+        pd.DataFrame(
+
+            technical_rows,
+
+            columns=[
+                "Factor",
+                "Status"
+            ]
+        ),
+
+        use_container_width=True,
+
+        hide_index=True
+    )
+
+
+    st.subheader(
+        "Technical Reasons"
+    )
+
+
+    for reason in tech[
+        "reasons"
+    ]:
+
+        if (
+
+            "FAIL" in reason.upper()
+
+            or
+
+            "below" in reason.lower()
+
+            or
+
+            "No " in reason
+        ):
+
+            st.warning(
+                f"⚠️ {reason}"
+            )
+
+        else:
+
+            st.success(
+                f"✅ {reason}"
+            )
+
+
+    st.divider()
+
+
+    st.subheader(
+        "Technical Scoring Model"
     )
 
 
     st.dataframe(
+
         pd.DataFrame(
+
             [
+
                 [
-                    "0–24",
-                    "LOW",
-                    "Normal monitoring."
+                    "Price > SMA200",
+                    "Long-term trend",
+                    1
                 ],
 
                 [
-                    "25–49",
-                    "MODERATE",
-                    "Early deterioration."
+                    "SMA50 > SMA200",
+                    "Medium-term trend",
+                    1
                 ],
 
                 [
-                    "50–74",
-                    "HIGH",
-                    "Multiple risk indicators align."
+                    "Higher Low",
+                    "Pullback structure",
+                    1
                 ],
 
                 [
-                    "75–100",
-                    "CRITICAL",
-                    "Potential systemic/regime stress."
+                    "Close > Previous High",
+                    "Daily confirmation",
+                    1
                 ],
+
+                [
+                    "ATR not extreme",
+                    "Volatility filter",
+                    1
+                ]
+
             ],
+
             columns=[
-                "Score",
-                "Level",
-                "Meaning"
+                "Factor",
+                "Purpose",
+                "Points"
             ]
         ),
+
         use_container_width=True,
+
         hide_index=True
     )
 
@@ -1357,62 +2217,119 @@ with t2:
 # MACRO
 # ============================================================
 
-with t3:
+with tabs[3]:
 
-    rows = []
+    st.subheader(
+        "Macro Dashboard"
+    )
 
 
-    for n, k in [
+    macro_rows = []
 
-        ("10Y", "US10Y"),
 
-        ("2Y", "US2Y"),
+    macro_indicators = [
 
-        ("10Y-2Y", "T10Y2Y"),
+        (
+            "10Y",
+            "US10Y"
+        ),
 
-        ("VIX", "VIX"),
+        (
+            "2Y",
+            "US2Y"
+        ),
 
-        ("DXY", "DXY"),
+        (
+            "10Y-2Y",
+            "T10Y2Y"
+        ),
 
-        ("PCE", "PCE"),
+        (
+            "VIX",
+            "VIX"
+        ),
 
-        ("Core PCE", "CORE_PCE"),
+        (
+            "DXY",
+            "DXY"
+        ),
 
-        ("Unemployment", "UNRATE"),
+        (
+            "PCE",
+            "PCE"
+        ),
 
-        ("Initial Claims 4W", "INITIAL_CLAIMS_4W"),
+        (
+            "Core PCE",
+            "CORE_PCE"
+        ),
 
-        ("HY Spread", "HY_SPREAD"),
+        (
+            "Unemployment",
+            "UNRATE"
+        ),
 
-        ("Corporate OAS", "CORP_OAS"),
+        (
+            "Initial Claims 4W",
+            "INITIAL_CLAIMS_4W"
+        ),
 
-        ("NFCI", "NFCI"),
+        (
+            "HY Spread",
+            "HY_SPREAD"
+        ),
 
-        ("Industrial Production", "INDPRO"),
+        (
+            "Corporate OAS",
+            "CORP_OAS"
+        ),
 
-        ("Retail Sales", "RETAIL"),
+        (
+            "NFCI",
+            "NFCI"
+        ),
 
-    ]:
+        (
+            "Industrial Production",
+            "INDPRO"
+        ),
 
-        rows.append(
+        (
+            "Retail Sales",
+            "RETAIL"
+        )
+    ]
+
+
+    for name, key_name in macro_indicators:
+
+        macro_rows.append(
+
             [
-                n,
+
+                name,
+
                 safe_value(
-                    f.get(k)
+                    f.get(key_name)
                 )
             ]
         )
 
 
     st.dataframe(
+
         pd.DataFrame(
-            rows,
+
+            macro_rows,
+
             columns=[
                 "Indicator",
                 "Latest"
             ]
         ),
+
         use_container_width=True,
+
         hide_index=True
     )
 
@@ -1421,32 +2338,40 @@ with t3:
 # TRADING
 # ============================================================
 
-with t4:
+with tabs[4]:
 
     st.subheader(
         "Trading Decision Support"
     )
+
 
     st.metric(
         "Final Decision",
         dec
     )
 
+
     st.write(
-        final_decision["reason"]
+        dec_reason
     )
 
 
     if ew_score >= 50:
 
         st.error(
-            "⚠️ Early Warning ≥ 50 — الحذر مرتفع."
+
+            "⚠️ Early Warning is elevated. "
+            "Do not treat a deep pullback as an "
+            "automatic buying opportunity."
         )
 
 
     entry = st.number_input(
+
         "Entry price",
+
         value=float(price),
+
         step=1.0
     )
 
@@ -1465,10 +2390,12 @@ with t4:
         f"{entry:.2f}"
     )
 
+
     c2.metric(
         "SL",
         f"{sl:.2f}"
     )
+
 
     c3.metric(
         "TP 1:4",
@@ -1482,7 +2409,9 @@ with t4:
 
 
     st.code(
-        "SL = Lowest Low of previous 5 completed Daily candles − 0.5 × ATR(14)\n"
+
+        "SL = Lowest Low of previous 5 completed "
+        "Daily candles − 0.5 × ATR(14)\n"
         "TP = Entry + 4R"
     )
 
@@ -1493,20 +2422,27 @@ with t4:
 
 
     st.dataframe(
-        pd.DataFrame(
-            {
-                "Pullback": [
-                    f"-{x}%"
-                    for x in PULLBACKS
-                ],
 
-                "Price": [
-                    ath * (1 - x / 100)
-                    for x in PULLBACKS
-                ],
+        pd.DataFrame(
+
+            {
+
+                "Pullback":
+                    [
+                        f"-{x}%"
+                        for x in PULLBACKS
+                    ],
+
+                "Price":
+                    [
+                        ath * (1 - x / 100)
+                        for x in PULLBACKS
+                    ]
             }
         ),
+
         use_container_width=True,
+
         hide_index=True
     )
 
@@ -1515,29 +2451,42 @@ with t4:
 # EVENTS
 # ============================================================
 
-with t5:
+with tabs[5]:
 
     st.subheader(
         "FOMC / Events"
     )
 
+
     st.write(
-        "Official Fed source fetched:",
+        "Official Fed source fetched:"
+    )
+
+
+    st.write(
         st.session_state.fomc.get(
             "source"
         )
     )
 
+
     st.write(
-        "Years detected:",
+        "Years detected:"
+    )
+
+
+    st.write(
         st.session_state.fomc.get(
             "years_found"
         )
     )
 
+
     st.warning(
-        "Actual / Forecast / Previous consensus is not fabricated. "
-        "It requires a reliable consensus provider."
+
+        "Actual / Forecast / Previous consensus "
+        "is not fabricated. It requires a reliable "
+        "consensus provider."
     )
 
 
@@ -1545,27 +2494,50 @@ with t5:
 # HISTORY
 # ============================================================
 
-with t6:
+with tabs[6]:
 
     st.subheader(
-        "Saved engine history"
+        "Saved Engine History"
     )
 
-    st.dataframe(
-        pd.DataFrame(
-            history(),
-            columns=[
-                "Time",
-                "Price",
-                "Drawdown",
-                "Score",
-                "Regime",
-                "Decision"
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True
-    )
+
+    hist = history()
+
+
+    if hist:
+
+        st.dataframe(
+
+            pd.DataFrame(
+
+                hist,
+
+                columns=[
+
+                    "Time",
+
+                    "Price",
+
+                    "Drawdown",
+
+                    "Score",
+
+                    "Regime",
+
+                    "Decision"
+                ]
+            ),
+
+            use_container_width=True,
+
+            hide_index=True
+        )
+
+    else:
+
+        st.info(
+            "No saved history yet."
+        )
 
 
     st.subheader(
@@ -1573,15 +2545,34 @@ with t6:
     )
 
 
-    st.dataframe(
-        pd.DataFrame(
-            alerts(),
-            columns=[
-                "Time",
-                "Type",
-                "Message"
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True
-    )
+    alert_data = alerts()
+
+
+    if alert_data:
+
+        st.dataframe(
+
+            pd.DataFrame(
+
+                alert_data,
+
+                columns=[
+
+                    "Time",
+
+                    "Type",
+
+                    "Message"
+                ]
+            ),
+
+            use_container_width=True,
+
+            hide_index=True
+        )
+
+    else:
+
+        st.info(
+            "No alerts yet."
+        )
