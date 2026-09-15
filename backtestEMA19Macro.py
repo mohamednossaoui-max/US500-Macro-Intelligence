@@ -128,26 +128,54 @@ def prepare_market(df):
 # ============================================================
 def detect_signals(df):
     """
-    Existing EMA19 pullback logic preserved:
-    - Close > EMA200
-    - EMA19 > EMA200
-    - Low <= EMA19
-    - Entry at signal-day close
-    - One signal at a time until the prior signal is resolved/invalidated
-    """
-    signals = []
-    last_signal_date = None
+    FINAL / BASELINE EMA19 SIGNAL ENGINE.
 
-    for i in range(max(EMA_TREND, ATR_PERIOD, STOP_LOOKBACK) + 1, len(df)):
+    Signal conditions:
+      1. Close > EMA200
+      2. EMA19 > EMA200
+      3. Low <= EMA19
+      4. Entry = signal-day Close
+      5. Stop = lowest Low of the previous 5 COMPLETED candles
+         minus 0.5 * ATR14 from the previous completed candle
+      6. RR = 1:4
+
+    IMPORTANT:
+      Only ONE signal/trade is allowed at a time.
+      After a signal is created, the engine advances to the candle
+      where that trade resolves (WIN / LOSS / AMBIGUOUS), or to the
+      end of the dataset if it remains OPEN.
+
+    This is intentional: it prevents multiple overlapping EMA19
+    signals from changing the original baseline.
+    """
+
+    signals = []
+
+    start_i = max(EMA_TREND, ATR_PERIOD, STOP_LOOKBACK) + 1
+    i = start_i
+
+    while i < len(df):
+
         row = df.iloc[i]
 
+        # ----------------------------------------------------
+        # Basic data validation
+        # ----------------------------------------------------
         if not np.isfinite(row["EMA19"]):
-            continue
-        if not np.isfinite(row["EMA200"]):
-            continue
-        if not np.isfinite(row["ATR14"]):
+            i += 1
             continue
 
+        if not np.isfinite(row["EMA200"]):
+            i += 1
+            continue
+
+        if not np.isfinite(row["ATR14"]):
+            i += 1
+            continue
+
+        # ----------------------------------------------------
+        # EMA19 pullback condition
+        # ----------------------------------------------------
         condition = (
             row["Close"] > row["EMA200"]
             and row["EMA19"] > row["EMA200"]
@@ -155,38 +183,50 @@ def detect_signals(df):
         )
 
         if not condition:
+            i += 1
             continue
 
-        if last_signal_date is not None:
-            # Avoid duplicate consecutive pullback signals.
-            if row["date"] <= last_signal_date:
-                continue
-
+        signal_date = row["date"]
         entry = float(row["Close"])
+
+        # ----------------------------------------------------
+        # Stop uses ONLY candles completed before signal candle
+        # ----------------------------------------------------
         previous_5 = df.iloc[i - STOP_LOOKBACK:i]
+
         prev_low = float(previous_5["Low"].min())
         previous_atr = float(df.iloc[i - 1]["ATR14"])
+
         stop = prev_low - ATR_MULTIPLIER * previous_atr
 
+        # ----------------------------------------------------
+        # Invalid stop
+        # ----------------------------------------------------
         if not np.isfinite(stop) or stop >= entry:
+
             signals.append(
                 {
-                    "signal_date": row["date"],
+                    "signal_date": signal_date,
                     "entry": entry,
                     "stop": stop,
                     "risk": entry - stop,
                     "valid_sl": False,
                 }
             )
-            last_signal_date = row["date"]
+
+            # Invalid setup is immediately released.
+            i += 1
             continue
 
+        # ----------------------------------------------------
+        # Valid trade
+        # ----------------------------------------------------
         risk = entry - stop
         target = entry + RR * risk
 
         signals.append(
             {
-                "signal_date": row["date"],
+                "signal_date": signal_date,
                 "entry": entry,
                 "stop": stop,
                 "risk": risk,
@@ -194,10 +234,37 @@ def detect_signals(df):
                 "valid_sl": True,
             }
         )
-        last_signal_date = row["date"]
+
+        # ----------------------------------------------------
+        # ONE TRADE AT A TIME
+        #
+        # Find the first future candle that resolves the trade.
+        # Same-day TP + SL = AMBIGUOUS.
+        # ----------------------------------------------------
+        exit_index = None
+
+        for j in range(i + 1, len(df)):
+
+            future_row = df.iloc[j]
+
+            hit_tp = future_row["High"] >= target
+            hit_sl = future_row["Low"] <= stop
+
+            if hit_tp or hit_sl:
+                exit_index = j
+                break
+
+        if exit_index is not None:
+            # Next eligible signal is AFTER the exit candle.
+            i = exit_index + 1
+        else:
+            # Trade remains open through the end of data.
+            break
 
     out = pd.DataFrame(signals)
+
     print(f"EMA19 Pullback signals: {len(out)}")
+
     return out
 
 
@@ -791,6 +858,9 @@ def grouped_summary(trades, group_col):
 # ============================================================
 def main():
     print("\nUS500 EMA19 + MACRO BACKTEST")
+    print("Signal engine: NON-OVERLAPPING / ONE TRADE AT A TIME")
+    print("Macro alignment: latest observation on/before each market day")
+    print("NOTE: This is NOT yet a release-date/vintage backtest.")
     print("=" * 60)
     print(f"Ticker: {MARKET_TICKER}")
     print(f"Start: {START_DATE}")
