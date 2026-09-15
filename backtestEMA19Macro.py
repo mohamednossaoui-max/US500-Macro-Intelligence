@@ -13,8 +13,8 @@ IMPORTANT:
 - Stop loss and TP are unchanged.
 - Macro is used for classification and comparison.
 - Macro data is aligned backward using observation dates.
-- FRED API key is optional.
-- If FRED API is unavailable, public FRED CSV is used.
+- FRED API key is used when available.
+- Public FRED CSV is used only as a fallback.
 - Derived macro growth/inflation rates are calculated from raw series.
 
 NOTE:
@@ -26,6 +26,7 @@ and publication timing are not fully reconstructed.
 from __future__ import annotations
 
 import io
+import os
 import warnings
 from typing import Optional
 
@@ -65,14 +66,6 @@ FRED_START_DATE = START_DATE
 # FRED PUBLIC SERIES
 # ============================================================
 
-# These are fetched directly from FRED's public CSV endpoint
-# when data.py cannot provide them.
-#
-# IMPORTANT:
-# PCE = nominal PCE level
-# PCEPI = headline PCE price index
-# PCEPILFE = core PCE price index
-
 FRED_PUBLIC_SERIES = {
     "US10Y": "DGS10",
     "US2Y": "DGS2",
@@ -90,6 +83,41 @@ FRED_PUBLIC_SERIES = {
     "CORE_PCE": "PCEPILFE",
     "FEDFUNDS": "FEDFUNDS",
 }
+
+
+# ============================================================
+# DATE NORMALIZATION
+# ============================================================
+
+def normalize_datetime_series(
+    values,
+) -> pd.Series:
+
+    """
+    Normalize all dates to timezone-naive datetime64[ns].
+
+    This prevents merge_asof errors such as:
+
+    dtype('<M8[s]')
+    vs
+    dtype('<M8[us]')
+    """
+
+    result = pd.to_datetime(
+        values,
+        errors="coerce",
+        utc=True,
+    )
+
+    # Convert timezone-aware UTC to timezone-naive.
+    try:
+        result = result.dt.tz_localize(None)
+    except AttributeError:
+        pass
+
+    return result.astype(
+        "datetime64[ns]"
+    )
 
 
 # ============================================================
@@ -136,8 +164,13 @@ def prepare_market_data(
     data = df.copy()
 
     data.index = pd.to_datetime(
-        data.index
+        data.index,
+        errors="coerce",
     )
+
+    data = data[
+        ~data.index.isna()
+    ]
 
     data = data.sort_index()
 
@@ -638,9 +671,8 @@ def _prepare_macro_frame(
             }
         )
 
-    frame["date"] = pd.to_datetime(
-        frame["date"],
-        errors="coerce",
+    frame["date"] = normalize_datetime_series(
+        frame["date"]
     )
 
     frame[name] = pd.to_numeric(
@@ -744,6 +776,128 @@ def _extract_macro_series(
 
 
 # ============================================================
+# FRED API KEY
+# ============================================================
+
+def get_fred_api_key() -> str:
+
+    return os.getenv(
+        "FRED_API_KEY",
+        "",
+    ).strip()
+
+
+# ============================================================
+# FRED API DIRECT FETCH
+# ============================================================
+
+def fetch_fred_api_series(
+    series_id: str,
+    start_date: str = START_DATE,
+) -> pd.DataFrame:
+
+    """
+    Direct FRED API fetch.
+
+    Used mainly for series that are not present in data.py,
+    such as PCEPI in the current configuration.
+    """
+
+    api_key = get_fred_api_key()
+
+    if not api_key:
+
+        return pd.DataFrame()
+
+    url = (
+        "https://api.stlouisfed.org/fred/series/observations"
+    )
+
+    params = {
+        "series_id": series_id,
+        "api_key": api_key,
+        "file_type": "json",
+        "observation_start": start_date,
+    }
+
+    try:
+
+        response = requests.get(
+            url,
+            params=params,
+            timeout=20,
+            headers={
+                "User-Agent":
+                    "US500-Macro-Backtest/1.0"
+            },
+        )
+
+        response.raise_for_status()
+
+        payload = response.json()
+
+        observations = payload.get(
+            "observations",
+            [],
+        )
+
+        if not observations:
+
+            return pd.DataFrame()
+
+        frame = pd.DataFrame(
+            observations
+        )
+
+        if (
+            "date" not in frame.columns
+            or "value" not in frame.columns
+        ):
+
+            return pd.DataFrame()
+
+        frame["date"] = normalize_datetime_series(
+            frame["date"]
+        )
+
+        frame["value"] = pd.to_numeric(
+            frame["value"],
+            errors="coerce",
+        )
+
+        frame = frame[
+            [
+                "date",
+                "value",
+            ]
+        ]
+
+        frame = frame.dropna(
+            subset=["date"]
+        )
+
+        frame = frame.sort_values(
+            "date"
+        )
+
+        frame = frame.drop_duplicates(
+            subset=["date"],
+            keep="last",
+        )
+
+        return frame
+
+    except Exception as exc:
+
+        print(
+            f"  FRED API fetch failed "
+            f"{series_id}: {exc}"
+        )
+
+        return pd.DataFrame()
+
+
+# ============================================================
 # PUBLIC FRED CSV FALLBACK
 # ============================================================
 
@@ -755,8 +909,7 @@ def fetch_fred_public_csv(
     """
     Download FRED data without an API key.
 
-    Endpoint:
-    fred.stlouisfed.org/graph/fredgraph.csv
+    This is only a fallback.
     """
 
     url = (
@@ -769,7 +922,7 @@ def fetch_fred_public_csv(
 
         response = requests.get(
             url,
-            timeout=30,
+            timeout=10,
             headers={
                 "User-Agent":
                     "US500-Macro-Backtest/1.0"
@@ -799,9 +952,8 @@ def fetch_fred_public_csv(
             }
         )
 
-        frame["date"] = pd.to_datetime(
-            frame["date"],
-            errors="coerce",
+        frame["date"] = normalize_datetime_series(
+            frame["date"]
         )
 
         frame["value"] = pd.to_numeric(
@@ -848,13 +1000,14 @@ def fetch_fred_public_csv(
 def load_macro_resilient() -> dict:
 
     """
-    First try the user's existing data.py loader.
+    Load macro data in three layers:
 
-    If a FRED series is unavailable, download it directly
-    from FRED's public CSV endpoint.
+    1. Existing data.py loader.
+    2. Direct FRED API using FRED_API_KEY.
+    3. Public FRED CSV fallback.
 
-    This means a FRED API key is NOT required for this
-    backtest.
+    This avoids losing an individual series simply because
+    it was not included in config.py.
     """
 
     existing_data = {}
@@ -881,7 +1034,7 @@ def load_macro_resilient() -> dict:
     result = {}
 
     # --------------------------------------------------------
-    # Standard series
+    # STANDARD SERIES
     # --------------------------------------------------------
 
     aliases = {
@@ -942,6 +1095,10 @@ def load_macro_resilient() -> dict:
             "PCE",
         ],
 
+        "PCEPI": [
+            "PCEPI",
+        ],
+
         "CORE_PCE": [
             "CORE_PCE",
             "PCEPILFE",
@@ -953,7 +1110,7 @@ def load_macro_resilient() -> dict:
     }
 
     # --------------------------------------------------------
-    # First use data.py
+    # FIRST: DATA.PY
     # --------------------------------------------------------
 
     for standard_name, names in aliases.items():
@@ -972,17 +1129,55 @@ def load_macro_resilient() -> dict:
                 }
             )
 
-            result[standard_name] = frame
+            result[
+                standard_name
+            ] = frame
 
     # --------------------------------------------------------
-    # FRED fallback
+    # SECOND: DIRECT FRED API
     # --------------------------------------------------------
 
     for standard_name, series_id in (
         FRED_PUBLIC_SERIES.items()
     ):
 
-        # Already available.
+        if standard_name in result:
+
+            continue
+
+        if get_fred_api_key():
+
+            print(
+                f"  Fetching FRED API: "
+                f"{standard_name} ({series_id})"
+            )
+
+            frame = fetch_fred_api_series(
+                series_id=series_id,
+                start_date=FRED_START_DATE,
+            )
+
+            if not frame.empty:
+
+                frame = frame.rename(
+                    columns={
+                        "value":
+                            standard_name
+                    }
+                )
+
+                result[
+                    standard_name
+                ] = frame
+
+    # --------------------------------------------------------
+    # THIRD: PUBLIC CSV
+    # --------------------------------------------------------
+
+    for standard_name, series_id in (
+        FRED_PUBLIC_SERIES.items()
+    ):
+
         if standard_name in result:
 
             continue
@@ -1008,7 +1203,9 @@ def load_macro_resilient() -> dict:
             }
         )
 
-        result[standard_name] = frame
+        result[
+            standard_name
+        ] = frame
 
     return result
 
@@ -1054,12 +1251,7 @@ def add_derived_series(
                 "date",
                 "INDPRO_YOY",
             ]
-        ].rename(
-            columns={
-                "INDPRO_YOY":
-                    "INDPRO_YOY"
-            }
-        )
+        ]
 
     # --------------------------------------------------------
     # RETAIL SALES YOY
@@ -1177,9 +1369,8 @@ def merge_macro_frames(
 
         temp = frame.copy()
 
-        temp["date"] = pd.to_datetime(
-            temp["date"],
-            errors="coerce",
+        temp["date"] = normalize_datetime_series(
+            temp["date"]
         )
 
         temp = temp.dropna(
@@ -1193,15 +1384,20 @@ def merge_macro_frames(
             "date"
         )
 
+        temp = temp.drop_duplicates(
+            subset=["date"],
+            keep="last",
+        )
+
         if merged is None:
 
             merged = temp
 
         else:
 
-            # Avoid accidental duplicate columns.
             duplicate_columns = [
-                c for c in temp.columns
+                c
+                for c in temp.columns
                 if c != "date"
                 and c in merged.columns
             ]
@@ -1222,9 +1418,21 @@ def merge_macro_frames(
                     how="outer",
                 )
 
+                merged["date"] = (
+                    normalize_datetime_series(
+                        merged["date"]
+                    )
+                )
+
     if merged is None:
 
         return pd.DataFrame()
+
+    merged["date"] = (
+        normalize_datetime_series(
+            merged["date"]
+        )
+    )
 
     merged = merged.sort_values(
         "date"
@@ -1654,14 +1862,18 @@ def prepare_macro_data(
         )
     )
 
-    market_reset["date"] = pd.to_datetime(
-        market_reset["date"],
-        errors="coerce",
+    # IMPORTANT:
+    # Force exact same datetime dtype on both sides.
+    market_reset["date"] = (
+        normalize_datetime_series(
+            market_reset["date"]
+        )
     )
 
-    macro["date"] = pd.to_datetime(
-        macro["date"],
-        errors="coerce",
+    macro["date"] = (
+        normalize_datetime_series(
+            macro["date"]
+        )
     )
 
     market_reset = (
@@ -1678,6 +1890,34 @@ def prepare_macro_data(
             subset=["date"]
         )
         .sort_values("date")
+    )
+
+    # Remove duplicates before merge_asof.
+    market_reset = (
+        market_reset
+        .drop_duplicates(
+            subset=["date"],
+            keep="last",
+        )
+    )
+
+    macro = (
+        macro
+        .drop_duplicates(
+            subset=["date"],
+            keep="last",
+        )
+    )
+
+    # Final dtype verification.
+    market_reset["date"] = (
+        market_reset["date"]
+        .astype("datetime64[ns]")
+    )
+
+    macro["date"] = (
+        macro["date"]
+        .astype("datetime64[ns]")
     )
 
     # --------------------------------------------------------
@@ -1732,8 +1972,10 @@ def attach_macro_to_trades(
 
     result = trades.copy()
 
-    result["signal_date"] = pd.to_datetime(
-        result["signal_date"]
+    result["signal_date"] = (
+        normalize_datetime_series(
+            result["signal_date"]
+        )
     )
 
     macro_columns = [
@@ -1771,7 +2013,8 @@ def attach_macro_to_trades(
     ]
 
     available = [
-        c for c in macro_columns
+        c
+        for c in macro_columns
         if c in macro_market.columns
     ]
 
@@ -1801,20 +2044,69 @@ def attach_macro_to_trades(
     )
 
     macro_for_merge["signal_date"] = (
-        pd.to_datetime(
+        normalize_datetime_series(
             macro_for_merge[
                 "signal_date"
             ]
         )
     )
 
+    result["signal_date"] = (
+        normalize_datetime_series(
+            result["signal_date"]
+        )
+    )
+
+    result = result.dropna(
+        subset=["signal_date"]
+    )
+
+    macro_for_merge = (
+        macro_for_merge
+        .dropna(
+            subset=["signal_date"]
+        )
+    )
+
+    result = result.sort_values(
+        "signal_date"
+    )
+
+    macro_for_merge = (
+        macro_for_merge
+        .sort_values(
+            "signal_date"
+        )
+    )
+
+    # Remove duplicate dates.
+    result = result.drop_duplicates(
+        subset=["signal_date"],
+        keep="last",
+    )
+
+    macro_for_merge = (
+        macro_for_merge
+        .drop_duplicates(
+            subset=["signal_date"],
+            keep="last",
+        )
+    )
+
+    # Force identical datetime precision.
+    result["signal_date"] = (
+        result["signal_date"]
+        .astype("datetime64[ns]")
+    )
+
+    macro_for_merge["signal_date"] = (
+        macro_for_merge["signal_date"]
+        .astype("datetime64[ns]")
+    )
+
     result = pd.merge_asof(
-        result.sort_values(
-            "signal_date"
-        ),
-        macro_for_merge.sort_values(
-            "signal_date"
-        ),
+        result,
+        macro_for_merge,
         on="signal_date",
         direction="backward",
     )
