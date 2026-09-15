@@ -495,6 +495,11 @@ def load_bls_data():
 def load_all_macro_data(
     start_date=None,
 ):
+    """
+    Load all macroeconomic data.
+
+    start_date can be supplied for historical studies.
+    """
 
     fred = load_fred_data(
         start_date=start_date
@@ -576,3 +581,208 @@ def data_status(
     return pd.DataFrame(
         status
     )
+
+
+# ============================================================
+# HISTORICAL DATA TEST
+# ============================================================
+
+if __name__ == "__main__":
+
+    print()
+    print("HISTORICAL MARKET DATA TEST")
+    print("===========================")
+
+    market = get_historical_market_data(
+        start_date="2019-01-01"
+    )
+
+    # --------------------------------------------------------
+    # Basic availability
+    # --------------------------------------------------------
+
+    if market.empty:
+
+        print(
+            "ERROR: Historical market data unavailable."
+        )
+
+    else:
+
+        print(
+            "Rows:",
+            len(market)
+        )
+
+        print(
+            "Start:",
+            market.index.min().date()
+        )
+
+        print(
+            "End:",
+            market.index.max().date()
+        )
+
+        print(
+            "Columns:",
+            list(market.columns)
+        )
+
+        # ----------------------------------------------------
+        # Required columns
+        # ----------------------------------------------------
+
+        required = [
+            "open",
+            "high",
+            "low",
+            "close",
+        ]
+
+        missing = [
+            col
+            for col in required
+            if col not in market.columns
+        ]
+
+        if missing:
+
+            print(
+                "Missing columns:",
+                missing
+            )
+
+        else:
+
+            print(
+                "Required OHLC columns: OK"
+            )
+
+        # ----------------------------------------------------
+        # COVID 2020 test
+        # ----------------------------------------------------
+
+        covid = market.loc[
+            "2020-02-01":"2020-04-30"
+        ]
+
+        print()
+        print(
+            "COVID 2020 TEST"
+        )
+        print(
+            "---------------"
+        )
+
+        print(
+            "COVID rows:",
+            len(covid)
+        )
+
+        if not covid.empty:
+
+            print(
+                "COVID period:",
+                covid.index.min().date(),
+                "->",
+                covid.index.max().date()
+            )
+
+            print(
+                "COVID lowest close:",
+                round(
+                    float(
+                        covid["close"].min()
+                    ),
+                    2
+                )
+            )
+
+            print(
+                "COVID highest close:",
+                round(
+                    float(
+                        covid["close"].max()
+                    ),
+                    2
+                )
+
+        else:
+
+            print(
+                "ERROR: COVID 2020 data not found."
+            )
+
+        # ----------------------------------------------------
+        # Historical event periods
+        # ----------------------------------------------------
+
+        periods = {
+
+            "2020 COVID":
+                ("2020-02-01", "2020-04-30"),
+
+            "2022 Rate Shock":
+                ("2022-01-01", "2022-12-31"),
+
+            "2023 Banking Stress":
+                ("2023-02-01", "2023-05-31"),
+
+            "2024 Growth Scare":
+                ("2024-07-01", "2024-09-30"),
+
+            "2025 Tariff Period":
+                ("2025-02-01", "2025-05-31"),
+        }
+
+        print()
+        print(
+            "HISTORICAL EVENT DATA CHECK"
+        )
+        print(
+            "---------------------------"
+        )
+
+        for name, (
+            start,
+            end,
+        ) in periods.items():
+
+            period_data = market.loc[
+                start:end
+            ]
+
+            print(
+                f"{name}:",
+                len(period_data),
+                "rows"
+            )
+
+        # ----------------------------------------------------
+        # Last rows
+        # ----------------------------------------------------
+
+        print()
+        print(
+            "LAST 5 ROWS"
+        )
+        print(
+            "-----------"
+        )
+
+        print(
+            market[
+                [
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                ]
+            ].tail()
+        )
+
+        print()
+        print(
+            "HISTORICAL MARKET DATA TEST COMPLETE"
+        )
