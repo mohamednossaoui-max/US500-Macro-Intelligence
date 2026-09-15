@@ -1,0 +1,26 @@
+name: Backtest EMA19
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backtest-ema19:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy requests yfinance streamlit
+
+      - name: Run EMA19 Backtest
+        run: |
+          python backtestEMA19.py
