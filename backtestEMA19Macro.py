@@ -1,14 +1,15 @@
 # ============================================================
 # US500 / S&P 500
-# EMA19 Signal Engine Diagnostic
+# EMA19 SIGNAL ENGINE DIAGNOSTIC V2
 #
 # الهدف:
-# تحديد أي منطق لتوليد الإشارات يطابق الـ baseline التاريخي
-# المعروف لدينا:
+# إعادة بناء الـ historical baseline القديم:
 #
-# Total signals = 119
+# TOTAL SIGNALS = 119
+# VALID SETUPS  = 117
+# INVALID SL    = 2
 #
-# Yearly reference:
+# VALID SETUPS BY YEAR:
 # 2019 = 1
 # 2020 = 16
 # 2021 = 26
@@ -18,9 +19,9 @@
 # 2025 = 19
 # 2026 = 18
 #
-# IMPORTANT:
-# هذا الملف يشخّص Signal Engine فقط.
-# لا نستخدم Macro ولا Early Warning ولا Fed Intelligence.
+# V2 لا يغير شروط الـ EMA19 الأساسية.
+# الذي يتم اختباره هو Signal Spacing / Duplicate Handling.
+#
 # ============================================================
 
 import warnings
@@ -40,9 +41,10 @@ TICKER = "^GSPC"
 START_DATE = "2019-01-01"
 
 EMA_FAST = 19
-EMA_SLOW = 200
+EMA_TREND = 200
 
 ATR_PERIOD = 14
+
 STOP_LOOKBACK = 5
 ATR_MULTIPLIER = 0.5
 
@@ -50,12 +52,16 @@ RR = 4.0
 
 
 # ============================================================
-# KNOWN REFERENCE
+# HISTORICAL REFERENCE
 # ============================================================
 
-REFERENCE_TOTAL = 119
+REFERENCE_TOTAL_SIGNALS = 119
 
-REFERENCE_YEARLY = {
+REFERENCE_VALID = 117
+
+REFERENCE_INVALID = 2
+
+REFERENCE_YEARLY_VALID = {
     2019: 1,
     2020: 16,
     2021: 26,
@@ -68,71 +74,179 @@ REFERENCE_YEARLY = {
 
 
 # ============================================================
-# DOWNLOAD MARKET DATA
+# DOWNLOAD
 # ============================================================
 
-def get_market_data():
+def download_market():
 
-    print("=" * 70)
+    print("=" * 72)
     print("DOWNLOADING MARKET DATA")
-    print("=" * 70)
+    print("=" * 72)
 
     df = yf.download(
         TICKER,
         start=START_DATE,
+        interval="1d",
         auto_adjust=False,
-        progress=False
+        progress=False,
     )
 
-    if df.empty:
-        raise RuntimeError("No market data downloaded.")
+    if df is None or df.empty:
+        raise RuntimeError(
+            "No market data returned."
+        )
 
-    # yfinance may return MultiIndex columns
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
+    # Handle yfinance MultiIndex
+    if isinstance(
+        df.columns,
+        pd.MultiIndex
+    ):
+        df.columns = (
+            df.columns
+            .get_level_values(0)
+        )
 
-    required = ["Open", "High", "Low", "Close"]
+    required = [
+        "Open",
+        "High",
+        "Low",
+        "Close",
+    ]
 
-    missing = [c for c in required if c not in df.columns]
+    missing = [
+        c for c in required
+        if c not in df.columns
+    ]
 
     if missing:
         raise RuntimeError(
             f"Missing columns: {missing}"
         )
 
-    df = df[required].copy()
+    df = df[
+        required
+    ].copy()
 
-    df.index = pd.to_datetime(df.index)
+    df.index = pd.to_datetime(
+        df.index,
+        errors="coerce"
+    )
 
-    # Remove timezone if present
+    df = df[
+        ~df.index.isna()
+    ]
+
     try:
-        df.index = df.index.tz_localize(None)
+        df.index = (
+            df.index
+            .tz_localize(None)
+        )
     except Exception:
         pass
 
     df = df.sort_index()
 
-    df = df.dropna()
+    df = df[
+        ~df.index.duplicated(
+            keep="last"
+        )
+    ]
 
-    print(f"Ticker       : {TICKER}")
-    print(f"Start        : {df.index.min().date()}")
-    print(f"End          : {df.index.max().date()}")
-    print(f"Rows         : {len(df)}")
+    df = df.reset_index()
+
+    df = df.rename(
+        columns={
+            "Date": "date"
+        }
+    )
+
+    for col in required:
+
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+    df = df.dropna(
+        subset=required
+    ).reset_index(
+        drop=True
+    )
+
+    print(
+        f"Market data : "
+        f"{df['date'].min().date()} "
+        f"-> "
+        f"{df['date'].max().date()}"
+    )
+
+    print(
+        f"Rows        : {len(df)}"
+    )
 
     return df
+
+
+# ============================================================
+# ATR
+# ============================================================
+
+def calculate_atr(
+    df,
+    period=14
+):
+
+    previous_close = (
+        df["Close"].shift(1)
+    )
+
+    tr1 = (
+        df["High"]
+        -
+        df["Low"]
+    )
+
+    tr2 = (
+        df["High"]
+        -
+        previous_close
+    ).abs()
+
+    tr3 = (
+        df["Low"]
+        -
+        previous_close
+    ).abs()
+
+    true_range = pd.concat(
+        [
+            tr1,
+            tr2,
+            tr3
+        ],
+        axis=1
+    ).max(axis=1)
+
+    atr = (
+        true_range
+        .ewm(
+            alpha=1 / period,
+            adjust=False,
+            min_periods=period
+        )
+        .mean()
+    )
+
+    return atr
 
 
 # ============================================================
 # INDICATORS
 # ============================================================
 
-def add_indicators(df):
+def prepare_market(df):
 
     df = df.copy()
-
-    # --------------------------------------------------------
-    # EMA 19
-    # --------------------------------------------------------
 
     df["EMA19"] = (
         df["Close"]
@@ -143,441 +257,624 @@ def add_indicators(df):
         .mean()
     )
 
-    # --------------------------------------------------------
-    # EMA 200
-    # --------------------------------------------------------
-
     df["EMA200"] = (
         df["Close"]
         .ewm(
-            span=EMA_SLOW,
+            span=EMA_TREND,
             adjust=False
         )
         .mean()
     )
 
-    # --------------------------------------------------------
-    # TRUE RANGE
-    # --------------------------------------------------------
-
-    previous_close = df["Close"].shift(1)
-
-    tr1 = df["High"] - df["Low"]
-
-    tr2 = (
-        df["High"] - previous_close
-    ).abs()
-
-    tr3 = (
-        df["Low"] - previous_close
-    ).abs()
-
-    df["TR"] = pd.concat(
-        [tr1, tr2, tr3],
-        axis=1
-    ).max(axis=1)
-
-    # --------------------------------------------------------
-    # ATR - Wilder
-    # --------------------------------------------------------
-
-    df["ATR14_WILDER"] = (
-        df["TR"]
-        .ewm(
-            alpha=1 / ATR_PERIOD,
-            adjust=False
-        )
-        .mean()
-    )
-
-    # --------------------------------------------------------
-    # ATR - SMA
-    # --------------------------------------------------------
-
-    df["ATR14_SMA"] = (
-        df["TR"]
-        .rolling(ATR_PERIOD)
-        .mean()
-    )
-
-    # --------------------------------------------------------
-    # ATR - pandas span
-    # --------------------------------------------------------
-
-    df["ATR14_SPAN"] = (
-        df["TR"]
-        .ewm(
-            span=ATR_PERIOD,
-            adjust=False
-        )
-        .mean()
-    )
-
-    # --------------------------------------------------------
-    # ATR - Wilder adjust=True
-    # --------------------------------------------------------
-
-    df["ATR14_WILDER_ADJUST"] = (
-        df["TR"]
-        .ewm(
-            alpha=1 / ATR_PERIOD,
-            adjust=True
-        )
-        .mean()
+    df["ATR14"] = calculate_atr(
+        df,
+        ATR_PERIOD
     )
 
     return df
 
 
 # ============================================================
-# BASE TECHNICAL CONDITION
+# BASELINE CONDITION
 # ============================================================
 
-def base_condition(df):
+def baseline_condition(
+    row
+):
 
     return (
-        (df["Close"] > df["EMA200"])
-        &
-        (df["EMA19"] > df["EMA200"])
-        &
-        (df["Low"] <= df["EMA19"])
+        row["Close"] > row["EMA200"]
+        and
+        row["EMA19"] > row["EMA200"]
+        and
+        row["Low"] <= row["EMA19"]
     )
 
 
 # ============================================================
-# SIGNAL ENGINE CANDIDATES
-# ============================================================
-
-def generate_signals_all(df):
-    """
-    Candidate A
-
-    Every candle satisfying the original conditions
-    becomes a signal.
-
-    Overlapping signals allowed.
-    """
-
-    condition = base_condition(df)
-
-    return df.index[condition].tolist()
-
-
-def generate_signals_first_after_nonqualifying(df):
-    """
-    Candidate B
-
-    Signal only when current candle qualifies AND
-    previous candle did NOT qualify.
-
-    This creates one signal at the beginning of
-    each consecutive qualifying sequence.
-    """
-
-    condition = base_condition(df)
-
-    previous = condition.shift(1).fillna(False)
-
-    signal = (
-        condition
-        &
-        ~previous
-    )
-
-    return df.index[signal].tolist()
-
-
-def generate_signals_last_in_run(df):
-    """
-    Candidate C
-
-    Signal only on the LAST qualifying candle
-    in a consecutive qualifying sequence.
-    """
-
-    condition = base_condition(df)
-
-    next_day = condition.shift(-1).fillna(False)
-
-    signal = (
-        condition
-        &
-        ~next_day
-    )
-
-    return df.index[signal].tolist()
-
-
-def generate_signals_prev_close_above_ema19(df):
-    """
-    Candidate D
-
-    Current candle must touch EMA19,
-    while previous candle closed above EMA19.
-
-    This attempts to capture a NEW pullback.
-    """
-
-    condition = (
-        (df["Close"] > df["EMA200"])
-        &
-        (df["EMA19"] > df["EMA200"])
-        &
-        (df["Low"] <= df["EMA19"])
-        &
-        (df["Close"].shift(1) > df["EMA19"].shift(1))
-    )
-
-    return df.index[condition].tolist()
-
-
-def generate_signals_prev_close_above_ema19_or_first(df):
-    """
-    Candidate E
-
-    New pullback condition.
-
-    Signal when:
-      - current candle touches EMA19
-      - trend conditions valid
-      - previous candle was above EMA19
-
-    This is essentially a stricter pullback reset.
-    """
-
-    condition = base_condition(df)
-
-    reset = (
-        df["Close"].shift(1)
-        >
-        df["EMA19"].shift(1)
-    )
-
-    signal = (
-        condition
-        &
-        reset
-    )
-
-    return df.index[signal].tolist()
-
-
-def generate_signals_cooldown(df, cooldown_days):
-    """
-    Candidate F
-
-    Every qualifying candle can generate a signal,
-    except signals within N calendar/trading rows
-    after a previous signal.
-    """
-
-    condition = base_condition(df)
-
-    candidate_dates = df.index[condition].tolist()
-
-    selected = []
-
-    last_position = None
-
-    for date in candidate_dates:
-
-        current_position = df.index.get_loc(date)
-
-        if last_position is None:
-
-            selected.append(date)
-
-            last_position = current_position
-
-        else:
-
-            distance = (
-                current_position
-                -
-                last_position
-            )
-
-            if distance > cooldown_days:
-
-                selected.append(date)
-
-                last_position = current_position
-
-    return selected
-
-
-def generate_signals_one_trade_at_time(df):
-    """
-    Candidate G
-
-    Only one trade can be active at a time.
-
-    IMPORTANT:
-    This is the current reconstructed engine that produced
-    approximately 75 signals and therefore is unlikely to be
-    the old 119-signal baseline.
-    """
-
-    condition = base_condition(df)
-
-    candidate_dates = df.index[condition].tolist()
-
-    selected = []
-
-    active_until_position = -1
-
-    for date in candidate_dates:
-
-        position = df.index.get_loc(date)
-
-        if position <= active_until_position:
-            continue
-
-        selected.append(date)
-
-        # We need to determine when this trade resolves.
-        # For the diagnostic, we use the same stop/TP logic.
-        stop = calculate_stop(
-            df,
-            position,
-            atr_column="ATR14_WILDER"
-        )
-
-        if stop is None:
-            active_until_position = position
-            continue
-
-        entry = float(df.iloc[position]["Close"])
-
-        risk = entry - stop
-
-        if risk <= 0:
-            active_until_position = position
-            continue
-
-        target = entry + RR * risk
-
-        resolution = find_trade_resolution(
-            df,
-            position,
-            stop,
-            target
-        )
-
-        if resolution is None:
-            active_until_position = len(df) - 1
-        else:
-            active_until_position = resolution
-
-    return selected
-
-
-# ============================================================
-# STOP CALCULATION
+# STOP
 # ============================================================
 
 def calculate_stop(
     df,
-    signal_position,
-    atr_column="ATR14_WILDER"
+    index
 ):
-    """
-    Original intended stop:
 
-    Lowest Low of previous 5 COMPLETED candles
-    minus 0.5 × ATR(14)
+    if index < STOP_LOOKBACK:
 
-    The trigger candle itself is excluded.
-    """
+        return np.nan
 
-    if signal_position < STOP_LOOKBACK:
-        return None
+    previous = df.iloc[
+        index - STOP_LOOKBACK:index
+    ]
 
-    previous_lows = (
-        df["Low"]
-        .iloc[
-            signal_position - STOP_LOOKBACK:
-            signal_position
-        ]
+    previous_low = float(
+        previous["Low"].min()
     )
 
-    lowest_low = previous_lows.min()
+    previous_atr = float(
+        df.iloc[index - 1]["ATR14"]
+    )
 
-    atr = df.iloc[
-        signal_position - 1
-    ][atr_column]
+    if not np.isfinite(
+        previous_atr
+    ):
 
-    if pd.isna(atr):
-        return None
+        return np.nan
 
     stop = (
-        lowest_low
+        previous_low
         -
-        ATR_MULTIPLIER * atr
+        ATR_MULTIPLIER
+        *
+        previous_atr
     )
 
-    return float(stop)
+    return stop
+
+
+# ============================================================
+# BUILD ALL RAW QUALIFYING SIGNALS
+# ============================================================
+
+def build_raw_candidates(
+    df
+):
+
+    candidates = []
+
+    start_index = (
+        max(
+            EMA_TREND,
+            ATR_PERIOD,
+            STOP_LOOKBACK
+        )
+        +
+        1
+    )
+
+    for i in range(
+        start_index,
+        len(df)
+    ):
+
+        row = df.iloc[i]
+
+        if not np.isfinite(
+            row["EMA19"]
+        ):
+            continue
+
+        if not np.isfinite(
+            row["EMA200"]
+        ):
+            continue
+
+        if not np.isfinite(
+            row["ATR14"]
+        ):
+            continue
+
+        if not baseline_condition(
+            row
+        ):
+            continue
+
+        stop = calculate_stop(
+            df,
+            i
+        )
+
+        entry = float(
+            row["Close"]
+        )
+
+        valid_sl = (
+            np.isfinite(stop)
+            and
+            stop < entry
+        )
+
+        if valid_sl:
+
+            risk = (
+                entry
+                -
+                stop
+            )
+
+            target = (
+                entry
+                +
+                RR * risk
+            )
+
+        else:
+
+            risk = np.nan
+            target = np.nan
+
+        candidates.append({
+
+            "index": i,
+
+            "date": row["date"],
+
+            "entry": entry,
+
+            "stop": stop,
+
+            "risk": risk,
+
+            "target": target,
+
+            "valid_sl": valid_sl,
+
+        })
+
+    return candidates
+
+
+# ============================================================
+# SIGNAL SPACING
+# ============================================================
+
+def apply_row_spacing(
+    candidates,
+    minimum_gap
+):
+    """
+    Keep a signal only if it is at least
+    minimum_gap trading rows after the
+    previously selected signal.
+
+    Examples:
+
+    gap = 0
+        every candidate
+
+    gap = 1
+        do not allow adjacent signal candles
+
+    gap = 5
+        selected signals must be >5
+        trading rows apart
+    """
+
+    if not candidates:
+        return []
+
+    selected = []
+
+    last_index = None
+
+    for candidate in candidates:
+
+        current = candidate[
+            "index"
+        ]
+
+        if last_index is None:
+
+            selected.append(
+                candidate
+            )
+
+            last_index = current
+
+            continue
+
+        distance = (
+            current
+            -
+            last_index
+        )
+
+        if distance > minimum_gap:
+
+            selected.append(
+                candidate
+            )
+
+            last_index = current
+
+    return selected
+
+
+# ============================================================
+# SIGNAL SPACING USING CALENDAR DAYS
+# ============================================================
+
+def apply_calendar_spacing(
+    candidates,
+    minimum_days
+):
+
+    if not candidates:
+        return []
+
+    selected = []
+
+    last_date = None
+
+    for candidate in candidates:
+
+        current_date = (
+            candidate["date"]
+        )
+
+        if last_date is None:
+
+            selected.append(
+                candidate
+            )
+
+            last_date = current_date
+
+            continue
+
+        days = (
+            current_date
+            -
+            last_date
+        ).days
+
+        if days > minimum_days:
+
+            selected.append(
+                candidate
+            )
+
+            last_date = current_date
+
+    return selected
+
+
+# ============================================================
+# FIRST SIGNAL AFTER RESET
+# ============================================================
+
+def apply_reset_logic(
+    df,
+    candidates,
+    reset_days
+):
+    """
+    A candidate becomes eligible only if
+    price has spent at least reset_days
+    trading candles WITHOUT touching EMA19.
+
+    This is not assumed to be the original.
+    It is tested as a diagnostic hypothesis.
+    """
+
+    selected = []
+
+    last_touch_index = None
+
+    candidate_map = {
+        c["index"]: c
+        for c in candidates
+    }
+
+    for i in range(
+        len(df)
+    ):
+
+        row = df.iloc[i]
+
+        touch = (
+            np.isfinite(
+                row["EMA19"]
+            )
+            and
+            row["Low"]
+            <=
+            row["EMA19"]
+        )
+
+        if touch:
+
+            last_touch_index = i
+
+        if i not in candidate_map:
+
+            continue
+
+        if last_touch_index is None:
+
+            selected.append(
+                candidate_map[i]
+            )
+
+            continue
+
+        distance = (
+            i
+            -
+            last_touch_index
+        )
+
+        if distance >= reset_days:
+
+            selected.append(
+                candidate_map[i]
+            )
+
+    return selected
+
+
+# ============================================================
+# PREVIOUS CLOSE ABOVE EMA19
+# ============================================================
+
+def apply_previous_close_filter(
+    df,
+    candidates
+):
+
+    selected = []
+
+    for candidate in candidates:
+
+        i = candidate["index"]
+
+        if i < 1:
+            continue
+
+        previous = df.iloc[
+            i - 1
+        ]
+
+        if (
+            previous["Close"]
+            >
+            previous["EMA19"]
+        ):
+
+            selected.append(
+                candidate
+            )
+
+    return selected
 
 
 # ============================================================
 # TRADE RESOLUTION
 # ============================================================
 
-def find_trade_resolution(
+def resolve_trade(
     df,
-    entry_position,
-    stop,
-    target
+    candidate
 ):
-    """
-    Evaluates candles AFTER the entry candle.
 
-    Same-day TP/SL is not evaluated because entry happens
-    at the close of the signal candle.
+    if not candidate[
+        "valid_sl"
+    ]:
 
-    If both TP and SL are touched on the same future candle,
-    the result is AMBIGUOUS.
-    """
+        return "INVALID_SL"
 
-    for i in range(
-        entry_position + 1,
+    entry_index = candidate[
+        "index"
+    ]
+
+    stop = candidate[
+        "stop"
+    ]
+
+    target = candidate[
+        "target"
+    ]
+
+    for j in range(
+        entry_index + 1,
         len(df)
     ):
 
-        high = float(df.iloc[i]["High"])
-        low = float(df.iloc[i]["Low"])
+        future = df.iloc[j]
 
-        hit_stop = low <= stop
-        hit_target = high >= target
+        hit_tp = (
+            future["High"]
+            >= target
+        )
 
-        if hit_stop and hit_target:
-            return i
+        hit_sl = (
+            future["Low"]
+            <= stop
+        )
 
-        if hit_stop:
-            return i
+        if hit_tp and hit_sl:
 
-        if hit_target:
-            return i
+            return "AMBIGUOUS"
 
-    return None
+        if hit_tp:
+
+            return "WIN"
+
+        if hit_sl:
+
+            return "LOSS"
+
+    return "OPEN"
 
 
 # ============================================================
-# YEARLY COUNTS
+# EVALUATE SIGNAL SET
 # ============================================================
 
-def yearly_counts(signal_dates):
+def evaluate_engine(
+    df,
+    candidates
+):
 
-    if not signal_dates:
+    records = []
+
+    for candidate in candidates:
+
+        result = resolve_trade(
+            df,
+            candidate
+        )
+
+        record = candidate.copy()
+
+        record[
+            "result"
+        ] = result
+
+        records.append(
+            record
+        )
+
+    return pd.DataFrame(
+        records
+    )
+
+
+# ============================================================
+# STATISTICS
+# ============================================================
+
+def calculate_statistics(
+    trades
+):
+
+    if trades.empty:
+
+        return {
+
+            "total_signals": 0,
+
+            "valid_setups": 0,
+
+            "invalid_sl": 0,
+
+            "wins": 0,
+
+            "losses": 0,
+
+            "ambiguous": 0,
+
+            "open": 0,
+
+        }
+
+    total = len(trades)
+
+    valid = int(
+        (
+            trades["valid_sl"]
+            == True
+        ).sum()
+    )
+
+    invalid = int(
+        (
+            trades["result"]
+            ==
+            "INVALID_SL"
+        ).sum()
+    )
+
+    wins = int(
+        (
+            trades["result"]
+            ==
+            "WIN"
+        ).sum()
+    )
+
+    losses = int(
+        (
+            trades["result"]
+            ==
+            "LOSS"
+        ).sum()
+    )
+
+    ambiguous = int(
+        (
+            trades["result"]
+            ==
+            "AMBIGUOUS"
+        ).sum()
+    )
+
+    open_trades = int(
+        (
+            trades["result"]
+            ==
+            "OPEN"
+        ).sum()
+    )
+
+    return {
+
+        "total_signals": total,
+
+        "valid_setups": valid,
+
+        "invalid_sl": invalid,
+
+        "wins": wins,
+
+        "losses": losses,
+
+        "ambiguous": ambiguous,
+
+        "open": open_trades,
+
+    }
+
+
+# ============================================================
+# YEARLY VALID SETUPS
+# ============================================================
+
+def yearly_valid_counts(
+    trades
+):
+
+    if trades.empty:
 
         return {}
 
-    years = pd.Series(
-        pd.to_datetime(signal_dates)
-    ).dt.year
+    valid = trades[
+        trades["valid_sl"] == True
+    ].copy()
+
+    if valid.empty:
+
+        return {}
+
+    valid["year"] = (
+        pd.to_datetime(
+            valid["date"]
+        ).dt.year
+    )
 
     counts = (
-        years
+        valid["year"]
         .value_counts()
         .sort_index()
         .to_dict()
@@ -590,151 +887,109 @@ def yearly_counts(signal_dates):
 
 
 # ============================================================
-# SIGNAL TABLE
-# ============================================================
-
-def build_signal_table(
-    df,
-    signal_dates,
-    engine_name
-):
-
-    rows = []
-
-    for date in signal_dates:
-
-        position = df.index.get_loc(date)
-
-        row = df.iloc[position]
-
-        stop = calculate_stop(
-            df,
-            position,
-            atr_column="ATR14_WILDER"
-        )
-
-        entry = float(row["Close"])
-
-        risk = None
-        target = None
-
-        if stop is not None:
-
-            risk = entry - stop
-
-            if risk > 0:
-
-                target = (
-                    entry
-                    +
-                    RR * risk
-                )
-
-        rows.append({
-
-            "engine": engine_name,
-
-            "date": date.strftime(
-                "%Y-%m-%d"
-            ),
-
-            "year": date.year,
-
-            "open": float(row["Open"]),
-
-            "high": float(row["High"]),
-
-            "low": float(row["Low"]),
-
-            "close": entry,
-
-            "EMA19": float(row["EMA19"]),
-
-            "EMA200": float(row["EMA200"]),
-
-            "ATR14": (
-                float(row["ATR14_WILDER"])
-                if not pd.isna(row["ATR14_WILDER"])
-                else np.nan
-            ),
-
-            "stop": stop,
-
-            "risk": risk,
-
-            "target": target,
-
-        })
-
-    return pd.DataFrame(rows)
-
-
-# ============================================================
-# COMPARE WITH REFERENCE
+# REFERENCE COMPARISON
 # ============================================================
 
 def compare_reference(
     engine_name,
-    signal_dates
+    trades
 ):
 
-    counts = yearly_counts(signal_dates)
-
-    years = sorted(
-        set(
-            list(REFERENCE_YEARLY.keys())
-            +
-            list(counts.keys())
-        )
+    stats = calculate_statistics(
+        trades
     )
 
-    total = len(signal_dates)
+    yearly = yearly_valid_counts(
+        trades
+    )
 
-    total_difference = (
-        total
+    total_diff = (
+        stats["total_signals"]
         -
-        REFERENCE_TOTAL
+        REFERENCE_TOTAL_SIGNALS
     )
 
-    exact_total = (
-        total
-        ==
-        REFERENCE_TOTAL
+    valid_diff = (
+        stats["valid_setups"]
+        -
+        REFERENCE_VALID
     )
 
-    yearly_match_count = 0
+    invalid_diff = (
+        stats["invalid_sl"]
+        -
+        REFERENCE_INVALID
+    )
 
-    for year in years:
+    yearly_matches = 0
 
-        actual = counts.get(
-            year,
-            0
-        )
+    for year, expected in (
+        REFERENCE_YEARLY_VALID.items()
+    ):
 
-        expected = REFERENCE_YEARLY.get(
+        actual = yearly.get(
             year,
             0
         )
 
         if actual == expected:
-            yearly_match_count += 1
 
-    exact_yearly = (
-        all(
-            counts.get(year, 0)
-            ==
-            REFERENCE_YEARLY.get(year, 0)
-            for year in REFERENCE_YEARLY
+            yearly_matches += 1
+
+    exact_yearly = all(
+
+        yearly.get(
+            year,
+            0
         )
+        ==
+        expected
+
+        for year, expected
+        in REFERENCE_YEARLY_VALID.items()
+
     )
 
-    if exact_total and exact_yearly:
+    exact_total = (
+        stats["total_signals"]
+        ==
+        REFERENCE_TOTAL_SIGNALS
+    )
+
+    exact_valid = (
+        stats["valid_setups"]
+        ==
+        REFERENCE_VALID
+    )
+
+    exact_invalid = (
+        stats["invalid_sl"]
+        ==
+        REFERENCE_INVALID
+    )
+
+    if (
+        exact_total
+        and
+        exact_valid
+        and
+        exact_invalid
+        and
+        exact_yearly
+    ):
 
         status = "EXACT MATCH"
 
-    elif exact_total:
+    elif (
+        exact_valid
+        and
+        exact_yearly
+    ):
 
-        status = "TOTAL MATCH / YEARLY MISMATCH"
+        status = (
+            "VALID/YEAR MATCH "
+            "BUT TOTAL MISMATCH"
+        )
 
     else:
 
@@ -744,142 +999,153 @@ def compare_reference(
 
         "engine": engine_name,
 
-        "total_signals": total,
+        "total_signals":
+            stats["total_signals"],
 
-        "reference_total": REFERENCE_TOTAL,
+        "reference_total":
+            REFERENCE_TOTAL_SIGNALS,
 
-        "difference": total_difference,
+        "total_difference":
+            total_diff,
 
-        "yearly_matches": yearly_match_count,
+        "valid_setups":
+            stats["valid_setups"],
 
-        "yearly_reference_count": len(
-            REFERENCE_YEARLY
-        ),
+        "reference_valid":
+            REFERENCE_VALID,
 
-        "status": status,
+        "valid_difference":
+            valid_diff,
+
+        "invalid_sl":
+            stats["invalid_sl"],
+
+        "reference_invalid":
+            REFERENCE_INVALID,
+
+        "invalid_difference":
+            invalid_diff,
+
+        "yearly_matches":
+            yearly_matches,
+
+        "yearly_total":
+            len(
+                REFERENCE_YEARLY_VALID
+            ),
+
+        "status":
+            status,
 
     }
 
 
 # ============================================================
-# BUILD YEARLY DIAGNOSTIC TABLE
-# ============================================================
-
-def build_yearly_diagnostic(
-    engine_name,
-    signal_dates
-):
-
-    counts = yearly_counts(
-        signal_dates
-    )
-
-    rows = []
-
-    for year in sorted(
-        REFERENCE_YEARLY.keys()
-    ):
-
-        expected = REFERENCE_YEARLY[
-            year
-        ]
-
-        actual = counts.get(
-            year,
-            0
-        )
-
-        rows.append({
-
-            "engine": engine_name,
-
-            "year": year,
-
-            "reference": expected,
-
-            "actual": actual,
-
-            "difference": (
-                actual
-                -
-                expected
-            ),
-
-            "match": (
-                actual
-                ==
-                expected
-            )
-
-        })
-
-    return pd.DataFrame(rows)
-
-
-# ============================================================
-# PRINT ENGINE RESULT
+# PRINT RESULT
 # ============================================================
 
 def print_engine_result(
     engine_name,
-    signal_dates
+    trades
 ):
 
     result = compare_reference(
         engine_name,
-        signal_dates
+        trades
     )
 
-    counts = yearly_counts(
-        signal_dates
+    yearly = yearly_valid_counts(
+        trades
     )
 
     print()
-    print("-" * 70)
+    print("-" * 72)
     print(engine_name)
-    print("-" * 70)
+    print("-" * 72)
 
     print(
-        f"Total signals : {result['total_signals']}"
+        f"Total signals : "
+        f"{result['total_signals']}"
     )
 
     print(
-        f"Reference     : {REFERENCE_TOTAL}"
+        f"Reference     : "
+        f"{result['reference_total']}"
     )
 
     print(
-        f"Difference    : {result['difference']}"
+        f"Difference    : "
+        f"{result['total_difference']:+d}"
     )
+
+    print()
+
+    print(
+        f"Valid setups  : "
+        f"{result['valid_setups']}"
+    )
+
+    print(
+        f"Reference     : "
+        f"{result['reference_valid']}"
+    )
+
+    print(
+        f"Difference    : "
+        f"{result['valid_difference']:+d}"
+    )
+
+    print()
+
+    print(
+        f"Invalid SL    : "
+        f"{result['invalid_sl']}"
+    )
+
+    print(
+        f"Reference     : "
+        f"{result['reference_invalid']}"
+    )
+
+    print(
+        f"Difference    : "
+        f"{result['invalid_difference']:+d}"
+    )
+
+    print()
 
     print(
         f"Year matches  : "
         f"{result['yearly_matches']}/"
-        f"{result['yearly_reference_count']}"
+        f"{result['yearly_total']}"
     )
 
     print(
-        f"STATUS        : {result['status']}"
+        f"STATUS        : "
+        f"{result['status']}"
     )
 
     print()
 
     print(
-        "YEAR | REFERENCE | ACTUAL | DIFF"
+        "YEAR | REF | ACTUAL | DIFF"
     )
 
     print(
-        "-" * 42
+        "-" * 40
     )
 
     for year in sorted(
-        REFERENCE_YEARLY.keys()
+        REFERENCE_YEARLY_VALID.keys()
     ):
 
-        reference = REFERENCE_YEARLY[
-            year
-        ]
+        reference = (
+            REFERENCE_YEARLY_VALID[
+                year
+            ]
+        )
 
-        actual = counts.get(
+        actual = yearly.get(
             year,
             0
         )
@@ -893,12 +1159,12 @@ def print_engine_result(
         marker = (
             "✓"
             if diff == 0
-            else " "
+            else ""
         )
 
         print(
             f"{year} | "
-            f"{reference:9d} | "
+            f"{reference:3d} | "
             f"{actual:6d} | "
             f"{diff:+4d} {marker}"
         )
@@ -911,20 +1177,33 @@ def print_engine_result(
 def main():
 
     print()
-    print("=" * 70)
-    print("US500 EMA19 SIGNAL ENGINE DIAGNOSTIC")
-    print("=" * 70)
+    print("=" * 72)
+    print("US500 EMA19 SIGNAL ENGINE DIAGNOSTIC V2")
+    print("=" * 72)
 
     print()
-    print("REFERENCE BASELINE")
-    print("-" * 70)
+    print("HISTORICAL REFERENCE")
+    print("-" * 72)
 
     print(
-        f"Total signals: {REFERENCE_TOTAL}"
+        f"Total signals : "
+        f"{REFERENCE_TOTAL_SIGNALS}"
     )
 
+    print(
+        f"Valid setups  : "
+        f"{REFERENCE_VALID}"
+    )
+
+    print(
+        f"Invalid SL    : "
+        f"{REFERENCE_INVALID}"
+    )
+
+    print()
+
     for year, count in (
-        REFERENCE_YEARLY.items()
+        REFERENCE_YEARLY_VALID.items()
     ):
 
         print(
@@ -932,415 +1211,413 @@ def main():
         )
 
     # --------------------------------------------------------
-    # DATA
+    # MARKET
     # --------------------------------------------------------
 
-    df = get_market_data()
+    df = download_market()
 
-    df = add_indicators(df)
-
-    # Remove the initial indicator period
-    df = df.dropna(
-        subset=[
-            "EMA19",
-            "EMA200"
-        ]
+    df = prepare_market(
+        df
     )
 
     print()
-    print("=" * 70)
+    print("=" * 72)
     print("DATA READY")
-    print("=" * 70)
+    print("=" * 72)
 
     print(
-        f"Rows after indicators: {len(df)}"
+        f"Rows: {len(df)}"
     )
 
     # --------------------------------------------------------
-    # CANDIDATE ENGINES
+    # RAW CANDIDATES
+    # --------------------------------------------------------
+
+    candidates = (
+        build_raw_candidates(
+            df
+        )
+    )
+
+    print()
+    print("=" * 72)
+    print("RAW BASELINE CANDIDATES")
+    print("=" * 72)
+
+    print(
+        f"Raw qualifying candles: "
+        f"{len(candidates)}"
+    )
+
+    # --------------------------------------------------------
+    # ENGINES
     # --------------------------------------------------------
 
     engines = {}
 
-    # A
-    engines[
-        "A_ALL_QUALIFYING"
-    ] = generate_signals_all(df)
+    # --------------------------------------------------------
+    # 1. No spacing
+    # --------------------------------------------------------
 
-    # B
     engines[
-        "B_FIRST_AFTER_NONQUALIFYING"
-    ] = generate_signals_first_after_nonqualifying(df)
+        "01_RAW_ALL"
+    ] = candidates
 
-    # C
-    engines[
-        "C_LAST_IN_QUALIFYING_RUN"
-    ] = generate_signals_last_in_run(df)
+    # --------------------------------------------------------
+    # 2-12. Trading-row spacing
+    # --------------------------------------------------------
 
-    # D
-    engines[
-        "D_PREV_CLOSE_ABOVE_EMA19"
-    ] = generate_signals_prev_close_above_ema19(df)
+    for gap in range(
+        1,
+        11
+    ):
 
-    # E
-    engines[
-        "E_NEW_PULLBACK_RESET"
-    ] = generate_signals_prev_close_above_ema19_or_first(df)
+        engines[
+            f"ROW_GAP_{gap}"
+        ] = apply_row_spacing(
+            candidates,
+            gap
+        )
 
-    # F1
+    # --------------------------------------------------------
+    # 13-22. Calendar-day spacing
+    # --------------------------------------------------------
+
+    for days in [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        10,
+        14,
+        20,
+    ]:
+
+        engines[
+            f"CALENDAR_GAP_{days}"
+        ] = apply_calendar_spacing(
+            candidates,
+            days
+        )
+
+    # --------------------------------------------------------
+    # 23. Previous close above EMA19
+    # --------------------------------------------------------
+
     engines[
-        "F_COOLDOWN_1"
-    ] = generate_signals_cooldown(
+        "PREVIOUS_CLOSE_ABOVE_EMA19"
+    ] = apply_previous_close_filter(
         df,
-        1
-    )
-
-    # F2
-    engines[
-        "F_COOLDOWN_2"
-    ] = generate_signals_cooldown(
-        df,
-        2
-    )
-
-    # F3
-    engines[
-        "F_COOLDOWN_3"
-    ] = generate_signals_cooldown(
-        df,
-        3
-    )
-
-    # F5
-    engines[
-        "F_COOLDOWN_5"
-    ] = generate_signals_cooldown(
-        df,
-        5
-    )
-
-    # F10
-    engines[
-        "F_COOLDOWN_10"
-    ] = generate_signals_cooldown(
-        df,
-        10
-    )
-
-    # G
-    engines[
-        "G_ONE_TRADE_AT_TIME"
-    ] = generate_signals_one_trade_at_time(
-        df
+        candidates
     )
 
     # --------------------------------------------------------
-    # RESULTS
+    # 24-28. Reset logic
+    # --------------------------------------------------------
+
+    for reset in [
+        1,
+        2,
+        3,
+        5,
+        10,
+    ]:
+
+        engines[
+            f"RESET_{reset}"
+        ] = apply_reset_logic(
+            df,
+            candidates,
+            reset
+        )
+
+    # --------------------------------------------------------
+    # EVALUATE
     # --------------------------------------------------------
 
     summary_rows = []
 
     yearly_rows = []
 
-    signal_tables = []
+    all_signal_rows = []
 
-    for engine_name, signal_dates in engines.items():
+    for engine_name, engine_candidates in (
+        engines.items()
+    ):
+
+        trades = evaluate_engine(
+            df,
+            engine_candidates
+        )
 
         print_engine_result(
             engine_name,
-            signal_dates
+            trades
         )
 
-        result = compare_reference(
+        comparison = compare_reference(
             engine_name,
-            signal_dates
+            trades
         )
 
         summary_rows.append(
-            result
+            comparison
         )
 
-        yearly_df = build_yearly_diagnostic(
-            engine_name,
-            signal_dates
+        yearly = yearly_valid_counts(
+            trades
         )
 
-        yearly_rows.append(
-            yearly_df
-        )
+        for year in sorted(
+            REFERENCE_YEARLY_VALID.keys()
+        ):
 
-        signal_df = build_signal_table(
-            df,
-            signal_dates,
-            engine_name
-        )
+            yearly_rows.append({
 
-        signal_tables.append(
-            signal_df
-        )
+                "engine":
+                    engine_name,
+
+                "year":
+                    year,
+
+                "reference_valid":
+                    REFERENCE_YEARLY_VALID[
+                        year
+                    ],
+
+                "actual_valid":
+                    yearly.get(
+                        year,
+                        0
+                    ),
+
+                "difference":
+                    yearly.get(
+                        year,
+                        0
+                    )
+                    -
+                    REFERENCE_YEARLY_VALID[
+                        year
+                    ],
+
+                "match":
+                    yearly.get(
+                        year,
+                        0
+                    )
+                    ==
+                    REFERENCE_YEARLY_VALID[
+                        year
+                    ],
+
+            })
+
+        for _, trade in (
+            trades.iterrows()
+        ):
+
+            row = trade.to_dict()
+
+            row[
+                "engine"
+            ] = engine_name
+
+            all_signal_rows.append(
+                row
+            )
 
     # --------------------------------------------------------
-    # SUMMARY
+    # SUMMARY DATAFRAME
     # --------------------------------------------------------
 
     summary = pd.DataFrame(
         summary_rows
     )
 
+    # Rank primarily by:
+    # 1. yearly matches
+    # 2. valid difference
+    # 3. total difference
+
+    summary[
+        "abs_valid_difference"
+    ] = summary[
+        "valid_difference"
+    ].abs()
+
+    summary[
+        "abs_total_difference"
+    ] = summary[
+        "total_difference"
+    ].abs()
+
     summary = summary.sort_values(
         by=[
             "yearly_matches",
-            "total_signals"
+            "abs_valid_difference",
+            "abs_total_difference",
         ],
         ascending=[
             False,
-            True
+            True,
+            True,
         ]
     )
 
-    yearly = pd.concat(
-        yearly_rows,
-        ignore_index=True
+    yearly_df = pd.DataFrame(
+        yearly_rows
     )
 
-    signals = pd.concat(
-        signal_tables,
-        ignore_index=True
+    signals_df = pd.DataFrame(
+        all_signal_rows
     )
 
     # --------------------------------------------------------
-    # SAVE FILES
+    # SAVE
     # --------------------------------------------------------
 
     summary.to_csv(
-        "signal_diagnostics_summary.csv",
+        "signal_diagnostics_v2_summary.csv",
         index=False
     )
 
-    yearly.to_csv(
-        "signal_diagnostics_yearly.csv",
+    yearly_df.to_csv(
+        "signal_diagnostics_v2_yearly.csv",
         index=False
     )
 
-    signals.to_csv(
-        "signal_diagnostics_signals.csv",
+    signals_df.to_csv(
+        "signal_diagnostics_v2_signals.csv",
         index=False
     )
 
     # --------------------------------------------------------
-    # FINAL REPORT
+    # FINAL SUMMARY
     # --------------------------------------------------------
 
     print()
     print()
-    print("=" * 70)
-    print("FINAL DIAGNOSTIC SUMMARY")
-    print("=" * 70)
+    print("=" * 72)
+    print("FINAL V2 SUMMARY")
+    print("=" * 72)
 
     print()
+
+    columns = [
+
+        "engine",
+
+        "total_signals",
+
+        "total_difference",
+
+        "valid_setups",
+
+        "valid_difference",
+
+        "invalid_sl",
+
+        "invalid_difference",
+
+        "yearly_matches",
+
+        "yearly_total",
+
+        "status",
+
+    ]
 
     print(
         summary[
-            [
-                "engine",
-                "total_signals",
-                "reference_total",
-                "difference",
-                "yearly_matches",
-                "yearly_reference_count",
-                "status"
-            ]
+            columns
         ].to_string(
             index=False
         )
     )
 
-    print()
-    print("=" * 70)
-    print("REFERENCE YEARLY COUNTS")
-    print("=" * 70)
-
-    print()
-
-    print(
-        "Year | "
-        "Reference | "
-        +
-        " | ".join(
-            [
-                "Actual"
-            ]
-        )
-    )
-
-    print("-" * 45)
-
-    # Best candidate
-    best_engine = (
-        summary.iloc[0]["engine"]
-        if not summary.empty
-        else None
-    )
-
-    if best_engine:
-
-        print()
-        print(
-            f"BEST CANDIDATE: {best_engine}"
-        )
-
-        best_row = summary.iloc[0]
-
-        print(
-            f"Total signals: "
-            f"{best_row['total_signals']}"
-        )
-
-        print(
-            f"Yearly matches: "
-            f"{best_row['yearly_matches']}/"
-            f"{best_row['yearly_reference_count']}"
-        )
-
-        print(
-            f"Status: "
-            f"{best_row['status']}"
-        )
-
     # --------------------------------------------------------
-    # ATR DIAGNOSTIC
+    # BEST CANDIDATE
     # --------------------------------------------------------
 
     print()
-    print("=" * 70)
-    print("ATR DIAGNOSTIC")
-    print("=" * 70)
+    print("=" * 72)
+    print("BEST CANDIDATES")
+    print("=" * 72)
 
     print()
 
-    print(
-        "Signal count is independent of ATR."
+    top = summary.head(
+        10
     )
 
     print(
-        "ATR only affects stop validity and R results."
-    )
-
-    print()
-
-    atr_columns = [
-        "ATR14_WILDER",
-        "ATR14_SMA",
-        "ATR14_SPAN",
-        "ATR14_WILDER_ADJUST"
-    ]
-
-    # Use all qualifying signals for ATR diagnostic
-    all_signals = engines[
-        "A_ALL_QUALIFYING"
-    ]
-
-    atr_rows = []
-
-    for atr_column in atr_columns:
-
-        invalid = 0
-        valid = 0
-
-        for date in all_signals:
-
-            position = df.index.get_loc(
-                date
-            )
-
-            stop = calculate_stop(
-                df,
-                position,
-                atr_column
-            )
-
-            if stop is None:
-
-                invalid += 1
-
-                continue
-
-            entry = float(
-                df.iloc[position]["Close"]
-            )
-
-            risk = (
-                entry
-                -
-                stop
-            )
-
-            if risk <= 0:
-
-                invalid += 1
-
-            else:
-
-                valid += 1
-
-        atr_rows.append({
-
-            "ATR_method": atr_column,
-
-            "signals": len(
-                all_signals
-            ),
-
-            "valid_SL": valid,
-
-            "invalid_SL": invalid
-
-        })
-
-    atr_df = pd.DataFrame(
-        atr_rows
-    )
-
-    print(
-        atr_df.to_string(
+        top[
+            columns
+        ].to_string(
             index=False
         )
     )
 
-    atr_df.to_csv(
-        "signal_diagnostics_atr.csv",
-        index=False
-    )
+    # --------------------------------------------------------
+    # EXACT MATCHES
+    # --------------------------------------------------------
+
+    exact = summary[
+        summary["status"]
+        ==
+        "EXACT MATCH"
+    ]
+
+    print()
+    print("=" * 72)
+    print("EXACT MATCHES")
+    print("=" * 72)
+
+    if exact.empty:
+
+        print(
+            "NO EXACT MATCH FOUND."
+        )
+
+    else:
+
+        print(
+            exact[
+                columns
+            ].to_string(
+                index=False
+            )
+        )
 
     # --------------------------------------------------------
-    # DONE
+    # FILES
     # --------------------------------------------------------
 
     print()
-    print("=" * 70)
+    print("=" * 72)
     print("FILES CREATED")
-    print("=" * 70)
+    print("=" * 72)
 
     print(
-        "signal_diagnostics_summary.csv"
+        "signal_diagnostics_v2_summary.csv"
     )
 
     print(
-        "signal_diagnostics_yearly.csv"
+        "signal_diagnostics_v2_yearly.csv"
     )
 
     print(
-        "signal_diagnostics_signals.csv"
-    )
-
-    print(
-        "signal_diagnostics_atr.csv"
+        "signal_diagnostics_v2_signals.csv"
     )
 
     print()
-    print("=" * 70)
-    print("DIAGNOSTIC COMPLETE")
-    print("=" * 70)
+    print("=" * 72)
+    print("DIAGNOSTIC V2 COMPLETE")
+    print("=" * 72)
 
 
 # ============================================================
@@ -1348,4 +1625,5 @@ def main():
 # ============================================================
 
 if __name__ == "__main__":
+
     main()
