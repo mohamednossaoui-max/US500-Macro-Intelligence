@@ -18,25 +18,14 @@ PULLBACK_LEVELS = [
 
 
 # ============================================================
-# FIND HISTORICAL PULLBACKS
+# PREPARE MARKET DATA
 # ============================================================
 
-def detect_pullbacks(
-    market_data,
-    levels=PULLBACK_LEVELS,
-):
+def prepare_market_data(market_data):
     """
-    Detect historical US500 pullbacks from running highs.
-
-    A pullback is measured from the highest closing price
-    reached before the correction.
-
-    Levels:
-        -3%
-        -5%
-        -10%
-        -20%
-        -30%
+    Prepare daily market data and calculate:
+        - running high
+        - drawdown from running high
     """
 
     if market_data is None or market_data.empty:
@@ -56,17 +45,9 @@ def detect_pullbacks(
 
     data = data.sort_index()
 
-    # --------------------------------------------------------
-    # Running high
-    # --------------------------------------------------------
-
     data["running_high"] = (
         data["close"].cummax()
     )
-
-    # --------------------------------------------------------
-    # Drawdown from running high
-    # --------------------------------------------------------
 
     data["drawdown_pct"] = (
         (
@@ -75,235 +56,438 @@ def detect_pullbacks(
         ) - 1
     ) * 100
 
-    events = []
+    return data
 
-    # --------------------------------------------------------
-    # Process each pullback level
-    # --------------------------------------------------------
 
-    for level in levels:
+# ============================================================
+# DETECT CORRECTION CYCLES
+# ============================================================
 
-        threshold = float(level)
+def detect_correction_cycles(
+    market_data,
+    minimum_drawdown=-3,
+):
+    """
+    Detect complete correction cycles.
 
-        below = (
-            data["drawdown_pct"]
-            <= threshold
+    A correction cycle starts when price closes at or below
+    the minimum drawdown from the previous reference high.
+
+    The cycle ends when price closes back at or above the
+    reference high.
+
+    Important:
+        The reference high is frozen during the correction.
+        Therefore a continuing decline does NOT create
+        multiple independent corrections.
+    """
+
+    data = prepare_market_data(
+        market_data
+    )
+
+    if data.empty:
+        return pd.DataFrame()
+
+    cycles = []
+
+    in_correction = False
+
+    reference_high = None
+    reference_high_date = None
+    start_date = None
+
+    cycle_rows = []
+
+    for date, row in data.iterrows():
+
+        close = float(
+            row["close"]
         )
 
-        if not below.any():
-            continue
-
-        # ----------------------------------------------------
-        # Detect first day crossing the level
-        # ----------------------------------------------------
-
-        previous = below.shift(
-            1,
-            fill_value=False
+        high = float(
+            row["high"]
         )
 
-        crossings = data[
-            below & ~previous
-        ]
+        low = float(
+            row["low"]
+        )
 
-        for date, row in crossings.iterrows():
+        if not in_correction:
 
-            reference_high = float(
+            current_high = float(
                 row["running_high"]
             )
 
-            drawdown = float(
-                row["drawdown_pct"]
+            current_high_date = (
+                data.loc[
+                    :date,
+                    "close"
+                ].idxmax()
             )
 
-            events.append(
+            drawdown = (
+                (
+                    close
+                    / current_high
+                ) - 1
+            ) * 100
+
+            if drawdown <= minimum_drawdown:
+
+                in_correction = True
+
+                reference_high = current_high
+
+                reference_high_date = (
+                    current_high_date
+                )
+
+                start_date = date
+
+                cycle_rows = [
+                    {
+                        "date": date,
+                        "close": close,
+                        "high": high,
+                        "low": low,
+                    }
+                ]
+
+        else:
+
+            cycle_rows.append(
                 {
-                    "level": abs(threshold),
                     "date": date,
-                    "reference_high": reference_high,
-                    "entry_price": float(
-                        row["close"]
-                    ),
-                    "drawdown_pct": drawdown,
+                    "close": close,
+                    "high": high,
+                    "low": low,
                 }
             )
 
-    if not events:
-        return pd.DataFrame()
+            # ------------------------------------------------
+            # Correction recovered
+            # ------------------------------------------------
 
-    events_df = pd.DataFrame(
-        events
-    )
+            if close >= reference_high:
 
-    events_df = events_df.sort_values(
-        [
-            "date",
-            "level",
-        ]
-    ).reset_index(
-        drop=True
-    )
+                cycle_df = pd.DataFrame(
+                    cycle_rows
+                )
 
-    return events_df
+                trough_position = (
+                    cycle_df["low"]
+                    .idxmin()
+                )
 
+                trough_row = (
+                    cycle_df.loc[
+                        trough_position
+                    ]
+                )
 
-# ============================================================
-# EVENT EXTREMES
-# ============================================================
+                trough_date = (
+                    trough_row["date"]
+                )
 
-def add_event_extremes(
-    market_data,
-    events,
-):
-    """
-    Add the lowest price reached after
-    each pullback level was triggered.
-    """
+                trough_price = float(
+                    trough_row["low"]
+                )
 
-    if events is None or events.empty:
-        return pd.DataFrame()
+                maximum_drawdown = (
+                    (
+                        trough_price
+                        / reference_high
+                    ) - 1
+                ) * 100
 
-    data = market_data.sort_index()
+                recovery_days = (
+                    date
+                    - start_date
+                ).days
 
-    results = []
+                cycles.append(
+                    {
+                        "reference_high_date":
+                            reference_high_date,
 
-    for _, event in events.iterrows():
+                        "reference_high":
+                            reference_high,
 
-        event_date = event["date"]
+                        "start_date":
+                            start_date,
 
-        future = data.loc[
-            event_date:
-        ]
+                        "start_price":
+                            float(
+                                cycle_rows[0][
+                                    "close"
+                                ]
+                            ),
 
-        if future.empty:
-            continue
+                        "trough_date":
+                            trough_date,
 
-        trough_date = future[
-            "low"
-        ].idxmin()
+                        "trough_price":
+                            trough_price,
 
-        trough_price = float(
-            future.loc[
-                trough_date,
-                "low"
+                        "maximum_drawdown_pct":
+                            maximum_drawdown,
+
+                        "recovery_date":
+                            date,
+
+                        "recovery_days":
+                            recovery_days,
+                    }
+                )
+
+                in_correction = False
+
+                reference_high = None
+                reference_high_date = None
+                start_date = None
+                cycle_rows = []
+
+    # --------------------------------------------------------
+    # Handle an unfinished correction at the end of data
+    # --------------------------------------------------------
+
+    if in_correction and cycle_rows:
+
+        cycle_df = pd.DataFrame(
+            cycle_rows
+        )
+
+        trough_position = (
+            cycle_df["low"]
+            .idxmin()
+        )
+
+        trough_row = (
+            cycle_df.loc[
+                trough_position
             ]
         )
 
-        reference_high = float(
-            event["reference_high"]
+        trough_date = (
+            trough_row["date"]
         )
 
-        trough_drawdown = (
+        trough_price = float(
+            trough_row["low"]
+        )
+
+        maximum_drawdown = (
             (
                 trough_price
                 / reference_high
             ) - 1
         ) * 100
 
-        result = event.to_dict()
+        cycles.append(
+            {
+                "reference_high_date":
+                    reference_high_date,
 
-        result[
-            "trough_date"
-        ] = trough_date
+                "reference_high":
+                    reference_high,
 
-        result[
-            "trough_price"
-        ] = trough_price
+                "start_date":
+                    start_date,
 
-        result[
-            "trough_drawdown_pct"
-        ] = trough_drawdown
+                "start_price":
+                    float(
+                        cycle_rows[0][
+                            "close"
+                        ]
+                    ),
 
-        results.append(
-            result
+                "trough_date":
+                    trough_date,
+
+                "trough_price":
+                    trough_price,
+
+                "maximum_drawdown_pct":
+                    maximum_drawdown,
+
+                "recovery_date":
+                    None,
+
+                "recovery_days":
+                    np.nan,
+            }
         )
 
-    if not results:
+    if not cycles:
         return pd.DataFrame()
 
     return pd.DataFrame(
-        results
+        cycles
     )
 
 
 # ============================================================
-# RECOVERY DATE
+# ADD PULLBACK LEVELS
 # ============================================================
 
-def add_recovery_dates(
+def add_pullback_levels(
     market_data,
-    events,
+    cycles,
+    levels=PULLBACK_LEVELS,
 ):
     """
-    Find the first date after the trough when
-    the market recovers back to the reference high.
+    For every correction cycle, identify the first date
+    on which each pullback level was reached.
+
+    Example:
+
+        -3%
+        -5%
+        -10%
+        -20%
+        -30%
+
+    These are entry-level observations inside the SAME
+    correction cycle.
     """
 
-    if events is None or events.empty:
+    if cycles is None or cycles.empty:
         return pd.DataFrame()
 
-    data = market_data.sort_index()
+    data = prepare_market_data(
+        market_data
+    )
 
     results = []
 
-    for _, event in events.iterrows():
+    for cycle_id, cycle in cycles.iterrows():
+
+        start_date = cycle[
+            "start_date"
+        ]
+
+        recovery_date = cycle[
+            "recovery_date"
+        ]
 
         reference_high = float(
-            event["reference_high"]
+            cycle[
+                "reference_high"
+            ]
         )
-
-        trough_date = event[
-            "trough_date"
-        ]
-
-        future = data.loc[
-            trough_date:
-        ]
-
-        recovery_date = None
-
-        for date, row in future.iterrows():
-
-            close = float(
-                row["close"]
-            )
-
-            if close >= reference_high:
-
-                recovery_date = date
-
-                break
-
-        result = event.to_dict()
-
-        result[
-            "recovery_date"
-        ] = recovery_date
 
         if recovery_date is not None:
-
-            result[
-                "recovery_days"
-            ] = (
+            period = data.loc[
+                start_date:
                 recovery_date
-                - trough_date
-            ).days
-
+            ]
         else:
+            period = data.loc[
+                start_date:
+            ]
+
+        for level in levels:
+
+            threshold_price = (
+                reference_high
+                * (
+                    1
+                    + level / 100
+                )
+            )
+
+            trigger_date = None
+            trigger_price = None
+            trigger_drawdown = None
+
+            for date, row in period.iterrows():
+
+                close = float(
+                    row["close"]
+                )
+
+                drawdown = (
+                    (
+                        close
+                        / reference_high
+                    ) - 1
+                ) * 100
+
+                if drawdown <= level:
+
+                    trigger_date = date
+                    trigger_price = close
+                    trigger_drawdown = drawdown
+
+                    break
+
+            if trigger_date is None:
+                continue
+
+            result = cycle.to_dict()
 
             result[
-                "recovery_days"
-            ] = np.nan
+                "cycle_id"
+            ] = int(cycle_id) + 1
 
-        results.append(
-            result
-        )
+            result[
+                "level"
+            ] = abs(level)
+
+            result[
+                "level_price"
+            ] = threshold_price
+
+            result[
+                "trigger_date"
+            ] = trigger_date
+
+            result[
+                "trigger_price"
+            ] = trigger_price
+
+            result[
+                "trigger_drawdown_pct"
+            ] = trigger_drawdown
+
+            results.append(
+                result
+            )
 
     if not results:
         return pd.DataFrame()
 
-    return pd.DataFrame(
+    result_df = pd.DataFrame(
         results
+    )
+
+    columns = [
+        "cycle_id",
+        "level",
+        "reference_high_date",
+        "reference_high",
+        "start_date",
+        "start_price",
+        "trigger_date",
+        "trigger_price",
+        "trigger_drawdown_pct",
+        "trough_date",
+        "trough_price",
+        "maximum_drawdown_pct",
+        "recovery_date",
+        "recovery_days",
+    ]
+
+    return result_df[
+        columns
+    ].sort_values(
+        [
+            "start_date",
+            "level",
+        ]
+    ).reset_index(
+        drop=True
     )
 
 
@@ -315,7 +499,7 @@ def build_historical_events(
     start_date="2019-01-01",
 ):
     """
-    Complete historical pullback detection pipeline.
+    Complete historical correction study.
     """
 
     market = get_historical_market_data(
@@ -325,28 +509,19 @@ def build_historical_events(
     if market.empty:
         return pd.DataFrame()
 
-    events = detect_pullbacks(
-        market
-    )
-
-    if events.empty:
-        return pd.DataFrame()
-
-    events = add_event_extremes(
+    cycles = detect_correction_cycles(
         market,
-        events
+        minimum_drawdown=-3,
     )
 
-    if events.empty:
+    if cycles.empty:
         return pd.DataFrame()
 
-    events = add_recovery_dates(
+    events = add_pullback_levels(
         market,
-        events
+        cycles,
+        levels=PULLBACK_LEVELS,
     )
-
-    if events.empty:
-        return pd.DataFrame()
 
     return events
 
@@ -359,10 +534,10 @@ if __name__ == "__main__":
 
     print()
     print(
-        "US500 HISTORICAL EVENT STUDY"
+        "US500 HISTORICAL CORRECTION STUDY"
     )
     print(
-        "============================"
+        "================================="
     )
 
     events = build_historical_events(
@@ -372,15 +547,23 @@ if __name__ == "__main__":
     if events.empty:
 
         print(
-            "ERROR: No historical events detected."
+            "ERROR: No historical correction events detected."
         )
 
     else:
 
         print()
         print(
-            "TOTAL EVENTS:",
+            "TOTAL LEVEL EVENTS:",
             len(events)
+        )
+
+        print()
+        print(
+            "UNIQUE CORRECTION CYCLES:",
+            events[
+                "cycle_id"
+            ].nunique()
         )
 
         print()
@@ -409,28 +592,64 @@ if __name__ == "__main__":
 
         print()
         print(
-            "HISTORICAL EVENTS"
+            "CORRECTION CYCLES"
         )
         print(
             "-----------------"
         )
 
-        display_columns = [
-            "level",
-            "date",
+        cycle_columns = [
+            "cycle_id",
+            "reference_high_date",
             "reference_high",
-            "entry_price",
-            "drawdown_pct",
+            "start_date",
             "trough_date",
             "trough_price",
-            "trough_drawdown_pct",
+            "maximum_drawdown_pct",
+            "recovery_date",
+            "recovery_days",
+        ]
+
+        cycles_display = (
+            events[
+                cycle_columns
+            ]
+            .drop_duplicates(
+                subset=[
+                    "cycle_id"
+                ]
+            )
+        )
+
+        print(
+            cycles_display.to_string(
+                index=False
+            )
+        )
+
+        print()
+        print(
+            "PULLBACK LEVEL EVENTS"
+        )
+        print(
+            "---------------------"
+        )
+
+        event_columns = [
+            "cycle_id",
+            "level",
+            "trigger_date",
+            "trigger_price",
+            "trigger_drawdown_pct",
+            "trough_date",
+            "maximum_drawdown_pct",
             "recovery_date",
             "recovery_days",
         ]
 
         print(
             events[
-                display_columns
+                event_columns
             ].to_string(
                 index=False
             )
@@ -438,5 +657,5 @@ if __name__ == "__main__":
 
         print()
         print(
-            "HISTORICAL EVENT STUDY COMPLETE"
+            "HISTORICAL CORRECTION STUDY COMPLETE"
         )
