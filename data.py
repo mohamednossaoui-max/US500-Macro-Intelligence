@@ -45,12 +45,7 @@ def get_market_data(
         if data is None or data.empty:
             return pd.DataFrame()
 
-        # ----------------------------------------------------
-        # Handle MultiIndex columns
-        # ----------------------------------------------------
-
         if isinstance(data.columns, pd.MultiIndex):
-
             data.columns = [
                 col[0]
                 for col in data.columns
@@ -75,7 +70,6 @@ def get_market_data(
         ]
 
         for col in required:
-
             if col not in data.columns:
                 return pd.DataFrame()
 
@@ -90,7 +84,6 @@ def get_market_data(
         return data
 
     except Exception:
-
         return pd.DataFrame()
 
 
@@ -113,10 +106,6 @@ def get_historical_market_data(
         - 2023 banking stress
         - 2024 growth scare
         - 2025 tariff shock
-
-    This function is intentionally separate from
-    get_market_data() so the live dashboard keeps
-    its existing behavior.
     """
 
     try:
@@ -132,12 +121,7 @@ def get_historical_market_data(
         if data is None or data.empty:
             return pd.DataFrame()
 
-        # ----------------------------------------------------
-        # Handle MultiIndex columns
-        # ----------------------------------------------------
-
         if isinstance(data.columns, pd.MultiIndex):
-
             data.columns = [
                 col[0]
                 for col in data.columns
@@ -162,7 +146,6 @@ def get_historical_market_data(
         ]
 
         for col in required:
-
             if col not in data.columns:
                 return pd.DataFrame()
 
@@ -177,7 +160,6 @@ def get_historical_market_data(
         return data.sort_index()
 
     except Exception:
-
         return pd.DataFrame()
 
 
@@ -192,17 +174,16 @@ def fred_series(
     """
     Retrieve a FRED time series.
 
-    If no API key is available, returns an empty DataFrame.
+    If no API key is available,
+    returns an empty DataFrame.
     """
 
     if not FRED_API_KEY:
-
         return pd.DataFrame(
             columns=["value"]
         )
 
     if start_date is None:
-
         start_date = (
             datetime.utcnow()
             - timedelta(days=3650)
@@ -214,15 +195,10 @@ def fred_series(
     )
 
     params = {
-
         "series_id": series_id,
-
         "api_key": FRED_API_KEY,
-
         "file_type": "json",
-
         "observation_start": start_date,
-
     }
 
     try:
@@ -246,9 +222,7 @@ def fred_series(
 
         for obs in observations:
 
-            value = obs.get(
-                "value"
-            )
+            value = obs.get("value")
 
             if value in (
                 None,
@@ -258,11 +232,8 @@ def fred_series(
                 continue
 
             try:
-
                 value = float(value)
-
             except Exception:
-
                 continue
 
             rows.append(
@@ -275,21 +246,21 @@ def fred_series(
             )
 
         if not rows:
-
             return pd.DataFrame(
                 columns=["value"]
             )
 
         df = pd.DataFrame(rows)
 
-        df = df.set_index(
-            "date"
-        ).sort_index()
+        df = (
+            df
+            .set_index("date")
+            .sort_index()
+        )
 
         return df
 
     except Exception:
-
         return pd.DataFrame(
             columns=["value"]
         )
@@ -365,8 +336,9 @@ def bls_series(
 
         result = response.json()
 
-        if result.get("status") != "REQUEST_SUCCEEDED":
-
+        if result.get(
+            "status"
+        ) != "REQUEST_SUCCEEDED":
             return pd.DataFrame(
                 columns=["value"]
             )
@@ -397,16 +369,13 @@ def bls_series(
                     continue
 
                 try:
-
                     value = float(
                         value.replace(
                             ",",
                             ""
                         )
                     )
-
                 except Exception:
-
                     continue
 
                 period = item.get(
@@ -414,12 +383,9 @@ def bls_series(
                     ""
                 )
 
-                # ------------------------------------------------
-                # Only monthly observations
-                # ------------------------------------------------
-
-                if not period.startswith("M"):
-
+                if not period.startswith(
+                    "M"
+                ):
                     continue
 
                 month = int(
@@ -427,7 +393,6 @@ def bls_series(
                 )
 
                 if month < 1 or month > 12:
-
                     continue
 
                 date = pd.Timestamp(
@@ -446,7 +411,6 @@ def bls_series(
                 )
 
         if not rows:
-
             return pd.DataFrame(
                 columns=["value"]
             )
@@ -465,7 +429,6 @@ def bls_series(
         return df
 
     except Exception:
-
         return pd.DataFrame(
             columns=["value"]
         )
@@ -498,7 +461,8 @@ def load_all_macro_data(
     """
     Load all macroeconomic data.
 
-    start_date can be supplied for historical studies.
+    start_date can be supplied
+    for historical studies.
     """
 
     fred = load_fred_data(
@@ -509,13 +473,8 @@ def load_all_macro_data(
 
     combined = {}
 
-    combined.update(
-        fred
-    )
-
-    combined.update(
-        bls
-    )
+    combined.update(fred)
+    combined.update(bls)
 
     return combined
 
@@ -530,21 +489,22 @@ def latest_value(
 ):
 
     if df is None:
-
         return default
 
     if df.empty:
-
         return default
 
     try:
 
-        value = df["value"].dropna().iloc[-1]
+        value = (
+            df["value"]
+            .dropna()
+            .iloc[-1]
+        )
 
         return float(value)
 
     except Exception:
-
         return default
 
 
@@ -560,7 +520,10 @@ def data_status(
 
     for name, df in macro_data.items():
 
-        if df is None or df.empty:
+        if (
+            df is None
+            or df.empty
+        ):
 
             status.append(
                 {
@@ -590,16 +553,16 @@ def data_status(
 if __name__ == "__main__":
 
     print()
-    print("HISTORICAL MARKET DATA TEST")
-    print("===========================")
+    print(
+        "HISTORICAL MARKET DATA TEST"
+    )
+    print(
+        "==========================="
+    )
 
     market = get_historical_market_data(
         start_date="2019-01-01"
     )
-
-    # --------------------------------------------------------
-    # Basic availability
-    # --------------------------------------------------------
 
     if market.empty:
 
@@ -629,10 +592,6 @@ if __name__ == "__main__":
             list(market.columns)
         )
 
-        # ----------------------------------------------------
-        # Required columns
-        # ----------------------------------------------------
-
         required = [
             "open",
             "high",
@@ -660,7 +619,7 @@ if __name__ == "__main__":
             )
 
         # ----------------------------------------------------
-        # COVID 2020 test
+        # COVID 2020 TEST
         # ----------------------------------------------------
 
         covid = market.loc[
@@ -699,16 +658,6 @@ if __name__ == "__main__":
                 )
             )
 
-    print(
-                "COVID lowest close:",
-                round(
-                    float(
-                        covid["close"].min()
-                    ),
-                    2
-                )
-            )
-
             print(
                 "COVID highest close:",
                 round(
@@ -717,6 +666,7 @@ if __name__ == "__main__":
                     ),
                     2
                 )
+            )
 
         else:
 
@@ -725,25 +675,40 @@ if __name__ == "__main__":
             )
 
         # ----------------------------------------------------
-        # Historical event periods
+        # HISTORICAL EVENT PERIODS
         # ----------------------------------------------------
 
         periods = {
 
             "2020 COVID":
-                ("2020-02-01", "2020-04-30"),
+                (
+                    "2020-02-01",
+                    "2020-04-30"
+                ),
 
             "2022 Rate Shock":
-                ("2022-01-01", "2022-12-31"),
+                (
+                    "2022-01-01",
+                    "2022-12-31"
+                ),
 
             "2023 Banking Stress":
-                ("2023-02-01", "2023-05-31"),
+                (
+                    "2023-02-01",
+                    "2023-05-31"
+                ),
 
             "2024 Growth Scare":
-                ("2024-07-01", "2024-09-30"),
+                (
+                    "2024-07-01",
+                    "2024-09-30"
+                ),
 
             "2025 Tariff Period":
-                ("2025-02-01", "2025-05-31"),
+                (
+                    "2025-02-01",
+                    "2025-05-31"
+                ),
         }
 
         print()
@@ -770,7 +735,7 @@ if __name__ == "__main__":
             )
 
         # ----------------------------------------------------
-        # Last rows
+        # LAST 5 ROWS
         # ----------------------------------------------------
 
         print()
