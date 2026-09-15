@@ -1,10 +1,10 @@
-name: Backtest EMA19
+name: Backtest EMA19 Macro
 
 on:
   workflow_dispatch:
 
 jobs:
-  backtest-ema19:
+  backtest-ema19-macro:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,6 +21,21 @@ jobs:
           pip install --upgrade pip
           pip install pandas numpy requests yfinance streamlit
 
-      - name: Run EMA19 Backtest
+      - name: Run EMA19 Macro Backtest
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
-          python backtestEMA19.py
+          python backtestEMA19Macro.py
+
+      - name: Upload Backtest Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ema19-macro-backtest-results
+          path: |
+            backtestEMA19Macro_trades.csv
+            backtestEMA19Macro_regimes.csv
+            backtestEMA19Macro_yearly.csv
+            backtestEMA19Macro_summary.csv
+            backtestEMA19Macro_macro_data.csv
+            backtestEMA19Macro_data_quality.csv
+            backtestEMA19Macro_signals.csv
