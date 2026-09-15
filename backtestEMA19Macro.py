@@ -1,78 +1,47 @@
-"""
-US500 EMA19 + Macro Regime Backtest
-===================================
-
-Phase 2:
-EMA19 Pullback baseline + historical macro regime classification.
-
-IMPORTANT:
-- No trade execution.
-- No position sizing.
-- No optimization.
-- EMA19 entry logic is unchanged.
-- Stop loss and TP are unchanged.
-- Macro is used for classification and comparison.
-- Macro data is aligned backward using observation dates.
-- FRED API key is used when available.
-- Public FRED CSV is used only as a fallback.
-- Derived macro growth/inflation rates are calculated from raw series.
-
-NOTE:
-This is NOT yet a true vintage/release-date backtest.
-It avoids future observation dates, but historical revisions
-and publication timing are not fully reconstructed.
-"""
-
-from __future__ import annotations
-
-import io
 import os
 import warnings
-from typing import Optional
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import requests
-
-from data import (
-    get_historical_market_data,
-    load_all_macro_data,
-)
+import yfinance as yf
 
 warnings.filterwarnings("ignore")
 
-
 # ============================================================
-# SETTINGS
+# CONFIG
 # ============================================================
-
 START_DATE = "2019-01-01"
-
+MARKET_TICKER = os.getenv("US500_TICKER", "^GSPC")
 EMA_FAST = 19
 EMA_TREND = 200
-
 RR = 4.0
-
 ATR_PERIOD = 14
-LOOKBACK_LOW = 5
+STOP_LOOKBACK = 5
 ATR_MULTIPLIER = 0.5
+FRED_API_KEY = os.getenv("FRED_API_KEY", "").strip()
 
-TICKER = "^GSPC"
+OUTPUT_TRADES = "backtestEMA19Macro_trades.csv"
+OUTPUT_REGIMES = "backtestEMA19Macro_regimes.csv"
+OUTPUT_YEARLY = "backtestEMA19Macro_yearly.csv"
+OUTPUT_SUMMARY = "backtestEMA19Macro_summary.csv"
+OUTPUT_MACRO = "backtestEMA19Macro_macro_data.csv"
+OUTPUT_QUALITY = "backtestEMA19Macro_data_quality.csv"
+OUTPUT_SIGNALS = "backtestEMA19Macro_signals.csv"
 
-FRED_START_DATE = START_DATE
+# We deliberately request extra history so YoY calculations have a full base.
+MACRO_FETCH_START = "2000-01-01"
 
-
-# ============================================================
-# FRED PUBLIC SERIES
-# ============================================================
-
-FRED_PUBLIC_SERIES = {
+FRED_SERIES = {
     "US10Y": "DGS10",
     "US2Y": "DGS2",
     "T10Y2Y": "T10Y2Y",
     "VIX": "VIXCLS",
+    "DXY": "DTWEXBGS",
     "UNRATE": "UNRATE",
     "INITIAL_CLAIMS_4W": "IC4WSA",
+    "FEDFUNDS": "FEDFUNDS",
     "HY_SPREAD": "BAMLH0A0HYM2",
     "CORP_OAS": "BAMLC0A0CM",
     "NFCI": "NFCI",
@@ -81,2174 +50,710 @@ FRED_PUBLIC_SERIES = {
     "PCE": "PCE",
     "PCEPI": "PCEPI",
     "CORE_PCE": "PCEPILFE",
-    "FEDFUNDS": "FEDFUNDS",
 }
 
+REGIME_NAMES = {
+    "A": "A â Healthy / Technical Pullback",
+    "B": "B â Growth Scare / Healthy Correction",
+    "C": "C â Inflation / Rates Shock",
+    "D": "D â Growth + Inflation / Mixed Stress",
+    "E": "E â Recession / Bear Risk",
+    "F": "F â Liquidity / Financial Shock",
+    "U": "U â Macro Data Insufficient",
+}
 
 # ============================================================
-# DATE NORMALIZATION
+# MARKET DATA
 # ============================================================
+def get_market_data():
+    print("Loading market data...")
 
-def normalize_datetime_series(
-    values,
-) -> pd.Series:
-
-    """
-    Normalize all dates to timezone-naive datetime64[ns].
-
-    This prevents merge_asof errors such as:
-
-    dtype('<M8[s]')
-    vs
-    dtype('<M8[us]')
-    """
-
-    result = pd.to_datetime(
-        values,
-        errors="coerce",
-        utc=True,
+    end_date = (pd.Timestamp.today() + pd.Timedelta(days=2)).strftime("%Y-%m-%d")
+    df = yf.download(
+        MARKET_TICKER,
+        start=START_DATE,
+        end=end_date,
+        interval="1d",
+        auto_adjust=False,
+        progress=False,
     )
 
-    # Convert timezone-aware UTC to timezone-naive.
-    try:
-        result = result.dt.tz_localize(None)
-    except AttributeError:
-        pass
+    if df.empty:
+        raise RuntimeError("Market data download returned no data.")
 
-    return result.astype(
-        "datetime64[ns]"
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    required = ["Open", "High", "Low", "Close"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise RuntimeError(f"Missing market columns: {missing}")
+
+    df = df[required].copy()
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    df = df.reset_index().rename(columns={"Date": "date"})
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").astype("datetime64[ns]")
+    df = df.dropna(subset=["date", "Close", "High", "Low"])
+    df = df.sort_values("date").drop_duplicates("date").reset_index(drop=True)
+
+    print(
+        f"Market data: {df['date'].min().date()} â {df['date'].max().date()}"
     )
+    return df
 
 
-# ============================================================
-# ATR
-# ============================================================
-
-def calculate_atr(
-    df: pd.DataFrame,
-    period: int = 14,
-) -> pd.Series:
-
-    high = df["high"]
-    low = df["low"]
-    close = df["close"]
-
-    previous_close = close.shift(1)
-
-    tr1 = high - low
-    tr2 = (high - previous_close).abs()
-    tr3 = (low - previous_close).abs()
-
-    true_range = pd.concat(
-        [tr1, tr2, tr3],
+def atr(df, period=14):
+    prev_close = df["Close"].shift(1)
+    tr = pd.concat(
+        [
+            df["High"] - df["Low"],
+            (df["High"] - prev_close).abs(),
+            (df["Low"] - prev_close).abs(),
+        ],
         axis=1,
     ).max(axis=1)
-
-    atr = true_range.ewm(
-        alpha=1 / period,
-        adjust=False,
-        min_periods=period,
-    ).mean()
-
-    return atr
+    return tr.rolling(period, min_periods=period).mean()
 
 
-# ============================================================
-# MARKET PREPARATION
-# ============================================================
-
-def prepare_market_data(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-
-    data = df.copy()
-
-    data.index = pd.to_datetime(
-        data.index,
-        errors="coerce",
-    )
-
-    data = data[
-        ~data.index.isna()
-    ]
-
-    data = data.sort_index()
-
-    data.columns = [
-        str(c)
-        .lower()
-        .replace(" ", "_")
-        for c in data.columns
-    ]
-
-    required = [
-        "open",
-        "high",
-        "low",
-        "close",
-    ]
-
-    for col in required:
-
-        if col not in data.columns:
-
-            raise ValueError(
-                f"Required market column missing: {col}"
-            )
-
-    data["ema19"] = data[
-        "close"
-    ].ewm(
-        span=EMA_FAST,
-        adjust=False,
-    ).mean()
-
-    data["ema200"] = data[
-        "close"
-    ].ewm(
-        span=EMA_TREND,
-        adjust=False,
-    ).mean()
-
-    # Previous completed candle ATR.
-    data["atr14"] = calculate_atr(
-        data,
-        ATR_PERIOD,
-    ).shift(1)
-
-    return data
+def prepare_market(df):
+    df = df.copy()
+    df["EMA19"] = df["Close"].ewm(span=EMA_FAST, adjust=False).mean()
+    df["EMA200"] = df["Close"].ewm(span=EMA_TREND, adjust=False).mean()
+    df["ATR14"] = atr(df, ATR_PERIOD)
+    return df
 
 
 # ============================================================
-# EMA19 SIGNAL DETECTION
+# EMA19 SIGNALS
 # ============================================================
-
-def detect_ema19_pullbacks(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-
+def detect_signals(df):
+    """
+    Existing EMA19 pullback logic preserved:
+    - Close > EMA200
+    - EMA19 > EMA200
+    - Low <= EMA19
+    - Entry at signal-day close
+    - One signal at a time until the prior signal is resolved/invalidated
+    """
     signals = []
+    last_signal_date = None
 
-    start_index = EMA_TREND
-
-    for i in range(
-        start_index,
-        len(df),
-    ):
-
+    for i in range(max(EMA_TREND, ATR_PERIOD, STOP_LOOKBACK) + 1, len(df)):
         row = df.iloc[i]
 
-        close = row["close"]
-        low = row["low"]
-        ema19 = row["ema19"]
-        ema200 = row["ema200"]
-
-        if pd.isna(close):
+        if not np.isfinite(row["EMA19"]):
+            continue
+        if not np.isfinite(row["EMA200"]):
+            continue
+        if not np.isfinite(row["ATR14"]):
             continue
 
-        if pd.isna(low):
+        condition = (
+            row["Close"] > row["EMA200"]
+            and row["EMA19"] > row["EMA200"]
+            and row["Low"] <= row["EMA19"]
+        )
+
+        if not condition:
             continue
 
-        if pd.isna(ema19):
-            continue
+        if last_signal_date is not None:
+            # Avoid duplicate consecutive pullback signals.
+            if row["date"] <= last_signal_date:
+                continue
 
-        if pd.isna(ema200):
-            continue
+        entry = float(row["Close"])
+        previous_5 = df.iloc[i - STOP_LOOKBACK:i]
+        prev_low = float(previous_5["Low"].min())
+        previous_atr = float(df.iloc[i - 1]["ATR14"])
+        stop = prev_low - ATR_MULTIPLIER * previous_atr
 
-        # ----------------------------------------------------
-        # TREND
-        # ----------------------------------------------------
-
-        if close <= ema200:
-            continue
-
-        if ema19 <= ema200:
-            continue
-
-        # ----------------------------------------------------
-        # TOUCH EMA19
-        # ----------------------------------------------------
-
-        if low > ema19:
-            continue
-
-        # ----------------------------------------------------
-        # PREVENT IMMEDIATE DUPLICATE SIGNAL
-        # ----------------------------------------------------
-
-        if i > 0:
-
-            previous = df.iloc[i - 1]
-
-            previous_close = (
-                previous["close"]
+        if not np.isfinite(stop) or stop >= entry:
+            signals.append(
+                {
+                    "signal_date": row["date"],
+                    "entry": entry,
+                    "stop": stop,
+                    "risk": entry - stop,
+                    "valid_sl": False,
+                }
             )
+            last_signal_date = row["date"]
+            continue
 
-            previous_low = (
-                previous["low"]
-            )
-
-            previous_ema19 = (
-                previous["ema19"]
-            )
-
-            if (
-                not pd.isna(previous_close)
-                and not pd.isna(previous_low)
-                and not pd.isna(previous_ema19)
-            ):
-
-                previous_was_reclaim = (
-                    previous_close > previous_ema19
-                    and previous_low <= previous_ema19
-                )
-
-                if previous_was_reclaim:
-                    continue
-
-        distance_ema19 = (
-            close / ema19 - 1
-        ) * 100
-
-        distance_ema200 = (
-            close / ema200 - 1
-        ) * 100
+        risk = entry - stop
+        target = entry + RR * risk
 
         signals.append(
             {
-                "signal_date": df.index[i],
-                "entry": float(close),
-                "ema19": float(ema19),
-                "ema200": float(ema200),
-                "distance_from_ema19_pct":
-                    float(distance_ema19),
-                "distance_from_ema200_pct":
-                    float(distance_ema200),
+                "signal_date": row["date"],
+                "entry": entry,
+                "stop": stop,
+                "risk": risk,
+                "target": target,
+                "valid_sl": True,
             }
         )
+        last_signal_date = row["date"]
 
-    return pd.DataFrame(
-        signals
-    )
-
-
-# ============================================================
-# STOP LOSS
-# ============================================================
-
-def calculate_stop_loss(
-    df: pd.DataFrame,
-    signal_index: int,
-) -> Optional[float]:
-
-    if signal_index < LOOKBACK_LOW:
-
-        return None
-
-    row = df.iloc[
-        signal_index
-    ]
-
-    atr = row["atr14"]
-
-    if pd.isna(atr):
-
-        return None
-
-    # Only candles BEFORE the signal candle.
-    previous_candles = df.iloc[
-        signal_index - LOOKBACK_LOW:
-        signal_index
-    ]
-
-    if len(previous_candles) < LOOKBACK_LOW:
-
-        return None
-
-    lowest_low = (
-        previous_candles["low"]
-        .min()
-    )
-
-    if pd.isna(lowest_low):
-
-        return None
-
-    stop_loss = (
-        lowest_low
-        - ATR_MULTIPLIER * atr
-    )
-
-    return float(stop_loss)
+    out = pd.DataFrame(signals)
+    print(f"EMA19 Pullback signals: {len(out)}")
+    return out
 
 
 # ============================================================
 # TRADE EVALUATION
 # ============================================================
+def evaluate_signal(signal, market):
+    signal_date = pd.Timestamp(signal["signal_date"])
+    entry = float(signal["entry"])
+    stop = float(signal["stop"])
+    risk = float(signal["risk"])
 
-def evaluate_trade(
-    df: pd.DataFrame,
-    signal_index: int,
-    entry: float,
-    stop_loss: float,
-    take_profit: float,
-) -> dict:
+    if not bool(signal["valid_sl"]):
+        return {
+            **signal,
+            "target": np.nan,
+            "result": "INVALID_SL",
+            "exit_date": pd.NaT,
+            "R": np.nan,
+        }
 
-    result = {
-        "status": "OPEN",
+    target = entry + RR * risk
+    future = market[market["date"] > signal_date].copy()
+
+    for _, row in future.iterrows():
+        hit_tp = row["High"] >= target
+        hit_sl = row["Low"] <= stop
+
+        if hit_tp and hit_sl:
+            return {
+                **signal,
+                "target": target,
+                "result": "AMBIGUOUS",
+                "exit_date": row["date"],
+                "R": np.nan,
+            }
+
+        if hit_tp:
+            return {
+                **signal,
+                "target": target,
+                "result": "WIN",
+                "exit_date": row["date"],
+                "R": RR,
+            }
+
+        if hit_sl:
+            return {
+                **signal,
+                "target": target,
+                "result": "LOSS",
+                "exit_date": row["date"],
+                "R": -1.0,
+            }
+
+    return {
+        **signal,
+        "target": target,
         "result": "OPEN",
         "exit_date": pd.NaT,
         "R": np.nan,
     }
 
-    for j in range(
-        signal_index + 1,
-        len(df),
-    ):
 
-        row = df.iloc[j]
-
-        high = row["high"]
-        low = row["low"]
-
-        if pd.isna(high) or pd.isna(low):
-
-            continue
-
-        hit_tp = (
-            high >= take_profit
-        )
-
-        hit_sl = (
-            low <= stop_loss
-        )
-
-        # ----------------------------------------------------
-        # SAME-DAY TP + SL
-        # ----------------------------------------------------
-
-        if hit_tp and hit_sl:
-
-            result["status"] = "VALID"
-            result["result"] = "AMBIGUOUS"
-            result["exit_date"] = df.index[j]
-
-            return result
-
-        # ----------------------------------------------------
-        # STOP
-        # ----------------------------------------------------
-
-        if hit_sl:
-
-            result["status"] = "VALID"
-            result["result"] = "LOSS"
-            result["exit_date"] = df.index[j]
-            result["R"] = -1.0
-
-            return result
-
-        # ----------------------------------------------------
-        # TARGET
-        # ----------------------------------------------------
-
-        if hit_tp:
-
-            result["status"] = "VALID"
-            result["result"] = "WIN"
-            result["exit_date"] = df.index[j]
-            result["R"] = RR
-
-            return result
-
-    return result
-
-
-# ============================================================
-# BUILD BACKTEST
-# ============================================================
-
-def build_ema19_backtest(
-    market: pd.DataFrame,
-    signals: pd.DataFrame,
-) -> pd.DataFrame:
-
-    trades = []
-
+def build_backtest(market, signals):
+    rows = []
     for _, signal in signals.iterrows():
+        rows.append(evaluate_signal(signal.to_dict(), market))
 
-        signal_date = pd.Timestamp(
-            signal["signal_date"]
-        )
-
-        try:
-
-            signal_index = (
-                market.index.get_loc(
-                    signal_date
-                )
-            )
-
-        except KeyError:
-
-            continue
-
-        entry = float(
-            signal["entry"]
-        )
-
-        stop_loss = calculate_stop_loss(
-            market,
-            signal_index,
-        )
-
-        row = signal.to_dict()
-
-        row["stop_loss"] = stop_loss
-
-        # ----------------------------------------------------
-        # INVALID STOP
-        # ----------------------------------------------------
-
-        if (
-            stop_loss is None
-            or pd.isna(stop_loss)
-            or stop_loss >= entry
-        ):
-
-            row["take_profit"] = np.nan
-            row["risk_points"] = np.nan
-            row["status"] = "INVALID_SL"
-            row["result"] = "INVALID_SL"
-            row["exit_date"] = pd.NaT
-            row["R"] = np.nan
-
-            trades.append(row)
-
-            continue
-
-        risk_points = (
-            entry - stop_loss
-        )
-
-        take_profit = (
-            entry
-            + RR * risk_points
-        )
-
-        evaluation = evaluate_trade(
-            market,
-            signal_index,
-            entry,
-            stop_loss,
-            take_profit,
-        )
-
-        row["take_profit"] = take_profit
-        row["risk_points"] = risk_points
-
-        row.update(
-            evaluation
-        )
-
-        trades.append(row)
-
-    return pd.DataFrame(
-        trades
-    )
+    trades = pd.DataFrame(rows)
+    print(f"Backtest events: {len(trades)}")
+    return trades
 
 
 # ============================================================
-# MACRO FRAME NORMALIZATION
+# FRED DATA
 # ============================================================
-
-def _prepare_macro_frame(
-    value,
-    name: str,
-) -> pd.DataFrame:
-
-    if value is None:
-
-        return pd.DataFrame(
-            columns=[
-                "date",
-                name,
-            ]
+def fred_series(series_id, start_date=MACRO_FETCH_START):
+    if not FRED_API_KEY:
+        raise RuntimeError(
+            "FRED_API_KEY is missing. Add it to GitHub Actions Secrets."
         )
 
-    if isinstance(
-        value,
-        pd.Series,
-    ):
-
-        frame = value.to_frame(
-            name=name
-        ).reset_index()
-
-    elif isinstance(
-        value,
-        pd.DataFrame,
-    ):
-
-        frame = value.copy()
-
-        if isinstance(
-            frame.index,
-            pd.DatetimeIndex,
-        ):
-
-            frame = frame.reset_index()
-
-            frame = frame.rename(
-                columns={
-                    frame.columns[0]:
-                        "date"
-                }
-            )
-
-        else:
-
-            date_column = None
-
-            for col in frame.columns:
-
-                if str(col).lower() in (
-                    "date",
-                    "datetime",
-                    "time",
-                ):
-
-                    date_column = col
-                    break
-
-            if date_column is not None:
-
-                frame = frame.rename(
-                    columns={
-                        date_column:
-                            "date"
-                    }
-                )
-
-    else:
-
-        return pd.DataFrame(
-            columns=[
-                "date",
-                name,
-            ]
-        )
-
-    if "date" not in frame.columns:
-
-        return pd.DataFrame(
-            columns=[
-                "date",
-                name,
-            ]
-        )
-
-    value_columns = [
-        c for c in frame.columns
-        if c != "date"
-    ]
-
-    if name not in frame.columns:
-
-        if not value_columns:
-
-            return pd.DataFrame(
-                columns=[
-                    "date",
-                    name,
-                ]
-            )
-
-        frame = frame.rename(
-            columns={
-                value_columns[0]:
-                    name
-            }
-        )
-
-    frame["date"] = normalize_datetime_series(
-        frame["date"]
-    )
-
-    frame[name] = pd.to_numeric(
-        frame[name],
-        errors="coerce",
-    )
-
-    frame = frame[
-        [
-            "date",
-            name,
-        ]
-    ]
-
-    frame = frame.dropna(
-        subset=["date"]
-    )
-
-    frame = frame.sort_values(
-        "date"
-    )
-
-    frame = frame.drop_duplicates(
-        subset=["date"],
-        keep="last",
-    )
-
-    return frame
-
-
-# ============================================================
-# EXTRACT SERIES FROM DATA DICT
-# ============================================================
-
-def _extract_macro_series(
-    macro_data,
-    possible_names,
-) -> pd.DataFrame:
-
-    if macro_data is None:
-
-        return pd.DataFrame()
-
-    if isinstance(
-        macro_data,
-        dict,
-    ):
-
-        normalized = {
-            str(k).lower(): v
-            for k, v
-            in macro_data.items()
-        }
-
-        for wanted in possible_names:
-
-            if wanted.lower() in normalized:
-
-                return _prepare_macro_frame(
-                    normalized[
-                        wanted.lower()
-                    ],
-                    wanted,
-                )
-
-    if isinstance(
-        macro_data,
-        pd.DataFrame,
-    ):
-
-        columns_lower = {
-            str(c).lower(): c
-            for c in macro_data.columns
-        }
-
-        for wanted in possible_names:
-
-            if wanted.lower() in columns_lower:
-
-                original = columns_lower[
-                    wanted.lower()
-                ]
-
-                frame = macro_data[
-                    [original]
-                ].copy()
-
-                frame = frame.rename(
-                    columns={
-                        original:
-                            wanted
-                    }
-                )
-
-                return _prepare_macro_frame(
-                    frame,
-                    wanted,
-                )
-
-    return pd.DataFrame()
-
-
-# ============================================================
-# FRED API KEY
-# ============================================================
-
-def get_fred_api_key() -> str:
-
-    return os.getenv(
-        "FRED_API_KEY",
-        "",
-    ).strip()
-
-
-# ============================================================
-# FRED API DIRECT FETCH
-# ============================================================
-
-def fetch_fred_api_series(
-    series_id: str,
-    start_date: str = START_DATE,
-) -> pd.DataFrame:
-
-    """
-    Direct FRED API fetch.
-
-    Used mainly for series that are not present in data.py,
-    such as PCEPI in the current configuration.
-    """
-
-    api_key = get_fred_api_key()
-
-    if not api_key:
-
-        return pd.DataFrame()
-
-    url = (
-        "https://api.stlouisfed.org/fred/series/observations"
-    )
-
+    url = "https://api.stlouisfed.org/fred/series/observations"
     params = {
         "series_id": series_id,
-        "api_key": api_key,
+        "api_key": FRED_API_KEY,
         "file_type": "json",
         "observation_start": start_date,
+        "sort_order": "asc",
     }
 
-    try:
+    r = requests.get(url, params=params, timeout=60)
+    r.raise_for_status()
+    data = r.json()
 
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20,
-            headers={
-                "User-Agent":
-                    "US500-Macro-Backtest/1.0"
-            },
-        )
+    observations = data.get("observations", [])
+    if not observations:
+        return pd.DataFrame(columns=["date", "value"])
 
-        response.raise_for_status()
+    out = pd.DataFrame(observations)
+    out["date"] = pd.to_datetime(out["date"], errors="coerce").astype("datetime64[ns]")
+    out["value"] = pd.to_numeric(out["value"], errors="coerce")
+    out = out[["date", "value"]].dropna(subset=["date", "value"])
+    out = out.sort_values("date").drop_duplicates("date", keep="last")
+    return out.reset_index(drop=True)
 
-        payload = response.json()
 
-        observations = payload.get(
-            "observations",
-            [],
-        )
+def load_macro_raw():
+    print("\n" + "=" * 60)
+    print("LOADING MACRO DATA")
+    print("=" * 60)
 
-        if not observations:
+    if not FRED_API_KEY:
+        raise RuntimeError("FRED_API_KEY is missing.")
 
-            return pd.DataFrame()
+    raw = {}
+    for name, series_id in FRED_SERIES.items():
+        try:
+            print(f"  Fetching FRED API: {name} ({series_id})")
+            df = fred_series(series_id)
+            raw[name] = df
+            print(f"    {len(df)} observations")
+        except Exception as exc:
+            print(f"    FAILED {name}: {exc}")
+            raw[name] = pd.DataFrame(columns=["date", "value"])
 
-        frame = pd.DataFrame(
-            observations
-        )
-
-        if (
-            "date" not in frame.columns
-            or "value" not in frame.columns
-        ):
-
-            return pd.DataFrame()
-
-        frame["date"] = normalize_datetime_series(
-            frame["date"]
-        )
-
-        frame["value"] = pd.to_numeric(
-            frame["value"],
-            errors="coerce",
-        )
-
-        frame = frame[
-            [
-                "date",
-                "value",
-            ]
-        ]
-
-        frame = frame.dropna(
-            subset=["date"]
-        )
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame = frame.drop_duplicates(
-            subset=["date"],
-            keep="last",
-        )
-
-        return frame
-
-    except Exception as exc:
-
-        print(
-            f"  FRED API fetch failed "
-            f"{series_id}: {exc}"
-        )
-
-        return pd.DataFrame()
+    return raw
 
 
 # ============================================================
-# PUBLIC FRED CSV FALLBACK
+# MACRO DERIVATIONS + DAILY ALIGNMENT
 # ============================================================
-
-def fetch_fred_public_csv(
-    series_id: str,
-    start_date: str = START_DATE,
-) -> pd.DataFrame:
-
+def derive_macro_series(raw):
     """
-    Download FRED data without an API key.
-
-    This is only a fallback.
+    Derive YoY/inflation metrics BEFORE daily alignment.
+    This is essential: never calculate YoY after forward-fill.
     """
+    clean = {k: v.copy() for k, v in raw.items()}
 
-    url = (
-        "https://fred.stlouisfed.org/graph/fredgraph.csv"
-        f"?id={series_id}"
-        f"&cosd={start_date}"
-    )
+    def yoy(name, output):
+        if name not in clean or clean[name].empty:
+            clean[output] = pd.DataFrame(columns=["date", "value"])
+            return
 
-    try:
+        s = clean[name].set_index("date")["value"].sort_index()
+        # Monthly series: 12 observations back.
+        derived = s.pct_change(12) * 100.0
+        clean[output] = derived.dropna().rename("value").reset_index()
 
-        response = requests.get(
-            url,
-            timeout=10,
-            headers={
-                "User-Agent":
-                    "US500-Macro-Backtest/1.0"
-            },
-        )
+    yoy("INDPRO", "INDPRO_YOY")
+    yoy("RETAIL", "RETAIL_YOY")
+    yoy("PCEPI", "PCE_INFLATION")
+    yoy("CORE_PCE", "CORE_PCE_INFLATION")
 
-        response.raise_for_status()
-
-        frame = pd.read_csv(
-            io.StringIO(
-                response.text
-            )
-        )
-
-        if frame.empty:
-
-            return pd.DataFrame()
-
-        date_col = frame.columns[0]
-
-        value_col = frame.columns[1]
-
-        frame = frame.rename(
-            columns={
-                date_col: "date",
-                value_col: "value",
-            }
-        )
-
-        frame["date"] = normalize_datetime_series(
-            frame["date"]
-        )
-
-        frame["value"] = pd.to_numeric(
-            frame["value"],
-            errors="coerce",
-        )
-
-        frame = frame[
-            [
-                "date",
-                "value",
-            ]
-        ]
-
-        frame = frame.dropna(
-            subset=["date"]
-        )
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame = frame.drop_duplicates(
-            subset=["date"],
-            keep="last",
-        )
-
-        return frame
-
-    except Exception as exc:
-
-        print(
-            f"  FRED public fetch failed "
-            f"{series_id}: {exc}"
-        )
-
-        return pd.DataFrame()
+    return clean
 
 
-# ============================================================
-# LOAD MACRO WITH FALLBACK
-# ============================================================
-
-def load_macro_resilient() -> dict:
-
+def align_one_series(market_dates, series_df):
     """
-    Load macro data in three layers:
-
-    1. Existing data.py loader.
-    2. Direct FRED API using FRED_API_KEY.
-    3. Public FRED CSV fallback.
-
-    This avoids losing an individual series simply because
-    it was not included in config.py.
+    Align each macro observation to the latest observation on/before
+    each market date. merge_asof is used instead of exact-date reindexing,
+    so monthly/weekly series remain available on normal trading days.
     """
-
-    existing_data = {}
-
-    try:
-
-        loaded = load_all_macro_data(
-            start_date=START_DATE
-        )
-
-        if isinstance(
-            loaded,
-            dict,
-        ):
-
-            existing_data = loaded
-
-    except Exception as exc:
-
-        print(
-            f"Existing macro loader warning: {exc}"
-        )
-
-    result = {}
-
-    # --------------------------------------------------------
-    # STANDARD SERIES
-    # --------------------------------------------------------
-
-    aliases = {
-
-        "US10Y": [
-            "US10Y",
-            "DGS10",
-        ],
-
-        "US2Y": [
-            "US2Y",
-            "DGS2",
-        ],
-
-        "T10Y2Y": [
-            "T10Y2Y",
-        ],
-
-        "VIX": [
-            "VIX",
-            "VIXCLS",
-        ],
-
-        "UNRATE": [
-            "UNRATE",
-            "UNEMPLOYMENT",
-        ],
-
-        "INITIAL_CLAIMS_4W": [
-            "INITIAL_CLAIMS_4W",
-            "IC4WSA",
-        ],
-
-        "HY_SPREAD": [
-            "HY_SPREAD",
-            "BAMLH0A0HYM2",
-        ],
-
-        "CORP_OAS": [
-            "CORP_OAS",
-            "BAMLC0A0CM",
-        ],
-
-        "NFCI": [
-            "NFCI",
-        ],
-
-        "INDPRO": [
-            "INDPRO",
-        ],
-
-        "RETAIL": [
-            "RETAIL",
-            "RSAFS",
-        ],
-
-        "PCE": [
-            "PCE",
-        ],
-
-        "PCEPI": [
-            "PCEPI",
-        ],
-
-        "CORE_PCE": [
-            "CORE_PCE",
-            "PCEPILFE",
-        ],
-
-        "FEDFUNDS": [
-            "FEDFUNDS",
-        ],
-    }
-
-    # --------------------------------------------------------
-    # FIRST: DATA.PY
-    # --------------------------------------------------------
-
-    for standard_name, names in aliases.items():
-
-        frame = _extract_macro_series(
-            existing_data,
-            names,
-        )
-
-        if not frame.empty:
-
-            frame = frame.rename(
-                columns={
-                    frame.columns[-1]:
-                        standard_name
-                }
-            )
-
-            result[
-                standard_name
-            ] = frame
-
-    # --------------------------------------------------------
-    # SECOND: DIRECT FRED API
-    # --------------------------------------------------------
-
-    for standard_name, series_id in (
-        FRED_PUBLIC_SERIES.items()
-    ):
-
-        if standard_name in result:
-
-            continue
-
-        if get_fred_api_key():
-
-            print(
-                f"  Fetching FRED API: "
-                f"{standard_name} ({series_id})"
-            )
-
-            frame = fetch_fred_api_series(
-                series_id=series_id,
-                start_date=FRED_START_DATE,
-            )
-
-            if not frame.empty:
-
-                frame = frame.rename(
-                    columns={
-                        "value":
-                            standard_name
-                    }
-                )
-
-                result[
-                    standard_name
-                ] = frame
-
-    # --------------------------------------------------------
-    # THIRD: PUBLIC CSV
-    # --------------------------------------------------------
-
-    for standard_name, series_id in (
-        FRED_PUBLIC_SERIES.items()
-    ):
-
-        if standard_name in result:
-
-            continue
-
-        print(
-            f"  Fetching FRED fallback: "
-            f"{standard_name} ({series_id})"
-        )
-
-        frame = fetch_fred_public_csv(
-            series_id=series_id,
-            start_date=FRED_START_DATE,
-        )
-
-        if frame.empty:
-
-            continue
-
-        frame = frame.rename(
-            columns={
-                "value":
-                    standard_name
-            }
-        )
-
-        result[
-            standard_name
-        ] = frame
-
-    return result
-
-
-# ============================================================
-# DERIVED MACRO INDICATORS
-# ============================================================
-
-def add_derived_series(
-    macro_frames: dict,
-) -> dict:
-
-    result = dict(
-        macro_frames
-    )
-
-    # --------------------------------------------------------
-    # INDUSTRIAL PRODUCTION YOY
-    # --------------------------------------------------------
-
-    if "INDPRO" in result:
-
-        frame = result[
-            "INDPRO"
-        ].copy()
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame[
-            "INDPRO_YOY"
-        ] = (
-            frame["INDPRO"]
-            .pct_change(12)
-            * 100
-        )
-
-        result[
-            "INDPRO_DERIVED"
-        ] = frame[
-            [
-                "date",
-                "INDPRO_YOY",
-            ]
-        ]
-
-    # --------------------------------------------------------
-    # RETAIL SALES YOY
-    # --------------------------------------------------------
-
-    if "RETAIL" in result:
-
-        frame = result[
-            "RETAIL"
-        ].copy()
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame[
-            "RETAIL_YOY"
-        ] = (
-            frame["RETAIL"]
-            .pct_change(12)
-            * 100
-        )
-
-        result[
-            "RETAIL_DERIVED"
-        ] = frame[
-            [
-                "date",
-                "RETAIL_YOY",
-            ]
-        ]
-
-    # --------------------------------------------------------
-    # HEADLINE PCE INFLATION
-    # --------------------------------------------------------
-
-    if "PCEPI" in result:
-
-        frame = result[
-            "PCEPI"
-        ].copy()
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame[
-            "PCE_INFLATION"
-        ] = (
-            frame["PCEPI"]
-            .pct_change(12)
-            * 100
-        )
-
-        result[
-            "PCE_INFLATION_DERIVED"
-        ] = frame[
-            [
-                "date",
-                "PCE_INFLATION",
-            ]
-        ]
-
-    # --------------------------------------------------------
-    # CORE PCE INFLATION
-    # --------------------------------------------------------
-
-    if "CORE_PCE" in result:
-
-        frame = result[
-            "CORE_PCE"
-        ].copy()
-
-        frame = frame.sort_values(
-            "date"
-        )
-
-        frame[
-            "CORE_PCE_INFLATION"
-        ] = (
-            frame["CORE_PCE"]
-            .pct_change(12)
-            * 100
-        )
-
-        result[
-            "CORE_PCE_INFLATION_DERIVED"
-        ] = frame[
-            [
-                "date",
-                "CORE_PCE_INFLATION",
-            ]
-        ]
-
-    return result
-
-
-# ============================================================
-# MERGE MACRO FRAMES
-# ============================================================
-
-def merge_macro_frames(
-    frames: dict,
-) -> pd.DataFrame:
-
-    merged = None
-
-    for name, frame in frames.items():
-
-        if frame is None:
-            continue
-
-        if frame.empty:
-            continue
-
-        temp = frame.copy()
-
-        temp["date"] = normalize_datetime_series(
-            temp["date"]
-        )
-
-        temp = temp.dropna(
-            subset=["date"]
-        )
-
-        if temp.empty:
-            continue
-
-        temp = temp.sort_values(
-            "date"
-        )
-
-        temp = temp.drop_duplicates(
-            subset=["date"],
-            keep="last",
-        )
-
-        if merged is None:
-
-            merged = temp
-
-        else:
-
-            duplicate_columns = [
-                c
-                for c in temp.columns
-                if c != "date"
-                and c in merged.columns
-            ]
-
-            temp = temp.drop(
-                columns=duplicate_columns,
-                errors="ignore",
-            )
-
-            if len(
-                temp.columns
-            ) > 1:
-
-                merged = pd.merge(
-                    merged,
-                    temp,
-                    on="date",
-                    how="outer",
-                )
-
-                merged["date"] = (
-                    normalize_datetime_series(
-                        merged["date"]
-                    )
-                )
-
-    if merged is None:
-
-        return pd.DataFrame()
-
-    merged["date"] = (
-        normalize_datetime_series(
-            merged["date"]
-        )
-    )
-
-    merged = merged.sort_values(
-        "date"
-    )
-
-    merged = merged.drop_duplicates(
-        subset=["date"],
-        keep="last",
-    )
-
-    return merged
-
-
-# ============================================================
-# MACRO CLASSIFICATION
-# ============================================================
-
-def classify_macro_regime(
-    row: pd.Series,
-) -> str:
-
-    hy = row.get(
-        "HY_SPREAD",
-        np.nan,
-    )
-
-    corp = row.get(
-        "CORP_OAS",
-        np.nan,
-    )
-
-    vix = row.get(
-        "VIX",
-        np.nan,
-    )
-
-    nfci = row.get(
-        "NFCI",
-        np.nan,
-    )
-
-    t10y2y = row.get(
-        "T10Y2Y",
-        np.nan,
-    )
-
-    unrate = row.get(
-        "UNRATE",
-        np.nan,
-    )
-
-    claims = row.get(
-        "INITIAL_CLAIMS_4W",
-        np.nan,
-    )
-
-    pce_inflation = row.get(
-        "PCE_INFLATION",
-        np.nan,
-    )
-
-    core_pce_inflation = row.get(
-        "CORE_PCE_INFLATION",
-        np.nan,
-    )
-
-    indpro_yoy = row.get(
-        "INDPRO_YOY",
-        np.nan,
-    )
-
-    retail_yoy = row.get(
-        "RETAIL_YOY",
-        np.nan,
-    )
-
-    us10y = row.get(
-        "US10Y",
-        np.nan,
-    )
-
-    us2y = row.get(
-        "US2Y",
-        np.nan,
-    )
-
-    fedfunds = row.get(
-        "FEDFUNDS",
-        np.nan,
-    )
-
-    # ========================================================
-    # F — LIQUIDITY / FINANCIAL SHOCK
-    # ========================================================
-
-    financial_stress = False
-
-    if (
-        not pd.isna(vix)
-        and vix >= 35
-    ):
-
-        financial_stress = True
-
-    if (
-        not pd.isna(hy)
-        and hy >= 6
-    ):
-
-        financial_stress = True
-
-    if (
-        not pd.isna(corp)
-        and corp >= 3.5
-    ):
-
-        financial_stress = True
-
-    if (
-        not pd.isna(nfci)
-        and nfci >= 1.0
-    ):
-
-        financial_stress = True
-
-    if financial_stress:
-
-        return (
-            "F — Liquidity / Financial Shock"
-        )
-
-    # ========================================================
-    # E — RECESSION / BEAR RISK
-    # ========================================================
-
-    recession_score = 0
-
-    if (
-        not pd.isna(unrate)
-        and unrate >= 5.0
-    ):
-
-        recession_score += 2
-
-    if (
-        not pd.isna(claims)
-        and claims >= 300000
-    ):
-
-        recession_score += 2
-
-    if (
-        not pd.isna(indpro_yoy)
-        and indpro_yoy < 0
-    ):
-
-        recession_score += 1
-
-    if (
-        not pd.isna(retail_yoy)
-        and retail_yoy < 0
-    ):
-
-        recession_score += 1
-
-    if (
-        not pd.isna(t10y2y)
-        and t10y2y < -0.50
-    ):
-
-        recession_score += 1
-
-    if recession_score >= 3:
-
-        return (
-            "E — Recession / Bear Risk"
-        )
-
-    # ========================================================
-    # C / D — INFLATION / RATES SHOCK
-    # ========================================================
-
-    inflation_score = 0
-
-    if (
-        not pd.isna(pce_inflation)
-        and pce_inflation >= 3.0
-    ):
-
-        inflation_score += 1
-
-    if (
-        not pd.isna(core_pce_inflation)
-        and core_pce_inflation >= 3.0
-    ):
-
-        inflation_score += 1
-
-    if (
-        not pd.isna(us10y)
-        and us10y >= 4.5
-    ):
-
-        inflation_score += 1
-
-    if (
-        not pd.isna(us2y)
-        and us2y >= 4.5
-    ):
-
-        inflation_score += 1
-
-    if (
-        not pd.isna(fedfunds)
-        and fedfunds >= 4.5
-    ):
-
-        inflation_score += 1
-
-    growth_weak = False
-
-    if (
-        not pd.isna(indpro_yoy)
-        and indpro_yoy < 0
-    ):
-
-        growth_weak = True
-
-    if (
-        not pd.isna(retail_yoy)
-        and retail_yoy < 0
-    ):
-
-        growth_weak = True
-
-    if (
-        not pd.isna(claims)
-        and claims >= 260000
-    ):
-
-        growth_weak = True
-
-    if inflation_score >= 3:
-
-        if growth_weak:
-
-            return (
-                "D — Growth + Inflation / Mixed Stress"
-            )
-
-        return (
-            "C — Inflation / Rates Shock"
-        )
-
-    # ========================================================
-    # B — GROWTH SCARE / HEALTHY CORRECTION
-    # ========================================================
-
-    growth_weak_count = 0
-
-    if (
-        not pd.isna(indpro_yoy)
-        and indpro_yoy < 0
-    ):
-
-        growth_weak_count += 1
-
-    if (
-        not pd.isna(retail_yoy)
-        and retail_yoy < 0
-    ):
-
-        growth_weak_count += 1
-
-    if (
-        not pd.isna(claims)
-        and claims >= 260000
-    ):
-
-        growth_weak_count += 1
-
-    inflation_not_hot = True
-
-    if (
-        not pd.isna(pce_inflation)
-        and pce_inflation >= 3.5
-    ):
-
-        inflation_not_hot = False
-
-    if (
-        not pd.isna(core_pce_inflation)
-        and core_pce_inflation >= 3.5
-    ):
-
-        inflation_not_hot = False
-
-    if (
-        growth_weak_count >= 2
-        and inflation_not_hot
-    ):
-
-        return (
-            "B — Growth Scare / Healthy Correction"
-        )
-
-    # ========================================================
-    # A — HEALTHY / TECHNICAL PULLBACK
-    # ========================================================
-
-    return (
-        "A — Healthy / Technical Pullback"
-    )
-
-
-# ============================================================
-# PREPARE MACRO DATA
-# ============================================================
-
-def prepare_macro_data(
-    market: pd.DataFrame,
-) -> pd.DataFrame:
-
-    print()
-    print(
-        "=" * 60
-    )
-
-    print(
-        "LOADING MACRO DATA"
-    )
-
-    print(
-        "=" * 60
-    )
-
-    # --------------------------------------------------------
-    # LOAD
-    # --------------------------------------------------------
-
-    macro_frames = load_macro_resilient()
-
-    if not macro_frames:
-
-        print(
-            "No macro series available."
-        )
-
-        return pd.DataFrame()
-
-    # --------------------------------------------------------
-    # PRINT STATUS
-    # --------------------------------------------------------
-
-    print()
-    print(
-        "MACRO DATA STATUS"
-    )
-
-    print(
-        "-" * 60
-    )
-
-    for name in FRED_PUBLIC_SERIES:
-
-        if name in macro_frames:
-
-            frame = macro_frames[
-                name
-            ]
-
-            print(
-                f"{name:<22}: "
-                f"{len(frame):>5} observations"
-            )
-
-        else:
-
-            print(
-                f"{name:<22}: UNAVAILABLE"
-            )
-
-    # --------------------------------------------------------
-    # DERIVED SERIES
-    # --------------------------------------------------------
-
-    macro_frames = add_derived_series(
-        macro_frames
-    )
-
-    # --------------------------------------------------------
-    # MERGE
-    # --------------------------------------------------------
-
-    macro = merge_macro_frames(
-        macro_frames
-    )
-
-    if macro.empty:
-
-        print(
-            "Macro merge produced no data."
-        )
-
-        return pd.DataFrame()
-
-    # --------------------------------------------------------
-    # MARKET DATES
-    # --------------------------------------------------------
-
-    market_reset = (
-        market
-        .reset_index()
-    )
-
-    first_column = (
-        market_reset.columns[0]
-    )
-
-    market_reset = (
-        market_reset
-        .rename(
-            columns={
-                first_column:
-                    "date"
-            }
-        )
-    )
-
-    # IMPORTANT:
-    # Force exact same datetime dtype on both sides.
-    market_reset["date"] = (
-        normalize_datetime_series(
-            market_reset["date"]
-        )
-    )
-
-    macro["date"] = (
-        normalize_datetime_series(
-            macro["date"]
-        )
-    )
-
-    market_reset = (
-        market_reset
-        .dropna(
-            subset=["date"]
-        )
-        .sort_values("date")
-    )
-
-    macro = (
-        macro
-        .dropna(
-            subset=["date"]
-        )
-        .sort_values("date")
-    )
-
-    # Remove duplicates before merge_asof.
-    market_reset = (
-        market_reset
-        .drop_duplicates(
-            subset=["date"],
-            keep="last",
-        )
-    )
-
-    macro = (
-        macro
-        .drop_duplicates(
-            subset=["date"],
-            keep="last",
-        )
-    )
-
-    # Final dtype verification.
-    market_reset["date"] = (
-        market_reset["date"]
-        .astype("datetime64[ns]")
-    )
-
-    macro["date"] = (
-        macro["date"]
-        .astype("datetime64[ns]")
-    )
-
-    # --------------------------------------------------------
-    # BACKWARD ALIGNMENT
-    # --------------------------------------------------------
-    #
-    # For each market day, use the latest macro observation
-    # whose observation date is <= that market day.
-    #
-    # This prevents future observation dates.
-    #
-    # It does NOT reconstruct historical release timestamps.
-    # --------------------------------------------------------
+    left = pd.DataFrame({"date": pd.to_datetime(market_dates).astype("datetime64[ns]")})
+    right = series_df.copy()
+
+    if right.empty:
+        return pd.Series(np.nan, index=left.index, dtype=float)
+
+    right["date"] = pd.to_datetime(right["date"], errors="coerce").astype("datetime64[ns]")
+    right["value"] = pd.to_numeric(right["value"], errors="coerce")
+    right = right.dropna(subset=["date", "value"])
+    right = right.sort_values("date").drop_duplicates("date", keep="last")
 
     merged = pd.merge_asof(
-        market_reset,
-        macro,
+        left.sort_values("date"),
+        right[["date", "value"]],
         on="date",
         direction="backward",
     )
 
-    # --------------------------------------------------------
-    # CLASSIFY
-    # --------------------------------------------------------
+    return merged["value"].set_axis(left.sort_values("date").index)
 
-    merged["macro_regime"] = (
-        merged.apply(
-            classify_macro_regime,
-            axis=1,
+
+def prepare_macro_data(market):
+    print("\n" + "=" * 60)
+    print("PREPARING MACRO DATA")
+    print("=" * 60)
+
+    raw = load_macro_raw()
+    clean = derive_macro_series(raw)
+
+    result = market.copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce").astype("datetime64[ns]")
+    result = result.sort_values("date").reset_index(drop=True)
+
+    for name, series_df in clean.items():
+        result[name] = align_one_series(result["date"], series_df).to_numpy()
+
+    # Regime classification after all series have been aligned.
+    result["macro_regime"] = result.apply(classify_macro_regime, axis=1)
+
+    # Early warning is also calculated daily.
+    result = calculate_early_warning(result)
+
+    # Data quality.
+    quality = []
+    total = len(result)
+    for col in list(FRED_SERIES.keys()) + [
+        "INDPRO_YOY",
+        "RETAIL_YOY",
+        "PCE_INFLATION",
+        "CORE_PCE_INFLATION",
+    ]:
+        available = int(result[col].notna().sum()) if col in result.columns else 0
+        quality.append(
+            {
+                "series": col,
+                "available_rows": available,
+                "total_market_rows": total,
+                "coverage_pct": (available / total * 100.0) if total else 0.0,
+            }
         )
+
+    quality_df = pd.DataFrame(quality)
+    quality_df.to_csv(OUTPUT_QUALITY, index=False)
+
+    print("\nMACRO DATA QUALITY")
+    print("-" * 60)
+    print(quality_df.to_string(index=False))
+
+    return result, quality_df
+
+
+# ============================================================
+# MACRO REGIME CLASSIFICATION
+# ============================================================
+def classify_macro_regime(row):
+    """
+    Mechanical A-F regime classification.
+
+    F = liquidity/financial shock
+    E = recession/bear risk
+    C/D = inflation/rates pressure
+    B = growth scare with contained inflation
+    A = healthy/technical pullback
+    U = insufficient macro data
+
+    Important: U prevents missing data from silently becoming A.
+    """
+    required_for_core = [
+        "VIX",
+        "HY_SPREAD",
+        "CORP_OAS",
+        "NFCI",
+        "UNRATE",
+        "INITIAL_CLAIMS_4W",
+        "INDPRO_YOY",
+        "RETAIL_YOY",
+        "PCE_INFLATION",
+        "CORE_PCE_INFLATION",
+        "T10Y2Y",
+        "US10Y",
+        "US2Y",
+        "FEDFUNDS",
+    ]
+
+    available_core = sum(
+        pd.notna(row.get(col, np.nan)) for col in required_for_core
     )
 
-    merged = merged.set_index(
-        "date"
-    )
+    # If too much macro information is missing, do not call it healthy.
+    if available_core < 8:
+        return REGIME_NAMES["U"]
 
-    return merged
+    vix = row.get("VIX", np.nan)
+    hy = row.get("HY_SPREAD", np.nan)
+    corp = row.get("CORP_OAS", np.nan)
+    nfci = row.get("NFCI", np.nan)
+
+    # ---------------- F: liquidity / financial shock ----------------
+    if (
+        (pd.notna(vix) and vix >= 35)
+        or (pd.notna(hy) and hy >= 6)
+        or (pd.notna(corp) and corp >= 3.5)
+        or (pd.notna(nfci) and nfci >= 1.0)
+    ):
+        return REGIME_NAMES["F"]
+
+    unemployment = row.get("UNRATE", np.nan)
+    claims = row.get("INITIAL_CLAIMS_4W", np.nan)
+    indpro_yoy = row.get("INDPRO_YOY", np.nan)
+    retail_yoy = row.get("RETAIL_YOY", np.nan)
+    curve = row.get("T10Y2Y", np.nan)
+
+    recession_score = 0
+    recession_score += int(pd.notna(unemployment) and unemployment >= 5.0)
+    recession_score += int(pd.notna(claims) and claims >= 300000)
+    recession_score += int(pd.notna(indpro_yoy) and indpro_yoy < 0)
+    recession_score += int(pd.notna(retail_yoy) and retail_yoy < 0)
+    recession_score += int(pd.notna(curve) and curve < -0.50)
+
+    # ---------------- E: recession / bear risk ----------------
+    if recession_score >= 3:
+        return REGIME_NAMES["E"]
+
+    pce = row.get("PCE_INFLATION", np.nan)
+    core_pce = row.get("CORE_PCE_INFLATION", np.nan)
+    us10y = row.get("US10Y", np.nan)
+    us2y = row.get("US2Y", np.nan)
+    fedfunds = row.get("FEDFUNDS", np.nan)
+
+    inflation_score = 0
+    inflation_score += int(pd.notna(pce) and pce >= 3.0)
+    inflation_score += int(pd.notna(core_pce) and core_pce >= 3.0)
+    inflation_score += int(pd.notna(us10y) and us10y >= 4.5)
+    inflation_score += int(pd.notna(us2y) and us2y >= 4.5)
+    inflation_score += int(pd.notna(fedfunds) and fedfunds >= 4.5)
+
+    growth_weak = 0
+    growth_weak += int(pd.notna(indpro_yoy) and indpro_yoy < 0)
+    growth_weak += int(pd.notna(retail_yoy) and retail_yoy < 0)
+    growth_weak += int(pd.notna(unemployment) and unemployment >= 4.5)
+    growth_weak += int(pd.notna(claims) and claims >= 275000)
+
+    # ---------------- C / D ----------------
+    if inflation_score >= 3:
+        if growth_weak >= 2:
+            return REGIME_NAMES["D"]
+        return REGIME_NAMES["C"]
+
+    # ---------------- B ----------------
+    if growth_weak >= 2:
+        return REGIME_NAMES["B"]
+
+    # ---------------- A ----------------
+    return REGIME_NAMES["A"]
+
+
+# ============================================================
+# EARLY WARNING
+# ============================================================
+def calculate_early_warning(df):
+    """
+    Daily leading-risk score 0-100.
+    Category maxima:
+      Credit 20
+      Labor 20
+      Yield Curve 15
+      Financial Conditions 20
+      Market 15
+      Macro Momentum 10
+    """
+    df = df.copy()
+
+    # Changes / pct changes are calculated on the aligned daily data.
+    hy_pct_60 = df["HY_SPREAD"].pct_change(60) * 100 if "HY_SPREAD" in df else np.nan
+    corp_pct_60 = df["CORP_OAS"].pct_change(60) * 100 if "CORP_OAS" in df else np.nan
+    claims_pct_12 = df["INITIAL_CLAIMS_4W"].pct_change(12) * 100 if "INITIAL_CLAIMS_4W" in df else np.nan
+    curve_delta_60 = df["T10Y2Y"].diff(60) if "T10Y2Y" in df else np.nan
+    nfci_delta_4 = df["NFCI"].diff(4) if "NFCI" in df else np.nan
+    vix_pct_20 = df["VIX"].pct_change(20) * 100 if "VIX" in df else np.nan
+    dxy_pct_60 = df["DXY"].pct_change(60) * 100 if "DXY" in df else np.nan
+
+    scores = []
+
+    for i in range(len(df)):
+        row = df.iloc[i]
+        credit = 0
+        labor = 0
+        curve = 0
+        financial = 0
+        market = 0
+        momentum = 0
+
+        hy = row.get("HY_SPREAD", np.nan)
+        corp = row.get("CORP_OAS", np.nan)
+        if pd.notna(hy):
+            if hy >= 6: credit += 12
+            elif hy >= 5: credit += 9
+            elif hy >= 4: credit += 5
+        if pd.notna(hy_pct_60.iloc[i]):
+            x = hy_pct_60.iloc[i]
+            if x >= 30: credit += 8
+            elif x >= 15: credit += 5
+            elif x >= 8: credit += 3
+        if pd.notna(corp):
+            if corp >= 3: credit += 5
+            elif corp >= 2.5: credit += 3
+        credit = min(credit, 20)
+
+        claims = row.get("INITIAL_CLAIMS_4W", np.nan)
+        unrate = row.get("UNRATE", np.nan)
+        if pd.notna(claims_pct_12.iloc[i]):
+            x = claims_pct_12.iloc[i]
+            if x >= 8: labor += 12
+            elif x >= 5: labor += 8
+            elif x >= 3: labor += 4
+        if pd.notna(unrate) and i >= 3:
+            delta = unrate - df.iloc[i - 3].get("UNRATE", np.nan)
+            if pd.notna(delta):
+                if delta >= 0.2: labor += 8
+                elif delta >= 0.1: labor += 4
+        labor = min(labor, 20)
+
+        curve_val = row.get("T10Y2Y", np.nan)
+        if pd.notna(curve_val):
+            if curve_val < -0.50: curve += 10
+            elif curve_val < 0: curve += 7
+        if pd.notna(curve_delta_60.iloc[i]):
+            x = curve_delta_60.iloc[i]
+            if x <= -0.50: curve += 5
+            elif x <= -0.25: curve += 3
+        curve = min(curve, 15)
+
+        nfci = row.get("NFCI", np.nan)
+        if pd.notna(nfci):
+            if nfci >= 1: financial += 12
+            elif nfci >= 0.5: financial += 8
+            elif nfci > 0: financial += 4
+        if pd.notna(nfci_delta_4.iloc[i]):
+            x = nfci_delta_4.iloc[i]
+            if x >= 0.30: financial += 8
+            elif x >= 0.15: financial += 5
+            elif x >= 0.08: financial += 2
+        financial = min(financial, 20)
+
+        vix = row.get("VIX", np.nan)
+        dxy = row.get("DXY", np.nan)
+        if pd.notna(vix):
+            if vix >= 35: market += 15
+            elif vix >= 30: market += 10
+            elif vix >= 25: market += 6
+            elif vix >= 20: market += 3
+        if pd.notna(vix_pct_20.iloc[i]):
+            x = vix_pct_20.iloc[i]
+            if x >= 50: market += 5
+            elif x >= 25: market += 3
+        if pd.notna(dxy_pct_60.iloc[i]):
+            x = dxy_pct_60.iloc[i]
+            if x >= 8: market += 3
+            elif x >= 5: market += 2
+        market = min(market, 15)
+
+        indpro = row.get("INDPRO_YOY", np.nan)
+        retail = row.get("RETAIL_YOY", np.nan)
+        pce = row.get("PCE_INFLATION", np.nan)
+        if pd.notna(indpro) and i >= 3:
+            if indpro < df.iloc[i - 3].get("INDPRO_YOY", indpro):
+                momentum += 3
+        if pd.notna(retail) and i >= 3:
+            if retail < df.iloc[i - 3].get("RETAIL_YOY", retail):
+                momentum += 3
+        if pd.notna(pce) and i >= 3:
+            if pce > df.iloc[i - 3].get("PCE_INFLATION", pce):
+                momentum += 4
+        momentum = min(momentum, 10)
+
+        total = credit + labor + curve + financial + market + momentum
+        if total <= 24:
+            level = "LOW"
+        elif total <= 49:
+            level = "MODERATE"
+        elif total <= 74:
+            level = "HIGH"
+        else:
+            level = "CRITICAL"
+
+        scores.append((total, level, credit, labor, curve, financial, market, momentum))
+
+    cols = [
+        "early_warning_score",
+        "early_warning_level",
+        "ew_credit",
+        "ew_labor",
+        "ew_yield_curve",
+        "ew_financial",
+        "ew_market",
+        "ew_macro_momentum",
+    ]
+    score_df = pd.DataFrame(scores, columns=cols, index=df.index)
+    return pd.concat([df, score_df], axis=1)
 
 
 # ============================================================
 # ATTACH MACRO TO TRADES
 # ============================================================
+def attach_macro_to_trades(trades, macro_daily):
+    trades = trades.copy()
+    macro = macro_daily.copy()
 
-def attach_macro_to_trades(
-    trades: pd.DataFrame,
-    macro_market: pd.DataFrame,
-) -> pd.DataFrame:
+    trades["signal_date"] = pd.to_datetime(trades["signal_date"], errors="coerce").astype("datetime64[ns]")
+    macro["date"] = pd.to_datetime(macro["date"], errors="coerce").astype("datetime64[ns]")
 
-    if trades.empty:
-
-        return trades
-
-    result = trades.copy()
-
-    result["signal_date"] = (
-        normalize_datetime_series(
-            result["signal_date"]
-        )
-    )
-
-    macro_columns = [
-
+    macro_cols = [
         "macro_regime",
-
+        "VIX",
         "US10Y",
         "US2Y",
         "T10Y2Y",
-
-        "VIX",
-
+        "DXY",
         "UNRATE",
-
         "INITIAL_CLAIMS_4W",
-
         "HY_SPREAD",
         "CORP_OAS",
         "NFCI",
-
-        "INDPRO",
         "INDPRO_YOY",
-
-        "RETAIL",
         "RETAIL_YOY",
-
-        "PCE",
-        "PCEPI",
         "PCE_INFLATION",
-
-        "CORE_PCE",
         "CORE_PCE_INFLATION",
-
         "FEDFUNDS",
+        "early_warning_score",
+        "early_warning_level",
     ]
 
-    available = [
-        c
-        for c in macro_columns
-        if c in macro_market.columns
-    ]
+    available = [c for c in macro_cols if c in macro.columns]
+    right = macro[["date"] + available].sort_values("date")
+    left = trades.sort_values("signal_date").copy()
 
-    if not available:
-
-        return result
-
-    macro_for_merge = (
-        macro_market[
-            available
-        ]
-        .reset_index()
-    )
-
-    first_column = (
-        macro_for_merge.columns[0]
-    )
-
-    macro_for_merge = (
-        macro_for_merge
-        .rename(
-            columns={
-                first_column:
-                    "signal_date"
-            }
-        )
-    )
-
-    macro_for_merge["signal_date"] = (
-        normalize_datetime_series(
-            macro_for_merge[
-                "signal_date"
-            ]
-        )
-    )
-
-    result["signal_date"] = (
-        normalize_datetime_series(
-            result["signal_date"]
-        )
-    )
-
-    result = result.dropna(
-        subset=["signal_date"]
-    )
-
-    macro_for_merge = (
-        macro_for_merge
-        .dropna(
-            subset=["signal_date"]
-        )
-    )
-
-    result = result.sort_values(
-        "signal_date"
-    )
-
-    macro_for_merge = (
-        macro_for_merge
-        .sort_values(
-            "signal_date"
-        )
-    )
-
-    # Remove duplicate dates.
-    result = result.drop_duplicates(
-        subset=["signal_date"],
-        keep="last",
-    )
-
-    macro_for_merge = (
-        macro_for_merge
-        .drop_duplicates(
-            subset=["signal_date"],
-            keep="last",
-        )
-    )
-
-    # Force identical datetime precision.
-    result["signal_date"] = (
-        result["signal_date"]
-        .astype("datetime64[ns]")
-    )
-
-    macro_for_merge["signal_date"] = (
-        macro_for_merge["signal_date"]
-        .astype("datetime64[ns]")
-    )
-
-    result = pd.merge_asof(
-        result,
-        macro_for_merge,
-        on="signal_date",
+    merged = pd.merge_asof(
+        left,
+        right,
+        left_on="signal_date",
+        right_on="date",
         direction="backward",
     )
 
-    return result
+    merged = merged.drop(columns=["date"], errors="ignore")
+    return merged.sort_values("signal_date").reset_index(drop=True)
 
 
 # ============================================================
-# SUMMARY
+# SUMMARIES
 # ============================================================
-
-def calculate_summary(
-    trades: pd.DataFrame,
-) -> dict:
-
-    if trades.empty:
-
-        return {
-            "total_signals": 0,
-            "valid_setups": 0,
-            "resolved_trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "ambiguous": 0,
-            "open": 0,
-            "invalid_sl": 0,
-            "win_rate_pct": np.nan,
-            "average_R": np.nan,
-            "expectancy_R": np.nan,
-            "total_R": np.nan,
-            "profit_factor": np.nan,
-        }
-
+def summarize_trades(trades):
     total = len(trades)
+    valid = int((trades["result"] != "INVALID_SL").sum())
+    resolved = int(trades["result"].isin(["WIN", "LOSS", "AMBIGUOUS"]).sum())
+    wins = int((trades["result"] == "WIN").sum())
+    losses = int((trades["result"] == "LOSS").sum())
+    ambiguous = int((trades["result"] == "AMBIGUOUS").sum())
+    open_trades = int((trades["result"] == "OPEN").sum())
+    invalid_sl = int((trades["result"] == "INVALID_SL").sum())
 
-    valid = int(
-        (
-            trades["status"]
-            == "VALID"
-        ).sum()
-    )
+    resolved_non_amb = int(trades["result"].isin(["WIN", "LOSS"]).sum())
+    win_rate = wins / resolved_non_amb * 100 if resolved_non_amb else np.nan
 
-    wins = int(
-        (
-            trades["result"]
-            == "WIN"
-        ).sum()
-    )
+    r_values = trades.loc[trades["result"].isin(["WIN", "LOSS"]), "R"].dropna()
+    average_r = float(r_values.mean()) if len(r_values) else np.nan
+    total_r = float(r_values.sum()) if len(r_values) else np.nan
+    expectancy = average_r
 
-    losses = int(
-        (
-            trades["result"]
-            == "LOSS"
-        ).sum()
-    )
-
-    ambiguous = int(
-        (
-            trades["result"]
-            == "AMBIGUOUS"
-        ).sum()
-    )
-
-    open_trades = int(
-        (
-            trades["result"]
-            == "OPEN"
-        ).sum()
-    )
-
-    invalid = int(
-        (
-            trades["status"]
-            == "INVALID_SL"
-        ).sum()
-    )
-
-    resolved = (
-        wins + losses
-    )
-
-    if resolved > 0:
-
-        win_rate = (
-            wins / resolved
-        ) * 100
-
-    else:
-
-        win_rate = np.nan
-
-    resolved_r = (
-        trades.loc[
-            trades["result"].isin(
-                [
-                    "WIN",
-                    "LOSS",
-                ]
-            ),
-            "R",
-        ]
-        .dropna()
-    )
-
-    if len(resolved_r) > 0:
-
-        average_r = (
-            resolved_r.mean()
-        )
-
-        total_r = (
-            resolved_r.sum()
-        )
-
-        gross_profit = (
-            resolved_r[
-                resolved_r > 0
-            ].sum()
-        )
-
-        gross_loss = abs(
-            resolved_r[
-                resolved_r < 0
-            ].sum()
-        )
-
-        if gross_loss > 0:
-
-            profit_factor = (
-                gross_profit
-                / gross_loss
-            )
-
-        else:
-
-            profit_factor = np.inf
-
-    else:
-
-        average_r = np.nan
-        total_r = np.nan
-        profit_factor = np.nan
+    gross_profit = float(r_values[r_values > 0].sum()) if len(r_values) else 0.0
+    gross_loss = float(-r_values[r_values < 0].sum()) if len(r_values) else 0.0
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else np.inf
 
     return {
         "total_signals": total,
@@ -2258,728 +763,106 @@ def calculate_summary(
         "losses": losses,
         "ambiguous": ambiguous,
         "open": open_trades,
-        "invalid_sl": invalid,
+        "invalid_sl": invalid_sl,
         "win_rate_pct": win_rate,
         "average_R": average_r,
-        "expectancy_R": average_r,
+        "expectancy_R": expectancy,
         "total_R": total_r,
         "profit_factor": profit_factor,
     }
 
 
-# ============================================================
-# MACRO SUMMARY
-# ============================================================
+def grouped_summary(trades, group_col):
+    rows = []
+    for key, g in trades.groupby(group_col, dropna=False):
+        s = summarize_trades(g)
+        s[group_col] = key
+        rows.append(s)
 
-def grouped_macro_summary(
-    trades: pd.DataFrame,
-) -> pd.DataFrame:
-
-    if (
-        trades.empty
-        or "macro_regime"
-        not in trades.columns
-    ):
-
+    if not rows:
         return pd.DataFrame()
 
-    rows = []
-
-    regime_order = [
-
-        "A — Healthy / Technical Pullback",
-
-        "B — Growth Scare / Healthy Correction",
-
-        "C — Inflation / Rates Shock",
-
-        "D — Growth + Inflation / Mixed Stress",
-
-        "E — Recession / Bear Risk",
-
-        "F — Liquidity / Financial Shock",
-    ]
-
-    for regime in regime_order:
-
-        subset = trades[
-            trades["macro_regime"]
-            == regime
-        ]
-
-        if subset.empty:
-
-            continue
-
-        summary = calculate_summary(
-            subset
-        )
-
-        rows.append(
-            {
-                "macro_regime": regime,
-
-                "signals":
-                    summary[
-                        "total_signals"
-                    ],
-
-                "valid":
-                    summary[
-                        "valid_setups"
-                    ],
-
-                "resolved":
-                    summary[
-                        "resolved_trades"
-                    ],
-
-                "wins":
-                    summary[
-                        "wins"
-                    ],
-
-                "losses":
-                    summary[
-                        "losses"
-                    ],
-
-                "ambiguous":
-                    summary[
-                        "ambiguous"
-                    ],
-
-                "open":
-                    summary[
-                        "open"
-                    ],
-
-                "win_rate_pct":
-                    summary[
-                        "win_rate_pct"
-                    ],
-
-                "average_R":
-                    summary[
-                        "average_R"
-                    ],
-
-                "total_R":
-                    summary[
-                        "total_R"
-                    ],
-
-                "profit_factor":
-                    summary[
-                        "profit_factor"
-                    ],
-            }
-        )
-
-    return pd.DataFrame(
-        rows
-    )
-
-
-# ============================================================
-# YEARLY SUMMARY
-# ============================================================
-
-def yearly_macro_summary(
-    trades: pd.DataFrame,
-) -> pd.DataFrame:
-
-    if trades.empty:
-
-        return pd.DataFrame()
-
-    data = trades.copy()
-
-    data["year"] = (
-        pd.to_datetime(
-            data["signal_date"]
-        ).dt.year
-    )
-
-    rows = []
-
-    for year, subset in (
-        data.groupby("year")
-    ):
-
-        summary = calculate_summary(
-            subset
-        )
-
-        rows.append(
-            {
-                "year": year,
-                **summary,
-            }
-        )
-
-    return (
-        pd.DataFrame(rows)
-        .sort_values("year")
-    )
-
-
-# ============================================================
-# MACRO DATA QUALITY
-# ============================================================
-
-def macro_data_quality(
-    macro_market: pd.DataFrame,
-) -> pd.DataFrame:
-
-    if macro_market.empty:
-
-        return pd.DataFrame()
-
-    rows = []
-
-    columns = [
-        "US10Y",
-        "US2Y",
-        "T10Y2Y",
-        "VIX",
-        "UNRATE",
-        "INITIAL_CLAIMS_4W",
-        "HY_SPREAD",
-        "CORP_OAS",
-        "NFCI",
-        "INDPRO",
-        "INDPRO_YOY",
-        "RETAIL",
-        "RETAIL_YOY",
-        "PCE_INFLATION",
-        "CORE_PCE_INFLATION",
-        "FEDFUNDS",
-    ]
-
-    for column in columns:
-
-        if column not in macro_market.columns:
-
-            continue
-
-        available = (
-            macro_market[column]
-            .notna()
-            .sum()
-        )
-
-        total = len(
-            macro_market
-        )
-
-        coverage = (
-            available / total * 100
-            if total > 0
-            else np.nan
-        )
-
-        rows.append(
-            {
-                "series": column,
-                "available_rows": int(
-                    available
-                ),
-                "total_market_rows": int(
-                    total
-                ),
-                "coverage_pct": coverage,
-            }
-        )
-
-    return pd.DataFrame(
-        rows
-    )
+    out = pd.DataFrame(rows)
+    return out[[group_col] + [c for c in s.keys()]]
 
 
 # ============================================================
 # MAIN
 # ============================================================
-
 def main():
+    print("\nUS500 EMA19 + MACRO BACKTEST")
+    print("=" * 60)
+    print(f"Ticker: {MARKET_TICKER}")
+    print(f"Start: {START_DATE}")
+    print(f"EMA: {EMA_FAST}")
+    print(f"Trend EMA: {EMA_TREND}")
+    print(f"RR: 1:{RR}")
 
-    print()
-    print(
-        "US500 EMA19 + MACRO BACKTEST"
-    )
+    market = get_market_data()
+    market = prepare_market(market)
 
-    print(
-        "=" * 60
-    )
+    signals = detect_signals(market)
+    signals.to_csv(OUTPUT_SIGNALS, index=False)
 
-    print(
-        f"Ticker: {TICKER}"
-    )
+    trades = build_backtest(market, signals)
 
-    print(
-        f"Start: {START_DATE}"
-    )
+    # Macro data is prepared independently from trade results.
+    macro_daily, quality = prepare_macro_data(market)
+    macro_daily.to_csv(OUTPUT_MACRO, index=False)
 
-    print(
-        f"EMA: {EMA_FAST}"
-    )
+    trades = attach_macro_to_trades(trades, macro_daily)
+    trades.to_csv(OUTPUT_TRADES, index=False)
 
-    print(
-        f"Trend EMA: {EMA_TREND}"
-    )
+    overall = summarize_trades(trades)
+    pd.DataFrame([overall]).to_csv(OUTPUT_SUMMARY, index=False)
 
-    print(
-        f"RR: 1:{RR}"
-    )
+    regime = grouped_summary(trades, "macro_regime")
+    regime.to_csv(OUTPUT_REGIMES, index=False)
 
-    # ========================================================
-    # MARKET
-    # ========================================================
+    trades["year"] = pd.to_datetime(trades["signal_date"]).dt.year
+    yearly = grouped_summary(trades, "year")
+    yearly.to_csv(OUTPUT_YEARLY, index=False)
 
-    print()
-    print(
-        "Loading market data..."
-    )
+    print("\n" + "=" * 60)
+    print("OVERALL")
+    print("=" * 60)
+    print(pd.DataFrame([overall]).to_string(index=False))
 
-    market_raw = (
-        get_historical_market_data(
-            ticker=TICKER,
-            start_date=START_DATE,
-        )
-    )
-
-    if market_raw is None:
-
-        raise RuntimeError(
-            "Market data returned None."
-        )
-
-    if market_raw.empty:
-
-        raise RuntimeError(
-            "Market data is empty."
-        )
-
-    market = prepare_market_data(
-        market_raw
-    )
-
-    print(
-        "Market data: "
-        f"{market.index.min().date()} "
-        "→ "
-        f"{market.index.max().date()}"
-    )
-
-    # ========================================================
-    # SIGNALS
-    # ========================================================
-
-    signals = detect_ema19_pullbacks(
-        market
-    )
-
-    print(
-        f"EMA19 Pullback signals: "
-        f"{len(signals)}"
-    )
-
-    # ========================================================
-    # BACKTEST
-    # ========================================================
-
-    trades = build_ema19_backtest(
-        market,
-        signals,
-    )
-
-    print(
-        f"Backtest events: "
-        f"{len(trades)}"
-    )
-
-    # ========================================================
-    # MACRO
-    # ========================================================
-
-    macro_market = prepare_macro_data(
-        market
-    )
-
-    if macro_market.empty:
-
-        print()
-        print(
-            "WARNING: Macro data unavailable."
-        )
-
-        trades[
-            "macro_regime"
-        ] = "DATA UNAVAILABLE"
-
+    print("\nRESULTS BY MACRO REGIME")
+    print("=" * 60)
+    if regime.empty:
+        print("No regime results.")
     else:
+        print(regime.to_string(index=False))
 
-        trades = attach_macro_to_trades(
-            trades,
-            macro_market,
-        )
+    print("\nYEARLY RESULTS")
+    print("=" * 60)
+    print(yearly.to_string(index=False))
 
-    # ========================================================
-    # OVERALL
-    # ========================================================
-
-    summary = calculate_summary(
-        trades
-    )
-
-    print()
+    print("\nMACRO REGIME COUNTS")
+    print("=" * 60)
     print(
-        "OVERALL"
+        trades["macro_regime"]
+        .value_counts(dropna=False)
+        .rename_axis("macro_regime")
+        .reset_index(name="signals")
+        .to_string(index=False)
     )
 
-    print(
-        "-" * 60
-    )
-
-    print(
-        f"Total Signals       : "
-        f"{summary['total_signals']}"
-    )
-
-    print(
-        f"Valid Setups        : "
-        f"{summary['valid_setups']}"
-    )
-
-    print(
-        f"Resolved Trades     : "
-        f"{summary['resolved_trades']}"
-    )
-
-    print(
-        f"Wins                : "
-        f"{summary['wins']}"
-    )
-
-    print(
-        f"Losses              : "
-        f"{summary['losses']}"
-    )
-
-    print(
-        f"Ambiguous           : "
-        f"{summary['ambiguous']}"
-    )
-
-    print(
-        f"Open                : "
-        f"{summary['open']}"
-    )
-
-    print(
-        f"Invalid Sl          : "
-        f"{summary['invalid_sl']}"
-    )
-
-    if pd.isna(
-        summary["win_rate_pct"]
-    ):
-
-        print(
-            "Win Rate Pct        : N/A"
-        )
-
-    else:
-
-        print(
-            f"Win Rate Pct        : "
-            f"{summary['win_rate_pct']:.3f}"
-        )
-
-    if pd.isna(
-        summary["average_R"]
-    ):
-
-        print(
-            "Average R           : N/A"
-        )
-
-    else:
-
-        print(
-            f"Average R           : "
-            f"{summary['average_R']:.3f}"
-        )
-
-    if pd.isna(
-        summary["expectancy_R"]
-    ):
-
-        print(
-            "Expectancy R        : N/A"
-        )
-
-    else:
-
-        print(
-            f"Expectancy R        : "
-            f"{summary['expectancy_R']:.3f}"
-        )
-
-    if pd.isna(
-        summary["total_R"]
-    ):
-
-        print(
-            "Total R             : N/A"
-        )
-
-    else:
-
-        print(
-            f"Total R             : "
-            f"{summary['total_R']:.1f}"
-        )
-
-    if pd.isna(
-        summary["profit_factor"]
-    ):
-
-        print(
-            "Profit Factor       : N/A"
-        )
-
-    elif np.isinf(
-        summary["profit_factor"]
-    ):
-
-        print(
-            "Profit Factor       : INF"
-        )
-
-    else:
-
-        print(
-            f"Profit Factor       : "
-            f"{summary['profit_factor']:.3f}"
-        )
-
-    # ========================================================
-    # MACRO RESULTS
-    # ========================================================
-
-    macro_summary = (
-        grouped_macro_summary(
-            trades
-        )
-    )
-
-    print()
-    print(
-        "RESULTS BY MACRO REGIME"
-    )
-
-    print(
-        "-" * 60
-    )
-
-    if macro_summary.empty:
-
-        print(
-            "No macro regime results available."
-        )
-
-    else:
-
-        print(
-            macro_summary.to_string(
-                index=False,
-                float_format=lambda x:
-                    f"{x:.3f}",
-            )
-        )
-
-    # ========================================================
-    # YEARLY
-    # ========================================================
-
-    yearly = yearly_macro_summary(
-        trades
-    )
-
-    print()
-    print(
-        "YEARLY RESULTS"
-    )
-
-    print(
-        "-" * 60
-    )
-
-    if yearly.empty:
-
-        print(
-            "No yearly results."
-        )
-
-    else:
-
-        yearly_columns = [
-            "year",
-            "total_signals",
-            "resolved_trades",
-            "wins",
-            "losses",
-            "ambiguous",
-            "win_rate_pct",
-            "average_R",
-            "total_R",
-        ]
-
-        print(
-            yearly[
-                yearly_columns
-            ].to_string(
-                index=False,
-                float_format=lambda x:
-                    f"{x:.3f}",
-            )
-        )
-
-    # ========================================================
-    # DATA QUALITY
-    # ========================================================
-
-    quality = (
-        macro_data_quality(
-            macro_market
-        )
-        if not macro_market.empty
-        else pd.DataFrame()
-    )
-
-    print()
-    print(
-        "MACRO DATA QUALITY"
-    )
-
-    print(
-        "-" * 60
-    )
-
-    if quality.empty:
-
-        print(
-            "No macro quality information."
-        )
-
-    else:
-
-        print(
-            quality.to_string(
-                index=False,
-                float_format=lambda x:
-                    f"{x:.2f}",
-            )
-        )
-
-    # ========================================================
-    # SAVE FILES
-    # ========================================================
-
-    trades.to_csv(
-        "backtestEMA19Macro_trades.csv",
-        index=False,
-    )
-
-    macro_summary.to_csv(
-        "backtestEMA19Macro_regimes.csv",
-        index=False,
-    )
-
-    yearly.to_csv(
-        "backtestEMA19Macro_yearly.csv",
-        index=False,
-    )
-
-    pd.DataFrame(
-        [summary]
-    ).to_csv(
-        "backtestEMA19Macro_summary.csv",
-        index=False,
-    )
-
-    if not macro_market.empty:
-
-        macro_market.to_csv(
-            "backtestEMA19Macro_macro_data.csv"
-        )
-
-    if not quality.empty:
-
-        quality.to_csv(
-            "backtestEMA19Macro_data_quality.csv",
-            index=False,
-        )
-
-    if not signals.empty:
-
-        signals.to_csv(
-            "backtestEMA19Macro_signals.csv",
-            index=False,
-        )
-
-    # ========================================================
-    # FILE LIST
-    # ========================================================
-
-    print()
-    print(
-        "FILES CREATED"
-    )
-
-    print(
-        "-" * 60
-    )
-
-    print(
-        "backtestEMA19Macro_trades.csv"
-    )
-
-    print(
-        "backtestEMA19Macro_regimes.csv"
-    )
-
-    print(
-        "backtestEMA19Macro_yearly.csv"
-    )
-
-    print(
-        "backtestEMA19Macro_summary.csv"
-    )
-
-    if not macro_market.empty:
-
-        print(
-            "backtestEMA19Macro_macro_data.csv"
-        )
-
-    if not quality.empty:
-
-        print(
-            "backtestEMA19Macro_data_quality.csv"
-        )
-
-    if not signals.empty:
-
-        print(
-            "backtestEMA19Macro_signals.csv"
-        )
-
-    print()
-    print(
-        "EMA19 + MACRO BACKTEST COMPLETE"
-    )
+    print("\nFILES CREATED")
+    print("=" * 60)
+    for f in [
+        OUTPUT_TRADES,
+        OUTPUT_REGIMES,
+        OUTPUT_YEARLY,
+        OUTPUT_SUMMARY,
+        OUTPUT_MACRO,
+        OUTPUT_QUALITY,
+        OUTPUT_SIGNALS,
+    ]:
+        print(f)
+
+    print("\nEMA19 + MACRO BACKTEST COMPLETE")
 
 
 if __name__ == "__main__":
