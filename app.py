@@ -33,6 +33,12 @@ from engine import (
     PULLBACKS,
 )
 
+# ============================================================
+# FED INTELLIGENCE
+# ============================================================
+
+from fed_intelligence import build_fed_intelligence
+
 
 # ============================================================
 # PAGE CONFIG
@@ -133,8 +139,10 @@ with st.sidebar:
     )
 
     st.caption(
-        "Fed stance is currently a manual input. "
-        "It should not be treated as an automatic Fed parser."
+        "Fed stance is currently a manual input for the "
+        "main macro engine. Fed Intelligence is analyzed "
+        "separately and does not automatically modify the "
+        "final decision."
     )
 
     st.divider()
@@ -168,7 +176,7 @@ with st.sidebar:
 
 
 # ============================================================
-# LOAD DATA
+# LOAD MARKET DATA
 # ============================================================
 
 @st.cache_data(
@@ -182,6 +190,10 @@ def load_market():
     )
 
 
+# ============================================================
+# LOAD MACRO DATA
+# ============================================================
+
 @st.cache_data(
     ttl=REFRESH_MINUTES * 60
 )
@@ -190,9 +202,45 @@ def load_macro():
     return load_all_macro_data()
 
 
+# ============================================================
+# LOAD FED INTELLIGENCE
+# ============================================================
+
+@st.cache_data(
+    ttl=REFRESH_MINUTES * 60
+)
+def load_fed_intelligence():
+
+    try:
+
+        result = build_fed_intelligence()
+
+        if result is None:
+
+            return {
+                "available": False,
+                "error": "Fed Intelligence returned no data.",
+            }
+
+        return result
+
+    except Exception as e:
+
+        return {
+            "available": False,
+            "error": str(e),
+        }
+
+
+# ============================================================
+# GET DATA
+# ============================================================
+
 market = load_market()
 
 macro_data = load_macro()
+
+fed_intelligence = load_fed_intelligence()
 
 
 # ============================================================
@@ -254,6 +302,74 @@ technical_score = technical_info["score"]
 technical_status = technical_info["status"]
 
 final_decision = decision_info["decision"]
+
+
+# ============================================================
+# FED INTELLIGENCE HELPERS
+# ============================================================
+
+def fed_get(key, default=None):
+
+    if not isinstance(fed_intelligence, dict):
+
+        return default
+
+    return fed_intelligence.get(
+        key,
+        default,
+    )
+
+
+def safe_number(value):
+
+    try:
+
+        if value is None:
+            return None
+
+        if isinstance(value, float) and np.isnan(value):
+            return None
+
+        return float(value)
+
+    except Exception:
+
+        return None
+
+
+def format_number(value, decimals=1):
+
+    number = safe_number(value)
+
+    if number is None:
+
+        return "N/A"
+
+    return f"{number:.{decimals}f}"
+
+
+def format_date(value):
+
+    if value is None:
+
+        return "N/A"
+
+    return str(value)
+
+
+def display_reason(reason):
+
+    if reason is None:
+
+        return "NEUTRAL"
+
+    text = str(reason).strip()
+
+    if text == "" or text.lower() == "none":
+
+        return "NEUTRAL"
+
+    return text
 
 
 # ============================================================
@@ -404,6 +520,7 @@ st.write(
     tab_early,
     tab_technical,
     tab_macro,
+    tab_fed,
     tab_trading,
     tab_events,
     tab_history,
@@ -413,6 +530,7 @@ st.write(
         "EARLY WARNING",
         "TECHNICAL",
         "MACRO",
+        "FED INTELLIGENCE",
         "TRADING",
         "EVENTS",
         "HISTORY",
@@ -521,7 +639,7 @@ with tab_live:
     )
 
     st.write(
-        "The system evaluates the market through four main layers:"
+        "The system evaluates the market through five analytical layers:"
     )
 
     st.markdown(
@@ -530,7 +648,13 @@ with tab_live:
         2. **Early Warning**
         3. **Technical Confirmation**
         4. **Drawdown / Pullback**
+        5. **Fed Intelligence**
         """
+    )
+
+    st.caption(
+        "Fed Intelligence is currently an independent analytical layer "
+        "and does not automatically modify the final decision."
     )
 
     st.caption(
@@ -1031,6 +1155,861 @@ with tab_macro:
 
 
 # ============================================================
+# FED INTELLIGENCE TAB
+# ============================================================
+
+with tab_fed:
+
+    st.subheader(
+        "🏛️ Fed Intelligence"
+    )
+
+    st.caption(
+        "Automated analysis of FOMC communication, Minutes, "
+        "Chair communication, SEP and Beige Book."
+    )
+
+    # --------------------------------------------------------
+    # AVAILABILITY
+    # --------------------------------------------------------
+
+    fed_available = fed_get(
+        "available",
+        True,
+    )
+
+    if fed_available is False:
+
+        st.error(
+            "Fed Intelligence is currently unavailable."
+        )
+
+        st.code(
+            str(
+                fed_get(
+                    "error",
+                    "Unknown error."
+                )
+            )
+        )
+
+        st.stop()
+
+    # --------------------------------------------------------
+    # TOP FED INFORMATION
+    # --------------------------------------------------------
+
+    latest_fomc = fed_get(
+        "latest_fomc",
+        fed_get(
+            "fomc_date",
+            "N/A",
+        ),
+    )
+
+    fed_chair = fed_get(
+        "fed_chair",
+        fed_get(
+            "chair",
+            "N/A",
+        ),
+    )
+
+    statement_tone = fed_get(
+        "statement_tone",
+        "N/A",
+    )
+
+    minutes_tone = fed_get(
+        "minutes_tone",
+        "N/A",
+    )
+
+    press_tone = fed_get(
+        "press_conference_tone",
+        fed_get(
+            "chair_tone",
+            "N/A",
+        ),
+    )
+
+    latest_sep = fed_get(
+        "latest_sep",
+        "N/A",
+    )
+
+    previous_sep = fed_get(
+        "previous_sep",
+        "N/A",
+    )
+
+    sep_shift = fed_get(
+        "sep_shift",
+        "N/A",
+    )
+
+    fed_score = fed_get(
+        "fed_score",
+        fed_get(
+            "score",
+            None,
+        ),
+    )
+
+    fed_classification = fed_get(
+        "overall_tone",
+        fed_get(
+            "classification",
+            "N/A",
+        ),
+    )
+
+    # --------------------------------------------------------
+    # MAIN FED METRICS
+    # --------------------------------------------------------
+
+    fc1, fc2, fc3, fc4 = st.columns(4)
+
+    with fc1:
+
+        st.metric(
+            "Fed Intelligence Score",
+            (
+                f"{safe_number(fed_score):.1f}/100"
+                if safe_number(fed_score) is not None
+                else "N/A"
+            ),
+        )
+
+    with fc2:
+
+        st.metric(
+            "Overall Tone",
+            str(
+                fed_classification
+            ),
+        )
+
+    with fc3:
+
+        st.metric(
+            "Latest FOMC",
+            format_date(
+                latest_fomc
+            ),
+        )
+
+    with fc4:
+
+        st.metric(
+            "Fed Chair",
+            str(
+                fed_chair
+            ),
+        )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # FOMC COMMUNICATION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "FOMC Communication"
+    )
+
+    communication_rows = [
+        [
+            "Statement",
+            str(statement_tone),
+        ],
+        [
+            "Minutes",
+            str(minutes_tone),
+        ],
+        [
+            "Chair / Press Conference",
+            str(press_tone),
+        ],
+    ]
+
+    st.dataframe(
+        pd.DataFrame(
+            communication_rows,
+            columns=[
+                "Source",
+                "Tone",
+            ],
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # POLICY DIMENSIONS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Fed Policy Dimensions"
+    )
+
+    dimensions = fed_get(
+        "dimensions",
+        {},
+    )
+
+    if not isinstance(
+        dimensions,
+        dict
+    ):
+
+        dimensions = {}
+
+    dimension_rows = []
+
+    dimension_order = [
+        (
+            "inflation",
+            "Inflation",
+        ),
+        (
+            "labor",
+            "Labor",
+        ),
+        (
+            "growth",
+            "Growth",
+        ),
+        (
+            "financial",
+            "Financial Conditions",
+        ),
+        (
+            "policy",
+            "Monetary Policy",
+        ),
+    ]
+
+    for key, label in dimension_order:
+
+        dimension = dimensions.get(
+            key,
+            {},
+        )
+
+        if not isinstance(
+            dimension,
+            dict
+        ):
+
+            dimension = {}
+
+        score = dimension.get(
+            "score_100",
+            dimension.get(
+                "score",
+                None,
+            ),
+        )
+
+        classification = dimension.get(
+            "classification",
+            dimension.get(
+                "tone",
+                None,
+            ),
+        )
+
+        if classification is None:
+
+            numeric_score = safe_number(
+                score
+            )
+
+            if numeric_score is None:
+
+                classification = "N/A"
+
+            elif numeric_score >= 70:
+
+                classification = "POSITIVE"
+
+            elif numeric_score >= 55:
+
+                classification = "SLIGHTLY POSITIVE"
+
+            elif numeric_score >= 45:
+
+                classification = "NEUTRAL"
+
+            elif numeric_score >= 30:
+
+                classification = "SLIGHTLY NEGATIVE"
+
+            else:
+
+                classification = "NEGATIVE"
+
+        dimension_rows.append(
+            [
+                label,
+                (
+                    f"{safe_number(score):.1f}/100"
+                    if safe_number(score) is not None
+                    else "N/A"
+                ),
+                str(
+                    classification
+                ),
+            ]
+        )
+
+    if dimension_rows:
+
+        st.dataframe(
+            pd.DataFrame(
+                dimension_rows,
+                columns=[
+                    "Dimension",
+                    "Score",
+                    "Classification",
+                ],
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    else:
+
+        st.info(
+            "No policy-dimension data available."
+        )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # SEP
+    # --------------------------------------------------------
+
+    st.subheader(
+        "📊 Summary of Economic Projections"
+    )
+
+    sep_col1, sep_col2 = st.columns(2)
+
+    with sep_col1:
+
+        st.write(
+            f"**Latest SEP:** {latest_sep}"
+        )
+
+    with sep_col2:
+
+        st.write(
+            f"**Previous SEP:** {previous_sep}"
+        )
+
+    st.write(
+        f"**SEP Shift:** {sep_shift}"
+    )
+
+    sep_data = fed_get(
+        "sep",
+        {},
+    )
+
+    if not isinstance(
+        sep_data,
+        dict
+    ):
+
+        sep_data = {}
+
+    previous_sep_data = fed_get(
+        "previous_sep_data",
+        fed_get(
+            "sep_previous",
+            {},
+        ),
+    )
+
+    if not isinstance(
+        previous_sep_data,
+        dict
+    ):
+
+        previous_sep_data = {}
+
+    sep_rows = []
+
+    sep_keys = [
+        (
+            "gdp",
+            "GDP Growth",
+        ),
+        (
+            "unemployment",
+            "Unemployment",
+        ),
+        (
+            "pce",
+            "PCE Inflation",
+        ),
+        (
+            "core_pce",
+            "Core PCE",
+        ),
+        (
+            "fed_funds",
+            "Federal Funds Rate",
+        ),
+    ]
+
+    for key, label in sep_keys:
+
+        current_value = sep_data.get(
+            key,
+            None,
+        )
+
+        previous_value = previous_sep_data.get(
+            key,
+            None,
+        )
+
+        current_number = safe_number(
+            current_value
+        )
+
+        previous_number = safe_number(
+            previous_value
+        )
+
+        if (
+            current_number is not None
+            and previous_number is not None
+        ):
+
+            change = (
+                current_number
+                - previous_number
+            )
+
+        else:
+
+            change = None
+
+        sep_rows.append(
+            [
+                label,
+                (
+                    f"{current_number:.1f}"
+                    if current_number is not None
+                    else "N/A"
+                ),
+                (
+                    f"{previous_number:.1f}"
+                    if previous_number is not None
+                    else "N/A"
+                ),
+                (
+                    f"{change:+.1f}"
+                    if change is not None
+                    else "N/A"
+                ),
+            ]
+        )
+
+    if sep_rows:
+
+        st.dataframe(
+            pd.DataFrame(
+                sep_rows,
+                columns=[
+                    "Indicator",
+                    "Latest SEP",
+                    "Previous SEP",
+                    "Change",
+                ],
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # BEIGE BOOK
+    # --------------------------------------------------------
+
+    st.subheader(
+        "📕 Beige Book"
+
+    )
+
+    beige = fed_get(
+        "beige_book",
+        fed_get(
+            "beige",
+            {},
+        ),
+    )
+
+    if not isinstance(
+        beige,
+        dict
+    ):
+
+        beige = {}
+
+    beige_title = beige.get(
+        "title",
+        beige.get(
+            "name",
+            "N/A",
+        ),
+    )
+
+    beige_issue = beige.get(
+        "issue",
+        beige.get(
+            "issue_date",
+            "N/A",
+        ),
+    )
+
+    beige_publication = beige.get(
+        "publication",
+        beige.get(
+            "publication_date",
+            "N/A",
+        ),
+    )
+
+    beige_score = beige.get(
+        "score",
+        beige.get(
+            "score_100",
+            None,
+        ),
+    )
+
+    beige_tone = beige.get(
+        "tone",
+        beige.get(
+            "classification",
+            "N/A",
+        ),
+    )
+
+    bc1, bc2, bc3, bc4 = st.columns(4)
+
+    with bc1:
+
+        st.write(
+            "**Beige Book**"
+        )
+
+        st.write(
+            str(
+                beige_title
+            )
+        )
+
+    with bc2:
+
+        st.write(
+            "**Issue**"
+        )
+
+        st.write(
+            str(
+                beige_issue
+            )
+        )
+
+    with bc3:
+
+        st.write(
+            "**Publication**"
+        )
+
+        st.write(
+            str(
+                beige_publication
+            )
+        )
+
+    with bc4:
+
+        st.write(
+            "**Score / Tone**"
+        )
+
+        if safe_number(
+            beige_score
+        ) is not None:
+
+            st.write(
+                f"{safe_number(beige_score):.1f}/100"
+            )
+
+        else:
+
+            st.write(
+                "N/A"
+            )
+
+        st.write(
+            str(
+                beige_tone
+            )
+        )
+
+    beige_dimensions = beige.get(
+        "dimensions",
+        {},
+    )
+
+    if not isinstance(
+        beige_dimensions,
+        dict
+    ):
+
+        beige_dimensions = {}
+
+    beige_rows = []
+
+    beige_order = [
+        (
+            "growth",
+            "Growth",
+        ),
+        (
+            "labor",
+            "Labor",
+        ),
+        (
+            "inflation",
+            "Inflation",
+        ),
+        (
+            "consumer",
+            "Consumer Spending",
+        ),
+        (
+            "manufacturing",
+            "Manufacturing",
+        ),
+        (
+            "financial",
+            "Financial Conditions",
+        ),
+        (
+            "housing",
+            "Housing",
+        ),
+    ]
+
+    for key, label in beige_order:
+
+        item = beige_dimensions.get(
+            key,
+            {},
+        )
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            item = {}
+
+        score = item.get(
+            "score_100",
+            item.get(
+                "score",
+                None,
+            ),
+        )
+
+        classification = item.get(
+            "classification",
+            item.get(
+                "tone",
+                None,
+            ),
+        )
+
+        if classification is None:
+
+            numeric_score = safe_number(
+                score
+            )
+
+            if numeric_score is None:
+
+                classification = "N/A"
+
+            elif numeric_score >= 70:
+
+                classification = "POSITIVE"
+
+            elif numeric_score >= 55:
+
+                classification = "SLIGHTLY POSITIVE"
+
+            elif numeric_score >= 45:
+
+                classification = "NEUTRAL"
+
+            elif numeric_score >= 30:
+
+                classification = "SLIGHTLY NEGATIVE"
+
+            else:
+
+                classification = "NEGATIVE"
+
+        beige_rows.append(
+            [
+                label,
+                (
+                    f"{safe_number(score):.1f}/100"
+                    if safe_number(score) is not None
+                    else "N/A"
+                ),
+                str(
+                    classification
+                ),
+            ]
+        )
+
+    if beige_rows:
+
+        st.dataframe(
+            pd.DataFrame(
+                beige_rows,
+                columns=[
+                    "Dimension",
+                    "Score",
+                    "Classification",
+                ],
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    # --------------------------------------------------------
+    # FED REASONS
+    # --------------------------------------------------------
+
+    st.divider()
+
+    st.subheader(
+        "🧠 Fed Intelligence Reasons"
+    )
+
+    reasons = fed_get(
+        "reasons",
+        [],
+    )
+
+    if reasons is None:
+
+        reasons = []
+
+    if isinstance(
+        reasons,
+        dict
+    ):
+
+        for key, value in reasons.items():
+
+            st.write(
+                f"• **{key}:** {display_reason(value)}"
+            )
+
+    elif isinstance(
+        reasons,
+        list
+    ):
+
+        if reasons:
+
+            for reason in reasons:
+
+                if isinstance(
+                    reason,
+                    dict
+                ):
+
+                    dimension = reason.get(
+                        "dimension",
+                        "",
+                    )
+
+                    text = reason.get(
+                        "reason",
+                        reason.get(
+                            "text",
+                            "",
+                        ),
+                    )
+
+                    st.write(
+                        f"• **{dimension}:** "
+                        f"{display_reason(text)}"
+                    )
+
+                else:
+
+                    st.write(
+                        f"• {display_reason(reason)}"
+                    )
+
+        else:
+
+            st.info(
+                "No additional reasons returned."
+            )
+
+    else:
+
+        st.write(
+            f"• {display_reason(reasons)}"
+        )
+
+    # --------------------------------------------------------
+    # IMPORTANT ARCHITECTURE NOTE
+    # --------------------------------------------------------
+
+    st.divider()
+
+    st.warning(
+        """
+        **Important architecture rule**
+
+        Fed Intelligence is currently an independent analytical layer.
+
+        It does **not** automatically modify:
+
+        - Final Decision
+        - Early Warning Score
+        - Technical Confirmation
+        - Position Size
+        - SL / TP
+
+        This is intentional. We should first validate the Fed Intelligence
+        model through historical event studies and backtesting before
+        allowing it to influence the trading engine.
+        """
+    )
+
+
+# ============================================================
 # TRADING TAB
 # ============================================================
 
@@ -1315,6 +2294,11 @@ with tab_history:
         - Initial Claims
         - Inflation
         - Fed stance
+        - Fed Intelligence
+        - FOMC Statement
+        - FOMC Minutes
+        - SEP Shift
+        - Beige Book
         - 1:4 TP result
         - Stop result
         - R multiple
@@ -1382,7 +2366,8 @@ st.divider()
 
 st.caption(
     f"{APP_NAME} | Daily Macro + Early Warning + Technical "
-    f"Decision Support | Data refresh: {REFRESH_MINUTES} min"
+    f"+ Fed Intelligence Decision Support | "
+    f"Data refresh: {REFRESH_MINUTES} min"
 )
 
 st.caption(
