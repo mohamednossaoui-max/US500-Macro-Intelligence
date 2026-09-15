@@ -1,4 +1,5 @@
-"""Federal Reserve Intelligence Engine - Phase 2A.
+"""
+Federal Reserve Intelligence Engine - Phase 2B.
 
 Analytical only:
 - FOMC Statement
@@ -6,8 +7,11 @@ Analytical only:
 - Fed Chair Press Conference
 - Summary of Economic Projections (SEP)
 - SEP shift analysis
+- Multi-dimensional Fed Intelligence analysis
+- Fed Intelligence Score 0-100
 
-No trade execution and no Decision Engine integration.
+No trade execution.
+No Decision Engine integration.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from __future__ import annotations
 import io
 import re
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import pandas as pd
 import requests
@@ -46,6 +50,7 @@ TIMEOUT = 30
 # ============================================================
 
 def get(url: str) -> Optional[requests.Response]:
+
     if not url:
         return None
 
@@ -55,7 +60,9 @@ def get(url: str) -> Optional[requests.Response]:
             headers=HEADERS,
             timeout=TIMEOUT
         )
+
         r.raise_for_status()
+
         return r
 
     except Exception:
@@ -67,6 +74,7 @@ def get(url: str) -> Optional[requests.Response]:
 # ============================================================
 
 def absolute(href: str) -> str:
+
     if not href:
         return ""
 
@@ -84,12 +92,18 @@ def absolute(href: str) -> str:
 # ============================================================
 
 def clean_html(html: str) -> str:
+
     if not html:
         return ""
 
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(
+        html,
+        "html.parser"
+    )
 
-    for x in soup(["script", "style", "noscript", "svg"]):
+    for x in soup(
+        ["script", "style", "noscript", "svg"]
+    ):
         x.decompose()
 
     return re.sub(
@@ -100,6 +114,7 @@ def clean_html(html: str) -> str:
 
 
 def pdf_text(url: str) -> str:
+
     if not url or PdfReader is None:
         return ""
 
@@ -109,7 +124,10 @@ def pdf_text(url: str) -> str:
         return ""
 
     try:
-        reader = PdfReader(io.BytesIO(r.content))
+
+        reader = PdfReader(
+            io.BytesIO(r.content)
+        )
 
         text = " ".join(
             (page.extract_text() or "")
@@ -123,6 +141,7 @@ def pdf_text(url: str) -> str:
         ).strip()
 
     except Exception:
+
         return ""
 
 
@@ -130,10 +149,9 @@ def pdf_text(url: str) -> str:
 # DATE HELPERS
 # ============================================================
 
-def date_from_href(href: str) -> Optional[date]:
-    """
-    Extract YYYYMMDD from an official Federal Reserve URL.
-    """
+def date_from_href(
+    href: str
+) -> Optional[date]:
 
     m = re.search(
         r"(20\d{6})",
@@ -144,12 +162,14 @@ def date_from_href(href: str) -> Optional[date]:
         return None
 
     try:
+
         return datetime.strptime(
             m.group(1),
             "%Y%m%d"
         ).date()
 
     except Exception:
+
         return None
 
 
@@ -159,11 +179,13 @@ def date_from_href(href: str) -> Optional[date]:
 
 def discover_links() -> Dict[str, Dict[date, str]]:
     """
-    Discover official FOMC document links indexed by document date.
+    Discover official FOMC document links.
 
-    The Federal Reserve uses several URL formats. In particular,
-    FOMC statements can appear as monetaryYYYYMMDDa.htm rather
-    than fomcstmtYYYYMMDD.htm.
+    Supports:
+    - FOMC statements
+    - FOMC minutes
+    - Press conferences
+    - SEP / projection materials
     """
 
     result = {
@@ -183,7 +205,10 @@ def discover_links() -> Dict[str, Dict[date, str]]:
         "html.parser"
     )
 
-    for a in soup.find_all("a", href=True):
+    for a in soup.find_all(
+        "a",
+        href=True
+    ):
 
         href = a.get(
             "href",
@@ -208,7 +233,7 @@ def discover_links() -> Dict[str, Dict[date, str]]:
         ).lower()
 
         # ----------------------------------------------------
-        # FOMC STATEMENT
+        # STATEMENT
         # ----------------------------------------------------
 
         if (
@@ -219,25 +244,29 @@ def discover_links() -> Dict[str, Dict[date, str]]:
                     h
                 )
             )
-            or (
-                "fomcstmt" in h
-            )
+            or "fomcstmt" in h
             or (
                 "statement" in label
                 and "minutes" not in label
             )
         ):
-            result["statement"][d] = url
+
+            result[
+                "statement"
+            ][d] = url
 
         # ----------------------------------------------------
-        # FOMC MINUTES
+        # MINUTES
         # ----------------------------------------------------
 
         elif (
             "fomcminutes" in h
             or "minutes" in label
         ):
-            result["minutes"][d] = url
+
+            result[
+                "minutes"
+            ][d] = url
 
         # ----------------------------------------------------
         # PRESS CONFERENCE
@@ -247,7 +276,10 @@ def discover_links() -> Dict[str, Dict[date, str]]:
             "fomcpresconf" in h
             or "press conference" in label
         ):
-            result["press"][d] = url
+
+            result[
+                "press"
+            ][d] = url
 
         # ----------------------------------------------------
         # SEP
@@ -257,7 +289,10 @@ def discover_links() -> Dict[str, Dict[date, str]]:
             "fomcproj" in h
             or "projection materials" in label
         ):
-            result["sep"][d] = url
+
+            result[
+                "sep"
+            ][d] = url
 
     return result
 
@@ -270,11 +305,6 @@ def latest_completed_fomc(
     links: Dict[str, Dict[date, str]],
     as_of: Optional[date] = None
 ) -> Optional[date]:
-    """
-    Return the latest FOMC document date that is not in the future.
-
-    This deliberately excludes a future/ongoing meeting.
-    """
 
     as_of = as_of or date.today()
 
@@ -285,7 +315,8 @@ def latest_completed_fomc(
     )
 
     done = [
-        d for d in dates
+        d
+        for d in dates
         if d <= as_of
     ]
 
@@ -326,7 +357,10 @@ def previous_sep(
 # DOCUMENT FETCH
 # ============================================================
 
-def fetch_document(url: str) -> str:
+def fetch_document(
+    url: str
+) -> str:
+
     if not url:
         return ""
 
@@ -335,10 +369,11 @@ def fetch_document(url: str) -> str:
 
     r = get(url)
 
-    return (
-        clean_html(r.text)
-        if r is not None
-        else ""
+    if r is None:
+        return ""
+
+    return clean_html(
+        r.text
     )
 
 
@@ -346,13 +381,12 @@ def fetch_document(url: str) -> str:
 # PRESS CONFERENCE
 # ============================================================
 
-def press_page_data(url: str) -> Dict:
-    """
-    Fetch the official FOMC press conference page and,
-    when available, its official PDF transcript.
-    """
+def press_page_data(
+    url: str
+) -> Dict:
 
     if not url:
+
         return {
             "page_url": None,
             "pdf_url": None,
@@ -362,6 +396,7 @@ def press_page_data(url: str) -> Dict:
     r = get(url)
 
     if r is None:
+
         return {
             "page_url": url,
             "pdf_url": None,
@@ -375,7 +410,10 @@ def press_page_data(url: str) -> Dict:
 
     pdf = ""
 
-    for a in soup.find_all("a", href=True):
+    for a in soup.find_all(
+        "a",
+        href=True
+    ):
 
         label = a.get_text(
             " ",
@@ -393,7 +431,9 @@ def press_page_data(url: str) -> Dict:
                 or "press conference" in label
             )
         ):
+
             pdf = href
+
             break
 
     text = (
@@ -410,10 +450,11 @@ def press_page_data(url: str) -> Dict:
 
 
 # ============================================================
-# SEP
+# SEP HELPERS
 # ============================================================
 
 def _num(x):
+
     if x is None:
         return None
 
@@ -430,6 +471,7 @@ def _num(x):
 
 
 def _norm(x):
+
     return re.sub(
         r"[^a-z0-9]",
         "",
@@ -437,25 +479,43 @@ def _norm(x):
     )
 
 
+# ============================================================
+# SEP EXTRACTION
+# ============================================================
+
 def extract_sep(
     url: str,
     sep_date: date
 ) -> Dict:
-    """
-    Read official accessible SEP HTML tables.
-    PDF/text fallback is used if necessary.
-    """
 
     out = {
-        "sep_date": sep_date.isoformat(),
-        "url": url,
-        "available": False,
-        "year": sep_date.year,
-        "gdp": None,
-        "unemployment": None,
-        "pce": None,
-        "core_pce": None,
-        "fed_funds": None,
+
+        "sep_date":
+            sep_date.isoformat(),
+
+        "url":
+            url,
+
+        "available":
+            False,
+
+        "year":
+            sep_date.year,
+
+        "gdp":
+            None,
+
+        "unemployment":
+            None,
+
+        "pce":
+            None,
+
+        "core_pce":
+            None,
+
+        "fed_funds":
+            None,
     }
 
     if not url:
@@ -466,17 +526,31 @@ def extract_sep(
     # --------------------------------------------------------
 
     try:
-        tables = pd.read_html(url)
+
+        tables = pd.read_html(
+            url
+        )
 
     except Exception:
+
         tables = []
 
     targets = {
-        "gdp": "changeinrealgdp",
-        "unemployment": "unemploymentrate",
-        "pce": "pceinflation",
-        "core_pce": "corepceinflation",
-        "fed_funds": "federalfundsrate",
+
+        "gdp":
+            "changeinrealgdp",
+
+        "unemployment":
+            "unemploymentrate",
+
+        "pce":
+            "pceinflation",
+
+        "core_pce":
+            "corepceinflation",
+
+        "fed_funds":
+            "federalfundsrate",
     }
 
     for df in tables:
@@ -503,32 +577,41 @@ def extract_sep(
                     ]
 
                     vals = [
-                        v for v in vals
+                        v
+                        for v in vals
                         if v is not None
                     ]
 
                     if vals:
+
                         out[field] = vals[0]
 
     if any(
         out[k] is not None
         for k in targets
     ):
+
         out["available"] = True
+
         return out
 
     # --------------------------------------------------------
     # TEXT FALLBACK
     # --------------------------------------------------------
 
-    text = fetch_document(url)
+    text = fetch_document(
+        url
+    )
 
-    out["available"] = bool(text)
+    out["available"] = bool(
+        text
+    )
 
     if not text:
         return out
 
     patterns = {
+
         "gdp":
             r"Change in real GDP.{0,120}?\b(\d+\.\d)\b",
 
@@ -554,6 +637,7 @@ def extract_sep(
         )
 
         if m:
+
             out[field] = float(
                 m.group(1)
             )
@@ -595,87 +679,148 @@ def sep_shift(
 
         change = (
             round(c - p, 2)
-            if c is not None and p is not None
+            if c is not None
+            and p is not None
             else None
         )
 
         result[f] = {
-            "current": c,
-            "previous": p,
-            "change": change
+
+            "current":
+                c,
+
+            "previous":
+                p,
+
+            "change":
+                change,
         }
 
         if change is None or change == 0:
             continue
 
-        # Higher inflation / higher policy rate
-        # = more hawkish
         if f in (
             "pce",
             "core_pce",
             "fed_funds"
         ):
 
-            hawkish += change > 0
-            dovish += change < 0
+            if change > 0:
+                hawkish += 1
 
-        # Higher GDP = hawkish
+            else:
+                dovish += 1
+
         elif f == "gdp":
 
-            hawkish += change > 0
-            dovish += change < 0
+            if change > 0:
+                hawkish += 1
 
-        # Higher unemployment = dovish
+            else:
+                dovish += 1
+
         elif f == "unemployment":
 
-            dovish += change > 0
-            hawkish += change < 0
+            if change > 0:
+                dovish += 1
+
+            else:
+                hawkish += 1
 
     classification = (
+
         "HAWKISH SHIFT"
         if hawkish > dovish
+
         else
+
         "DOVISH SHIFT"
         if dovish > hawkish
+
         else
+
         "MIXED / NEUTRAL SHIFT"
     )
 
     return {
-        "classification": classification,
-        "hawkish_points": int(hawkish),
-        "dovish_points": int(dovish),
-        "fields": result,
+
+        "classification":
+            classification,
+
+        "hawkish_points":
+            int(hawkish),
+
+        "dovish_points":
+            int(dovish),
+
+        "fields":
+            result,
     }
 
 
 # ============================================================
-# TONE
+# BASIC TONE
 # ============================================================
 
 HAWKISH = [
+
     "higher for longer",
+
     "restrictive",
+
     "inflation remains elevated",
+
     "persistent inflation",
+
     "upside risks to inflation",
+
     "additional tightening",
+
     "rate increase",
+
     "raise the target range",
+
     "higher policy rate",
+
+    "inflation pressures",
+
+    "inflationary pressures",
+
+    "tight monetary policy",
+
+    "policy remains restrictive",
 ]
 
+
 DOVISH = [
+
     "rate cut",
+
     "rate cuts",
+
     "lower rates",
+
     "easing policy",
+
     "labor market has cooled",
+
     "economic activity slowed",
+
     "growth slowed",
+
     "downside risks",
+
     "inflation has eased",
+
     "inflation eased",
+
+    "policy easing",
+
+    "monetary easing",
+
+    "lower policy rate",
+
+    "lower policy rates",
 ]
 
 
@@ -700,14 +845,23 @@ def tone_score(
         return 0
 
     score = (
-        count_terms(text, HAWKISH)
+        count_terms(
+            text,
+            HAWKISH
+        )
         -
-        count_terms(text, DOVISH)
+        count_terms(
+            text,
+            DOVISH
+        )
     )
 
     return max(
         -20,
-        min(20, score)
+        min(
+            20,
+            score
+        )
     )
 
 
@@ -730,6 +884,10 @@ def tone(
     return "NEUTRAL"
 
 
+# ============================================================
+# DOCUMENT ANALYSIS
+# ============================================================
+
 def analyze(
     name: str,
     text: str
@@ -738,62 +896,90 @@ def analyze(
     if not text:
 
         return {
-            "name": name,
-            "available": False,
-            "tone": "UNAVAILABLE",
-            "tone_score": None,
+
+            "name":
+                name,
+
+            "available":
+                False,
+
+            "tone":
+                "UNAVAILABLE",
+
+            "tone_score":
+                None,
         }
 
-    s = tone_score(text)
+    s = tone_score(
+        text
+    )
 
     return {
-        "name": name,
-        "available": True,
-        "tone": tone(s),
-        "tone_score": s,
 
-        "inflation_mentions": count_terms(
-            text,
-            [
-                "inflation",
-                "prices",
-                "price pressures",
-            ],
-        ),
+        "name":
+            name,
 
-        "labor_mentions": count_terms(
-            text,
-            [
-                "employment",
-                "labor market",
-                "unemployment",
-                "job gains",
-                "wages",
-            ],
-        ),
+        "available":
+            True,
 
-        "growth_mentions": count_terms(
-            text,
-            [
-                "economic activity",
-                "economic growth",
-                "growth",
-                "consumer spending",
-            ],
-        ),
+        "tone":
+            tone(s),
 
-        "financial_mentions": count_terms(
-            text,
-            [
-                "financial conditions",
-                "financial stability",
-                "credit conditions",
-                "banking",
-                "liquidity",
-            ],
-        ),
+        "tone_score":
+            s,
 
-        "text_length": len(text),
+        "inflation_mentions":
+            count_terms(
+                text,
+                [
+                    "inflation",
+                    "prices",
+                    "price pressures",
+                    "inflation pressures",
+                ]
+            ),
+
+        "labor_mentions":
+            count_terms(
+                text,
+                [
+                    "employment",
+                    "labor market",
+                    "unemployment",
+                    "job gains",
+                    "wages",
+                    "payroll",
+                ]
+            ),
+
+        "growth_mentions":
+            count_terms(
+                text,
+                [
+                    "economic activity",
+                    "economic growth",
+                    "growth",
+                    "consumer spending",
+                    "demand",
+                    "output",
+                ]
+            ),
+
+        "financial_mentions":
+            count_terms(
+                text,
+                [
+                    "financial conditions",
+                    "financial stability",
+                    "credit conditions",
+                    "banking",
+                    "liquidity",
+                    "credit",
+                ]
+            ),
+
+        "text_length":
+            len(text),
     }
 
 
@@ -814,24 +1000,863 @@ FED_CHAIR_TRANSITION = date(
 def fed_chair_for_date(
     document_date: Optional[date]
 ) -> str:
-    """
-    Return the Federal Reserve Chair applicable
-    to a document date.
-
-    Before May 22, 2026:
-        Jerome Powell
-
-    From May 22, 2026:
-        Kevin Warsh
-    """
 
     if (
         document_date is not None
-        and document_date >= FED_CHAIR_TRANSITION
+        and document_date >=
+        FED_CHAIR_TRANSITION
     ):
+
         return "Kevin Warsh"
 
     return "Jerome Powell"
+
+
+# ============================================================
+# PHASE 2B — DIRECTIONAL LANGUAGE
+# ============================================================
+
+# These phrases are directional signals.
+# Positive values indicate hawkish pressure.
+# Negative values indicate dovish pressure.
+
+DIMENSION_SIGNALS = {
+
+    "inflation": {
+
+        "hawkish": [
+
+            "inflation remains elevated",
+
+            "inflation remains high",
+
+            "inflation has moved up",
+
+            "inflation increased",
+
+            "inflation picked up",
+
+            "inflation pressures remain",
+
+            "price pressures remain",
+
+            "upside risks to inflation",
+
+            "inflationary pressures",
+
+            "persistent inflation",
+
+            "higher inflation",
+
+            "inflation expectations increased",
+
+            "inflation expectations remain elevated",
+        ],
+
+        "dovish": [
+
+            "inflation has eased",
+
+            "inflation eased",
+
+            "inflation declined",
+
+            "inflation moderated",
+
+            "inflation moved lower",
+
+            "price pressures eased",
+
+            "inflation pressures eased",
+
+            "inflation expectations declined",
+
+            "inflation expectations eased",
+
+            "further progress on inflation",
+        ],
+    },
+
+    "labor": {
+
+        "hawkish": [
+
+            "employment remains strong",
+
+            "job gains remained solid",
+
+            "job gains remain strong",
+
+            "labor market remains tight",
+
+            "labor market remains strong",
+
+            "wage pressures remain",
+
+            "wages increased",
+
+            "employment increased",
+
+            "employment grew",
+
+            "labor demand remains strong",
+        ],
+
+        "dovish": [
+
+            "labor market has cooled",
+
+            "labor market cooled",
+
+            "employment slowed",
+
+            "job gains slowed",
+
+            "job gains weakened",
+
+            "employment declined",
+
+            "unemployment increased",
+
+            "unemployment rose",
+
+            "labor demand weakened",
+
+            "labor market softened",
+
+            "labor market weakened",
+        ],
+    },
+
+    "growth": {
+
+        "hawkish": [
+
+            "economic activity remains solid",
+
+            "economic activity remains strong",
+
+            "economic growth remained solid",
+
+            "growth remained solid",
+
+            "growth remained strong",
+
+            "consumer spending remained strong",
+
+            "consumer spending increased",
+
+            "demand remains strong",
+
+            "economic activity increased",
+        ],
+
+        "dovish": [
+
+            "economic activity slowed",
+
+            "economic activity weakened",
+
+            "growth slowed",
+
+            "growth weakened",
+
+            "economic growth slowed",
+
+            "consumer spending slowed",
+
+            "consumer spending weakened",
+
+            "demand weakened",
+
+            "economic activity declined",
+
+            "economic activity softened",
+        ],
+    },
+
+    "financial": {
+
+        "hawkish": [
+
+            "financial conditions tightened",
+
+            "financial conditions remain tight",
+
+            "credit conditions tightened",
+
+            "financial conditions restrictive",
+
+            "financial stress increased",
+        ],
+
+        "dovish": [
+
+            "financial conditions eased",
+
+            "financial conditions improved",
+
+            "credit conditions eased",
+
+            "credit conditions improved",
+
+            "financial stress declined",
+        ],
+    },
+
+    "policy": {
+
+        "hawkish": [
+
+            "higher for longer",
+
+            "policy remains restrictive",
+
+            "policy remains restrictive for longer",
+
+            "additional tightening",
+
+            "higher policy rate",
+
+            "higher policy rates",
+
+            "raise the target range",
+
+            "rate increase",
+
+            "rate increases",
+
+            "restrictive policy",
+
+            "restrictive monetary policy",
+
+            "not yet time to ease",
+
+            "not ready to cut",
+        ],
+
+        "dovish": [
+
+            "rate cut",
+
+            "rate cuts",
+
+            "lower policy rate",
+
+            "lower policy rates",
+
+            "easing policy",
+
+            "policy easing",
+
+            "monetary easing",
+
+            "begin easing",
+
+            "easier policy",
+
+            "lower rates",
+
+            "time to ease",
+        ],
+    },
+}
+
+
+# ============================================================
+# SIGNAL SCORING
+# ============================================================
+
+def dimension_signal(
+    text: str,
+    dimension: str
+) -> Dict:
+
+    if not text:
+
+        return {
+
+            "score":
+                0,
+
+            "hawkish":
+                0,
+
+            "dovish":
+                0,
+
+            "classification":
+                "UNAVAILABLE",
+
+            "evidence":
+                [],
+        }
+
+    low = text.lower()
+
+    signals = DIMENSION_SIGNALS[
+        dimension
+    ]
+
+    hawkish_hits = []
+    dovish_hits = []
+
+    for phrase in signals["hawkish"]:
+
+        count = low.count(
+            phrase.lower()
+        )
+
+        if count > 0:
+
+            hawkish_hits.extend(
+                [phrase] * count
+            )
+
+    for phrase in signals["dovish"]:
+
+        count = low.count(
+            phrase.lower()
+        )
+
+        if count > 0:
+
+            dovish_hits.extend(
+                [phrase] * count
+            )
+
+    raw = (
+        len(hawkish_hits)
+        -
+        len(dovish_hits)
+    )
+
+    score = max(
+        -10,
+        min(
+            10,
+            raw
+        )
+    )
+
+    if score >= 5:
+
+        classification = "HAWKISH"
+
+    elif score >= 2:
+
+        classification = "MODERATELY HAWKISH"
+
+    elif score <= -5:
+
+        classification = "DOVISH"
+
+    elif score <= -2:
+
+        classification = "MODERATELY DOVISH"
+
+    else:
+
+        classification = "NEUTRAL"
+
+    evidence = []
+
+    for phrase in hawkish_hits[:3]:
+
+        evidence.append(
+            f"Hawkish: {phrase}"
+        )
+
+    for phrase in dovish_hits[:3]:
+
+        evidence.append(
+            f"Dovish: {phrase}"
+        )
+
+    return {
+
+        "score":
+            score,
+
+        "hawkish":
+            len(hawkish_hits),
+
+        "dovish":
+            len(dovish_hits),
+
+        "classification":
+            classification,
+
+        "evidence":
+            evidence,
+    }
+
+
+# ============================================================
+# DOCUMENT DIMENSION ANALYSIS
+# ============================================================
+
+def analyze_dimensions(
+    text: str
+) -> Dict:
+
+    return {
+
+        dimension:
+            dimension_signal(
+                text,
+                dimension
+            )
+
+        for dimension
+        in DIMENSION_SIGNALS
+    }
+
+
+# ============================================================
+# FED INTELLIGENCE WEIGHTS
+# ============================================================
+
+DIMENSION_WEIGHTS = {
+
+    "inflation":
+        25,
+
+    "labor":
+        15,
+
+    "growth":
+        15,
+
+    "financial":
+        10,
+
+    "policy":
+        35,
+}
+
+
+# ============================================================
+# NORMALIZE DIMENSION
+# ============================================================
+
+def dimension_to_100(
+    score: float
+) -> float:
+
+    # Internal dimension score:
+    # -10 = fully dovish
+    #   0 = neutral
+    # +10 = fully hawkish
+
+    value = (
+        (score + 10)
+        / 20
+        * 100
+    )
+
+    return round(
+        max(
+            0,
+            min(
+                100,
+                value
+            )
+        ),
+        1
+    )
+
+
+# ============================================================
+# FED INTELLIGENCE SCORE
+# ============================================================
+
+def calculate_fed_score(
+    dimensions: Dict,
+    sep_shift_data: Optional[Dict] = None
+) -> Dict:
+
+    weighted_sum = 0.0
+    total_weight = 0.0
+
+    component_scores = {}
+
+    for dimension, weight in DIMENSION_WEIGHTS.items():
+
+        item = dimensions.get(
+            dimension,
+            {}
+        )
+
+        score = item.get(
+            "score"
+        )
+
+        if score is None:
+            continue
+
+        normalized = dimension_to_100(
+            score
+        )
+
+        component_scores[
+            dimension
+        ] = normalized
+
+        weighted_sum += (
+            normalized * weight
+        )
+
+        total_weight += weight
+
+    if total_weight == 0:
+
+        base_score = 50.0
+
+    else:
+
+        base_score = (
+            weighted_sum
+            /
+            total_weight
+        )
+
+    # --------------------------------------------------------
+    # SEP adjustment
+    #
+    # SEP is an independent macro-policy confirmation.
+    # It receives a modest adjustment so that it cannot
+    # completely override document-based analysis.
+    # --------------------------------------------------------
+
+    sep_adjustment = 0.0
+
+    if sep_shift_data:
+
+        classification = sep_shift_data.get(
+            "classification",
+            ""
+        )
+
+        if classification == "HAWKISH SHIFT":
+
+            sep_adjustment = 5.0
+
+        elif classification == "DOVISH SHIFT":
+
+            sep_adjustment = -5.0
+
+    final_score = max(
+        0,
+        min(
+            100,
+            base_score + sep_adjustment
+        )
+    )
+
+    final_score = round(
+        final_score,
+        1
+    )
+
+    if final_score >= 75:
+
+        classification = "HAWKISH"
+
+    elif final_score >= 56:
+
+        classification = "MODERATELY HAWKISH"
+
+    elif final_score >= 45:
+
+        classification = "NEUTRAL"
+
+    elif final_score >= 25:
+
+        classification = "MODERATELY DOVISH"
+
+    else:
+
+        classification = "DOVISH"
+
+    return {
+
+        "score":
+            final_score,
+
+        "classification":
+            classification,
+
+        "base_score":
+            round(
+                base_score,
+                1
+            ),
+
+        "sep_adjustment":
+            sep_adjustment,
+
+        "components":
+            component_scores,
+    }
+
+
+# ============================================================
+# EVIDENCE GENERATOR
+# ============================================================
+
+def build_evidence(
+    dimensions: Dict,
+    sep_shift_data: Optional[Dict] = None
+) -> List[str]:
+
+    evidence = []
+
+    # --------------------------------------------------------
+    # Highest-impact dimensions first
+    # --------------------------------------------------------
+
+    ordered = sorted(
+        dimensions.items(),
+        key=lambda x: abs(
+            x[1].get(
+                "score",
+                0
+            )
+        ),
+        reverse=True
+    )
+
+    for dimension, data in ordered:
+
+        score = data.get(
+            "score",
+            0
+        )
+
+        if score == 0:
+            continue
+
+        label = dimension.replace(
+            "_",
+            " "
+        ).title()
+
+        classification = data.get(
+            "classification",
+            "NEUTRAL"
+        )
+
+        if score > 0:
+
+            evidence.append(
+                f"{label}: {classification} "
+                f"(+{score})"
+            )
+
+        else:
+
+            evidence.append(
+                f"{label}: {classification} "
+                f"({score})"
+            )
+
+    if sep_shift_data:
+
+        sep_class = sep_shift_data.get(
+            "classification"
+        )
+
+        if sep_class:
+
+            evidence.append(
+                f"SEP: {sep_class}"
+            )
+
+    return evidence[:6]
+
+
+# ============================================================
+# FULL FED ANALYSIS
+# ============================================================
+
+def build_deep_fed_analysis(
+    statement_text: str,
+    minutes_text: str,
+    chair_text: str,
+    sep_shift_data: Optional[Dict] = None
+) -> Dict:
+
+    # --------------------------------------------------------
+    # Analyze each document separately
+    # --------------------------------------------------------
+
+    statement_dimensions = analyze_dimensions(
+        statement_text
+    )
+
+    minutes_dimensions = analyze_dimensions(
+        minutes_text
+    )
+
+    chair_dimensions = analyze_dimensions(
+        chair_text
+    )
+
+    # --------------------------------------------------------
+    # Combine documents
+    #
+    # Statement:
+    #   35%
+    #
+    # Minutes:
+    #   40%
+    #
+    # Chair:
+    #   25%
+    #
+    # This prevents one short document from dominating.
+    # --------------------------------------------------------
+
+    combined = {}
+
+    for dimension in DIMENSION_WEIGHTS:
+
+        s = statement_dimensions[
+            dimension
+        ].get(
+            "score",
+            0
+        )
+
+        m = minutes_dimensions[
+            dimension
+        ].get(
+            "score",
+            0
+        )
+
+        c = chair_dimensions[
+            dimension
+        ].get(
+            "score",
+            0
+        )
+
+        combined_score = (
+            s * 0.35
+            +
+            m * 0.40
+            +
+            c * 0.25
+        )
+
+        combined_score = max(
+            -10,
+            min(
+                10,
+                combined_score
+            )
+        )
+
+        classification = (
+            "HAWKISH"
+            if combined_score >= 5
+            else
+            "MODERATELY HAWKISH"
+            if combined_score >= 2
+            else
+            "DOVISH"
+            if combined_score <= -5
+            else
+            "MODERATELY DOVISH"
+            if combined_score <= -2
+            else
+            "NEUTRAL"
+        )
+
+        evidence = []
+
+        for source_name, source_data in [
+            (
+                "Statement",
+                statement_dimensions[dimension]
+            ),
+            (
+                "Minutes",
+                minutes_dimensions[dimension]
+            ),
+            (
+                "Chair",
+                chair_dimensions[dimension]
+            ),
+        ]:
+
+            if source_data.get(
+                "score",
+                0
+            ) != 0:
+
+                evidence.append(
+                    f"{source_name}: "
+                    f"{source_data['classification']}"
+                )
+
+        combined[
+            dimension
+        ] = {
+
+            "score":
+                round(
+                    combined_score,
+                    2
+                ),
+
+            "classification":
+                classification,
+
+            "evidence":
+                evidence,
+        }
+
+    # --------------------------------------------------------
+    # Final score
+    # --------------------------------------------------------
+
+    score = calculate_fed_score(
+        combined,
+        sep_shift_data
+    )
+
+    reasons = build_evidence(
+        combined,
+        sep_shift_data
+    )
+
+    return {
+
+        "score":
+            score,
+
+        "dimensions":
+            combined,
+
+        "documents":
+            {
+
+                "statement":
+                    statement_dimensions,
+
+                "minutes":
+                    minutes_dimensions,
+
+                "chair":
+                    chair_dimensions,
+            },
+
+        "reasons":
+            reasons,
+    }
 
 
 # ============================================================
@@ -852,12 +1877,16 @@ def build_fed_intelligence() -> Dict:
     if not meeting:
 
         return {
-            "available": False,
-            "error": "No completed FOMC meeting found.",
+
+            "available":
+                False,
+
+            "error":
+                "No completed FOMC meeting found.",
         }
 
     # --------------------------------------------------------
-    # DOCUMENT URLS
+    # URLS
     # --------------------------------------------------------
 
     statement_url = links[
@@ -898,7 +1927,7 @@ def build_fed_intelligence() -> Dict:
     )
 
     # --------------------------------------------------------
-    # HISTORICAL FED CHAIR
+    # FED CHAIR
     # --------------------------------------------------------
 
     chair_name = fed_chair_for_date(
@@ -952,8 +1981,47 @@ def build_fed_intelligence() -> Dict:
             current_sep,
             previous
         )
-        if current_sep and previous
+        if current_sep
+        and previous
         else {}
+    )
+
+    # --------------------------------------------------------
+    # BASIC DOCUMENT ANALYSIS
+    # --------------------------------------------------------
+
+    statement_analysis = analyze(
+        "FOMC Statement",
+        statement_text
+    )
+
+    minutes_analysis = analyze(
+        "FOMC Minutes",
+        minutes_text
+    )
+
+    chair_analysis = analyze(
+        f"{chair_name} Press Conference",
+        press["text"]
+    )
+
+    # --------------------------------------------------------
+    # PHASE 2B DEEP ANALYSIS
+    # --------------------------------------------------------
+
+    deep_analysis = build_deep_fed_analysis(
+
+        statement_text=
+            statement_text,
+
+        minutes_text=
+            minutes_text,
+
+        chair_text=
+            press["text"],
+
+        sep_shift_data=
+            shift,
     )
 
     # --------------------------------------------------------
@@ -962,7 +2030,8 @@ def build_fed_intelligence() -> Dict:
 
     return {
 
-        "available": True,
+        "available":
+            True,
 
         "as_of_date":
             today.isoformat(),
@@ -981,40 +2050,23 @@ def build_fed_intelligence() -> Dict:
             chair_name,
 
         # ----------------------------------------------------
-        # FOMC STATEMENT
+        # DOCUMENT ANALYSIS
         # ----------------------------------------------------
 
         "statement":
-            analyze(
-                "FOMC Statement",
-                statement_text
-            ),
+            statement_analysis,
 
         "statement_source":
             statement_url,
 
-        # ----------------------------------------------------
-        # FOMC MINUTES
-        # ----------------------------------------------------
-
         "minutes":
-            analyze(
-                "FOMC Minutes",
-                minutes_text
-            ),
+            minutes_analysis,
 
         "minutes_source":
             minutes_url,
 
-        # ----------------------------------------------------
-        # FED CHAIR PRESS CONFERENCE
-        # ----------------------------------------------------
-
         "chair":
-            analyze(
-                f"{chair_name} Press Conference",
-                press["text"]
-            ),
+            chair_analysis,
 
         "chair_page":
             press["page_url"],
@@ -1048,6 +2100,13 @@ def build_fed_intelligence() -> Dict:
 
         "sep_shift":
             shift,
+
+        # ----------------------------------------------------
+        # PHASE 2B
+        # ----------------------------------------------------
+
+        "fed_intelligence":
+            deep_analysis,
     }
 
 
@@ -1059,17 +2118,30 @@ def fed_summary(
     data: Dict
 ) -> str:
 
-    if not data.get("available"):
+    if not data.get(
+        "available"
+    ):
 
         return (
             "FED INTELLIGENCE unavailable: "
-            + str(
+            +
+            str(
                 data.get(
                     "error",
                     "unknown error"
                 )
             )
         )
+
+    fi = data.get(
+        "fed_intelligence",
+        {}
+    )
+
+    score_data = fi.get(
+        "score",
+        {}
+    )
 
     lines = [
 
@@ -1098,16 +2170,29 @@ def fed_summary(
         f"{data.get('previous_sep_date')}",
     ]
 
-    if data.get("sep_shift"):
+    # --------------------------------------------------------
+    # SEP SHIFT
+    # --------------------------------------------------------
+
+    if data.get(
+        "sep_shift"
+    ):
 
         lines.append(
             "SEP Shift: "
-            + data["sep_shift"]["classification"]
+            +
+            data[
+                "sep_shift"
+            ][
+                "classification"
+            ]
         )
 
         for k, v in data[
             "sep_shift"
-        ]["fields"].items():
+        ][
+            "fields"
+        ].items():
 
             lines.append(
                 f"{k}: "
@@ -1116,7 +2201,71 @@ def fed_summary(
                 f"({v['change']})"
             )
 
-    return "\n".join(lines)
+    # --------------------------------------------------------
+    # PHASE 2B SCORE
+    # --------------------------------------------------------
+
+    if score_data:
+
+        lines.extend([
+
+            "",
+
+            "PHASE 2B",
+
+            "---------",
+
+            f"Fed Intelligence Score: "
+            f"{score_data.get('score')}/100",
+
+            f"Overall Tone: "
+            f"{score_data.get('classification')}",
+
+            f"Base Score: "
+            f"{score_data.get('base_score')}",
+
+            f"SEP Adjustment: "
+            f"{score_data.get('sep_adjustment')}",
+        ])
+
+        components = score_data.get(
+            "components",
+            {}
+        )
+
+        for dimension, value in components.items():
+
+            lines.append(
+                f"{dimension.title()}: "
+                f"{value}/100"
+            )
+
+    # --------------------------------------------------------
+    # REASONS
+    # --------------------------------------------------------
+
+    reasons = fi.get(
+        "reasons",
+        []
+    )
+
+    if reasons:
+
+        lines.extend([
+            "",
+            "REASONS",
+            "-------",
+        ])
+
+        for reason in reasons:
+
+            lines.append(
+                f"- {reason}"
+            )
+
+    return "\n".join(
+        lines
+    )
 
 
 # ============================================================
@@ -1128,5 +2277,7 @@ if __name__ == "__main__":
     result = build_fed_intelligence()
 
     print(
-        fed_summary(result)
+        fed_summary(
+            result
+        )
     )
