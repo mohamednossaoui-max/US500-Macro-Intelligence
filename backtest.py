@@ -1,618 +1,375 @@
 import pandas as pd
 import numpy as np
 
-from data import get_historical_market_data
+from config import MARKET_TICKER
+from data import load_market_data
+from historical_events import detect_correction_cycles
 
 
 # ============================================================
-# CONFIGURATION
+# SETTINGS
 # ============================================================
-
-TICKER = "^GSPC"
-START_DATE = "2019-01-01"
-
-PULLBACKS = [3, 5, 10, 20, 30]
 
 RR = 4.0
+PULLBACKS = [3, 5, 10, 20, 30]
+
 ATR_PERIOD = 14
 SL_LOOKBACK = 5
-
-ENTRY_MODE = "trigger_close"
+ATR_MULTIPLIER = 0.5
 
 
 # ============================================================
-# PREPARE DATA
+# ATR
 # ============================================================
 
-def prepare_data(df):
+def calculate_atr(df, period=14):
+    """
+    Calculate True Range and ATR.
 
-    df = df.copy()
+    ATR is shifted by one day later so that the trigger day
+    itself is NOT used in the ATR calculation.
+    """
 
-    df.columns = [str(c).lower() for c in df.columns]
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
 
-    required = ["open", "high", "low", "close"]
+    previous_close = close.shift(1)
 
-    for col in required:
-        if col not in df.columns:
-            raise ValueError(
-                f"Missing required column: {col}"
-            )
+    tr1 = high - low
+    tr2 = (high - previous_close).abs()
+    tr3 = (low - previous_close).abs()
 
-    df = df.sort_index()
-    df = df[~df.index.duplicated(keep="first")]
-
-    # --------------------------------------------------------
-    # True Range
-    # --------------------------------------------------------
-
-    previous_close = df["close"].shift(1)
-
-    tr1 = df["high"] - df["low"]
-    tr2 = (df["high"] - previous_close).abs()
-    tr3 = (df["low"] - previous_close).abs()
-
-    df["tr"] = pd.concat(
+    true_range = pd.concat(
         [tr1, tr2, tr3],
         axis=1
     ).max(axis=1)
 
-    # ATR based on completed candles.
-    df["atr14"] = (
-        df["tr"]
-        .rolling(ATR_PERIOD)
-        .mean()
-        .shift(1)
-    )
+    atr = true_range.rolling(period).mean()
 
-    # --------------------------------------------------------
-    # Previous 5 completed candles
-    # --------------------------------------------------------
+    # Exclude current trigger day
+    atr = atr.shift(1)
 
-    df["previous_5_low"] = (
-        df["low"]
-        .shift(1)
-        .rolling(SL_LOOKBACK)
-        .min()
-    )
-
-    return df
+    return atr
 
 
 # ============================================================
-# DETECT CORRECTION CYCLES
+# CREATE PULLBACK EVENTS
 # ============================================================
 
-def detect_correction_cycles(
-    df,
-    minimum_drawdown=-3.0
-):
+def create_pullback_events(df, cycles):
+    """
+    For every correction cycle create one event for each
+    pullback level.
 
-    cycles = []
+    Levels:
+        -3%
+        -5%
+        -10%
+        -20%
+        -30%
 
-    running_high = -np.inf
-    reference_high = None
-    reference_high_date = None
-
-    in_correction = False
-    start_date = None
-    start_position = None
-
-    for i, (date, row) in enumerate(
-        df.iterrows()
-    ):
-
-        close = float(row["close"])
-
-        # ----------------------------------------------------
-        # New closing high
-        # ----------------------------------------------------
-
-        if close > running_high:
-
-            # Recovery of previous correction
-            if (
-                in_correction
-                and reference_high is not None
-                and close >= reference_high
-            ):
-
-                cycle_df = df.iloc[
-                    start_position:i + 1
-                ]
-
-                trough_date = cycle_df[
-                    "low"
-                ].idxmin()
-
-                trough_price = float(
-                    cycle_df.loc[
-                        trough_date,
-                        "low"
-                    ]
-                )
-
-                maximum_drawdown = (
-                    trough_price /
-                    reference_high - 1
-                ) * 100
-
-                recovery_days = (
-                    date - start_date
-                ).days
-
-                cycles.append({
-                    "reference_high_date":
-                        reference_high_date,
-
-                    "reference_high":
-                        reference_high,
-
-                    "start_date":
-                        start_date,
-
-                    "trough_date":
-                        trough_date,
-
-                    "trough_price":
-                        trough_price,
-
-                    "maximum_drawdown_pct":
-                        maximum_drawdown,
-
-                    "recovery_date":
-                        date,
-
-                    "recovery_days":
-                        recovery_days,
-                })
-
-                in_correction = False
-                start_date = None
-                start_position = None
-
-            running_high = close
-
-            if not in_correction:
-
-                reference_high = close
-                reference_high_date = date
-
-        # ----------------------------------------------------
-        # Drawdown
-        # ----------------------------------------------------
-
-        if reference_high is not None:
-
-            drawdown = (
-                close /
-                reference_high - 1
-            ) * 100
-
-            if (
-                not in_correction
-                and drawdown <= minimum_drawdown
-            ):
-
-                in_correction = True
-                start_date = date
-                start_position = i
-
-    # --------------------------------------------------------
-    # Unfinished final correction
-    # --------------------------------------------------------
-
-    if in_correction:
-
-        cycle_df = df.iloc[start_position:]
-
-        trough_date = cycle_df[
-            "low"
-        ].idxmin()
-
-        trough_price = float(
-            cycle_df.loc[
-                trough_date,
-                "low"
-            ]
-        )
-
-        maximum_drawdown = (
-            trough_price /
-            reference_high - 1
-        ) * 100
-
-        cycles.append({
-            "reference_high_date":
-                reference_high_date,
-
-            "reference_high":
-                reference_high,
-
-            "start_date":
-                start_date,
-
-            "trough_date":
-                trough_date,
-
-            "trough_price":
-                trough_price,
-
-            "maximum_drawdown_pct":
-                maximum_drawdown,
-
-            "recovery_date":
-                None,
-
-            "recovery_days":
-                None,
-        })
-
-    return pd.DataFrame(cycles)
-
-
-# ============================================================
-# ADD PULLBACK EVENTS
-# ============================================================
-
-def add_pullback_events(df, cycles):
+    If a level was never reached, result = NO_TRIGGER.
+    """
 
     events = []
 
-    for cycle_id, cycle in enumerate(
-        cycles.to_dict("records"),
-        start=1
-    ):
+    for cycle in cycles:
 
-        reference_high = float(
-            cycle["reference_high"]
-        )
+        cycle_id = cycle.get("cycle_id")
 
-        start_date = cycle["start_date"]
+        reference_high = cycle.get("reference_high")
+        correction_start = cycle.get("start_date")
+        correction_end = cycle.get("recovery_date")
 
-        cycle_mask = (
-            df.index >= start_date
-        )
+        if reference_high is None:
+            continue
 
-        if cycle["recovery_date"] is not None:
+        # Data inside correction cycle
+        cycle_df = df.copy()
 
-            cycle_mask &= (
-                df.index <=
-                cycle["recovery_date"]
-            )
+        if correction_start is not None:
+            cycle_df = cycle_df[
+                cycle_df.index >= pd.to_datetime(correction_start)
+            ]
 
-        cycle_df = df.loc[cycle_mask]
+        if correction_end is not None:
+            cycle_df = cycle_df[
+                cycle_df.index <= pd.to_datetime(correction_end)
+            ]
 
         for pullback in PULLBACKS:
 
-            target_price = (
-                reference_high *
-                (1 - pullback / 100)
+            target_price = reference_high * (
+                1 - pullback / 100
             )
 
-            trigger = cycle_df[
-                cycle_df["close"] <=
-                target_price
-            ]
+            trigger_date = None
+            trigger_row = None
+
+            # Find first closing price reaching the pullback
+            for date, row in cycle_df.iterrows():
+
+                close = row["Close"]
+
+                if close <= target_price:
+                    trigger_date = date
+                    trigger_row = row
+                    break
 
             # ------------------------------------------------
-            # No trigger
+            # NO TRIGGER
             # ------------------------------------------------
 
-            if trigger.empty:
+            if trigger_date is None:
 
                 events.append({
                     "cycle_id": cycle_id,
-                    "pullback_level": pullback,
-                    "reference_high":
-                        reference_high,
-                    "reference_high_date":
-                        cycle[
-                            "reference_high_date"
-                        ],
-                    "target_price":
-                        target_price,
-                    "trigger_date":
-                        None,
-                    "entry":
-                        np.nan,
-                    "atr14":
-                        np.nan,
-                    "previous_5_low":
-                        np.nan,
-                    "sl":
-                        np.nan,
-                    "tp":
-                        np.nan,
-                    "risk":
-                        np.nan,
-                    "setup_status":
-                        "NO_TRIGGER",
-                    "maximum_drawdown_pct":
-                        cycle[
-                            "maximum_drawdown_pct"
-                        ],
+                    "pullback_level": -pullback,
+                    "reference_high": reference_high,
+                    "target_price": target_price,
+                    "trigger_date": None,
+                    "entry": None,
+                    "previous_5_low": None,
+                    "atr14": None,
+                    "sl": None,
+                    "tp": None,
+                    "risk": None,
+                    "result": "NO_TRIGGER",
+                    "exit_date": None,
+                    "R": None,
+                    "maximum_drawdown_pct": None,
                 })
 
                 continue
 
             # ------------------------------------------------
-            # First trigger
+            # ENTRY
             # ------------------------------------------------
 
-            trigger_date = trigger.index[0]
+            entry = float(trigger_row["Close"])
 
-            trigger_row = df.loc[
-                trigger_date
-            ]
+            # Previous 5 completed candles
+            previous_data = df.loc[
+                df.index < trigger_date
+            ].tail(SL_LOOKBACK)
 
-            entry = float(
-                trigger_row["close"]
-            )
-
-            atr = trigger_row["atr14"]
-
-            previous_5_low = (
-                trigger_row["previous_5_low"]
-            )
-
-            # ------------------------------------------------
-            # Missing historical data
-            # ------------------------------------------------
-
-            if (
-                pd.isna(atr)
-                or pd.isna(previous_5_low)
-            ):
+            if len(previous_data) < SL_LOOKBACK:
 
                 events.append({
                     "cycle_id": cycle_id,
-                    "pullback_level": pullback,
-                    "reference_high":
-                        reference_high,
-                    "reference_high_date":
-                        cycle[
-                            "reference_high_date"
-                        ],
-                    "target_price":
-                        target_price,
-                    "trigger_date":
-                        trigger_date,
-                    "entry":
-                        entry,
-                    "atr14":
-                        atr,
-                    "previous_5_low":
-                        previous_5_low,
-                    "sl":
-                        np.nan,
-                    "tp":
-                        np.nan,
-                    "risk":
-                        np.nan,
-                    "setup_status":
-                        "INSUFFICIENT_DATA",
-                    "maximum_drawdown_pct":
-                        cycle[
-                            "maximum_drawdown_pct"
-                        ],
+                    "pullback_level": -pullback,
+                    "reference_high": reference_high,
+                    "target_price": target_price,
+                    "trigger_date": trigger_date,
+                    "entry": entry,
+                    "previous_5_low": None,
+                    "atr14": None,
+                    "sl": None,
+                    "tp": None,
+                    "risk": None,
+                    "result": "INSUFFICIENT_DATA",
+                    "exit_date": None,
+                    "R": None,
+                    "maximum_drawdown_pct": None,
                 })
 
                 continue
 
+            previous_5_low = float(
+                previous_data["Low"].min()
+            )
+
+            # ATR already excludes trigger day
+            atr14 = df.loc[trigger_date, "atr14"]
+
             # ------------------------------------------------
-            # Stop Loss
+            # INVALID ATR
             # ------------------------------------------------
 
-            sl = (
-                float(previous_5_low)
-                - 0.5 * float(atr)
+            if pd.isna(atr14):
+
+                events.append({
+                    "cycle_id": cycle_id,
+                    "pullback_level": -pullback,
+                    "reference_high": reference_high,
+                    "target_price": target_price,
+                    "trigger_date": trigger_date,
+                    "entry": entry,
+                    "previous_5_low": previous_5_low,
+                    "atr14": None,
+                    "sl": None,
+                    "tp": None,
+                    "risk": None,
+                    "result": "INSUFFICIENT_DATA",
+                    "exit_date": None,
+                    "R": None,
+                    "maximum_drawdown_pct": None,
+                })
+
+                continue
+
+            atr14 = float(atr14)
+
+            # ------------------------------------------------
+            # STOP LOSS
+            # ------------------------------------------------
+
+            sl = previous_5_low - (
+                ATR_MULTIPLIER * atr14
             )
 
             risk = entry - sl
 
             # ------------------------------------------------
-            # IMPORTANT:
-            # Do NOT silently delete invalid setups.
+            # INVALID SL
             # ------------------------------------------------
 
             if risk <= 0:
 
                 events.append({
                     "cycle_id": cycle_id,
-                    "pullback_level": pullback,
-                    "reference_high":
-                        reference_high,
-                    "reference_high_date":
-                        cycle[
-                            "reference_high_date"
-                        ],
-                    "target_price":
-                        target_price,
-                    "trigger_date":
-                        trigger_date,
-                    "entry":
-                        entry,
-                    "atr14":
-                        float(atr),
-                    "previous_5_low":
-                        float(previous_5_low),
-                    "sl":
-                        sl,
-                    "tp":
-                        np.nan,
-                    "risk":
-                        risk,
-                    "setup_status":
-                        "INVALID_SL",
-                    "maximum_drawdown_pct":
-                        cycle[
-                            "maximum_drawdown_pct"
-                        ],
+                    "pullback_level": -pullback,
+                    "reference_high": reference_high,
+                    "target_price": target_price,
+                    "trigger_date": trigger_date,
+                    "entry": entry,
+                    "previous_5_low": previous_5_low,
+                    "atr14": atr14,
+                    "sl": sl,
+                    "tp": None,
+                    "risk": risk,
+                    "result": "INVALID_SL",
+                    "exit_date": None,
+                    "R": None,
+                    "maximum_drawdown_pct": None,
                 })
 
                 continue
 
             # ------------------------------------------------
-            # Valid setup
+            # TAKE PROFIT
             # ------------------------------------------------
 
-            tp = (
-                entry +
+            tp = entry + (
                 RR * risk
             )
 
-            events.append({
-                "cycle_id": cycle_id,
-                "pullback_level": pullback,
-                "reference_high":
-                    reference_high,
-                "reference_high_date":
-                    cycle[
-                        "reference_high_date"
-                    ],
-                "target_price":
-                    target_price,
-                "trigger_date":
-                    trigger_date,
-                "entry":
-                    entry,
-                "atr14":
-                    float(atr),
-                "previous_5_low":
-                    float(previous_5_low),
-                "sl":
-                    sl,
-                "tp":
-                    tp,
-                "risk":
-                    risk,
-                "setup_status":
-                    "VALID",
-                "maximum_drawdown_pct":
-                    cycle[
-                        "maximum_drawdown_pct"
-                    ],
-            })
+            # ------------------------------------------------
+            # EVALUATE TRADE
+            # ------------------------------------------------
 
-    return pd.DataFrame(events)
+            result = evaluate_trade(
+                df=df,
+                trigger_date=trigger_date,
+                entry=entry,
+                sl=sl,
+                tp=tp,
+            )
+
+            result["cycle_id"] = cycle_id
+            result["pullback_level"] = -pullback
+            result["reference_high"] = reference_high
+            result["target_price"] = target_price
+            result["trigger_date"] = trigger_date
+            result["entry"] = entry
+            result["previous_5_low"] = previous_5_low
+            result["atr14"] = atr14
+            result["sl"] = sl
+            result["tp"] = tp
+            result["risk"] = risk
+
+            events.append(result)
+
+    return events
 
 
 # ============================================================
-# EVALUATE ONE TRADE
+# EVALUATE TRADE
 # ============================================================
 
-def evaluate_trade(df, event):
+def evaluate_trade(
+    df,
+    trigger_date,
+    entry,
+    sl,
+    tp,
+):
+    """
+    Long trade.
 
-    if event["setup_status"] != "VALID":
+    Entry = trigger day's closing price.
 
-        return {
-            "result":
-                event["setup_status"],
+    Starting from the following completed Daily candle:
 
-            "exit_date":
-                None,
+        Low <= SL  -> LOSS
+        High >= TP -> WIN
 
-            "exit_price":
-                np.nan,
+    If both SL and TP are touched during the same candle,
+    the result is AMBIGUOUS because Daily OHLC does not reveal
+    which level was touched first.
+    """
 
-            "R":
-                np.nan,
-        }
-
-    trigger_date = event["trigger_date"]
-
-    future = df.loc[
+    future_df = df.loc[
         df.index > trigger_date
     ]
 
-    entry = float(event["entry"])
-    sl = float(event["sl"])
-    tp = float(event["tp"])
+    for date, row in future_df.iterrows():
 
-    for date, row in future.iterrows():
+        high = float(row["High"])
+        low = float(row["Low"])
 
-        high = float(row["high"])
-        low = float(row["low"])
-
-        hit_tp = high >= tp
         hit_sl = low <= sl
+        hit_tp = high >= tp
 
         # ----------------------------------------------------
-        # Same-bar ambiguity
+        # BOTH LEVELS TOUCHED
         # ----------------------------------------------------
 
-        if hit_tp and hit_sl:
+        if hit_sl and hit_tp:
 
             return {
-                "result":
-                    "AMBIGUOUS",
-
-                "exit_date":
-                    date,
-
-                "exit_price":
-                    np.nan,
-
-                "R":
-                    np.nan,
+                "result": "AMBIGUOUS",
+                "exit_date": date,
+                "R": None,
+                "maximum_drawdown_pct": None,
             }
 
         # ----------------------------------------------------
-        # Stop
+        # STOP LOSS
         # ----------------------------------------------------
 
         if hit_sl:
 
             return {
-                "result":
-                    "LOSS",
-
-                "exit_date":
-                    date,
-
-                "exit_price":
-                    sl,
-
-                "R":
-                    -1.0,
+                "result": "LOSS",
+                "exit_date": date,
+                "R": -1.0,
+                "maximum_drawdown_pct": None,
             }
 
         # ----------------------------------------------------
-        # Target
+        # TAKE PROFIT
         # ----------------------------------------------------
 
         if hit_tp:
 
             return {
-                "result":
-                    "WIN",
-
-                "exit_date":
-                    date,
-
-                "exit_price":
-                    tp,
-
-                "R":
-                    RR,
+                "result": "WIN",
+                "exit_date": date,
+                "R": RR,
+                "maximum_drawdown_pct": None,
             }
 
     # --------------------------------------------------------
-    # End of historical data
+    # TRADE STILL OPEN
     # --------------------------------------------------------
 
     return {
-        "result":
-            "OPEN",
-
-        "exit_date":
-            None,
-
-        "exit_price":
-            np.nan,
-
-        "R":
-            np.nan,
+        "result": "OPEN",
+        "exit_date": None,
+        "R": None,
+        "maximum_drawdown_pct": None,
     }
 
 
@@ -624,128 +381,156 @@ def calculate_summary(trades):
 
     rows = []
 
-    for level in PULLBACKS:
+    for pullback in PULLBACKS:
 
-        subset = trades[
-            trades["pullback_level"] == level
+        level = -pullback
+
+        level_trades = [
+            t for t in trades
+            if t["pullback_level"] == level
         ]
 
-        if subset.empty:
-            continue
+        total_events = len(level_trades)
 
-        valid = subset[
-            subset["setup_status"] == "VALID"
+        valid = [
+            t for t in level_trades
+            if t["result"] in [
+                "WIN",
+                "LOSS",
+                "AMBIGUOUS",
+                "OPEN"
+            ]
         ]
 
-        wins = (
-            valid["result"] == "WIN"
-        ).sum()
+        resolved = [
+            t for t in level_trades
+            if t["result"] in [
+                "WIN",
+                "LOSS"
+            ]
+        ]
 
-        losses = (
-            valid["result"] == "LOSS"
-        ).sum()
+        wins = [
+            t for t in level_trades
+            if t["result"] == "WIN"
+        ]
 
-        ambiguous = (
-            valid["result"] == "AMBIGUOUS"
-        ).sum()
+        losses = [
+            t for t in level_trades
+            if t["result"] == "LOSS"
+        ]
 
-        open_trades = (
-            valid["result"] == "OPEN"
-        ).sum()
+        ambiguous = [
+            t for t in level_trades
+            if t["result"] == "AMBIGUOUS"
+        ]
 
-        invalid_sl = (
-            subset["result"] == "INVALID_SL"
-        ).sum()
+        open_trades = [
+            t for t in level_trades
+            if t["result"] == "OPEN"
+        ]
 
-        no_trigger = (
-            subset["result"] == "NO_TRIGGER"
-        ).sum()
+        invalid_sl = [
+            t for t in level_trades
+            if t["result"] == "INVALID_SL"
+        ]
 
-        insufficient = (
-            subset["result"] ==
-            "INSUFFICIENT_DATA"
-        ).sum()
+        no_trigger = [
+            t for t in level_trades
+            if t["result"] == "NO_TRIGGER"
+        ]
 
-        resolved = wins + losses
+        insufficient_data = [
+            t for t in level_trades
+            if t["result"] == "INSUFFICIENT_DATA"
+        ]
 
-        if resolved > 0:
+        win_rate = (
+            len(wins) / len(resolved) * 100
+            if resolved
+            else np.nan
+        )
 
-            win_rate = (
-                wins /
-                resolved *
-                100
+        loss_rate = (
+            len(losses) / len(resolved) * 100
+            if resolved
+            else np.nan
+        )
+
+        r_values = [
+            t["R"]
+            for t in resolved
+            if t["R"] is not None
+        ]
+
+        average_r = (
+            np.mean(r_values)
+            if r_values
+            else np.nan
+        )
+
+        total_r = (
+            np.sum(r_values)
+            if r_values
+            else 0
+        )
+
+        expectancy_r = (
+            total_r / len(resolved)
+            if resolved
+            else np.nan
+        )
+
+        gross_profit = sum(
+            t["R"]
+            for t in wins
+            if t["R"] is not None
+        )
+
+        gross_loss = abs(
+            sum(
+                t["R"]
+                for t in losses
+                if t["R"] is not None
             )
+        )
 
-            loss_rate = (
-                losses /
-                resolved *
-                100
-            )
-
-            resolved_r = valid[
-                valid["result"].isin(
-                    ["WIN", "LOSS"]
-                )
-            ]["R"]
-
-            average_r = (
-                resolved_r.mean()
-            )
-
-            gross_profit = resolved_r[
-                resolved_r > 0
-            ].sum()
-
-            gross_loss = abs(
-                resolved_r[
-                    resolved_r < 0
-                ].sum()
-            )
-
-            profit_factor = (
-                gross_profit /
-                gross_loss
-                if gross_loss > 0
-                else np.nan
-            )
-
-        else:
-
-            win_rate = np.nan
-            loss_rate = np.nan
-            average_r = np.nan
-            profit_factor = np.nan
+        profit_factor = (
+            gross_profit / gross_loss
+            if gross_loss > 0
+            else np.nan
+        )
 
         rows.append({
-            "pullback":
-                f"-{level}%",
+
+            "pullback": f"-{pullback}%",
 
             "total_events":
-                len(subset),
+                total_events,
 
             "valid_setups":
                 len(valid),
 
             "wins":
-                wins,
+                len(wins),
 
             "losses":
-                losses,
+                len(losses),
 
             "ambiguous":
-                ambiguous,
+                len(ambiguous),
 
             "open":
-                open_trades,
+                len(open_trades),
 
             "invalid_sl":
-                invalid_sl,
+                len(invalid_sl),
 
             "no_trigger":
-                no_trigger,
+                len(no_trigger),
 
             "insufficient_data":
-                insufficient,
+                len(insufficient_data),
 
             "win_rate_pct":
                 win_rate,
@@ -757,7 +542,7 @@ def calculate_summary(trades):
                 average_r,
 
             "expectancy_R":
-                average_r,
+                expectancy_r,
 
             "profit_factor":
                 profit_factor,
@@ -767,46 +552,257 @@ def calculate_summary(trades):
 
 
 # ============================================================
-# MAIN BACKTEST
+# DIAGNOSTICS
 # ============================================================
 
-def run_backtest():
+def print_diagnostics(trades):
 
+    # ========================================================
+    # INVALID SL
+    # ========================================================
+
+    print("\n")
+    print("=" * 80)
+    print("DIAGNOSTICS — INVALID SL")
+    print("=" * 80)
+
+    invalid = [
+        t for t in trades
+        if t["result"] == "INVALID_SL"
+    ]
+
+    if not invalid:
+
+        print("No INVALID_SL cases.")
+
+    else:
+
+        for i, t in enumerate(invalid, 1):
+
+            print("\n" + "-" * 80)
+            print(f"INVALID CASE #{i}")
+            print("-" * 80)
+
+            print(
+                f"Cycle ID           : "
+                f"{t.get('cycle_id')}"
+            )
+
+            print(
+                f"Pullback           : "
+                f"{t.get('pullback_level')}%"
+            )
+
+            print(
+                f"Trigger date       : "
+                f"{t.get('trigger_date')}"
+            )
+
+            print(
+                f"Reference high     : "
+                f"{t.get('reference_high')}"
+            )
+
+            print(
+                f"Target price       : "
+                f"{t.get('target_price')}"
+            )
+
+            print(
+                f"Entry              : "
+                f"{t.get('entry')}"
+            )
+
+            print(
+                f"Previous 5 Low     : "
+                f"{t.get('previous_5_low')}"
+            )
+
+            print(
+                f"ATR(14)             : "
+                f"{t.get('atr14')}"
+            )
+
+            print(
+                f"SL                 : "
+                f"{t.get('sl')}"
+            )
+
+            print(
+                f"Risk               : "
+                f"{t.get('risk')}"
+            )
+
+            print(
+                f"Maximum drawdown   : "
+                f"{t.get('maximum_drawdown_pct')}%"
+            )
+
+    # ========================================================
+    # AMBIGUOUS
+    # ========================================================
+
+    print("\n")
+    print("=" * 80)
+    print("DIAGNOSTICS — AMBIGUOUS")
+    print("=" * 80)
+
+    ambiguous = [
+        t for t in trades
+        if t["result"] == "AMBIGUOUS"
+    ]
+
+    if not ambiguous:
+
+        print("No AMBIGUOUS cases.")
+
+    else:
+
+        for i, t in enumerate(ambiguous, 1):
+
+            print("\n" + "-" * 80)
+            print(f"AMBIGUOUS CASE #{i}")
+            print("-" * 80)
+
+            print(
+                f"Cycle ID           : "
+                f"{t.get('cycle_id')}"
+            )
+
+            print(
+                f"Pullback           : "
+                f"{t.get('pullback_level')}%"
+            )
+
+            print(
+                f"Trigger date       : "
+                f"{t.get('trigger_date')}"
+            )
+
+            print(
+                f"Reference high     : "
+                f"{t.get('reference_high')}"
+            )
+
+            print(
+                f"Entry              : "
+                f"{t.get('entry')}"
+            )
+
+            print(
+                f"SL                 : "
+                f"{t.get('sl')}"
+            )
+
+            print(
+                f"TP                 : "
+                f"{t.get('tp')}"
+            )
+
+            print(
+                f"Exit date          : "
+                f"{t.get('exit_date')}"
+            )
+
+    # ========================================================
+    # SAVE DIAGNOSTIC FILES
+    # ========================================================
+
+    pd.DataFrame(invalid).to_csv(
+        "backtest_invalid_sl.csv",
+        index=False
+    )
+
+    pd.DataFrame(ambiguous).to_csv(
+        "backtest_ambiguous.csv",
+        index=False
+    )
+
+    print("\n")
+    print("=" * 80)
+    print("DIAGNOSTIC FILES")
+    print("=" * 80)
+
+    print("backtest_invalid_sl.csv")
+    print("backtest_ambiguous.csv")
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+    print("\n")
+    print("=" * 60)
     print("US500 BACKTEST")
     print("=" * 60)
 
-    print(f"Ticker: {TICKER}")
-    print(f"Start: {START_DATE}")
+    print(f"Ticker: {MARKET_TICKER}")
+    print(f"Start: 2019-01-01")
     print(f"RR: 1:{RR}")
     print(f"Pullbacks: {PULLBACKS}")
-    print()
 
     # --------------------------------------------------------
-    # Load data
+    # LOAD DATA
     # --------------------------------------------------------
 
-    df = get_historical_market_data(
-        ticker=TICKER,
-        start_date=START_DATE
-    )
+    df = load_market_data()
 
-    if df is None or df.empty:
+    if df is None or len(df) == 0:
 
-        raise ValueError(
-            "No historical market data available."
-        )
+        print("\nERROR: No market data available.")
+        return
 
-    df = prepare_data(df)
+    df = df.copy()
+
+    df.index = pd.to_datetime(df.index)
+
+    df = df.sort_index()
 
     print(
-        f"Market data: "
+        f"\nMarket data: "
         f"{df.index.min().date()} "
         f"→ "
         f"{df.index.max().date()}"
     )
 
     # --------------------------------------------------------
-    # Correction cycles
+    # VALIDATE OHLC
+    # --------------------------------------------------------
+
+    required_columns = [
+        "Open",
+        "High",
+        "Low",
+        "Close",
+    ]
+
+    missing = [
+        c for c in required_columns
+        if c not in df.columns
+    ]
+
+    if missing:
+
+        print(
+            "\nERROR: Missing OHLC columns:",
+            missing
+        )
+
+        return
+
+    # --------------------------------------------------------
+    # ATR
+    # --------------------------------------------------------
+
+    df["atr14"] = calculate_atr(
+        df,
+        ATR_PERIOD
+    )
+
+    # --------------------------------------------------------
+    # CORRECTION CYCLES
     # --------------------------------------------------------
 
     cycles = detect_correction_cycles(df)
@@ -817,70 +813,30 @@ def run_backtest():
     )
 
     # --------------------------------------------------------
-    # Events
+    # EVENTS
     # --------------------------------------------------------
 
-    events = add_pullback_events(
+    trades = create_pullback_events(
         df,
         cycles
     )
 
     print(
         f"Total pullback events: "
-        f"{len(events)}"
+        f"{len(trades)}"
     )
 
     # --------------------------------------------------------
-    # Evaluate
-    # --------------------------------------------------------
-
-    results = []
-
-    for _, event in events.iterrows():
-
-        outcome = evaluate_trade(
-            df,
-            event
-        )
-
-        result = event.to_dict()
-
-        result.update(outcome)
-
-        results.append(result)
-
-    trades = pd.DataFrame(results)
-
-    # --------------------------------------------------------
-    # Save detailed data
-    # --------------------------------------------------------
-
-    trades.to_csv(
-        "backtest_trades.csv",
-        index=False
-    )
-
-    cycles.to_csv(
-        "backtest_cycles.csv",
-        index=False
-    )
-
-    # --------------------------------------------------------
-    # Summary
+    # SUMMARY
     # --------------------------------------------------------
 
     summary = calculate_summary(
         trades
     )
 
-    summary.to_csv(
-        "backtest_summary.csv",
-        index=False
-    )
-
-    print()
+    print("\n")
     print("RESULTS BY PULLBACK")
-    print("-" * 60)
+    print("-" * 80)
 
     print(
         summary.to_string(
@@ -889,22 +845,101 @@ def run_backtest():
     )
 
     # --------------------------------------------------------
-    # Overall
+    # OVERALL
     # --------------------------------------------------------
 
-    valid = trades[
-        trades["setup_status"] == "VALID"
+    resolved = [
+        t for t in trades
+        if t["result"] in [
+            "WIN",
+            "LOSS"
+        ]
     ]
 
-    resolved = valid[
-        valid["result"].isin(
-            ["WIN", "LOSS"]
+    wins = [
+        t for t in trades
+        if t["result"] == "WIN"
+    ]
+
+    losses = [
+        t for t in trades
+        if t["result"] == "LOSS"
+    ]
+
+    ambiguous = [
+        t for t in trades
+        if t["result"] == "AMBIGUOUS"
+    ]
+
+    invalid_sl = [
+        t for t in trades
+        if t["result"] == "INVALID_SL"
+    ]
+
+    open_trades = [
+        t for t in trades
+        if t["result"] == "OPEN"
+    ]
+
+    valid_setups = [
+        t for t in trades
+        if t["result"] in [
+            "WIN",
+            "LOSS",
+            "AMBIGUOUS",
+            "OPEN"
+        ]
+    ]
+
+    r_values = [
+        t["R"]
+        for t in resolved
+        if t["R"] is not None
+    ]
+
+    total_r = (
+        sum(r_values)
+        if r_values
+        else 0
+    )
+
+    average_r = (
+        np.mean(r_values)
+        if r_values
+        else np.nan
+    )
+
+    win_rate = (
+        len(wins) /
+        len(resolved) *
+        100
+        if resolved
+        else np.nan
+    )
+
+    gross_profit = sum(
+        t["R"]
+        for t in wins
+        if t["R"] is not None
+    )
+
+    gross_loss = abs(
+        sum(
+            t["R"]
+            for t in losses
+            if t["R"] is not None
         )
-    ]
+    )
 
-    print()
+    profit_factor = (
+        gross_profit / gross_loss
+        if gross_loss > 0
+        else np.nan
+    )
+
+    print("\n")
     print("OVERALL")
-    print("-" * 60)
+    print("-" * 80)
 
     print(
         f"Total events    : "
@@ -913,7 +948,7 @@ def run_backtest():
 
     print(
         f"Valid setups    : "
-        f"{len(valid)}"
+        f"{len(valid_setups)}"
     )
 
     print(
@@ -923,89 +958,98 @@ def run_backtest():
 
     print(
         f"Invalid SL      : "
-        f"{(trades['result'] == 'INVALID_SL').sum()}"
+        f"{len(invalid_sl)}"
     )
 
     print(
         f"Ambiguous       : "
-        f"{(trades['result'] == 'AMBIGUOUS').sum()}"
+        f"{len(ambiguous)}"
     )
 
     print(
         f"Open            : "
-        f"{(trades['result'] == 'OPEN').sum()}"
+        f"{len(open_trades)}"
     )
 
-    if not resolved.empty:
+    print(
+        f"Wins            : "
+        f"{len(wins)}"
+    )
 
-        wins = (
-            resolved["result"] == "WIN"
-        ).sum()
+    print(
+        f"Losses          : "
+        f"{len(losses)}"
+    )
 
-        losses = (
-            resolved["result"] == "LOSS"
-        ).sum()
+    print(
+        f"Win rate        : "
+        f"{win_rate:.2f}%"
+    )
 
-        total_r = resolved["R"].sum()
+    print(
+        f"Average R       : "
+        f"{average_r:.3f}"
+    )
 
-        average_r = resolved["R"].mean()
+    print(
+        f"Total R         : "
+        f"{total_r:.2f}"
+    )
 
-        win_rate = (
-            wins /
-            len(resolved) *
-            100
-        )
+    print(
+        f"Profit Factor   : "
+        f"{profit_factor:.2f}"
+    )
 
-        gross_profit = resolved.loc[
-            resolved["R"] > 0,
-            "R"
-        ].sum()
+    # --------------------------------------------------------
+    # SAVE MAIN FILES
+    # --------------------------------------------------------
 
-        gross_loss = abs(
-            resolved.loc[
-                resolved["R"] < 0,
-                "R"
-            ].sum()
-        )
+    trades_df = pd.DataFrame(
+        trades
+    )
 
-        profit_factor = (
-            gross_profit /
-            gross_loss
-            if gross_loss > 0
-            else np.nan
-        )
+    trades_df.to_csv(
+        "backtest_trades.csv",
+        index=False
+    )
 
-        print(
-            f"Wins            : {wins}"
-        )
+    cycles_df = pd.DataFrame(
+        cycles
+    )
 
-        print(
-            f"Losses          : {losses}"
-        )
+    cycles_df.to_csv(
+        "backtest_cycles.csv",
+        index=False
+    )
 
-        print(
-            f"Win rate        : {win_rate:.2f}%"
-        )
+    summary.to_csv(
+        "backtest_summary.csv",
+        index=False
+    )
 
-        print(
-            f"Average R       : {average_r:.3f}"
-        )
+    # --------------------------------------------------------
+    # DIAGNOSTICS
+    # --------------------------------------------------------
 
-        print(
-            f"Total R         : {total_r:.2f}"
-        )
+    print_diagnostics(
+        trades
+    )
 
-        print(
-            f"Profit Factor   : "
-            f"{profit_factor:.2f}"
-        )
+    # --------------------------------------------------------
+    # FILES
+    # --------------------------------------------------------
 
-    print()
+    print("\n")
+    print("=" * 80)
     print("FILES CREATED")
-    print("-" * 60)
+    print("=" * 80)
+
     print("backtest_trades.csv")
     print("backtest_cycles.csv")
     print("backtest_summary.csv")
+    print("backtest_invalid_sl.csv")
+    print("backtest_ambiguous.csv")
 
 
 # ============================================================
@@ -1013,4 +1057,4 @@ def run_backtest():
 # ============================================================
 
 if __name__ == "__main__":
-    run_backtest()
+    main()
