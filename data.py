@@ -699,6 +699,16 @@ if __name__ == "__main__":
                 )
             )
 
+    print(
+                "COVID lowest close:",
+                round(
+                    float(
+                        covid["close"].min()
+                    ),
+                    2
+                )
+            )
+
             print(
                 "COVID highest close:",
                 round(
