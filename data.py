@@ -95,6 +95,93 @@ def get_market_data(
 
 
 # ============================================================
+# HISTORICAL MARKET DATA
+# ============================================================
+
+def get_historical_market_data(
+    ticker=MARKET_TICKER,
+    start_date="2019-01-01",
+):
+    """
+    Download extended daily US500 / S&P 500 history.
+
+    Used for:
+        - Historical Event Study
+        - Pullback analysis
+        - COVID 2020
+        - 2022 rate/inflation shock
+        - 2023 banking stress
+        - 2024 growth scare
+        - 2025 tariff shock
+
+    This function is intentionally separate from
+    get_market_data() so the live dashboard keeps
+    its existing behavior.
+    """
+
+    try:
+
+        data = yf.download(
+            ticker,
+            start=start_date,
+            interval="1d",
+            auto_adjust=False,
+            progress=False,
+        )
+
+        if data is None or data.empty:
+            return pd.DataFrame()
+
+        # ----------------------------------------------------
+        # Handle MultiIndex columns
+        # ----------------------------------------------------
+
+        if isinstance(data.columns, pd.MultiIndex):
+
+            data.columns = [
+                col[0]
+                for col in data.columns
+            ]
+
+        data = data.rename(
+            columns={
+                "Open": "open",
+                "High": "high",
+                "Low": "low",
+                "Close": "close",
+                "Adj Close": "adj_close",
+                "Volume": "volume",
+            }
+        )
+
+        required = [
+            "open",
+            "high",
+            "low",
+            "close",
+        ]
+
+        for col in required:
+
+            if col not in data.columns:
+                return pd.DataFrame()
+
+        data = data.dropna(
+            subset=required
+        )
+
+        data.index = pd.to_datetime(
+            data.index
+        )
+
+        return data.sort_index()
+
+    except Exception:
+
+        return pd.DataFrame()
+
+
+# ============================================================
 # FRED
 # ============================================================
 
@@ -405,9 +492,13 @@ def load_bls_data():
 # COMBINED MACRO DATA
 # ============================================================
 
-def load_all_macro_data():
+def load_all_macro_data(
+    start_date=None,
+):
 
-    fred = load_fred_data()
+    fred = load_fred_data(
+        start_date=start_date
+    )
 
     bls = load_bls_data()
 
