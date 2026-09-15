@@ -23,13 +23,6 @@ def get_market_data(
 ):
     """
     Download daily OHLCV market data.
-
-    Default market proxy:
-        ^GSPC = S&P 500 Index
-
-    Important:
-        This may differ slightly from the US500 CFD/futures
-        feed used by a broker.
     """
 
     try:
@@ -83,7 +76,12 @@ def get_market_data(
 
         return data
 
-    except Exception:
+    except Exception as exc:
+
+        print(
+            f"Market data error: {exc}"
+        )
+
         return pd.DataFrame()
 
 
@@ -97,15 +95,6 @@ def get_historical_market_data(
 ):
     """
     Download extended daily US500 / S&P 500 history.
-
-    Used for:
-        - Historical Event Study
-        - Pullback analysis
-        - COVID 2020
-        - 2022 rate/inflation shock
-        - 2023 banking stress
-        - 2024 growth scare
-        - 2025 tariff shock
     """
 
     try:
@@ -159,7 +148,12 @@ def get_historical_market_data(
 
         return data.sort_index()
 
-    except Exception:
+    except Exception as exc:
+
+        print(
+            f"Historical market data error: {exc}"
+        )
+
         return pd.DataFrame()
 
 
@@ -174,16 +168,26 @@ def fred_series(
     """
     Retrieve a FRED time series.
 
-    If no API key is available,
-    returns an empty DataFrame.
+    Returns:
+        DataFrame with:
+            date
+            value
+
+    FRED requires a valid API key.
     """
 
     if not FRED_API_KEY:
+
+        print(
+            f"FRED API KEY MISSING -> {series_id}"
+        )
+
         return pd.DataFrame(
-            columns=["value"]
+            columns=["date", "value"]
         )
 
     if start_date is None:
+
         start_date = (
             datetime.utcnow()
             - timedelta(days=3650)
@@ -206,12 +210,46 @@ def fred_series(
         response = requests.get(
             url,
             params=params,
-            timeout=20,
+            timeout=30,
         )
 
-        response.raise_for_status()
+        if response.status_code != 200:
+
+            print(
+                f"FRED ERROR {series_id}: "
+                f"HTTP {response.status_code}"
+            )
+
+            try:
+                print(
+                    response.text[:500]
+                )
+            except Exception:
+                pass
+
+            return pd.DataFrame(
+                columns=["date", "value"]
+            )
 
         payload = response.json()
+
+        if "error_code" in payload:
+
+            print(
+                f"FRED API ERROR {series_id}: "
+                f"{payload.get('error_code')}"
+            )
+
+            print(
+                payload.get(
+                    "error_message",
+                    "",
+                )
+            )
+
+            return pd.DataFrame(
+                columns=["date", "value"]
+            )
 
         observations = payload.get(
             "observations",
@@ -232,25 +270,40 @@ def fred_series(
                 continue
 
             try:
+
                 value = float(value)
+
             except Exception:
+
+                continue
+
+            date = obs.get("date")
+
+            if not date:
                 continue
 
             rows.append(
                 {
                     "date": pd.to_datetime(
-                        obs["date"]
+                        date
                     ),
                     "value": value,
                 }
             )
 
         if not rows:
-            return pd.DataFrame(
-                columns=["value"]
+
+            print(
+                f"FRED NO DATA -> {series_id}"
             )
 
-        df = pd.DataFrame(rows)
+            return pd.DataFrame(
+                columns=["date", "value"]
+            )
+
+        df = pd.DataFrame(
+            rows
+        )
 
         df = (
             df
@@ -260,9 +313,26 @@ def fred_series(
 
         return df
 
-    except Exception:
+    except requests.exceptions.RequestException as exc:
+
+        print(
+            f"FRED REQUEST ERROR "
+            f"{series_id}: {exc}"
+        )
+
         return pd.DataFrame(
-            columns=["value"]
+            columns=["date", "value"]
+        )
+
+    except Exception as exc:
+
+        print(
+            f"FRED ERROR "
+            f"{series_id}: {exc}"
+        )
+
+        return pd.DataFrame(
+            columns=["date", "value"]
         )
 
 
@@ -300,9 +370,6 @@ def bls_series(
 ):
     """
     Retrieve a BLS public time series.
-
-    BLS allows a limited historical range
-    per API request.
     """
 
     current_year = datetime.utcnow().year
@@ -339,8 +406,14 @@ def bls_series(
         if result.get(
             "status"
         ) != "REQUEST_SUCCEEDED":
+
+            print(
+                f"BLS ERROR {series_id}: "
+                f"{result}"
+            )
+
             return pd.DataFrame(
-                columns=["value"]
+                columns=["date", "value"]
             )
 
         rows = []
@@ -369,18 +442,21 @@ def bls_series(
                     continue
 
                 try:
+
                     value = float(
                         value.replace(
                             ",",
-                            ""
+                            "",
                         )
                     )
+
                 except Exception:
+
                     continue
 
                 period = item.get(
                     "period",
-                    ""
+                    "",
                 )
 
                 if not period.startswith(
@@ -388,9 +464,15 @@ def bls_series(
                 ):
                     continue
 
-                month = int(
-                    period[1:]
-                )
+                try:
+
+                    month = int(
+                        period[1:]
+                    )
+
+                except Exception:
+
+                    continue
 
                 if month < 1 or month > 12:
                     continue
@@ -411,11 +493,14 @@ def bls_series(
                 )
 
         if not rows:
+
             return pd.DataFrame(
-                columns=["value"]
+                columns=["date", "value"]
             )
 
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(
+            rows
+        )
 
         df = (
             df
@@ -428,9 +513,14 @@ def bls_series(
 
         return df
 
-    except Exception:
+    except Exception as exc:
+
+        print(
+            f"BLS ERROR {series_id}: {exc}"
+        )
+
         return pd.DataFrame(
-            columns=["value"]
+            columns=["date", "value"]
         )
 
 
@@ -460,9 +550,6 @@ def load_all_macro_data(
 ):
     """
     Load all macroeconomic data.
-
-    start_date can be supplied
-    for historical studies.
     """
 
     fred = load_fred_data(
@@ -505,6 +592,7 @@ def latest_value(
         return float(value)
 
     except Exception:
+
         return default
 
 
@@ -547,17 +635,29 @@ def data_status(
 
 
 # ============================================================
-# HISTORICAL DATA TEST
+# TEST
 # ============================================================
 
 if __name__ == "__main__":
 
     print()
     print(
+        "DATA.PY TEST"
+    )
+    print(
+        "============"
+    )
+
+    # --------------------------------------------------------
+    # MARKET TEST
+    # --------------------------------------------------------
+
+    print()
+    print(
         "HISTORICAL MARKET DATA TEST"
     )
     print(
-        "==========================="
+        "---------------------------"
     )
 
     market = get_historical_market_data(
@@ -618,146 +718,96 @@ if __name__ == "__main__":
                 "Required OHLC columns: OK"
             )
 
-        # ----------------------------------------------------
-        # COVID 2020 TEST
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # FRED TEST
+    # --------------------------------------------------------
 
-        covid = market.loc[
-            "2020-02-01":"2020-04-30"
-        ]
+    print()
+    print(
+        "FRED TEST"
+    )
+    print(
+        "---------"
+    )
 
-        print()
-        print(
-            "COVID 2020 TEST"
-        )
-        print(
-            "---------------"
-        )
+    if not FRED_API_KEY:
 
         print(
-            "COVID rows:",
-            len(covid)
+            "ERROR: FRED_API_KEY is not configured."
         )
 
-        if not covid.empty:
+        print(
+            "Add FRED_API_KEY to your GitHub Actions secret."
+        )
 
-            print(
-                "COVID period:",
-                covid.index.min().date(),
-                "->",
-                covid.index.max().date()
-            )
+    else:
 
-            print(
-                "COVID lowest close:",
-                round(
-                    float(
-                        covid["close"].min()
-                    ),
-                    2
+        print(
+            "FRED API key detected."
+        )
+
+        fred = load_fred_data(
+            start_date="2019-01-01"
+        )
+
+        for name, df in fred.items():
+
+            if df.empty:
+
+                print(
+                    f"{name:<22}: UNAVAILABLE"
                 )
-            )
+
+            else:
+
+                latest_date = (
+                    df.index.max().date()
+                )
+
+                latest = float(
+                    df["value"].iloc[-1]
+                )
+
+                print(
+                    f"{name:<22}: "
+                    f"{len(df):>5} observations | "
+                    f"{df.index.min().date()} -> "
+                    f"{latest_date} | "
+                    f"latest={latest}"
+                )
+
+    # --------------------------------------------------------
+    # BLS TEST
+    # --------------------------------------------------------
+
+    print()
+    print(
+        "BLS TEST"
+    )
+    print(
+        "--------"
+    )
+
+    bls = load_bls_data()
+
+    for name, df in bls.items():
+
+        if df.empty:
 
             print(
-                "COVID highest close:",
-                round(
-                    float(
-                        covid["close"].max()
-                    ),
-                    2
-                )
+                f"{name:<22}: UNAVAILABLE"
             )
 
         else:
 
             print(
-                "ERROR: COVID 2020 data not found."
+                f"{name:<22}: "
+                f"{len(df):>5} observations | "
+                f"{df.index.min().date()} -> "
+                f"{df.index.max().date()}"
             )
 
-        # ----------------------------------------------------
-        # HISTORICAL EVENT PERIODS
-        # ----------------------------------------------------
-
-        periods = {
-
-            "2020 COVID":
-                (
-                    "2020-02-01",
-                    "2020-04-30"
-                ),
-
-            "2022 Rate Shock":
-                (
-                    "2022-01-01",
-                    "2022-12-31"
-                ),
-
-            "2023 Banking Stress":
-                (
-                    "2023-02-01",
-                    "2023-05-31"
-                ),
-
-            "2024 Growth Scare":
-                (
-                    "2024-07-01",
-                    "2024-09-30"
-                ),
-
-            "2025 Tariff Period":
-                (
-                    "2025-02-01",
-                    "2025-05-31"
-                ),
-        }
-
-        print()
-        print(
-            "HISTORICAL EVENT DATA CHECK"
-        )
-        print(
-            "---------------------------"
-        )
-
-        for name, (
-            start,
-            end,
-        ) in periods.items():
-
-            period_data = market.loc[
-                start:end
-            ]
-
-            print(
-                f"{name}:",
-                len(period_data),
-                "rows"
-            )
-
-        # ----------------------------------------------------
-        # LAST 5 ROWS
-        # ----------------------------------------------------
-
-        print()
-        print(
-            "LAST 5 ROWS"
-        )
-        print(
-            "-----------"
-        )
-
-        print(
-            market[
-                [
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                ]
-            ].tail()
-        )
-
-        print()
-        print(
-            "HISTORICAL MARKET DATA TEST COMPLETE"
-        )
+    print()
+    print(
+        "DATA.PY TEST COMPLETE"
+    )
