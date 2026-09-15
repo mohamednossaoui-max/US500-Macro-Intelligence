@@ -76,27 +76,68 @@ def date_from_href(href: str) -> Optional[date]:
 
 def discover_links() -> Dict[str, Dict[date, str]]:
     """Discover official FOMC document links indexed by document date."""
-    result = {"statement": {}, "minutes": {}, "press": {}, "sep": {}}
+    
+    result = {
+        "statement": {},
+        "minutes": {},
+        "press": {},
+        "sep": {},
+    }
+
     r = get(CALENDAR)
+
     if r is None:
         return result
+
     soup = BeautifulSoup(r.text, "html.parser")
+
     for a in soup.find_all("a", href=True):
-        href = a.get("href", "")
+
+        href = a.get("href", "").strip()
+        if not href:
+            continue
+
         url = absolute(href)
+
         d = date_from_href(href)
+
         if not d:
             continue
+
         h = href.lower()
         label = a.get_text(" ", strip=True).lower()
-        if "fomcstmt" in h or "statement" in label:
+
+        # FOMC Statement
+        if (
+            "monetary" in h
+            and re.search(r"monetary\d{8}a\.htm", h)
+        ) or (
+            "statement" in label
+            and "minutes" not in label
+        ):
             result["statement"][d] = url
-        elif "fomcminutes" in h or "minutes" in label:
+
+        # FOMC Minutes
+        elif (
+            "fomcminutes" in h
+            or "minutes" in label
+        ):
             result["minutes"][d] = url
-        elif "fomcpresconf" in h or "press conference" in label:
+
+        # Press Conference
+        elif (
+            "fomcpresconf" in h
+            or "press conference" in label
+        ):
             result["press"][d] = url
-        elif "fomcproj" in h or "projection materials" in label:
+
+        # Summary of Economic Projections
+        elif (
+            "fomcproj" in h
+            or "projection materials" in label
+        ):
             result["sep"][d] = url
+
     return result
 
 
