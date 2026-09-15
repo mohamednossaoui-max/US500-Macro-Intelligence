@@ -1,16 +1,8 @@
 """
-Federal Reserve Intelligence Engine - Phase 2C.
+Federal Reserve Intelligence Engine
+Phase 2A + Phase 2B + Phase 2C
 
-Analytical only:
-- FOMC Statement
-- FOMC Minutes
-- Fed Chair Press Conference
-- Summary of Economic Projections (SEP)
-- SEP shift analysis
-- Multi-dimensional Fed Intelligence analysis
-- Fed Intelligence Score 0-100
-- Beige Book analysis
-
+Analytical only.
 No trade execution.
 No Decision Engine integration.
 """
@@ -20,7 +12,7 @@ from __future__ import annotations
 import io
 import re
 from datetime import date, datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 import pandas as pd
 import requests
@@ -37,67 +29,41 @@ except Exception:
 # ============================================================
 
 FED = "https://www.federalreserve.gov"
-
-CALENDAR = (
-    f"{FED}/monetarypolicy/fomccalendars.htm"
-)
-
-BEIGE_BOOK = (
-    f"{FED}/monetarypolicy/publications/"
-    f"beige-book-default.htm"
-)
+CALENDAR = f"{FED}/monetarypolicy/fomccalendars.htm"
+BEIGE_BOOK = f"{FED}/monetarypolicy/publications/beige-book-default.htm"
 
 HEADERS = {
-    "User-Agent":
-        "Mozilla/5.0 US500-Macro-Intelligence/2.0"
+    "User-Agent": "Mozilla/5.0 US500-Macro-Intelligence/2.0"
 }
 
 TIMEOUT = 30
 
 
 # ============================================================
-# HTTP
+# HTTP HELPERS
 # ============================================================
 
-def get(
-    url: str
-) -> Optional[requests.Response]:
-
+def get(url: str) -> Optional[requests.Response]:
     if not url:
         return None
 
     try:
-
         r = requests.get(
             url,
             headers=HEADERS,
             timeout=TIMEOUT
         )
-
         r.raise_for_status()
-
         return r
-
     except Exception:
-
         return None
 
 
-# ============================================================
-# URL HELPERS
-# ============================================================
-
-def absolute(
-    href: str
-) -> str:
-
+def absolute(href: str) -> str:
     if not href:
         return ""
 
-    if (
-        href.startswith("http://")
-        or href.startswith("https://")
-    ):
+    if href.startswith("http://") or href.startswith("https://"):
         return href
 
     if href.startswith("/"):
@@ -106,41 +72,23 @@ def absolute(
     return FED + "/" + href.lstrip("./")
 
 
-# ============================================================
-# HTML / PDF TEXT
-# ============================================================
-
-def clean_html(
-    html: str
-) -> str:
-
+def clean_html(html: str) -> str:
     if not html:
         return ""
 
-    soup = BeautifulSoup(
-        html,
-        "html.parser"
-    )
+    soup = BeautifulSoup(html, "html.parser")
 
-    for x in soup(
-        ["script", "style", "noscript", "svg"]
-    ):
+    for x in soup(["script", "style", "noscript", "svg"]):
         x.decompose()
 
     return re.sub(
         r"\s+",
         " ",
-        soup.get_text(
-            " ",
-            strip=True
-        )
+        soup.get_text(" ", strip=True)
     ).strip()
 
 
-def pdf_text(
-    url: str
-) -> str:
-
+def pdf_text(url: str) -> str:
     if not url or PdfReader is None:
         return ""
 
@@ -150,78 +98,67 @@ def pdf_text(
         return ""
 
     try:
-
-        reader = PdfReader(
-            io.BytesIO(r.content)
-        )
+        reader = PdfReader(io.BytesIO(r.content))
 
         text = " ".join(
-            (
-                page.extract_text()
-                or ""
-            )
+            (page.extract_text() or "")
             for page in reader.pages
         )
 
-        return re.sub(
-            r"\s+",
-            " ",
-            text
-        ).strip()
+        return re.sub(r"\s+", " ", text).strip()
 
     except Exception:
-
         return ""
 
 
+def fetch_document(url: str) -> str:
+    if not url:
+        return ""
+
+    if url.lower().endswith(".pdf"):
+        return pdf_text(url)
+
+    r = get(url)
+
+    if r is None:
+        return ""
+
+    return clean_html(r.text)
+
+
 # ============================================================
-# DATE HELPERS
+# DATE / LINK HELPERS
 # ============================================================
 
-def date_from_href(
-    href: str
-) -> Optional[date]:
+def date_from_href(href: str) -> Optional[date]:
+    if not href:
+        return None
 
-    m = re.search(
-        r"(20\d{6})",
-        href or ""
-    )
+    m = re.search(r"(20\d{6})", href)
 
     if not m:
         return None
 
     try:
-
         return datetime.strptime(
             m.group(1),
             "%Y%m%d"
         ).date()
 
     except Exception:
-
         return None
 
 
-# ============================================================
-# FED DOCUMENT DISCOVERY
-# ============================================================
-
 def discover_links() -> Dict[str, Dict[date, str]]:
     """
-    Discover official FOMC document links.
-
-    Supports:
-    - FOMC statements
-    - FOMC minutes
-    - Press conferences
-    - SEP / projection materials
+    Discover official FOMC documents from the Fed calendar.
     """
 
     result = {
         "statement": {},
         "minutes": {},
         "press": {},
-        "sep": {},
+        "sep": {}
     }
 
     r = get(CALENDAR)
@@ -229,108 +166,52 @@ def discover_links() -> Dict[str, Dict[date, str]]:
     if r is None:
         return result
 
-    soup = BeautifulSoup(
-        r.text,
-        "html.parser"
-    )
+    soup = BeautifulSoup(r.text, "html.parser")
 
-    for a in soup.find_all(
-        "a",
-        href=True
-    ):
+    for a in soup.find_all("a", href=True):
 
-        href = a.get(
-            "href",
-            ""
-        ).strip()
-
-        if not href:
-            continue
-
+        href = a.get("href", "")
         url = absolute(href)
 
-        d = date_from_href(
-            href
-        )
+        d = date_from_href(href)
 
         if not d:
             continue
 
         h = href.lower()
+        label = a.get_text(" ", strip=True).lower()
 
-        label = a.get_text(
-            " ",
-            strip=True
-        ).lower()
-
-        # ----------------------------------------------------
-        # STATEMENT
-        # ----------------------------------------------------
-
+        # FOMC statement
         if (
-            (
-                "monetary" in h
-                and re.search(
-                    r"monetary\d{8}a\.htm",
-                    h
-                )
-            )
-            or "fomcstmt" in h
-            or (
-                "statement" in label
-                and "minutes" not in label
-            )
+            "fomcstmt" in h
+            or re.search(r"monetary\d{8}a\.htm", h)
+            or "statement" in label
         ):
+            result["statement"][d] = url
 
-            result[
-                "statement"
-            ][d] = url
-
-        # ----------------------------------------------------
-        # MINUTES
-        # ----------------------------------------------------
-
+        # FOMC minutes
         elif (
             "fomcminutes" in h
             or "minutes" in label
         ):
+            result["minutes"][d] = url
 
-            result[
-                "minutes"
-            ][d] = url
-
-        # ----------------------------------------------------
-        # PRESS CONFERENCE
-        # ----------------------------------------------------
-
+        # Press conference
         elif (
             "fomcpresconf" in h
             or "press conference" in label
         ):
+            result["press"][d] = url
 
-            result[
-                "press"
-            ][d] = url
-
-        # ----------------------------------------------------
-        # SEP
-        # ----------------------------------------------------
-
+        # SEP / projections
         elif (
             "fomcproj" in h
             or "projection materials" in label
         ):
-
-            result[
-                "sep"
-            ][d] = url
+            result["sep"][d] = url
 
     return result
 
-
-# ============================================================
-# FOMC DATE SELECTION
-# ============================================================
 
 def latest_completed_fomc(
     links: Dict[str, Dict[date, str]],
@@ -340,39 +221,17 @@ def latest_completed_fomc(
     as_of = as_of or date.today()
 
     dates = (
-        set(
-            links.get(
-                "statement",
-                {}
-            )
-        )
-        |
-        set(
-            links.get(
-                "minutes",
-                {}
-            )
-        )
-        |
-        set(
-            links.get(
-                "press",
-                {}
-            )
-        )
+        set(links.get("statement", {}))
+        | set(links.get("minutes", {}))
+        | set(links.get("press", {}))
     )
 
     done = [
-        d
-        for d in dates
+        d for d in dates
         if d <= as_of
     ]
 
-    return (
-        max(done)
-        if done
-        else None
-    )
+    return max(done) if done else None
 
 
 def latest_sep(
@@ -382,20 +241,12 @@ def latest_sep(
 
     as_of = as_of or date.today()
 
-    ds = [
-        d
-        for d in links.get(
-            "sep",
-            {}
-        )
+    dates = [
+        d for d in links.get("sep", {})
         if d <= as_of
     ]
 
-    return (
-        max(ds)
-        if ds
-        else None
-    )
+    return max(dates) if dates else None
 
 
 def previous_sep(
@@ -403,61 +254,44 @@ def previous_sep(
     current: date
 ) -> Optional[date]:
 
-    ds = [
-        d
-        for d in links.get(
-            "sep",
-            {}
-        )
+    dates = [
+        d for d in links.get("sep", {})
         if d < current
     ]
 
-    return (
-        max(ds)
-        if ds
-        else None
-    )
+    return max(dates) if dates else None
 
 
 # ============================================================
-# DOCUMENT FETCH
+# DYNAMIC FED CHAIR
 # ============================================================
 
-def fetch_document(
-    url: str
-) -> str:
+def fed_chair_for_date(d: Optional[date]) -> str:
+    """
+    Current chair handling.
 
-    if not url:
-        return ""
+    Kevin Warsh became Fed Chair on May 22, 2026.
+    Before that, Jerome Powell was Chair.
+    """
 
-    if url.lower().endswith(
-        ".pdf"
-    ):
+    if not d:
+        return "Unknown"
 
-        return pdf_text(
-            url
-        )
+    warsh_start = date(2026, 5, 22)
 
-    r = get(url)
+    if d >= warsh_start:
+        return "Kevin Warsh"
 
-    if r is None:
-        return ""
-
-    return clean_html(
-        r.text
-    )
+    return "Jerome Powell"
 
 
 # ============================================================
 # PRESS CONFERENCE
 # ============================================================
 
-def press_page_data(
-    url: str
-) -> Dict:
+def press_page_data(url: str) -> Dict:
 
     if not url:
-
         return {
             "page_url": None,
             "pdf_url": None,
@@ -467,7 +301,6 @@ def press_page_data(
     r = get(url)
 
     if r is None:
-
         return {
             "page_url": url,
             "pdf_url": None,
@@ -481,10 +314,7 @@ def press_page_data(
 
     pdf = ""
 
-    for a in soup.find_all(
-        "a",
-        href=True
-    ):
+    for a in soup.find_all("a", href=True):
 
         label = a.get_text(
             " ",
@@ -492,48 +322,34 @@ def press_page_data(
         ).lower()
 
         href = absolute(
-            a.get(
-                "href",
-                ""
-            )
+            a.get("href", "")
         )
 
         if (
-            href.lower().endswith(
-                ".pdf"
-            )
+            href.lower().endswith(".pdf")
             and (
                 "transcript" in label
                 or "press conference" in label
             )
         ):
-
             pdf = href
-
             break
 
     text = (
         pdf_text(pdf)
         if pdf
-        else clean_html(
-            r.text
-        )
+        else clean_html(r.text)
     )
 
     return {
-        "page_url":
-            url,
-
-        "pdf_url":
-            pdf or None,
-
-        "text":
-            text
+        "page_url": url,
+        "pdf_url": pdf or None,
+        "text": text
     }
 
 
 # ============================================================
-# SEP HELPERS
+# SEP
 # ============================================================
 
 def _num(x):
@@ -541,19 +357,14 @@ def _num(x):
     if x is None:
         return None
 
+    text = str(x).replace("â", "-")
+
     m = re.search(
         r"-?\d+(?:\.\d+)?",
-        str(x).replace(
-            "−",
-            "-"
-        )
+        text
     )
 
-    return (
-        float(m.group())
-        if m
-        else None
-    )
+    return float(m.group()) if m else None
 
 
 def _norm(x):
@@ -565,78 +376,38 @@ def _norm(x):
     )
 
 
-# ============================================================
-# SEP EXTRACTION
-# ============================================================
-
 def extract_sep(
     url: str,
     sep_date: date
 ) -> Dict:
 
     out = {
-
-        "sep_date":
-            sep_date.isoformat(),
-
-        "url":
-            url,
-
-        "available":
-            False,
-
-        "year":
-            sep_date.year,
-
-        "gdp":
-            None,
-
-        "unemployment":
-            None,
-
-        "pce":
-            None,
-
-        "core_pce":
-            None,
-
-        "fed_funds":
-            None,
+        "sep_date": sep_date.isoformat(),
+        "url": url,
+        "available": False,
+        "year": sep_date.year,
+        "gdp": None,
+        "unemployment": None,
+        "pce": None,
+        "core_pce": None,
+        "fed_funds": None
     }
 
     if not url:
         return out
 
-    # --------------------------------------------------------
-    # HTML TABLES
-    # --------------------------------------------------------
-
     try:
-
-        tables = pd.read_html(
-            url
-        )
+        tables = pd.read_html(url)
 
     except Exception:
-
         tables = []
 
     targets = {
-
-        "gdp":
-            "changeinrealgdp",
-
-        "unemployment":
-            "unemploymentrate",
-
-        "pce":
-            "pceinflation",
-
-        "core_pce":
-            "corepceinflation",
-
-        "fed_funds":
-            "federalfundsrate",
+        "gdp": "changeinrealgdp",
+        "unemployment": "unemploymentrate",
+        "pce": "pceinflation",
+        "core_pce": "corepceinflation",
+        "fed_funds": "federalfundsrate"
     }
 
     for df in tables:
@@ -646,9 +417,7 @@ def extract_sep(
 
         for _, row in df.iterrows():
 
-            first = _norm(
-                row.iloc[0]
-            )
+            first = _norm(row.iloc[0])
 
             for field, target in targets.items():
 
@@ -663,35 +432,23 @@ def extract_sep(
                     ]
 
                     vals = [
-                        v
-                        for v in vals
+                        v for v in vals
                         if v is not None
                     ]
 
                     if vals:
-
                         out[field] = vals[0]
 
     if any(
         out[k] is not None
         for k in targets
     ):
-
         out["available"] = True
-
         return out
 
-    # --------------------------------------------------------
-    # TEXT FALLBACK
-    # --------------------------------------------------------
+    text = fetch_document(url)
 
-    text = fetch_document(
-        url
-    )
-
-    out["available"] = bool(
-        text
-    )
+    out["available"] = bool(text)
 
     if not text:
         return out
@@ -711,22 +468,19 @@ def extract_sep(
             r"Core PCE inflation.{0,120}?\b(\d+\.\d)\b",
 
         "fed_funds":
-            r"Federal funds rate.{0,120}?\b(\d+\.\d)\b",
+            r"Federal funds rate.{0,120}?\b(\d+\.\d)\b"
     }
 
-    for field, pat in patterns.items():
+    for field, pattern in patterns.items():
 
         m = re.search(
-            pat,
+            pattern,
             text,
             re.I
         )
 
         if m:
-
-            out[field] = float(
-                m.group(1)
-            )
+            out[field] = float(m.group(1))
 
     out["available"] = any(
         out[k] is not None
@@ -735,10 +489,6 @@ def extract_sep(
 
     return out
 
-
-# ============================================================
-# SEP SHIFT
-# ============================================================
 
 def sep_shift(
     current: Dict,
@@ -750,7 +500,7 @@ def sep_shift(
         "unemployment",
         "pce",
         "core_pce",
-        "fed_funds",
+        "fed_funds"
     ]
 
     result = {}
@@ -760,42 +510,22 @@ def sep_shift(
 
     for f in fields:
 
-        c = current.get(
-            f
-        )
-
-        p = previous.get(
-            f
-        )
+        c = current.get(f)
+        p = previous.get(f)
 
         change = (
-            round(
-                c - p,
-                2
-            )
-            if (
-                c is not None
-                and p is not None
-            )
+            round(c - p, 2)
+            if c is not None and p is not None
             else None
         )
 
         result[f] = {
-
-            "current":
-                c,
-
-            "previous":
-                p,
-
-            "change":
-                change,
+            "current": c,
+            "previous": p,
+            "change": change
         }
 
-        if (
-            change is None
-            or change == 0
-        ):
+        if change is None or change == 0:
             continue
 
         if f in (
@@ -823,100 +553,54 @@ def sep_shift(
             else:
                 hawkish += 1
 
-    classification = (
+    if hawkish > dovish:
+        classification = "HAWKISH SHIFT"
 
-        "HAWKISH SHIFT"
-        if hawkish > dovish
+    elif dovish > hawkish:
+        classification = "DOVISH SHIFT"
 
-        else
-
-        "DOVISH SHIFT"
-        if dovish > hawkish
-
-        else
-
-        "MIXED / NEUTRAL SHIFT"
-    )
+    else:
+        classification = "MIXED / NEUTRAL SHIFT"
 
     return {
-
-        "classification":
-            classification,
-
-        "hawkish_points":
-            int(hawkish),
-
-        "dovish_points":
-            int(dovish),
-
-        "fields":
-            result,
+        "classification": classification,
+        "hawkish_points": int(hawkish),
+        "dovish_points": int(dovish),
+        "fields": result
     }
 
 
 # ============================================================
-# BASIC TONE
+# DOCUMENT TONE
 # ============================================================
 
 HAWKISH = [
-
     "higher for longer",
-
     "restrictive",
-
     "inflation remains elevated",
-
     "persistent inflation",
-
     "upside risks to inflation",
-
     "additional tightening",
-
     "rate increase",
-
     "raise the target range",
-
     "higher policy rate",
-
     "inflation pressures",
-
-    "inflationary pressures",
-
-    "tight monetary policy",
-
-    "policy remains restrictive",
+    "price pressures"
 ]
 
 
 DOVISH = [
-
     "rate cut",
-
     "rate cuts",
-
     "lower rates",
-
     "easing policy",
-
     "labor market has cooled",
-
     "economic activity slowed",
-
     "growth slowed",
-
     "downside risks",
-
     "inflation has eased",
-
     "inflation eased",
-
-    "policy easing",
-
-    "monetary easing",
-
-    "lower policy rate",
-
-    "lower policy rates",
+    "labor market weakened"
 ]
 
 
@@ -933,37 +617,23 @@ def count_terms(
     )
 
 
-def tone_score(
-    text: str
-) -> int:
+def tone_score(text: str) -> int:
 
     if not text:
         return 0
 
     score = (
-        count_terms(
-            text,
-            HAWKISH
-        )
-        -
-        count_terms(
-            text,
-            DOVISH
-        )
+        count_terms(text, HAWKISH)
+        - count_terms(text, DOVISH)
     )
 
     return max(
         -20,
-        min(
-            20,
-            score
-        )
+        min(20, score)
     )
 
 
-def tone(
-    score: int
-) -> str:
+def tone(score: int) -> str:
 
     if score >= 8:
         return "HAWKISH"
@@ -980,10 +650,6 @@ def tone(
     return "NEUTRAL"
 
 
-# ============================================================
-# DOCUMENT ANALYSIS
-# ============================================================
-
 def analyze(
     name: str,
     text: str
@@ -992,372 +658,169 @@ def analyze(
     if not text:
 
         return {
-
-            "name":
-                name,
-
-            "available":
-                False,
-
-            "tone":
-                "UNAVAILABLE",
-
-            "tone_score":
-                None,
+            "name": name,
+            "available": False,
+            "tone": "UNAVAILABLE",
+            "tone_score": None
         }
 
-    s = tone_score(
-        text
-    )
+    s = tone_score(text)
 
     return {
+        "name": name,
+        "available": True,
+        "tone": tone(s),
+        "tone_score": s,
 
-        "name":
-            name,
+        "inflation_mentions": count_terms(
+            text,
+            [
+                "inflation",
+                "prices",
+                "price pressures"
+            ]
+        ),
 
-        "available":
-            True,
+        "labor_mentions": count_terms(
+            text,
+            [
+                "employment",
+                "labor market",
+                "unemployment",
+                "job gains",
+                "wages"
+            ]
+        ),
 
-        "tone":
-            tone(s),
+        "growth_mentions": count_terms(
+            text,
+            [
+                "economic activity",
+                "economic growth",
+                "growth",
+                "consumer spending"
+            ]
+        ),
 
-        "tone_score":
-            s,
+        "financial_mentions": count_terms(
+            text,
+            [
+                "financial conditions",
+                "financial stability",
+                "credit conditions",
+                "banking",
+                "liquidity"
+            ]
+        ),
 
-        "inflation_mentions":
-            count_terms(
-                text,
-                [
-                    "inflation",
-                    "prices",
-                    "price pressures",
-                    "inflation pressures",
-                ]
-            ),
-
-        "labor_mentions":
-            count_terms(
-                text,
-                [
-                    "employment",
-                    "labor market",
-                    "unemployment",
-                    "job gains",
-                    "wages",
-                    "payroll",
-                ]
-            ),
-
-        "growth_mentions":
-            count_terms(
-                text,
-                [
-                    "economic activity",
-                    "economic growth",
-                    "growth",
-                    "consumer spending",
-                    "demand",
-                    "output",
-                ]
-            ),
-
-        "financial_mentions":
-            count_terms(
-                text,
-                [
-                    "financial conditions",
-                    "financial stability",
-                    "credit conditions",
-                    "banking",
-                    "liquidity",
-                    "credit",
-                ]
-            ),
-
-        "text_length":
-            len(text),
+        "text_length": len(text)
     }
 
 
 # ============================================================
-# FED CHAIR
-# ============================================================
-
-# Kevin Warsh became Federal Reserve Chair
-# on May 22, 2026.
-
-FED_CHAIR_TRANSITION = date(
-    2026,
-    5,
-    22
-)
-
-
-def fed_chair_for_date(
-    document_date: Optional[date]
-) -> str:
-
-    if (
-        document_date is not None
-        and document_date >=
-        FED_CHAIR_TRANSITION
-    ):
-
-        return "Kevin Warsh"
-
-    return "Jerome Powell"
-
-
-# ============================================================
-# PHASE 2B — DIRECTIONAL LANGUAGE
+# PHASE 2B — FED DIMENSIONS
 # ============================================================
 
 DIMENSION_SIGNALS = {
 
     "inflation": {
-
         "hawkish": [
-
             "inflation remains elevated",
-
             "inflation remains high",
-
-            "inflation has moved up",
-
-            "inflation increased",
-
-            "inflation picked up",
-
-            "inflation pressures remain",
-
-            "price pressures remain",
-
-            "upside risks to inflation",
-
-            "inflationary pressures",
-
             "persistent inflation",
-
-            "higher inflation",
-
+            "price pressures",
+            "higher prices",
             "inflation expectations increased",
-
-            "inflation expectations remain elevated",
+            "upside inflation risks"
         ],
-
         "dovish": [
-
-            "inflation has eased",
-
             "inflation eased",
-
             "inflation declined",
-
             "inflation moderated",
-
-            "inflation moved lower",
-
             "price pressures eased",
-
-            "inflation pressures eased",
-
-            "inflation expectations declined",
-
-            "inflation expectations eased",
-
-            "further progress on inflation",
-        ],
+            "inflation expectations declined"
+        ]
     },
 
     "labor": {
-
         "hawkish": [
-
-            "employment remains strong",
-
-            "job gains remained solid",
-
-            "job gains remain strong",
-
-            "labor market remains tight",
-
             "labor market remains strong",
-
-            "wage pressures remain",
-
-            "wages increased",
-
             "employment increased",
-
-            "employment grew",
-
-            "labor demand remains strong",
+            "job gains",
+            "wages increased",
+            "wage growth"
         ],
-
         "dovish": [
-
-            "labor market has cooled",
-
-            "labor market cooled",
-
-            "employment slowed",
-
-            "job gains slowed",
-
-            "job gains weakened",
-
-            "employment declined",
-
-            "unemployment increased",
-
-            "unemployment rose",
-
-            "labor demand weakened",
-
-            "labor market softened",
-
             "labor market weakened",
-        ],
+            "employment declined",
+            "job losses",
+            "unemployment increased",
+            "hiring slowed",
+            "labor demand weakened"
+        ]
     },
 
     "growth": {
-
         "hawkish": [
-
-            "economic activity remains solid",
-
-            "economic activity remains strong",
-
-            "economic growth remained solid",
-
-            "growth remained solid",
-
-            "growth remained strong",
-
-            "consumer spending remained strong",
-
-            "consumer spending increased",
-
-            "demand remains strong",
-
             "economic activity increased",
+            "economic growth increased",
+            "growth remained solid",
+            "consumer spending increased",
+            "demand remained strong"
         ],
-
         "dovish": [
-
             "economic activity slowed",
-
-            "economic activity weakened",
-
             "growth slowed",
-
-            "growth weakened",
-
-            "economic growth slowed",
-
-            "consumer spending slowed",
-
-            "consumer spending weakened",
-
-            "demand weakened",
-
-            "economic activity declined",
-
-            "economic activity softened",
-        ],
+            "economic activity weakened",
+            "consumer spending declined",
+            "demand weakened"
+        ]
     },
 
     "financial": {
-
         "hawkish": [
-
             "financial conditions tightened",
-
-            "financial conditions remain tight",
-
             "credit conditions tightened",
-
             "financial conditions restrictive",
-
-            "financial stress increased",
+            "credit became more restrictive"
         ],
-
         "dovish": [
-
             "financial conditions eased",
-
-            "financial conditions improved",
-
             "credit conditions eased",
-
-            "credit conditions improved",
-
-            "financial stress declined",
-        ],
+            "financial conditions improved",
+            "credit availability improved"
+        ]
     },
 
     "policy": {
-
         "hawkish": [
-
             "higher for longer",
-
-            "policy remains restrictive",
-
-            "policy remains restrictive for longer",
-
-            "additional tightening",
-
-            "higher policy rate",
-
-            "higher policy rates",
-
-            "raise the target range",
-
-            "rate increase",
-
-            "rate increases",
-
             "restrictive policy",
-
-            "restrictive monetary policy",
-
-            "not yet time to ease",
-
-            "not ready to cut",
+            "additional tightening",
+            "rate increase",
+            "higher policy rate",
+            "policy remains restrictive"
         ],
-
         "dovish": [
-
             "rate cut",
-
             "rate cuts",
-
-            "lower policy rate",
-
-            "lower policy rates",
-
-            "easing policy",
-
-            "policy easing",
-
-            "monetary easing",
-
-            "begin easing",
-
-            "easier policy",
-
             "lower rates",
-
-            "time to ease",
-        ],
-    },
+            "easing policy",
+            "policy easing",
+            "lower policy rate"
+        ]
+    }
 }
 
 
-# ============================================================
-# SIGNAL SCORING
-# ============================================================
+DIMENSION_WEIGHTS = {
+    "inflation": 25,
+    "labor": 15,
+    "growth": 15,
+    "financial": 10,
+    "policy": 35
+}
+
 
 def dimension_signal(
     text: str,
@@ -1367,241 +830,84 @@ def dimension_signal(
     if not text:
 
         return {
-
-            "score":
-                0,
-
-            "hawkish":
-                0,
-
-            "dovish":
-                0,
-
-            "classification":
-                "UNAVAILABLE",
-
-            "evidence":
-                [],
+            "score": 0,
+            "classification": "UNAVAILABLE",
+            "hawkish_hits": 0,
+            "dovish_hits": 0
         }
 
     low = text.lower()
 
-    signals = DIMENSION_SIGNALS[
-        dimension
-    ]
+    cfg = DIMENSION_SIGNALS[dimension]
 
-    hawkish_hits = []
-    dovish_hits = []
-
-    for phrase in signals[
-        "hawkish"
-    ]:
-
-        count = low.count(
-            phrase.lower()
-        )
-
-        if count > 0:
-
-            hawkish_hits.extend(
-                [phrase] * count
-            )
-
-    for phrase in signals[
-        "dovish"
-    ]:
-
-        count = low.count(
-            phrase.lower()
-        )
-
-        if count > 0:
-
-            dovish_hits.extend(
-                [phrase] * count
-            )
-
-    raw = (
-        len(hawkish_hits)
-        -
-        len(dovish_hits)
+    hawkish_hits = sum(
+        low.count(term)
+        for term in cfg["hawkish"]
     )
+
+    dovish_hits = sum(
+        low.count(term)
+        for term in cfg["dovish"]
+    )
+
+    raw = hawkish_hits - dovish_hits
 
     score = max(
         -10,
-        min(
-            10,
-            raw
-        )
+        min(10, raw)
     )
 
-    if score >= 5:
-
+    if score >= 4:
         classification = "HAWKISH"
 
-    elif score >= 2:
+    elif score >= 1:
+        classification = "MODERATELY HAWKISH"
 
-        classification = (
-            "MODERATELY HAWKISH"
-        )
-
-    elif score <= -5:
-
+    elif score <= -4:
         classification = "DOVISH"
 
-    elif score <= -2:
-
-        classification = (
-            "MODERATELY DOVISH"
-        )
+    elif score <= -1:
+        classification = "MODERATELY DOVISH"
 
     else:
-
         classification = "NEUTRAL"
 
-    evidence = []
-
-    for phrase in hawkish_hits[:3]:
-
-        evidence.append(
-            f"Hawkish: {phrase}"
-        )
-
-    for phrase in dovish_hits[:3]:
-
-        evidence.append(
-            f"Dovish: {phrase}"
-        )
-
     return {
-
-        "score":
-            score,
-
-        "hawkish":
-            len(hawkish_hits),
-
-        "dovish":
-            len(dovish_hits),
-
-        "classification":
-            classification,
-
-        "evidence":
-            evidence,
+        "score": score,
+        "classification": classification,
+        "hawkish_hits": hawkish_hits,
+        "dovish_hits": dovish_hits
     }
 
-
-# ============================================================
-# DOCUMENT DIMENSION ANALYSIS
-# ============================================================
-
-def analyze_dimensions(
-    text: str
-) -> Dict:
-
-    return {
-
-        dimension:
-            dimension_signal(
-                text,
-                dimension
-            )
-
-        for dimension
-        in DIMENSION_SIGNALS
-    }
-
-
-# ============================================================
-# FED INTELLIGENCE WEIGHTS
-# ============================================================
-
-DIMENSION_WEIGHTS = {
-
-    "inflation":
-        25,
-
-    "labor":
-        15,
-
-    "growth":
-        15,
-
-    "financial":
-        10,
-
-    "policy":
-        35,
-}
-
-
-# ============================================================
-# NORMALIZE DIMENSION
-# ============================================================
 
 def dimension_to_100(
-    score: float
+    signal: Dict
 ) -> float:
 
-    value = (
-        (score + 10)
-        / 20
-        * 100
-    )
+    score = signal.get("score", 0)
 
     return round(
-        max(
-            0,
-            min(
-                100,
-                value
-            )
-        ),
+        50 + score * 5,
         1
     )
 
 
-# ============================================================
-# FED INTELLIGENCE SCORE
-# ============================================================
-
 def calculate_fed_score(
     dimensions: Dict,
-    sep_shift_data: Optional[Dict] = None
+    sep_shift_data: Optional[Dict]
 ) -> Dict:
 
-    weighted_sum = 0.0
-    total_weight = 0.0
+    weighted = 0
+    total_weight = 0
 
-    component_scores = {}
+    for name, weight in DIMENSION_WEIGHTS.items():
 
-    for dimension, weight in (
-        DIMENSION_WEIGHTS.items()
-    ):
-
-        item = dimensions.get(
-            dimension,
-            {}
-        )
-
-        score = item.get(
-            "score"
-        )
-
-        if score is None:
+        if name not in dimensions:
             continue
 
-        normalized = dimension_to_100(
-            score
-        )
-
-        component_scores[
-            dimension
-        ] = normalized
-
-        weighted_sum += (
-            normalized * weight
+        weighted += (
+            dimensions[name]["score_100"]
+            * weight
         )
 
         total_weight += weight
@@ -1613,351 +919,189 @@ def calculate_fed_score(
     else:
 
         base_score = (
-            weighted_sum
-            /
-            total_weight
+            weighted / total_weight
         )
-
-    # --------------------------------------------------------
-    # SEP adjustment
-    # --------------------------------------------------------
 
     sep_adjustment = 0.0
 
     if sep_shift_data:
 
-        classification = (
-            sep_shift_data.get(
-                "classification",
-                ""
-            )
+        classification = sep_shift_data.get(
+            "classification",
+            ""
         )
 
-        if classification == (
-            "HAWKISH SHIFT"
-        ):
-
+        if classification == "HAWKISH SHIFT":
             sep_adjustment = 5.0
 
-        elif classification == (
-            "DOVISH SHIFT"
-        ):
-
+        elif classification == "DOVISH SHIFT":
             sep_adjustment = -5.0
 
     final_score = max(
         0,
         min(
             100,
-            base_score
-            +
-            sep_adjustment
+            base_score + sep_adjustment
         )
-    )
-
-    final_score = round(
-        final_score,
-        1
     )
 
     if final_score >= 75:
-
         classification = "HAWKISH"
 
     elif final_score >= 56:
-
-        classification = (
-            "MODERATELY HAWKISH"
-        )
+        classification = "MODERATELY HAWKISH"
 
     elif final_score >= 45:
-
         classification = "NEUTRAL"
 
     elif final_score >= 25:
-
-        classification = (
-            "MODERATELY DOVISH"
-        )
+        classification = "MODERATELY DOVISH"
 
     else:
-
         classification = "DOVISH"
 
     return {
-
-        "score":
-            final_score,
-
-        "classification":
-            classification,
-
-        "base_score":
-            round(
-                base_score,
-                1
-            ),
-
-        "sep_adjustment":
-            sep_adjustment,
-
-        "components":
-            component_scores,
+        "score": round(final_score, 1),
+        "base_score": round(base_score, 1),
+        "sep_adjustment": sep_adjustment,
+        "classification": classification
     }
 
 
-# ============================================================
-# EVIDENCE GENERATOR
-# ============================================================
-
 def build_evidence(
     dimensions: Dict,
-    sep_shift_data: Optional[Dict] = None
-) -> List[str]:
+    sep_shift_data: Optional[Dict]
+) -> list:
 
-    evidence = []
+    reasons = []
 
-    ordered = sorted(
-        dimensions.items(),
-        key=lambda x: abs(
-            x[1].get(
-                "score",
-                0
-            )
-        ),
-        reverse=True
-    )
-
-    for dimension, data in ordered:
-
-        score = data.get(
-            "score",
-            0
-        )
-
-        if score == 0:
-            continue
-
-        label = dimension.replace(
-            "_",
-            " "
-        ).title()
+    for name, data in dimensions.items():
 
         classification = data.get(
-            "classification",
-            "NEUTRAL"
+            "classification"
         )
 
-        if score > 0:
-
-            evidence.append(
-                f"{label}: "
-                f"{classification} "
-                f"(+{score})"
+        contribution = round(
+            (
+                data["score_100"] - 50
             )
+            * DIMENSION_WEIGHTS[name]
+            / 100,
+            2
+        )
 
-        else:
-
-            evidence.append(
-                f"{label}: "
-                f"{classification} "
-                f"({score})"
-            )
+        reasons.append(
+            f"- {name.capitalize()}: "
+            f"{classification} "
+            f"({contribution:+.2f})"
+        )
 
     if sep_shift_data:
 
-        sep_class = (
-            sep_shift_data.get(
-                "classification"
-            )
+        classification = sep_shift_data.get(
+            "classification"
         )
 
-        if sep_class:
+        if classification != "MIXED / NEUTRAL SHIFT":
 
-            evidence.append(
-                f"SEP: {sep_class}"
+            reasons.append(
+                f"- SEP: {classification}"
             )
 
-    return evidence[:6]
+    return reasons
 
-
-# ============================================================
-# FULL FED ANALYSIS
-# ============================================================
 
 def build_deep_fed_analysis(
     statement_text: str,
     minutes_text: str,
     chair_text: str,
-    sep_shift_data: Optional[Dict] = None
+    sep_shift_data: Optional[Dict]
 ) -> Dict:
 
-    statement_dimensions = (
-        analyze_dimensions(
-            statement_text
-        )
-    )
+    statement_dimensions = {}
+    minutes_dimensions = {}
+    chair_dimensions = {}
 
-    minutes_dimensions = (
-        analyze_dimensions(
-            minutes_text
-        )
-    )
+    for dimension in DIMENSION_WEIGHTS:
 
-    chair_dimensions = (
-        analyze_dimensions(
-            chair_text
+        s = dimension_signal(
+            statement_text,
+            dimension
         )
-    )
+
+        m = dimension_signal(
+            minutes_text,
+            dimension
+        )
+
+        c = dimension_signal(
+            chair_text,
+            dimension
+        )
+
+        statement_dimensions[dimension] = {
+            **s,
+            "score_100": dimension_to_100(s)
+        }
+
+        minutes_dimensions[dimension] = {
+            **m,
+            "score_100": dimension_to_100(m)
+        }
+
+        chair_dimensions[dimension] = {
+            **c,
+            "score_100": dimension_to_100(c)
+        }
 
     combined = {}
 
     for dimension in DIMENSION_WEIGHTS:
 
-        s = statement_dimensions[
-            dimension
-        ].get(
-            "score",
-            0
-        )
-
-        m = minutes_dimensions[
-            dimension
-        ].get(
-            "score",
-            0
-        )
-
-        c = chair_dimensions[
-            dimension
-        ].get(
-            "score",
-            0
-        )
+        s = statement_dimensions[dimension]["score_100"]
+        m = minutes_dimensions[dimension]["score_100"]
+        c = chair_dimensions[dimension]["score_100"]
 
         combined_score = (
             s * 0.35
-            +
-            m * 0.40
-            +
-            c * 0.25
+            + m * 0.40
+            + c * 0.25
         )
 
-        combined_score = max(
-            -10,
-            min(
-                10,
-                combined_score
-            )
-        )
-
-        classification = (
-
-            "HAWKISH"
-            if combined_score >= 5
-
-            else
-            "MODERATELY HAWKISH"
-            if combined_score >= 2
-
-            else
-            "DOVISH"
-            if combined_score <= -5
-
-            else
-            "MODERATELY DOVISH"
-            if combined_score <= -2
-
-            else
-            "NEUTRAL"
-        )
-
-        evidence = []
-
-        for source_name, source_data in [
-
-            (
-                "Statement",
-                statement_dimensions[
-                    dimension
-                ]
+        combined[dimension] = {
+            "score_100": round(
+                combined_score,
+                1
             ),
-
-            (
-                "Minutes",
-                minutes_dimensions[
-                    dimension
-                ]
-            ),
-
-            (
-                "Chair",
-                chair_dimensions[
-                    dimension
-                ]
-            ),
-        ]:
-
-            if source_data.get(
-                "score",
-                0
-            ) != 0:
-
-                evidence.append(
-                    f"{source_name}: "
-                    f"{source_data['classification']}"
-                )
-
-        combined[
-            dimension
-        ] = {
-
-            "score":
-                round(
-                    combined_score,
-                    2
-                ),
-
-            "classification":
-                classification,
-
-            "evidence":
-                evidence,
+            "statement": statement_dimensions[dimension],
+            "minutes": minutes_dimensions[dimension],
+            "chair": chair_dimensions[dimension]
         }
 
-    score = calculate_fed_score(
-        combined,
+    dimensions_for_score = {
+        k: {
+            "score_100": v["score_100"]
+        }
+        for k, v in combined.items()
+    }
+
+    fed_score = calculate_fed_score(
+        dimensions_for_score,
         sep_shift_data
     )
 
     reasons = build_evidence(
-        combined,
+        dimensions_for_score,
         sep_shift_data
     )
 
     return {
-
-        "score":
-            score,
-
-        "dimensions":
-            combined,
-
-        "documents":
-            {
-
-                "statement":
-                    statement_dimensions,
-
-                "minutes":
-                    minutes_dimensions,
-
-                "chair":
-                    chair_dimensions,
-            },
-
-        "reasons":
-            reasons,
+        "statement": statement_dimensions,
+        "minutes": minutes_dimensions,
+        "chair": chair_dimensions,
+        "combined": combined,
+        "fed_score": fed_score,
+        "reasons": reasons
     }
 
 
@@ -1965,30 +1109,32 @@ def build_deep_fed_analysis(
 # PHASE 2C — BEIGE BOOK
 # ============================================================
 
-def discover_latest_beige_book(
+def discover_beige_book(
     as_of: Optional[date] = None
 ) -> Dict:
+
+    """
+    Discover the latest official Beige Book.
+
+    The Fed archive uses issue-month URLs such as:
+    beigebook202608-summary.htm
+
+    The August 2026 issue was published on
+    September 2, 2026.
+    """
 
     as_of = as_of or date.today()
 
     result = {
-
-        "available":
-            False,
-
-        "date":
-            None,
-
-        "url":
-            None,
-
-        "text":
-            "",
+        "available": False,
+        "issue_date": None,
+        "publication_date": None,
+        "title": None,
+        "url": None,
+        "text": ""
     }
 
-    r = get(
-        BEIGE_BOOK
-    )
+    r = get(BEIGE_BOOK)
 
     if r is None:
         return result
@@ -2000,444 +1146,301 @@ def discover_latest_beige_book(
 
     candidates = []
 
-    for a in soup.find_all(
-        "a",
-        href=True
-    ):
+    for a in soup.find_all("a", href=True):
 
-        href = a.get(
-            "href",
-            ""
-        ).strip()
-
-        if not href:
-            continue
-
-        url = absolute(
-            href
-        )
-
+        href = a.get("href", "")
         label = a.get_text(
             " ",
             strip=True
         )
 
-        combined = (
-            f"{label} {href}"
-        ).lower()
+        full_url = absolute(href)
 
-        if (
-            "beige book"
-            not in combined
+        m = re.search(
+            r"beigebook(20\d{4})",
+            href.lower()
+        )
+
+        if not m:
+            continue
+
+        issue = m.group(1)
+
+        try:
+            issue_year = int(issue[:4])
+            issue_month = int(issue[4:6])
+
+            issue_date = date(
+                issue_year,
+                issue_month,
+                1
+            )
+
+        except Exception:
+            continue
+
+        # Never select an issue that is clearly in the future.
+        if issue_date > date(
+            as_of.year,
+            as_of.month,
+            1
         ):
             continue
 
-        # ----------------------------------------------------
-        # YYYY-MM-DD / YYYY_MM_DD / YYYY/MM/DD
-        # ----------------------------------------------------
-
-        dates = re.findall(
-            r"(20\d{2})[-_/]"
-            r"(\d{1,2})[-_/]"
-            r"(\d{1,2})",
-            combined
-        )
-
-        for y, m, d in dates:
-
-            try:
-
-                dt = date(
-                    int(y),
-                    int(m),
-                    int(d)
-                )
-
-                if dt <= as_of:
-
-                    candidates.append(
-                        (
-                            dt,
-                            url
-                        )
-                    )
-
-            except Exception:
-
-                continue
-
-        # ----------------------------------------------------
-        # YYYYMMDD
-        # ----------------------------------------------------
-
-        dt = date_from_href(
-            href
-        )
-
-        if (
-            dt
-            and dt <= as_of
-        ):
-
-            candidates.append(
-                (
-                    dt,
-                    url
-                )
-            )
-
-    # --------------------------------------------------------
-    # If page links don't expose a date, try text patterns
-    # --------------------------------------------------------
-
-    if not candidates:
-
-        page_text = clean_html(
-            r.text
-        )
-
-        date_patterns = re.findall(
-            r"(20\d{2})[-/]"
-            r"(\d{1,2})[-/]"
-            r"(\d{1,2})",
-            page_text
-        )
-
-        for y, m, d in date_patterns:
-
-            try:
-
-                dt = date(
-                    int(y),
-                    int(m),
-                    int(d)
-                )
-
-                if dt <= as_of:
-
-                    candidates.append(
-                        (
-                            dt,
-                            BEIGE_BOOK
-                        )
-                    )
-
-            except Exception:
-
-                continue
+        candidates.append({
+            "issue_date": issue_date,
+            "url": full_url,
+            "label": label,
+            "href": href
+        })
 
     if not candidates:
         return result
 
-    # Remove duplicate pairs.
-    candidates = list(
-        {
-            (dt, url)
-            for dt, url in candidates
-        }
+    latest_issue = max(
+        x["issue_date"]
+        for x in candidates
     )
 
-    candidates.sort(
-        key=lambda x: x[0],
-        reverse=True
-    )
+    same_issue = [
+        x for x in candidates
+        if x["issue_date"] == latest_issue
+    ]
 
-    latest_date, latest_url = (
-        candidates[0]
-    )
+    # Prefer National Summary.
+    national = None
 
-    text = fetch_document(
-        latest_url
-    )
+    for item in same_issue:
 
-    # --------------------------------------------------------
-    # Some Beige Book links point to an HTML page that links
-    # to the actual PDF. If text is too short, inspect links.
-    # --------------------------------------------------------
+        text = (
+            item["label"]
+            + " "
+            + item["href"]
+        ).lower()
 
-    if (
-        not text
-        or len(text) < 1000
-    ):
+        if "summary" in text or "national" in text:
+            national = item
+            break
 
-        page_response = get(
-            latest_url
+    # If the archive did not expose a summary link,
+    # use the predictable official summary URL.
+    if national is None:
+
+        predictable = (
+            f"{FED}/monetarypolicy/"
+            f"beigebook{latest_issue.year}"
+            f"{latest_issue.month:02d}-summary.htm"
         )
 
-        if page_response is not None:
+        response = get(predictable)
 
-            page_soup = BeautifulSoup(
-                page_response.text,
-                "html.parser"
-            )
+        if response is not None:
 
-            pdf_candidates = []
+            national = {
+                "issue_date": latest_issue,
+                "url": predictable,
+                "label": "National Summary",
+                "href": predictable
+            }
 
-            for a in page_soup.find_all(
-                "a",
-                href=True
-            ):
+    if national is None:
+        return result
 
-                href = absolute(
-                    a.get(
-                        "href",
-                        ""
-                    )
-                )
+    text = fetch_document(
+        national["url"]
+    )
 
-                label = a.get_text(
-                    " ",
-                    strip=True
-                ).lower()
+    if not text:
+        return result
 
-                if (
-                    href.lower().endswith(
-                        ".pdf"
-                    )
-                    and (
-                        "beige" in label
-                        or "beige" in href.lower()
-                    )
-                ):
+    # The publication date can be extracted from
+    # the official page when available.
+    publication_date = None
 
-                    pdf_candidates.append(
-                        href
-                    )
+    date_patterns = [
+        r"Last Update:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
+        r"Published:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})"
+    ]
 
-            if pdf_candidates:
+    for pattern in date_patterns:
 
-                pdf_url = (
-                    pdf_candidates[0]
-                )
+        match = re.search(
+            pattern,
+            text,
+            re.I
+        )
 
-                pdf_content = pdf_text(
-                    pdf_url
-                )
+        if match:
 
-                if pdf_content:
+            try:
 
-                    text = pdf_content
+                publication_date = datetime.strptime(
+                    match.group(1),
+                    "%B %d, %Y"
+                ).date()
 
-                    latest_url = pdf_url
+                break
+
+            except Exception:
+                pass
 
     result.update({
-
-        "available":
-            bool(text),
-
-        "date":
-            latest_date.isoformat(),
-
-        "url":
-            latest_url,
-
-        "text":
-            text,
+        "available": True,
+        "issue_date": latest_issue.isoformat(),
+        "publication_date": (
+            publication_date.isoformat()
+            if publication_date
+            else None
+        ),
+        "title": (
+            f"Beige Book - "
+            f"{latest_issue.strftime('%B %Y')}"
+        ),
+        "url": national["url"],
+        "text": text
     })
 
     return result
 
 
 # ============================================================
-# BEIGE BOOK DIMENSION SIGNALS
+# BEIGE BOOK ANALYSIS
 # ============================================================
 
-BEIGE_DIMENSION_SIGNALS = {
+BEIGE_DIMENSIONS = {
 
     "growth": {
-
-        "hawkish": [
-
+        "positive": [
             "economic activity increased",
-
             "economic activity grew",
-
+            "economic activity expanded",
             "activity increased",
-
             "activity grew",
-
-            "consumer spending increased",
-
-            "consumer spending grew",
-
-            "manufacturing activity increased",
-
-            "demand increased",
-
-            "business activity increased",
-
-            "output increased",
+            "activity expanded",
+            "growth increased",
+            "growth picked up",
+            "demand strengthened",
+            "outlook was positive"
         ],
-
-        "dovish": [
-
+        "negative": [
             "economic activity declined",
-
             "economic activity decreased",
-
             "activity declined",
-
             "activity decreased",
-
-            "consumer spending declined",
-
-            "consumer spending decreased",
-
-            "manufacturing activity declined",
-
-            "demand declined",
-
-            "business activity declined",
-
-            "output declined",
-        ],
+            "growth slowed",
+            "growth weakened",
+            "demand weakened",
+            "outlook deteriorated"
+        ]
     },
 
     "labor": {
-
-        "hawkish": [
-
+        "positive": [
+            "employment rose",
             "employment increased",
-
-            "employment grew",
-
             "hiring increased",
-
-            "hiring picked up",
-
             "labor demand increased",
-
-            "labor demand remained strong",
-
-            "wage growth increased",
-
-            "wage pressures increased",
+            "labor demand remained healthy",
+            "wages grew",
+            "wage growth"
         ],
-
-        "dovish": [
-
+        "negative": [
             "employment declined",
-
-            "employment decreased",
-
+            "employment fell",
             "hiring slowed",
-
-            "hiring declined",
-
-            "labor demand weakened",
-
             "labor demand declined",
-
-            "wage growth slowed",
-
-            "wage pressures eased",
-        ],
+            "labor demand weakened",
+            "layoffs increased"
+        ]
     },
 
     "inflation": {
-
-        "hawkish": [
-
-            "prices increased",
-
-            "prices rose",
-
-            "price pressures increased",
-
-            "price pressures remained elevated",
-
-            "input costs increased",
-
-            "input costs rose",
-
-            "wage pressures remained elevated",
-
-            "inflationary pressures increased",
-
-            "cost pressures increased",
-        ],
-
-        "dovish": [
-
-            "prices declined",
-
-            "prices decreased",
-
+        "positive": [
+            "prices eased",
+            "price increases slowed",
             "price pressures eased",
-
-            "price pressures moderated",
-
-            "input costs declined",
-
-            "input costs decreased",
-
-            "cost pressures eased",
-
-            "inflationary pressures eased",
+            "inflation moderated",
+            "input costs declined"
         ],
+        "negative": [
+            "prices increased",
+            "prices rose",
+            "price pressures",
+            "input price pressures",
+            "input costs increased",
+            "higher energy prices",
+            "higher fuel prices",
+            "tariff-related impacts"
+        ]
     },
 
-    "consumer": {
-
-        "hawkish": [
-
-            "consumer spending increased",
-
+    "consumer_spending": {
+        "positive": [
             "consumer spending grew",
-
+            "consumer spending increased",
+            "consumer spending strengthened",
             "retail sales increased",
-
-            "consumer demand increased",
+            "tourism activity increased"
         ],
-
-        "dovish": [
-
+        "negative": [
             "consumer spending declined",
-
-            "consumer spending decreased",
-
-            "consumer spending slowed",
-
+            "consumer spending weakened",
             "retail sales declined",
+            "price sensitivity",
+            "consumer confidence declined"
+        ]
+    },
 
-            "consumer demand weakened",
+    "manufacturing": {
+        "positive": [
+            "manufacturing activity picked up",
+            "manufacturing activity increased",
+            "manufacturing demand grew",
+            "manufacturing demand increased",
+            "new orders increased"
         ],
+        "negative": [
+            "manufacturing activity declined",
+            "manufacturing activity weakened",
+            "manufacturing demand declined",
+            "manufacturing demand weakened"
+        ]
     },
 
     "financial": {
-
-        "hawkish": [
-
-            "financial conditions tightened",
-
-            "credit conditions tightened",
-
-            "lending standards tightened",
-
-            "credit availability decreased",
-
-            "financial stress increased",
-        ],
-
-        "dovish": [
-
-            "financial conditions eased",
-
+        "positive": [
             "financial conditions improved",
-
-            "credit conditions eased",
-
-            "credit availability improved",
-
-            "financial stress declined",
+            "financial conditions eased",
+            "loan volumes increased",
+            "lending increased",
+            "loan demand grew"
         ],
+        "negative": [
+            "financial conditions tightened",
+            "loan volumes declined",
+            "lending declined",
+            "credit conditions tightened",
+            "loan demand weakened"
+        ]
     },
+
+    "housing": {
+        "positive": [
+            "residential construction increased",
+            "housing activity increased",
+            "home sales increased",
+            "residential real estate improved"
+        ],
+        "negative": [
+            "residential construction declined",
+            "housing activity declined",
+            "home sales declined",
+            "residential real estate declined",
+            "housing softened"
+        ]
+    }
 }
 
-
-# ============================================================
-# BEIGE BOOK DIMENSION ANALYSIS
-# ============================================================
 
 def beige_dimension_signal(
     text: str,
@@ -2447,272 +1450,168 @@ def beige_dimension_signal(
     if not text:
 
         return {
-
-            "score":
-                0,
-
-            "hawkish":
-                0,
-
-            "dovish":
-                0,
-
-            "classification":
-                "UNAVAILABLE",
-
-            "evidence":
-                [],
+            "score": 0,
+            "score_100": 50.0,
+            "classification": "UNAVAILABLE",
+            "positive_hits": 0,
+            "negative_hits": 0
         }
 
     low = text.lower()
 
-    signals = (
-        BEIGE_DIMENSION_SIGNALS[
-            dimension
-        ]
+    cfg = BEIGE_DIMENSIONS[dimension]
+
+    positive_hits = sum(
+        low.count(term)
+        for term in cfg["positive"]
     )
 
-    hawkish_hits = []
-    dovish_hits = []
-
-    for phrase in signals[
-        "hawkish"
-    ]:
-
-        count = low.count(
-            phrase.lower()
-        )
-
-        if count:
-
-            hawkish_hits.extend(
-                [phrase] * count
-            )
-
-    for phrase in signals[
-        "dovish"
-    ]:
-
-        count = low.count(
-            phrase.lower()
-        )
-
-        if count:
-
-            dovish_hits.extend(
-                [phrase] * count
-            )
-
-    raw = (
-        len(hawkish_hits)
-        -
-        len(dovish_hits)
+    negative_hits = sum(
+        low.count(term)
+        for term in cfg["negative"]
     )
 
-    score = max(
+    raw = positive_hits - negative_hits
+
+    raw = max(
         -10,
-        min(
-            10,
-            raw
-        )
+        min(10, raw)
     )
 
-    if score >= 5:
+    score_100 = round(
+        50 + raw * 5,
+        1
+    )
 
-        classification = "HAWKISH"
+    if raw >= 4:
+        classification = "POSITIVE"
 
-    elif score >= 2:
+    elif raw >= 1:
+        classification = "SLIGHTLY POSITIVE"
 
-        classification = (
-            "MODERATELY HAWKISH"
-        )
+    elif raw <= -4:
+        classification = "NEGATIVE"
 
-    elif score <= -5:
-
-        classification = "DOVISH"
-
-    elif score <= -2:
-
-        classification = (
-            "MODERATELY DOVISH"
-        )
+    elif raw <= -1:
+        classification = "SLIGHTLY NEGATIVE"
 
     else:
-
         classification = "NEUTRAL"
 
-    evidence = []
-
-    for phrase in hawkish_hits[:3]:
-
-        evidence.append(
-            f"Hawkish: {phrase}"
-        )
-
-    for phrase in dovish_hits[:3]:
-
-        evidence.append(
-            f"Dovish: {phrase}"
-        )
-
     return {
-
-        "score":
-            score,
-
-        "hawkish":
-            len(hawkish_hits),
-
-        "dovish":
-            len(dovish_hits),
-
-        "classification":
-            classification,
-
-        "evidence":
-            evidence,
+        "score": raw,
+        "score_100": score_100,
+        "classification": classification,
+        "positive_hits": positive_hits,
+        "negative_hits": negative_hits
     }
 
 
-def analyze_beige_book(
-    text: str
+def build_beige_analysis(
+    beige_text: str
 ) -> Dict:
 
-    dimensions = {
+    if not beige_text:
 
-        dimension:
+        return {
+            "available": False,
+            "score": None,
+            "tone": "UNAVAILABLE",
+            "dimensions": {},
+            "reasons": []
+        }
+
+    dimensions = {}
+
+    for dimension in BEIGE_DIMENSIONS:
+
+        dimensions[dimension] = (
             beige_dimension_signal(
-                text,
+                beige_text,
                 dimension
             )
+        )
 
-        for dimension
-        in BEIGE_DIMENSION_SIGNALS
-    }
-
-    # --------------------------------------------------------
-    # Beige Book weights
-    # --------------------------------------------------------
+    # Beige Book is descriptive rather than a direct
+    # monetary-policy document.
+    #
+    # Growth / labor / consumer / manufacturing /
+    # financial / housing are economic-growth dimensions.
+    #
+    # Inflation is treated separately because stronger
+    # price pressure is more hawkish for the Fed.
 
     weights = {
-
-        "growth":
-            25,
-
-        "labor":
-            20,
-
-        "inflation":
-            30,
-
-        "consumer":
-            15,
-
-        "financial":
-            10,
+        "growth": 20,
+        "labor": 15,
+        "inflation": 25,
+        "consumer_spending": 10,
+        "manufacturing": 10,
+        "financial": 10,
+        "housing": 10
     }
 
-    weighted_sum = 0.0
-    total_weight = 0.0
+    weighted = 0
+    total_weight = 0
 
-    components = {}
+    for dimension, weight in weights.items():
 
-    for dimension, weight in (
-        weights.items()
-    ):
-
-        item = dimensions[
-            dimension
-        ]
-
-        score = item.get(
-            "score",
-            0
-        )
-
-        normalized = dimension_to_100(
-            score
-        )
-
-        components[
-            dimension
-        ] = normalized
-
-        weighted_sum += (
-            normalized
+        weighted += (
+            dimensions[dimension]["score_100"]
             * weight
         )
 
         total_weight += weight
 
-    if total_weight:
-
-        final_score = (
-            weighted_sum
-            /
-            total_weight
-        )
-
-    else:
-
-        final_score = 50.0
-
-    final_score = round(
-        max(
-            0,
-            min(
-                100,
-                final_score
-            )
-        ),
-        1
+    score = (
+        weighted / total_weight
+        if total_weight
+        else 50.0
     )
 
-    if final_score >= 75:
+    # The score is an analytical balance,
+    # NOT a probability and NOT a trading signal.
+    if score >= 65:
+        overall = "MODERATELY HAWKISH / STRONG ACTIVITY"
 
-        classification = "HAWKISH"
+    elif score >= 56:
+        overall = "SLIGHTLY HAWKISH"
 
-    elif final_score >= 56:
+    elif score >= 45:
+        overall = "NEUTRAL"
 
-        classification = (
-            "MODERATELY HAWKISH"
-        )
-
-    elif final_score >= 45:
-
-        classification = "NEUTRAL"
-
-    elif final_score >= 25:
-
-        classification = (
-            "MODERATELY DOVISH"
-        )
+    elif score >= 35:
+        overall = "SLIGHTLY DOVISH"
 
     else:
+        overall = "MODERATELY DOVISH"
 
-        classification = "DOVISH"
+    reasons = []
+
+    for dimension, data in dimensions.items():
+
+        reasons.append(
+            f"- {dimension.replace('_', ' ').capitalize()}: "
+            f"{data['classification']} "
+            f"({data['score_100']:.1f}/100)"
+        )
 
     return {
-
-        "score":
-            final_score,
-
-        "classification":
-            classification,
-
-        "components":
-            components,
-
-        "dimensions":
-            dimensions,
-
-        "text_length":
-            len(text),
+        "available": True,
+        "score": round(score, 1),
+        "tone": overall,
+        "dimensions": dimensions,
+        "reasons": reasons,
+        "method": (
+            "Heuristic analytical score based on "
+            "directional language in the official "
+            "National Summary. Not a probability."
+        )
     }
 
 
 # ============================================================
-# MAIN FED INTELLIGENCE BUILDER
+# COMPLETE FED INTELLIGENCE
 # ============================================================
 
 def build_fed_intelligence() -> Dict:
@@ -2729,42 +1628,30 @@ def build_fed_intelligence() -> Dict:
     if not meeting:
 
         return {
-
-            "available":
-                False,
-
-            "error":
-                "No completed FOMC meeting found.",
+            "available": False,
+            "error": "No completed FOMC meeting found."
         }
 
-    # --------------------------------------------------------
-    # URLS
-    # --------------------------------------------------------
-
-    statement_url = links[
-        "statement"
-    ].get(
-        meeting,
-        ""
+    statement_url = (
+        links["statement"].get(
+            meeting,
+            ""
+        )
     )
 
-    minutes_url = links[
-        "minutes"
-    ].get(
-        meeting,
-        ""
+    minutes_url = (
+        links["minutes"].get(
+            meeting,
+            ""
+        )
     )
 
-    press_url = links[
-        "press"
-    ].get(
-        meeting,
-        ""
+    press_url = (
+        links["press"].get(
+            meeting,
+            ""
+        )
     )
-
-    # --------------------------------------------------------
-    # DOCUMENT TEXT
-    # --------------------------------------------------------
 
     statement_text = fetch_document(
         statement_url
@@ -2778,36 +1665,9 @@ def build_fed_intelligence() -> Dict:
         press_url
     )
 
-    # --------------------------------------------------------
-    # FED CHAIR
-    # --------------------------------------------------------
-
-    chair_name = fed_chair_for_date(
+    chair = fed_chair_for_date(
         meeting
     )
-
-    # --------------------------------------------------------
-    # BEIGE BOOK — PHASE 2C
-    # --------------------------------------------------------
-
-    beige_book = (
-        discover_latest_beige_book(
-            as_of=today
-        )
-    )
-
-    beige_analysis = (
-        analyze_beige_book(
-            beige_book.get(
-                "text",
-                ""
-            )
-        )
-    )
-
-    # --------------------------------------------------------
-    # SEP
-    # --------------------------------------------------------
 
     current_sep_date = latest_sep(
         links,
@@ -2824,187 +1684,157 @@ def build_fed_intelligence() -> Dict:
     )
 
     current_sep = (
-
         extract_sep(
-            links[
-                "sep"
-            ].get(
+            links["sep"].get(
                 current_sep_date,
                 ""
             ),
             current_sep_date
         )
-
         if current_sep_date
-
         else {}
     )
 
     previous = (
-
         extract_sep(
-            links[
-                "sep"
-            ].get(
+            links["sep"].get(
                 prev_sep_date,
                 ""
             ),
             prev_sep_date
         )
-
         if prev_sep_date
-
         else {}
     )
 
     shift = (
-
         sep_shift(
             current_sep,
             previous
         )
-
-        if (
-            current_sep
-            and previous
-        )
-
+        if current_sep and previous
         else {}
     )
 
     # --------------------------------------------------------
-    # BASIC DOCUMENT ANALYSIS
+    # PHASE 2B
     # --------------------------------------------------------
 
-    statement_analysis = analyze(
-        "FOMC Statement",
-        statement_text
-    )
-
-    minutes_analysis = analyze(
-        "FOMC Minutes",
-        minutes_text
-    )
-
-    chair_analysis = analyze(
-        f"{chair_name} Press Conference",
-        press["text"]
+    deep_analysis = build_deep_fed_analysis(
+        statement_text=statement_text,
+        minutes_text=minutes_text,
+        chair_text=press["text"],
+        sep_shift_data=shift
     )
 
     # --------------------------------------------------------
-    # PHASE 2B DEEP ANALYSIS
+    # PHASE 2C
     # --------------------------------------------------------
 
-    deep_analysis = (
-        build_deep_fed_analysis(
-
-            statement_text=
-                statement_text,
-
-            minutes_text=
-                minutes_text,
-
-            chair_text=
-                press["text"],
-
-            sep_shift_data=
-                shift,
-        )
+    beige = discover_beige_book(
+        as_of=today
     )
 
-    # --------------------------------------------------------
-    # RETURN
-    # --------------------------------------------------------
+    beige_analysis = build_beige_analysis(
+        beige.get("text", "")
+    )
 
     return {
 
-        "available":
-            True,
+        "available": True,
 
-        "as_of_date":
-            today.isoformat(),
+        "as_of_date": today.isoformat(),
 
-        "latest_fomc":
-            meeting.isoformat(),
+        "latest_fomc": meeting.isoformat(),
 
-        "current_date":
-            today.isoformat(),
+        "current_date": today.isoformat(),
+
+        "fed_chair": chair,
 
         # ----------------------------------------------------
-        # FED CHAIR
+        # FOMC
         # ----------------------------------------------------
 
-        "fed_chair":
-            chair_name,
+        "statement": analyze(
+            "FOMC Statement",
+            statement_text
+        ),
 
-        # ----------------------------------------------------
-        # DOCUMENT ANALYSIS
-        # ----------------------------------------------------
+        "statement_source": statement_url,
 
-        "statement":
-            statement_analysis,
+        "minutes": analyze(
+            "FOMC Minutes",
+            minutes_text
+        ),
 
-        "statement_source":
-            statement_url,
+        "minutes_source": minutes_url,
 
-        "minutes":
-            minutes_analysis,
+        "chair_press": analyze(
+            f"{chair} Press Conference",
+            press["text"]
+        ),
 
-        "minutes_source":
-            minutes_url,
+        "chair_page": press["page_url"],
 
-        "chair":
-            chair_analysis,
+        "chair_pdf": press["pdf_url"],
 
-        "chair_page":
-            press["page_url"],
+        # Backward-compatible key
+        "powell": analyze(
+            f"{chair} Press Conference",
+            press["text"]
+        ),
 
-        "chair_pdf":
-            press["pdf_url"],
+        "powell_page": press["page_url"],
+
+        "powell_pdf": press["pdf_url"],
 
         # ----------------------------------------------------
         # SEP
         # ----------------------------------------------------
 
-        "latest_sep_date":
-            (
-                current_sep_date.isoformat()
-                if current_sep_date
-                else None
-            ),
+        "latest_sep_date": (
+            current_sep_date.isoformat()
+            if current_sep_date
+            else None
+        ),
 
-        "previous_sep_date":
-            (
-                prev_sep_date.isoformat()
-                if prev_sep_date
-                else None
-            ),
+        "previous_sep_date": (
+            prev_sep_date.isoformat()
+            if prev_sep_date
+            else None
+        ),
 
-        "sep_current":
-            current_sep,
+        "sep_current": current_sep,
 
-        "sep_previous":
-            previous,
+        "sep_previous": previous,
 
-        "sep_shift":
-            shift,
+        "sep_shift": shift,
 
         # ----------------------------------------------------
         # PHASE 2B
         # ----------------------------------------------------
 
-        "fed_intelligence":
-            deep_analysis,
+        "phase_2b": deep_analysis,
+
+        "fed_score": deep_analysis[
+            "fed_score"
+        ],
 
         # ----------------------------------------------------
-        # PHASE 2C — BEIGE BOOK
+        # PHASE 2C
         # ----------------------------------------------------
 
-        "beige_book":
-            beige_book,
+        "beige_book": {
+            "available": beige["available"],
+            "issue_date": beige["issue_date"],
+            "publication_date": beige[
+                "publication_date"
+            ],
+            "title": beige["title"],
+            "url": beige["url"]
+        },
 
-        "beige_analysis":
-            beige_analysis,
+        "beige_analysis": beige_analysis
     }
 
 
@@ -3016,14 +1846,11 @@ def fed_summary(
     data: Dict
 ) -> str:
 
-    if not data.get(
-        "available"
-    ):
+    if not data.get("available"):
 
         return (
             "FED INTELLIGENCE unavailable: "
-            +
-            str(
+            + str(
                 data.get(
                     "error",
                     "unknown error"
@@ -3031,36 +1858,37 @@ def fed_summary(
             )
         )
 
-    fi = data.get(
-        "fed_intelligence",
+    fed_score = data.get(
+        "fed_score",
         {}
     )
 
-    score_data = fi.get(
-        "score",
+    beige = data.get(
+        "beige_book",
+        {}
+    )
+
+    beige_analysis = data.get(
+        "beige_analysis",
         {}
     )
 
     lines = [
 
         "FED INTELLIGENCE",
-
         "================",
 
         f"Latest FOMC: "
         f"{data['latest_fomc']}",
 
         f"Fed Chair: "
-        f"{data['fed_chair']}",
+        f"{data.get('fed_chair')}",
 
         f"Statement: "
         f"{data['statement']['tone']}",
 
-        (
-            f"{data['fed_chair']} "
-            f"Press Conference: "
-            f"{data['chair']['tone']}"
-        ),
+        f"{data.get('fed_chair')} Press Conference: "
+        f"{data['chair_press']['tone']}",
 
         f"Minutes: "
         f"{data['minutes']['tone']}",
@@ -3069,32 +1897,25 @@ def fed_summary(
         f"{data.get('latest_sep_date')}",
 
         f"Previous SEP: "
-        f"{data.get('previous_sep_date')}",
+        f"{data.get('previous_sep_date')}"
     ]
 
     # --------------------------------------------------------
-    # SEP SHIFT
+    # SEP
     # --------------------------------------------------------
 
-    if data.get(
-        "sep_shift"
-    ):
+    if data.get("sep_shift"):
 
         lines.append(
             "SEP Shift: "
-            +
-            data[
-                "sep_shift"
-            ][
+            + data["sep_shift"][
                 "classification"
             ]
         )
 
         for k, v in data[
             "sep_shift"
-        ][
-            "fields"
-        ].items():
+        ]["fields"].items():
 
             lines.append(
                 f"{k}: "
@@ -3104,164 +1925,123 @@ def fed_summary(
             )
 
     # --------------------------------------------------------
-    # PHASE 2B SCORE
+    # PHASE 2B
     # --------------------------------------------------------
 
-    if score_data:
+    lines.extend([
 
-        lines.extend([
+        "",
+        "PHASE 2B",
+        "---------",
 
-            "",
+        f"Fed Intelligence Score: "
+        f"{fed_score.get('score')}/100",
 
-            "PHASE 2B",
+        f"Overall Tone: "
+        f"{fed_score.get('classification')}",
 
-            "---------",
+        f"Base Score: "
+        f"{fed_score.get('base_score')}",
 
-            (
-                "Fed Intelligence Score: "
-                f"{score_data.get('score')}/100"
-            ),
+        f"SEP Adjustment: "
+        f"{fed_score.get('sep_adjustment')}"
+    ])
 
-            (
-                "Overall Tone: "
-                f"{score_data.get('classification')}"
-            ),
+    dimensions = data.get(
+        "phase_2b",
+        {}
+    ).get(
+        "combined",
+        {}
+    )
 
-            (
-                "Base Score: "
-                f"{score_data.get('base_score')}"
-            ),
+    for name, dimension in dimensions.items():
 
-            (
-                "SEP Adjustment: "
-                f"{score_data.get('sep_adjustment')}"
-            ),
-        ])
-
-        components = score_data.get(
-            "components",
-            {}
+        lines.append(
+            f"{name.capitalize()}: "
+            f"{dimension['score_100']}/100"
         )
 
-        for dimension, value in (
-            components.items()
-        ):
-
-            lines.append(
-                f"{dimension.title()}: "
-                f"{value}/100"
-            )
-
     # --------------------------------------------------------
-    # PHASE 2C — BEIGE BOOK
+    # PHASE 2C
     # --------------------------------------------------------
 
-    beige_source = data.get(
-        "beige_book",
-        {}
-    )
+    lines.extend([
+        "",
+        "PHASE 2C — BEIGE BOOK",
+        "---------------------"
+    ])
 
-    beige = data.get(
-        "beige_analysis",
-        {}
-    )
+    if not beige.get("available"):
 
-    if beige_source.get(
-        "available"
-    ):
-
-        lines.extend([
-
-            "",
-
-            "PHASE 2C — BEIGE BOOK",
-
-            "---------------------",
-
-            (
-                "Latest Beige Book: "
-                f"{beige_source.get('date')}"
-            ),
-
-            (
-                "Beige Book Score: "
-                f"{beige.get('score')}/100"
-            ),
-
-            (
-                "Overall Tone: "
-                f"{beige.get('classification')}"
-            ),
-        ])
-
-        for dimension, value in (
-            beige.get(
-                "components",
-                {}
-            ).items()
-        ):
-
-            lines.append(
-                f"{dimension.title()}: "
-                f"{value}/100"
-            )
+        lines.append(
+            "Beige Book: UNAVAILABLE"
+        )
 
     else:
 
-        lines.extend([
+        lines.append(
+            f"Beige Book: "
+            f"{beige.get('title')}"
+        )
 
-            "",
+        lines.append(
+            f"Issue: "
+            f"{beige.get('issue_date')}"
+        )
 
-            "PHASE 2C — BEIGE BOOK",
+        lines.append(
+            f"Publication: "
+            f"{beige.get('publication_date')}"
+        )
 
-            "---------------------",
+        lines.append(
+            f"Beige Book Score: "
+            f"{beige_analysis.get('score')}/100"
+        )
 
-            "Beige Book: UNAVAILABLE",
-        ])
+        lines.append(
+            f"Beige Book Tone: "
+            f"{beige_analysis.get('tone')}"
+        )
+
+        for reason in beige_analysis.get(
+            "reasons",
+            []
+        ):
+            lines.append(reason)
 
     # --------------------------------------------------------
     # REASONS
     # --------------------------------------------------------
 
-    reasons = fi.get(
+    lines.extend([
+        "",
+        "REASONS",
+        "-------"
+    ])
+
+    for reason in data.get(
+        "phase_2b",
+        {}
+    ).get(
         "reasons",
         []
-    )
+    ):
 
-    if reasons:
+        lines.append(reason)
 
-        lines.extend([
-
-            "",
-
-            "REASONS",
-
-            "-------",
-        ])
-
-        for reason in reasons:
-
-            lines.append(
-                f"- {reason}"
-            )
-
-    return "\n".join(
-        lines
-    )
+    return "\n".join(lines)
 
 
 # ============================================================
-# LOCAL TEST
+# TEST
 # ============================================================
 
 if __name__ == "__main__":
 
-    result = (
-        build_fed_intelligence()
-    )
+    result = build_fed_intelligence()
 
     print(
-        fed_summary(
-            result
-        )
+        fed_summary(result)
     )
