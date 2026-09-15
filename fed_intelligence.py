@@ -100,9 +100,20 @@ def discover_links() -> Dict[str, Dict[date, str]]:
     return result
 
 
-def latest_completed_fomc(links: Dict[str, Dict[date, str]]) -> Optional[date]:
-    dates = set(links.get("statement", {})) | set(links.get("minutes", {})) | set(links.get("press", {}))
-    done = [d for d in dates if d <= date.today()]
+def latest_completed_fomc(links: Dict[str, Dict[date, str]], as_of: Optional[date] = None) -> Optional[date]:
+    """Return the latest FOMC document date that is not in the future.
+
+    This deliberately excludes an ongoing/future meeting. On a meeting
+    day, a future-dated statement/press-conference link is not treated as
+    a completed meeting until its document date has arrived.
+    """
+    as_of = as_of or date.today()
+    dates = (
+        set(links.get("statement", {}))
+        | set(links.get("minutes", {}))
+        | set(links.get("press", {}))
+    )
+    done = [d for d in dates if d <= as_of]
     return max(done) if done else None
 
 
@@ -281,7 +292,8 @@ def analyze(name: str, text: str) -> Dict:
 
 def build_fed_intelligence() -> Dict:
     links = discover_links()
-    meeting = latest_completed_fomc(links)
+    today = date.today()
+    meeting = latest_completed_fomc(links, as_of=today)
     if not meeting:
         return {"available": False, "error": "No completed FOMC meeting found."}
 
@@ -301,7 +313,9 @@ def build_fed_intelligence() -> Dict:
 
     return {
         "available": True,
+        "as_of_date": today.isoformat(),
         "latest_fomc": meeting.isoformat(),
+        "current_date": today.isoformat(),
         "statement": analyze("FOMC Statement", statement_text),
         "statement_source": statement_url,
         "minutes": analyze("FOMC Minutes", minutes_text),
