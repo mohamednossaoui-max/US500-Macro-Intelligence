@@ -1,5 +1,5 @@
 """
-Federal Reserve Intelligence Engine - Phase 2B.
+Federal Reserve Intelligence Engine - Phase 2C.
 
 Analytical only:
 - FOMC Statement
@@ -9,6 +9,7 @@ Analytical only:
 - SEP shift analysis
 - Multi-dimensional Fed Intelligence analysis
 - Fed Intelligence Score 0-100
+- Beige Book analysis
 
 No trade execution.
 No Decision Engine integration.
@@ -36,10 +37,19 @@ except Exception:
 # ============================================================
 
 FED = "https://www.federalreserve.gov"
-CALENDAR = f"{FED}/monetarypolicy/fomccalendars.htm"
+
+CALENDAR = (
+    f"{FED}/monetarypolicy/fomccalendars.htm"
+)
+
+BEIGE_BOOK = (
+    f"{FED}/monetarypolicy/publications/"
+    f"beige-book-default.htm"
+)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 US500-Macro-Intelligence/2.0"
+    "User-Agent":
+        "Mozilla/5.0 US500-Macro-Intelligence/2.0"
 }
 
 TIMEOUT = 30
@@ -49,12 +59,15 @@ TIMEOUT = 30
 # HTTP
 # ============================================================
 
-def get(url: str) -> Optional[requests.Response]:
+def get(
+    url: str
+) -> Optional[requests.Response]:
 
     if not url:
         return None
 
     try:
+
         r = requests.get(
             url,
             headers=HEADERS,
@@ -66,6 +79,7 @@ def get(url: str) -> Optional[requests.Response]:
         return r
 
     except Exception:
+
         return None
 
 
@@ -73,12 +87,17 @@ def get(url: str) -> Optional[requests.Response]:
 # URL HELPERS
 # ============================================================
 
-def absolute(href: str) -> str:
+def absolute(
+    href: str
+) -> str:
 
     if not href:
         return ""
 
-    if href.startswith("http://") or href.startswith("https://"):
+    if (
+        href.startswith("http://")
+        or href.startswith("https://")
+    ):
         return href
 
     if href.startswith("/"):
@@ -91,7 +110,9 @@ def absolute(href: str) -> str:
 # HTML / PDF TEXT
 # ============================================================
 
-def clean_html(html: str) -> str:
+def clean_html(
+    html: str
+) -> str:
 
     if not html:
         return ""
@@ -109,11 +130,16 @@ def clean_html(html: str) -> str:
     return re.sub(
         r"\s+",
         " ",
-        soup.get_text(" ", strip=True)
+        soup.get_text(
+            " ",
+            strip=True
+        )
     ).strip()
 
 
-def pdf_text(url: str) -> str:
+def pdf_text(
+    url: str
+) -> str:
 
     if not url or PdfReader is None:
         return ""
@@ -130,7 +156,10 @@ def pdf_text(url: str) -> str:
         )
 
         text = " ".join(
-            (page.extract_text() or "")
+            (
+                page.extract_text()
+                or ""
+            )
             for page in reader.pages
         )
 
@@ -220,7 +249,9 @@ def discover_links() -> Dict[str, Dict[date, str]]:
 
         url = absolute(href)
 
-        d = date_from_href(href)
+        d = date_from_href(
+            href
+        )
 
         if not d:
             continue
@@ -309,9 +340,26 @@ def latest_completed_fomc(
     as_of = as_of or date.today()
 
     dates = (
-        set(links.get("statement", {}))
-        | set(links.get("minutes", {}))
-        | set(links.get("press", {}))
+        set(
+            links.get(
+                "statement",
+                {}
+            )
+        )
+        |
+        set(
+            links.get(
+                "minutes",
+                {}
+            )
+        )
+        |
+        set(
+            links.get(
+                "press",
+                {}
+            )
+        )
     )
 
     done = [
@@ -320,7 +368,11 @@ def latest_completed_fomc(
         if d <= as_of
     ]
 
-    return max(done) if done else None
+    return (
+        max(done)
+        if done
+        else None
+    )
 
 
 def latest_sep(
@@ -332,11 +384,18 @@ def latest_sep(
 
     ds = [
         d
-        for d in links.get("sep", {})
+        for d in links.get(
+            "sep",
+            {}
+        )
         if d <= as_of
     ]
 
-    return max(ds) if ds else None
+    return (
+        max(ds)
+        if ds
+        else None
+    )
 
 
 def previous_sep(
@@ -346,11 +405,18 @@ def previous_sep(
 
     ds = [
         d
-        for d in links.get("sep", {})
+        for d in links.get(
+            "sep",
+            {}
+        )
         if d < current
     ]
 
-    return max(ds) if ds else None
+    return (
+        max(ds)
+        if ds
+        else None
+    )
 
 
 # ============================================================
@@ -364,8 +430,13 @@ def fetch_document(
     if not url:
         return ""
 
-    if url.lower().endswith(".pdf"):
-        return pdf_text(url)
+    if url.lower().endswith(
+        ".pdf"
+    ):
+
+        return pdf_text(
+            url
+        )
 
     r = get(url)
 
@@ -421,11 +492,16 @@ def press_page_data(
         ).lower()
 
         href = absolute(
-            a.get("href", "")
+            a.get(
+                "href",
+                ""
+            )
         )
 
         if (
-            href.lower().endswith(".pdf")
+            href.lower().endswith(
+                ".pdf"
+            )
             and (
                 "transcript" in label
                 or "press conference" in label
@@ -439,13 +515,20 @@ def press_page_data(
     text = (
         pdf_text(pdf)
         if pdf
-        else clean_html(r.text)
+        else clean_html(
+            r.text
+        )
     )
 
     return {
-        "page_url": url,
-        "pdf_url": pdf or None,
-        "text": text
+        "page_url":
+            url,
+
+        "pdf_url":
+            pdf or None,
+
+        "text":
+            text
     }
 
 
@@ -460,7 +543,10 @@ def _num(x):
 
     m = re.search(
         r"-?\d+(?:\.\d+)?",
-        str(x).replace("−", "-")
+        str(x).replace(
+            "−",
+            "-"
+        )
     )
 
     return (
@@ -674,13 +760,23 @@ def sep_shift(
 
     for f in fields:
 
-        c = current.get(f)
-        p = previous.get(f)
+        c = current.get(
+            f
+        )
+
+        p = previous.get(
+            f
+        )
 
         change = (
-            round(c - p, 2)
-            if c is not None
-            and p is not None
+            round(
+                c - p,
+                2
+            )
+            if (
+                c is not None
+                and p is not None
+            )
             else None
         )
 
@@ -696,7 +792,10 @@ def sep_shift(
                 change,
         }
 
-        if change is None or change == 0:
+        if (
+            change is None
+            or change == 0
+        ):
             continue
 
         if f in (
@@ -707,7 +806,6 @@ def sep_shift(
 
             if change > 0:
                 hawkish += 1
-
             else:
                 dovish += 1
 
@@ -715,7 +813,6 @@ def sep_shift(
 
             if change > 0:
                 hawkish += 1
-
             else:
                 dovish += 1
 
@@ -723,7 +820,6 @@ def sep_shift(
 
             if change > 0:
                 dovish += 1
-
             else:
                 hawkish += 1
 
@@ -1016,10 +1112,6 @@ def fed_chair_for_date(
 # PHASE 2B — DIRECTIONAL LANGUAGE
 # ============================================================
 
-# These phrases are directional signals.
-# Positive values indicate hawkish pressure.
-# Negative values indicate dovish pressure.
-
 DIMENSION_SIGNALS = {
 
     "inflation": {
@@ -1301,7 +1393,9 @@ def dimension_signal(
     hawkish_hits = []
     dovish_hits = []
 
-    for phrase in signals["hawkish"]:
+    for phrase in signals[
+        "hawkish"
+    ]:
 
         count = low.count(
             phrase.lower()
@@ -1313,7 +1407,9 @@ def dimension_signal(
                 [phrase] * count
             )
 
-    for phrase in signals["dovish"]:
+    for phrase in signals[
+        "dovish"
+    ]:
 
         count = low.count(
             phrase.lower()
@@ -1345,7 +1441,9 @@ def dimension_signal(
 
     elif score >= 2:
 
-        classification = "MODERATELY HAWKISH"
+        classification = (
+            "MODERATELY HAWKISH"
+        )
 
     elif score <= -5:
 
@@ -1353,7 +1451,9 @@ def dimension_signal(
 
     elif score <= -2:
 
-        classification = "MODERATELY DOVISH"
+        classification = (
+            "MODERATELY DOVISH"
+        )
 
     else:
 
@@ -1444,11 +1544,6 @@ def dimension_to_100(
     score: float
 ) -> float:
 
-    # Internal dimension score:
-    # -10 = fully dovish
-    #   0 = neutral
-    # +10 = fully hawkish
-
     value = (
         (score + 10)
         / 20
@@ -1481,7 +1576,9 @@ def calculate_fed_score(
 
     component_scores = {}
 
-    for dimension, weight in DIMENSION_WEIGHTS.items():
+    for dimension, weight in (
+        DIMENSION_WEIGHTS.items()
+    ):
 
         item = dimensions.get(
             dimension,
@@ -1523,26 +1620,28 @@ def calculate_fed_score(
 
     # --------------------------------------------------------
     # SEP adjustment
-    #
-    # SEP is an independent macro-policy confirmation.
-    # It receives a modest adjustment so that it cannot
-    # completely override document-based analysis.
     # --------------------------------------------------------
 
     sep_adjustment = 0.0
 
     if sep_shift_data:
 
-        classification = sep_shift_data.get(
-            "classification",
-            ""
+        classification = (
+            sep_shift_data.get(
+                "classification",
+                ""
+            )
         )
 
-        if classification == "HAWKISH SHIFT":
+        if classification == (
+            "HAWKISH SHIFT"
+        ):
 
             sep_adjustment = 5.0
 
-        elif classification == "DOVISH SHIFT":
+        elif classification == (
+            "DOVISH SHIFT"
+        ):
 
             sep_adjustment = -5.0
 
@@ -1550,7 +1649,9 @@ def calculate_fed_score(
         0,
         min(
             100,
-            base_score + sep_adjustment
+            base_score
+            +
+            sep_adjustment
         )
     )
 
@@ -1565,7 +1666,9 @@ def calculate_fed_score(
 
     elif final_score >= 56:
 
-        classification = "MODERATELY HAWKISH"
+        classification = (
+            "MODERATELY HAWKISH"
+        )
 
     elif final_score >= 45:
 
@@ -1573,7 +1676,9 @@ def calculate_fed_score(
 
     elif final_score >= 25:
 
-        classification = "MODERATELY DOVISH"
+        classification = (
+            "MODERATELY DOVISH"
+        )
 
     else:
 
@@ -1612,10 +1717,6 @@ def build_evidence(
 
     evidence = []
 
-    # --------------------------------------------------------
-    # Highest-impact dimensions first
-    # --------------------------------------------------------
-
     ordered = sorted(
         dimensions.items(),
         key=lambda x: abs(
@@ -1650,21 +1751,25 @@ def build_evidence(
         if score > 0:
 
             evidence.append(
-                f"{label}: {classification} "
+                f"{label}: "
+                f"{classification} "
                 f"(+{score})"
             )
 
         else:
 
             evidence.append(
-                f"{label}: {classification} "
+                f"{label}: "
+                f"{classification} "
                 f"({score})"
             )
 
     if sep_shift_data:
 
-        sep_class = sep_shift_data.get(
-            "classification"
+        sep_class = (
+            sep_shift_data.get(
+                "classification"
+            )
         )
 
         if sep_class:
@@ -1687,36 +1792,23 @@ def build_deep_fed_analysis(
     sep_shift_data: Optional[Dict] = None
 ) -> Dict:
 
-    # --------------------------------------------------------
-    # Analyze each document separately
-    # --------------------------------------------------------
-
-    statement_dimensions = analyze_dimensions(
-        statement_text
+    statement_dimensions = (
+        analyze_dimensions(
+            statement_text
+        )
     )
 
-    minutes_dimensions = analyze_dimensions(
-        minutes_text
+    minutes_dimensions = (
+        analyze_dimensions(
+            minutes_text
+        )
     )
 
-    chair_dimensions = analyze_dimensions(
-        chair_text
+    chair_dimensions = (
+        analyze_dimensions(
+            chair_text
+        )
     )
-
-    # --------------------------------------------------------
-    # Combine documents
-    #
-    # Statement:
-    #   35%
-    #
-    # Minutes:
-    #   40%
-    #
-    # Chair:
-    #   25%
-    #
-    # This prevents one short document from dominating.
-    # --------------------------------------------------------
 
     combined = {}
 
@@ -1760,17 +1852,22 @@ def build_deep_fed_analysis(
         )
 
         classification = (
+
             "HAWKISH"
             if combined_score >= 5
+
             else
             "MODERATELY HAWKISH"
             if combined_score >= 2
+
             else
             "DOVISH"
             if combined_score <= -5
+
             else
             "MODERATELY DOVISH"
             if combined_score <= -2
+
             else
             "NEUTRAL"
         )
@@ -1778,17 +1875,26 @@ def build_deep_fed_analysis(
         evidence = []
 
         for source_name, source_data in [
+
             (
                 "Statement",
-                statement_dimensions[dimension]
+                statement_dimensions[
+                    dimension
+                ]
             ),
+
             (
                 "Minutes",
-                minutes_dimensions[dimension]
+                minutes_dimensions[
+                    dimension
+                ]
             ),
+
             (
                 "Chair",
-                chair_dimensions[dimension]
+                chair_dimensions[
+                    dimension
+                ]
             ),
         ]:
 
@@ -1818,10 +1924,6 @@ def build_deep_fed_analysis(
             "evidence":
                 evidence,
         }
-
-    # --------------------------------------------------------
-    # Final score
-    # --------------------------------------------------------
 
     score = calculate_fed_score(
         combined,
@@ -1856,6 +1958,756 @@ def build_deep_fed_analysis(
 
         "reasons":
             reasons,
+    }
+
+
+# ============================================================
+# PHASE 2C — BEIGE BOOK
+# ============================================================
+
+def discover_latest_beige_book(
+    as_of: Optional[date] = None
+) -> Dict:
+
+    as_of = as_of or date.today()
+
+    result = {
+
+        "available":
+            False,
+
+        "date":
+            None,
+
+        "url":
+            None,
+
+        "text":
+            "",
+    }
+
+    r = get(
+        BEIGE_BOOK
+    )
+
+    if r is None:
+        return result
+
+    soup = BeautifulSoup(
+        r.text,
+        "html.parser"
+    )
+
+    candidates = []
+
+    for a in soup.find_all(
+        "a",
+        href=True
+    ):
+
+        href = a.get(
+            "href",
+            ""
+        ).strip()
+
+        if not href:
+            continue
+
+        url = absolute(
+            href
+        )
+
+        label = a.get_text(
+            " ",
+            strip=True
+        )
+
+        combined = (
+            f"{label} {href}"
+        ).lower()
+
+        if (
+            "beige book"
+            not in combined
+        ):
+            continue
+
+        # ----------------------------------------------------
+        # YYYY-MM-DD / YYYY_MM_DD / YYYY/MM/DD
+        # ----------------------------------------------------
+
+        dates = re.findall(
+            r"(20\d{2})[-_/]"
+            r"(\d{1,2})[-_/]"
+            r"(\d{1,2})",
+            combined
+        )
+
+        for y, m, d in dates:
+
+            try:
+
+                dt = date(
+                    int(y),
+                    int(m),
+                    int(d)
+                )
+
+                if dt <= as_of:
+
+                    candidates.append(
+                        (
+                            dt,
+                            url
+                        )
+                    )
+
+            except Exception:
+
+                continue
+
+        # ----------------------------------------------------
+        # YYYYMMDD
+        # ----------------------------------------------------
+
+        dt = date_from_href(
+            href
+        )
+
+        if (
+            dt
+            and dt <= as_of
+        ):
+
+            candidates.append(
+                (
+                    dt,
+                    url
+                )
+            )
+
+    # --------------------------------------------------------
+    # If page links don't expose a date, try text patterns
+    # --------------------------------------------------------
+
+    if not candidates:
+
+        page_text = clean_html(
+            r.text
+        )
+
+        date_patterns = re.findall(
+            r"(20\d{2})[-/]"
+            r"(\d{1,2})[-/]"
+            r"(\d{1,2})",
+            page_text
+        )
+
+        for y, m, d in date_patterns:
+
+            try:
+
+                dt = date(
+                    int(y),
+                    int(m),
+                    int(d)
+                )
+
+                if dt <= as_of:
+
+                    candidates.append(
+                        (
+                            dt,
+                            BEIGE_BOOK
+                        )
+                    )
+
+            except Exception:
+
+                continue
+
+    if not candidates:
+        return result
+
+    # Remove duplicate pairs.
+    candidates = list(
+        {
+            (dt, url)
+            for dt, url in candidates
+        }
+    )
+
+    candidates.sort(
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    latest_date, latest_url = (
+        candidates[0]
+    )
+
+    text = fetch_document(
+        latest_url
+    )
+
+    # --------------------------------------------------------
+    # Some Beige Book links point to an HTML page that links
+    # to the actual PDF. If text is too short, inspect links.
+    # --------------------------------------------------------
+
+    if (
+        not text
+        or len(text) < 1000
+    ):
+
+        page_response = get(
+            latest_url
+        )
+
+        if page_response is not None:
+
+            page_soup = BeautifulSoup(
+                page_response.text,
+                "html.parser"
+            )
+
+            pdf_candidates = []
+
+            for a in page_soup.find_all(
+                "a",
+                href=True
+            ):
+
+                href = absolute(
+                    a.get(
+                        "href",
+                        ""
+                    )
+                )
+
+                label = a.get_text(
+                    " ",
+                    strip=True
+                ).lower()
+
+                if (
+                    href.lower().endswith(
+                        ".pdf"
+                    )
+                    and (
+                        "beige" in label
+                        or "beige" in href.lower()
+                    )
+                ):
+
+                    pdf_candidates.append(
+                        href
+                    )
+
+            if pdf_candidates:
+
+                pdf_url = (
+                    pdf_candidates[0]
+                )
+
+                pdf_content = pdf_text(
+                    pdf_url
+                )
+
+                if pdf_content:
+
+                    text = pdf_content
+
+                    latest_url = pdf_url
+
+    result.update({
+
+        "available":
+            bool(text),
+
+        "date":
+            latest_date.isoformat(),
+
+        "url":
+            latest_url,
+
+        "text":
+            text,
+    })
+
+    return result
+
+
+# ============================================================
+# BEIGE BOOK DIMENSION SIGNALS
+# ============================================================
+
+BEIGE_DIMENSION_SIGNALS = {
+
+    "growth": {
+
+        "hawkish": [
+
+            "economic activity increased",
+
+            "economic activity grew",
+
+            "activity increased",
+
+            "activity grew",
+
+            "consumer spending increased",
+
+            "consumer spending grew",
+
+            "manufacturing activity increased",
+
+            "demand increased",
+
+            "business activity increased",
+
+            "output increased",
+        ],
+
+        "dovish": [
+
+            "economic activity declined",
+
+            "economic activity decreased",
+
+            "activity declined",
+
+            "activity decreased",
+
+            "consumer spending declined",
+
+            "consumer spending decreased",
+
+            "manufacturing activity declined",
+
+            "demand declined",
+
+            "business activity declined",
+
+            "output declined",
+        ],
+    },
+
+    "labor": {
+
+        "hawkish": [
+
+            "employment increased",
+
+            "employment grew",
+
+            "hiring increased",
+
+            "hiring picked up",
+
+            "labor demand increased",
+
+            "labor demand remained strong",
+
+            "wage growth increased",
+
+            "wage pressures increased",
+        ],
+
+        "dovish": [
+
+            "employment declined",
+
+            "employment decreased",
+
+            "hiring slowed",
+
+            "hiring declined",
+
+            "labor demand weakened",
+
+            "labor demand declined",
+
+            "wage growth slowed",
+
+            "wage pressures eased",
+        ],
+    },
+
+    "inflation": {
+
+        "hawkish": [
+
+            "prices increased",
+
+            "prices rose",
+
+            "price pressures increased",
+
+            "price pressures remained elevated",
+
+            "input costs increased",
+
+            "input costs rose",
+
+            "wage pressures remained elevated",
+
+            "inflationary pressures increased",
+
+            "cost pressures increased",
+        ],
+
+        "dovish": [
+
+            "prices declined",
+
+            "prices decreased",
+
+            "price pressures eased",
+
+            "price pressures moderated",
+
+            "input costs declined",
+
+            "input costs decreased",
+
+            "cost pressures eased",
+
+            "inflationary pressures eased",
+        ],
+    },
+
+    "consumer": {
+
+        "hawkish": [
+
+            "consumer spending increased",
+
+            "consumer spending grew",
+
+            "retail sales increased",
+
+            "consumer demand increased",
+        ],
+
+        "dovish": [
+
+            "consumer spending declined",
+
+            "consumer spending decreased",
+
+            "consumer spending slowed",
+
+            "retail sales declined",
+
+            "consumer demand weakened",
+        ],
+    },
+
+    "financial": {
+
+        "hawkish": [
+
+            "financial conditions tightened",
+
+            "credit conditions tightened",
+
+            "lending standards tightened",
+
+            "credit availability decreased",
+
+            "financial stress increased",
+        ],
+
+        "dovish": [
+
+            "financial conditions eased",
+
+            "financial conditions improved",
+
+            "credit conditions eased",
+
+            "credit availability improved",
+
+            "financial stress declined",
+        ],
+    },
+}
+
+
+# ============================================================
+# BEIGE BOOK DIMENSION ANALYSIS
+# ============================================================
+
+def beige_dimension_signal(
+    text: str,
+    dimension: str
+) -> Dict:
+
+    if not text:
+
+        return {
+
+            "score":
+                0,
+
+            "hawkish":
+                0,
+
+            "dovish":
+                0,
+
+            "classification":
+                "UNAVAILABLE",
+
+            "evidence":
+                [],
+        }
+
+    low = text.lower()
+
+    signals = (
+        BEIGE_DIMENSION_SIGNALS[
+            dimension
+        ]
+    )
+
+    hawkish_hits = []
+    dovish_hits = []
+
+    for phrase in signals[
+        "hawkish"
+    ]:
+
+        count = low.count(
+            phrase.lower()
+        )
+
+        if count:
+
+            hawkish_hits.extend(
+                [phrase] * count
+            )
+
+    for phrase in signals[
+        "dovish"
+    ]:
+
+        count = low.count(
+            phrase.lower()
+        )
+
+        if count:
+
+            dovish_hits.extend(
+                [phrase] * count
+            )
+
+    raw = (
+        len(hawkish_hits)
+        -
+        len(dovish_hits)
+    )
+
+    score = max(
+        -10,
+        min(
+            10,
+            raw
+        )
+    )
+
+    if score >= 5:
+
+        classification = "HAWKISH"
+
+    elif score >= 2:
+
+        classification = (
+            "MODERATELY HAWKISH"
+        )
+
+    elif score <= -5:
+
+        classification = "DOVISH"
+
+    elif score <= -2:
+
+        classification = (
+            "MODERATELY DOVISH"
+        )
+
+    else:
+
+        classification = "NEUTRAL"
+
+    evidence = []
+
+    for phrase in hawkish_hits[:3]:
+
+        evidence.append(
+            f"Hawkish: {phrase}"
+        )
+
+    for phrase in dovish_hits[:3]:
+
+        evidence.append(
+            f"Dovish: {phrase}"
+        )
+
+    return {
+
+        "score":
+            score,
+
+        "hawkish":
+            len(hawkish_hits),
+
+        "dovish":
+            len(dovish_hits),
+
+        "classification":
+            classification,
+
+        "evidence":
+            evidence,
+    }
+
+
+def analyze_beige_book(
+    text: str
+) -> Dict:
+
+    dimensions = {
+
+        dimension:
+            beige_dimension_signal(
+                text,
+                dimension
+            )
+
+        for dimension
+        in BEIGE_DIMENSION_SIGNALS
+    }
+
+    # --------------------------------------------------------
+    # Beige Book weights
+    # --------------------------------------------------------
+
+    weights = {
+
+        "growth":
+            25,
+
+        "labor":
+            20,
+
+        "inflation":
+            30,
+
+        "consumer":
+            15,
+
+        "financial":
+            10,
+    }
+
+    weighted_sum = 0.0
+    total_weight = 0.0
+
+    components = {}
+
+    for dimension, weight in (
+        weights.items()
+    ):
+
+        item = dimensions[
+            dimension
+        ]
+
+        score = item.get(
+            "score",
+            0
+        )
+
+        normalized = dimension_to_100(
+            score
+        )
+
+        components[
+            dimension
+        ] = normalized
+
+        weighted_sum += (
+            normalized
+            * weight
+        )
+
+        total_weight += weight
+
+    if total_weight:
+
+        final_score = (
+            weighted_sum
+            /
+            total_weight
+        )
+
+    else:
+
+        final_score = 50.0
+
+    final_score = round(
+        max(
+            0,
+            min(
+                100,
+                final_score
+            )
+        ),
+        1
+    )
+
+    if final_score >= 75:
+
+        classification = "HAWKISH"
+
+    elif final_score >= 56:
+
+        classification = (
+            "MODERATELY HAWKISH"
+        )
+
+    elif final_score >= 45:
+
+        classification = "NEUTRAL"
+
+    elif final_score >= 25:
+
+        classification = (
+            "MODERATELY DOVISH"
+        )
+
+    else:
+
+        classification = "DOVISH"
+
+    return {
+
+        "score":
+            final_score,
+
+        "classification":
+            classification,
+
+        "components":
+            components,
+
+        "dimensions":
+            dimensions,
+
+        "text_length":
+            len(text),
     }
 
 
@@ -1935,6 +2787,25 @@ def build_fed_intelligence() -> Dict:
     )
 
     # --------------------------------------------------------
+    # BEIGE BOOK — PHASE 2C
+    # --------------------------------------------------------
+
+    beige_book = (
+        discover_latest_beige_book(
+            as_of=today
+        )
+    )
+
+    beige_analysis = (
+        analyze_beige_book(
+            beige_book.get(
+                "text",
+                ""
+            )
+        )
+    )
+
+    # --------------------------------------------------------
     # SEP
     # --------------------------------------------------------
 
@@ -1953,36 +2824,51 @@ def build_fed_intelligence() -> Dict:
     )
 
     current_sep = (
+
         extract_sep(
-            links["sep"].get(
+            links[
+                "sep"
+            ].get(
                 current_sep_date,
                 ""
             ),
             current_sep_date
         )
+
         if current_sep_date
+
         else {}
     )
 
     previous = (
+
         extract_sep(
-            links["sep"].get(
+            links[
+                "sep"
+            ].get(
                 prev_sep_date,
                 ""
             ),
             prev_sep_date
         )
+
         if prev_sep_date
+
         else {}
     )
 
     shift = (
+
         sep_shift(
             current_sep,
             previous
         )
-        if current_sep
-        and previous
+
+        if (
+            current_sep
+            and previous
+        )
+
         else {}
     )
 
@@ -2009,19 +2895,21 @@ def build_fed_intelligence() -> Dict:
     # PHASE 2B DEEP ANALYSIS
     # --------------------------------------------------------
 
-    deep_analysis = build_deep_fed_analysis(
+    deep_analysis = (
+        build_deep_fed_analysis(
 
-        statement_text=
-            statement_text,
+            statement_text=
+                statement_text,
 
-        minutes_text=
-            minutes_text,
+            minutes_text=
+                minutes_text,
 
-        chair_text=
-            press["text"],
+            chair_text=
+                press["text"],
 
-        sep_shift_data=
-            shift,
+            sep_shift_data=
+                shift,
+        )
     )
 
     # --------------------------------------------------------
@@ -2107,6 +2995,16 @@ def build_fed_intelligence() -> Dict:
 
         "fed_intelligence":
             deep_analysis,
+
+        # ----------------------------------------------------
+        # PHASE 2C — BEIGE BOOK
+        # ----------------------------------------------------
+
+        "beige_book":
+            beige_book,
+
+        "beige_analysis":
+            beige_analysis,
     }
 
 
@@ -2146,6 +3044,7 @@ def fed_summary(
     lines = [
 
         "FED INTELLIGENCE",
+
         "================",
 
         f"Latest FOMC: "
@@ -2157,8 +3056,11 @@ def fed_summary(
         f"Statement: "
         f"{data['statement']['tone']}",
 
-        f"{data['fed_chair']} Press Conference: "
-        f"{data['chair']['tone']}",
+        (
+            f"{data['fed_chair']} "
+            f"Press Conference: "
+            f"{data['chair']['tone']}"
+        ),
 
         f"Minutes: "
         f"{data['minutes']['tone']}",
@@ -2215,17 +3117,25 @@ def fed_summary(
 
             "---------",
 
-            f"Fed Intelligence Score: "
-            f"{score_data.get('score')}/100",
+            (
+                "Fed Intelligence Score: "
+                f"{score_data.get('score')}/100"
+            ),
 
-            f"Overall Tone: "
-            f"{score_data.get('classification')}",
+            (
+                "Overall Tone: "
+                f"{score_data.get('classification')}"
+            ),
 
-            f"Base Score: "
-            f"{score_data.get('base_score')}",
+            (
+                "Base Score: "
+                f"{score_data.get('base_score')}"
+            ),
 
-            f"SEP Adjustment: "
-            f"{score_data.get('sep_adjustment')}",
+            (
+                "SEP Adjustment: "
+                f"{score_data.get('sep_adjustment')}"
+            ),
         ])
 
         components = score_data.get(
@@ -2233,12 +3143,81 @@ def fed_summary(
             {}
         )
 
-        for dimension, value in components.items():
+        for dimension, value in (
+            components.items()
+        ):
 
             lines.append(
                 f"{dimension.title()}: "
                 f"{value}/100"
             )
+
+    # --------------------------------------------------------
+    # PHASE 2C — BEIGE BOOK
+    # --------------------------------------------------------
+
+    beige_source = data.get(
+        "beige_book",
+        {}
+    )
+
+    beige = data.get(
+        "beige_analysis",
+        {}
+    )
+
+    if beige_source.get(
+        "available"
+    ):
+
+        lines.extend([
+
+            "",
+
+            "PHASE 2C — BEIGE BOOK",
+
+            "---------------------",
+
+            (
+                "Latest Beige Book: "
+                f"{beige_source.get('date')}"
+            ),
+
+            (
+                "Beige Book Score: "
+                f"{beige.get('score')}/100"
+            ),
+
+            (
+                "Overall Tone: "
+                f"{beige.get('classification')}"
+            ),
+        ])
+
+        for dimension, value in (
+            beige.get(
+                "components",
+                {}
+            ).items()
+        ):
+
+            lines.append(
+                f"{dimension.title()}: "
+                f"{value}/100"
+            )
+
+    else:
+
+        lines.extend([
+
+            "",
+
+            "PHASE 2C — BEIGE BOOK",
+
+            "---------------------",
+
+            "Beige Book: UNAVAILABLE",
+        ])
 
     # --------------------------------------------------------
     # REASONS
@@ -2252,8 +3231,11 @@ def fed_summary(
     if reasons:
 
         lines.extend([
+
             "",
+
             "REASONS",
+
             "-------",
         ])
 
@@ -2274,7 +3256,9 @@ def fed_summary(
 
 if __name__ == "__main__":
 
-    result = build_fed_intelligence()
+    result = (
+        build_fed_intelligence()
+    )
 
     print(
         fed_summary(
