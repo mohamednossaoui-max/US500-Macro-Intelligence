@@ -1,0 +1,52 @@
+name: Backtest EMA19 Macro
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backtest-ema19-macro:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy requests yfinance streamlit
+
+      - name: Check FRED API Key
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [ -n "$FRED_API_KEY" ]; then
+            echo "FRED_API_KEY is available"
+          else
+            echo "ERROR: FRED_API_KEY is missing"
+            exit 1
+          fi
+
+      - name: Run EMA19 Macro Backtest
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          python backtestEMA19Macro.py
+
+      - name: Upload Backtest Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ema19-macro-backtest-results
+          path: |
+            backtestEMA19Macro_trades.csv
+            backtestEMA19Macro_regimes.csv
+            backtestEMA19Macro_yearly.csv
+            backtestEMA19Macro_summary.csv
+            backtestEMA19Macro_macro_data.csv
+            backtestEMA19Macro_data_quality.csv
+            backtestEMA19Macro_signals.csv
