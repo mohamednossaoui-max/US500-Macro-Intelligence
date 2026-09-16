@@ -1,5 +1,5 @@
 # ============================================================
-# US500 MACRO BACKTEST V2.2.2 - INDEPENDENT EPISODE ANALYSIS
+# US500 MACRO BACKTEST V2.8 - EPISODE INTEGRITY + STATISTICAL AUDIT
 # FROZEN EMA19 BASELINE + MACRO V2.1 + DRAWdown LEAD EVENT STUDY
 # ============================================================
 # Frozen baseline configuration validated by V3:
@@ -1762,5 +1762,350 @@ def v27_main():
     print("\nMACRO CALIBRATION V2.7 TEMPORAL / DEPENDENCY ROBUSTNESS COMPLETE")
 
 
+
+# ============================================================
+# V2.8 EPISODE INTEGRITY + STATISTICAL AUDIT
+# ============================================================
+# Research-only audit of V2.7. No frozen baseline, hypothesis,
+# entry, exit, sizing, or Decision Engine logic is changed.
+#
+# Purpose:
+# 1) Reconstruct independent episodes from the DAILY MARKET path,
+#    rather than from trade dates only.
+# 2) Recompute the V2.7 episode-level permutation exactly.
+# 3) Compare the exact finite permutation distribution with the
+#    Monte-Carlo p-value printed by V2.7.
+# 4) Audit episode/year concentration and leave-one-cluster-out.
+# ============================================================
+
+from itertools import combinations
+
+V28_THRESHOLD = -3.0
+
+def v28_market_episode_labels(market, threshold=V28_THRESHOLD):
+    """Assign each market date to an independent drawdown episode.
+
+    The episode starts when Close/previous cumulative High reaches the
+    threshold. Recovery requires a later genuine new intraday high
+    (High >= prior cumulative High), matching the independent-episode
+    logic used by the V2.2 episode study.
+    """
+    m = market.copy()
+    m.index = pd.to_datetime(m.index)
+    ref_high = m["High"].cummax()
+    dd = (m["Close"] / ref_high - 1.0) * 100.0
+    prior_ref_high = ref_high.shift(1)
+    recovered = prior_ref_high.notna() & (m["High"] >= prior_ref_high)
+
+    labels = []
+    episode_id = 0
+    active = False
+    for pos in range(len(m)):
+        value = float(dd.iloc[pos])
+        if not active and np.isfinite(value) and value <= threshold:
+            episode_id += 1
+            active = True
+        labels.append(episode_id if active else 0)
+        if active and bool(recovered.iloc[pos]):
+            active = False
+    return pd.Series(labels, index=m.index, name="market_episode_id")
+
+
+def v28_attach_market_episodes(trades, market, threshold=V28_THRESHOLD):
+    out = trades.copy()
+    out["signal_date"] = pd.to_datetime(out["signal_date"])
+    labels = v28_market_episode_labels(market, threshold)
+    mapping = labels.reindex(out["signal_date"]).ffill().fillna(0).astype(int)
+    out["market_episode_id"] = mapping.to_numpy()
+    out["market_episode"] = out["market_episode_id"].apply(
+        lambda x: f"EP_{int(x)}" if int(x) > 0 else "NORMAL"
+    )
+    return out
+
+
+def v28_exact_episode_permutation(trades, episode_col, n_mc=5000):
+    """Exact finite permutation test over episode assignments.
+
+    The statistic is the mean of episode-level mean R values. The null
+    assigns the same number of episodes as the hypothesis uses, without
+    replacement. Exact enumeration is used whenever combinations are
+    computationally manageable; otherwise Monte Carlo is used and flagged.
+
+    This deliberately treats an episode as the unit of evidence.
+    """
+    rows = []
+    rng = np.random.default_rng(V27_SEED + 2800)
+
+    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+
+    for name, fn in v25_hypotheses():
+        mask = np.asarray(fn(resolved), dtype=bool)
+        g = resolved.loc[mask].copy()
+        if g.empty:
+            continue
+
+        g["R_num"] = pd.to_numeric(g["R"], errors="coerce")
+        g = g[np.isfinite(g["R_num"])].copy()
+        if g.empty:
+            continue
+
+        # Only episodes represented by resolved trades are eligible.
+        all_ep = []
+        ep_means = {}
+        for ep, eg in resolved.groupby(episode_col, dropna=False):
+            rr = pd.to_numeric(eg["R"], errors="coerce").dropna()
+            if len(rr):
+                ep_means[ep] = float(rr.mean())
+                all_ep.append(ep)
+
+        selected_ep = list(pd.unique(g[episode_col]))
+        selected_ep = [e for e in selected_ep if e in ep_means]
+        total_eps = len(all_ep)
+        k = len(selected_ep)
+
+        observed = float(g["R_num"].mean())
+
+        if total_eps == 0 or k == 0 or k > total_eps:
+            exact_p = np.nan
+            combinations_total = 0
+            extreme = 0
+            null_min = np.nan
+            null_max = np.nan
+        else:
+            combo_count = 0
+            extreme = 0
+            null_stats = []
+            if total_eps <= 20:
+                for combo in combinations(all_ep, k):
+                    stat = float(np.mean([ep_means[e] for e in combo]))
+                    null_stats.append(stat)
+                    combo_count += 1
+                    if stat >= observed - 1e-12:
+                        extreme += 1
+                # Randomization-test p: count / number of attainable assignments.
+                exact_p = extreme / combo_count
+                combinations_total = combo_count
+                null_min = float(min(null_stats)) if null_stats else np.nan
+                null_max = float(max(null_stats)) if null_stats else np.nan
+            else:
+                for _ in range(n_mc):
+                    chosen = rng.choice(all_ep, size=k, replace=False)
+                    stat = float(np.mean([ep_means[e] for e in chosen]))
+                    if stat >= observed - 1e-12:
+                        extreme += 1
+                exact_p = float((extreme + 1) / (n_mc + 1))
+                combinations_total = np.nan
+                null_min = np.nan
+                null_max = np.nan
+
+        rows.append({
+            "hypothesis": name,
+            "episode_definition": episode_col,
+            "resolved": int(len(g)),
+            "observed_mean_R_trade_level": observed,
+            "observed_episode_count": int(k),
+            "total_resolved_episode_count": int(total_eps),
+            "episode_means": str({str(e): round(ep_means[e], 6) for e in all_ep}),
+            "exact_or_mc_p": exact_p,
+            "extreme_assignments": int(extreme),
+            "total_assignments": combinations_total,
+            "null_stat_min": null_min,
+            "null_stat_max": null_max,
+            "selected_episodes": str([str(e) for e in selected_ep]),
+        })
+    return pd.DataFrame(rows)
+
+
+def v28_reproduce_v27_mc(trades, n=V27_BOOTSTRAPS):
+    """Reproduce the V2.7 episode permutation algorithm exactly.
+
+    This is an audit function only. It lets us compare what the code
+    actually computes with the p-values printed in the V2.7 run.
+    """
+    work = add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD)
+    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
+
+    rows = []
+    rng = np.random.default_rng(V27_SEED + 100)
+
+    for name, fn in v25_hypotheses():
+        mask = np.asarray(fn(resolved), dtype=bool)
+        if not mask.any():
+            continue
+        observed = float(pd.to_numeric(
+            resolved.loc[mask, "R"], errors="coerce"
+        ).dropna().mean())
+
+        episode_labels = resolved["dd3_episode_id"].to_numpy()
+        unique = pd.unique(episode_labels)
+        selected_obs = pd.unique(episode_labels[mask])
+        k = len(selected_obs)
+
+        if k == 0 or len(unique) <= 1:
+            p = np.nan
+        else:
+            episode_means = {
+                e: float(pd.to_numeric(
+                    resolved.loc[episode_labels == e, "R"],
+                    errors="coerce"
+                ).dropna().mean())
+                for e in unique
+            }
+            valid_eps = [e for e, v in episode_means.items() if np.isfinite(v)]
+            k2 = min(k, len(valid_eps))
+            extreme = 0
+            for _ in range(n):
+                chosen = rng.choice(valid_eps, size=k2, replace=False)
+                stat = float(np.mean([episode_means[e] for e in chosen]))
+                if stat >= observed - 1e-12:
+                    extreme += 1
+            p = float((extreme + 1) / (n + 1))
+
+        rows.append({
+            "hypothesis": name,
+            "v27_episode_count_all": int(len(unique)),
+            "v27_episode_count_selected": int(k),
+            "v27_recomputed_mc_p": p,
+            "v27_observed_mean_R": observed,
+        })
+    return pd.DataFrame(rows)
+
+
+def v28_cluster_audit(trades, episode_col):
+    """Trade contribution and leave-one-cluster-out audit."""
+    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    rows = []
+    for name, fn in v25_hypotheses():
+        g = resolved.loc[fn(resolved)].copy()
+        if g.empty:
+            continue
+        g["R_num"] = pd.to_numeric(g["R"], errors="coerce")
+        g = g[np.isfinite(g["R_num"])].copy()
+        if g.empty:
+            continue
+
+        ep_stats = []
+        for ep, eg in g.groupby(episode_col, dropna=False):
+            ep_stats.append({
+                "episode": ep,
+                "trades": len(eg),
+                "total_R": float(eg["R_num"].sum()),
+                "mean_R": float(eg["R_num"].mean()),
+            })
+        ep_stats = sorted(ep_stats, key=lambda x: x["total_R"], reverse=True)
+
+        loo_means = []
+        for ep in ep_stats:
+            keep = g[episode_col] != ep["episode"]
+            if keep.sum():
+                loo_means.append(float(g.loc[keep, "R_num"].mean()))
+
+        years = pd.to_datetime(g["signal_date"]).dt.year
+        year_means = []
+        for y in sorted(years.unique()):
+            keep = years != y
+            if keep.sum():
+                year_means.append(float(g.loc[keep, "R_num"].mean()))
+
+        rows.append({
+            "hypothesis": name,
+            "episode_definition": episode_col,
+            "resolved": len(g),
+            "episode_count": g[episode_col].nunique(dropna=False),
+            "top_episode": str(ep_stats[0]["episode"]) if ep_stats else "",
+            "top_episode_trades": ep_stats[0]["trades"] if ep_stats else 0,
+            "top_episode_total_R": ep_stats[0]["total_R"] if ep_stats else np.nan,
+            "total_R": float(g["R_num"].sum()),
+            "total_R_excl_top_episode": (
+                float(g["R_num"].sum() - ep_stats[0]["total_R"])
+                if ep_stats else np.nan
+            ),
+            "loo_episode_min_mean_R": min(loo_means) if loo_means else np.nan,
+            "loo_episode_max_mean_R": max(loo_means) if loo_means else np.nan,
+            "year_count": years.nunique(),
+            "loo_year_min_mean_R": min(year_means) if year_means else np.nan,
+            "loo_year_max_mean_R": max(year_means) if year_means else np.nan,
+            "episode_details": str(ep_stats),
+        })
+    return pd.DataFrame(rows)
+
+
+def v28_main():
+    market = load_market()
+    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+
+    baseline = build_baseline_trades(market)
+    if not print_baseline_check(baseline):
+        raise RuntimeError("FROZEN BASELINE FAILED. V2.8 is stopped.")
+
+    fred = load_fred()
+    trades = attach_macro(baseline, fred)
+    trades = add_drawdown(trades, market)
+    trades = add_zones(trades)
+    trades = add_confluence_flags(trades)
+    trades = add_v24_period(trades, "2025-01-01")
+
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V2.8 — EPISODE INTEGRITY + STATISTICAL AUDIT")
+    print("=" * 72)
+    print("V2.7 hypotheses remain frozen: H1/H2/H4/H5; H3 retained for audit.")
+    print("No thresholds, entries, exits, sizing, or Decision Engine logic are changed.")
+    print("Research-only. This stage audits V2.7; it is not a new optimization stage.")
+
+    v27_mc = v28_reproduce_v27_mc(trades)
+    market_ep = v28_attach_market_episodes(trades, market)
+    exact_trade_ep = v28_exact_episode_permutation(market_ep, "market_episode_id")
+    exact_v27_ep = v28_exact_episode_permutation(
+        add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD),
+        "dd3_episode_id"
+    )
+    audit_market = v28_cluster_audit(market_ep, "market_episode_id")
+    audit_v27 = v28_cluster_audit(
+        add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD),
+        "dd3_episode_id"
+    )
+
+    print("\nV2.7 ALGORITHM REPRODUCTION CHECK")
+    print("-" * 72)
+    print(v27_mc.to_string(index=False))
+
+    print("\nEXACT EPISODE PERMUTATION — MARKET-BASED INDEPENDENT EPISODES")
+    print("-" * 72)
+    print(exact_trade_ep.to_string(index=False))
+
+    print("\nEXACT EPISODE PERMUTATION — ORIGINAL V2.7 TRADE-DATE EPISODES")
+    print("-" * 72)
+    print(exact_v27_ep.to_string(index=False))
+
+    print("\nCLUSTER / LEAVE-ONE-EPISODE AUDIT — MARKET EPISODES")
+    print("-" * 72)
+    print(audit_market.to_string(index=False))
+
+    print("\nCLUSTER / LEAVE-ONE-EPISODE AUDIT — ORIGINAL V2.7 EPISODES")
+    print("-" * 72)
+    print(audit_v27.to_string(index=False))
+
+    trades.to_csv("macro_backtest_v28_trades.csv", index=False)
+    market_ep.to_csv("macro_backtest_v28_market_episode_trades.csv", index=False)
+    v27_mc.to_csv("macro_backtest_v28_v27_algorithm_reproduction.csv", index=False)
+    exact_trade_ep.to_csv("macro_backtest_v28_exact_market_episode_permutation.csv", index=False)
+    exact_v27_ep.to_csv("macro_backtest_v28_exact_v27_episode_permutation.csv", index=False)
+    audit_market.to_csv("macro_backtest_v28_market_episode_cluster_audit.csv", index=False)
+    audit_v27.to_csv("macro_backtest_v28_v27_episode_cluster_audit.csv", index=False)
+
+    print("\nFILES CREATED")
+    print("macro_backtest_v28_trades.csv")
+    print("macro_backtest_v28_market_episode_trades.csv")
+    print("macro_backtest_v28_v27_algorithm_reproduction.csv")
+    print("macro_backtest_v28_exact_market_episode_permutation.csv")
+    print("macro_backtest_v28_exact_v27_episode_permutation.csv")
+    print("macro_backtest_v28_market_episode_cluster_audit.csv")
+    print("macro_backtest_v28_v27_episode_cluster_audit.csv")
+    print("\nMACRO CALIBRATION V2.8 EPISODE INTEGRITY + STATISTICAL AUDIT COMPLETE")
+
+
 if __name__ == "__main__":
-    v27_main()
+    v28_main()
