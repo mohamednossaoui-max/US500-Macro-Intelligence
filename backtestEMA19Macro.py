@@ -1,6 +1,8 @@
 # ============================================================
-# US500 MACRO BACKTEST V2
-# FROZEN EMA19 BASELINE + SCORE-BASED HISTORICAL MACRO REGIME
+# US500 MACRO BACKTEST V2.1
+# FROZEN EMA19 BASELINE
+# + MACRO V2
+# + MACRO CALIBRATION V2.1
 # ============================================================
 #
 # IMPORTANT:
@@ -11,57 +13,44 @@
 # 109 resolved / 36 wins / 73 losses / 3 ambiguous / 5 open
 # +71R / PF ~= 1.973
 #
-# FROZEN EMA19 ENGINE:
-# ATR       : Wilder ATR(14)
-# Condition : Close > EMA19
-#             Low <= EMA19
-#             Close > EMA200
-#             EMA19 > EMA200
-# Spacing   : ROW_GAP_1
-# Position  : OVERLAP
-# Stop      : lowest Low of previous 5 completed candles
-#             - 0.5 * previous completed ATR(14)
-# RR        : 1:4
+# V2.1 PURPOSE:
 #
-# ============================================================
+# This version does NOT modify the trading strategy.
 #
-# MACRO V2
+# It adds:
 #
-# Six independent macro stress dimensions:
+# 1. Macro Level
+# 2. Macro Momentum
+# 3. Direction of deterioration
+# 4. Leading-stress analysis
+# 5. Drawdown x Macro Momentum analysis
 #
-# 1. Growth
-# 2. Inflation
-# 3. Labor
-# 4. Rates
-# 5. Credit
-# 6. Liquidity
+# Six dimensions:
 #
-# Each dimension is scored from 0 to 100:
+# Growth
+# Inflation
+# Labor
+# Rates
+# Credit
+# Liquidity
 #
-# 0   = very low stress
-# 50  = moderate / neutral stress
-# 100 = extreme stress
+# ------------------------------------------------------------
+# NO LOOK-AHEAD
+# ------------------------------------------------------------
 #
-# Regime:
+# Daily data:
+#   observations available on/before signal date
 #
-# A = Healthy / Technical Pullback
-# B = Growth Scare / Healthy Correction
-# C = Inflation / Rates Shock
-# D = Growth + Inflation / Mixed Stress
-# E = Recession / Bear Risk
-# F = Liquidity / Financial Shock
+# Monthly data:
+#   previous calendar month's observation
 #
-# IMPORTANT:
-# Macro classification does NOT modify trades.
-# It only attaches historical information to the
-# unchanged baseline trades.
+# ------------------------------------------------------------
+# IMPORTANT
 #
-# NO LOOK-AHEAD:
-# - Daily data uses observations available on/before signal date.
-# - Monthly data uses previous calendar month's observation.
+# V2.1 is a RESEARCH / CALIBRATION layer.
 #
-# FRED_API_KEY must be supplied through the environment.
-# Never hard-code the API key in this file.
+# It is NOT connected to the Decision Engine.
+#
 # ============================================================
 
 import os
@@ -97,20 +86,28 @@ FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 # ============================================================
 
 FRED_SERIES = {
+
     "US10Y": "DGS10",
     "US2Y": "DGS2",
     "T10Y2Y": "T10Y2Y",
+
     "VIX": "VIXCLS",
     "DXY": "DTWEXBGS",
+
     "UNRATE": "UNRATE",
     "INITIAL_CLAIMS_4W": "IC4WSA",
+
     "HY_SPREAD": "BAMLH0A0HYM2",
     "CORP_OAS": "BAMLC0A0CM",
+
     "NFCI": "NFCI",
+
     "INDPRO": "INDPRO",
     "RETAIL": "RSAFS",
+
     "PCE": "PCE",
     "CORE_PCE": "PCEPILFE",
+
     "FEDFUNDS": "FEDFUNDS",
 }
 
@@ -120,16 +117,37 @@ FRED_SERIES = {
 # ============================================================
 
 MONTHLY_SERIES = {
+
     "UNRATE",
     "INDPRO",
     "RETAIL",
     "PCE",
     "CORE_PCE",
     "FEDFUNDS",
+
 }
 
 
-DAILY_SERIES = set(FRED_SERIES) - MONTHLY_SERIES
+DAILY_SERIES = (
+    set(FRED_SERIES)
+    - MONTHLY_SERIES
+)
+
+
+# ============================================================
+# MOMENTUM CONFIGURATION
+# ============================================================
+
+# Fixed lookbacks.
+#
+# These are intentionally simple and transparent.
+# They are NOT optimized on the historical results.
+
+DAILY_MOMENTUM_LOOKBACK = 20
+MEDIUM_DAILY_LOOKBACK = 60
+
+MONTHLY_MOMENTUM_LOOKBACK = 3
+MEDIUM_MONTHLY_LOOKBACK = 6
 
 
 # ============================================================
@@ -147,19 +165,34 @@ def load_market():
     )
 
     if df.empty:
+
         raise RuntimeError(
             "Yahoo Finance returned no market data."
         )
 
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
+    if isinstance(
+        df.columns,
+        pd.MultiIndex,
+    ):
+
+        df.columns = (
+            df.columns
+            .get_level_values(0)
+        )
 
     df = df[
-        ["Open", "High", "Low", "Close"]
+        [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+        ]
     ].copy()
 
     df.index = (
-        pd.to_datetime(df.index)
+        pd.to_datetime(
+            df.index
+        )
         .tz_localize(None)
     )
 
@@ -175,6 +208,7 @@ def load_market():
         "Low",
         "Close",
     ]:
+
         df[column] = pd.to_numeric(
             df[column],
             errors="coerce",
@@ -186,36 +220,50 @@ def load_market():
     # EMA19
     # --------------------------------------------------------
 
-    df["EMA19"] = df["Close"].ewm(
-        span=EMA19,
-        adjust=False,
-        min_periods=EMA19,
-    ).mean()
+    df["EMA19"] = (
+        df["Close"]
+        .ewm(
+            span=EMA19,
+            adjust=False,
+            min_periods=EMA19,
+        )
+        .mean()
+    )
 
     # --------------------------------------------------------
     # EMA200
     # --------------------------------------------------------
 
-    df["EMA200"] = df["Close"].ewm(
-        span=EMA200,
-        adjust=False,
-        min_periods=EMA200,
-    ).mean()
+    df["EMA200"] = (
+        df["Close"]
+        .ewm(
+            span=EMA200,
+            adjust=False,
+            min_periods=EMA200,
+        )
+        .mean()
+    )
 
     # --------------------------------------------------------
-    # True Range
+    # TRUE RANGE
     # --------------------------------------------------------
 
-    previous_close = df["Close"].shift(1)
+    previous_close = (
+        df["Close"].shift(1)
+    )
 
     tr = pd.concat(
         [
             df["High"] - df["Low"],
+
             (
-                df["High"] - previous_close
+                df["High"]
+                - previous_close
             ).abs(),
+
             (
-                df["Low"] - previous_close
+                df["Low"]
+                - previous_close
             ).abs(),
         ],
         axis=1,
@@ -224,14 +272,18 @@ def load_market():
     df["TR"] = tr
 
     # --------------------------------------------------------
-    # Wilder ATR(14)
+    # WILDER ATR(14)
     # --------------------------------------------------------
 
-    df["ATR14_WILDER"] = tr.ewm(
-        alpha=1 / ATR14,
-        adjust=False,
-        min_periods=ATR14,
-    ).mean()
+    df["ATR14_WILDER"] = (
+        tr
+        .ewm(
+            alpha=1 / ATR14,
+            adjust=False,
+            min_periods=ATR14,
+        )
+        .mean()
+    )
 
     return df
 
@@ -252,6 +304,7 @@ def build_baseline_signals(df):
             pd.notna(row["EMA19"])
             and pd.notna(row["EMA200"])
         ):
+
             continue
 
         # ----------------------------------------------------
@@ -264,6 +317,7 @@ def build_baseline_signals(df):
             and row["Low"] <= row["EMA19"]
             and row["Close"] > row["EMA19"]
         ):
+
             continue
 
         raw.append(i)
@@ -280,6 +334,7 @@ def build_baseline_signals(df):
             p == 0
             or raw[p] - raw[p - 1] > 1
         ):
+
             selected.append(i)
 
     return selected
@@ -289,20 +344,27 @@ def build_baseline_signals(df):
 # FROZEN STOP
 # ============================================================
 
-def baseline_stop(df, i):
+def baseline_stop(
+    df,
+    i,
+):
 
     if i < LOW_LOOKBACK + 1:
+
         return np.nan
 
     previous_5 = df.iloc[
         i - LOW_LOOKBACK:i
     ]
 
-    previous_atr = df.iloc[i - 1][
-        "ATR14_WILDER"
-    ]
+    previous_atr = (
+        df.iloc[i - 1][
+            "ATR14_WILDER"
+        ]
+    )
 
     if pd.isna(previous_atr):
+
         return np.nan
 
     return float(
@@ -326,6 +388,7 @@ def resolve_trade(
         not np.isfinite(stop)
         or stop >= entry
     ):
+
         return (
             "INVALID_SL",
             np.nan,
@@ -352,11 +415,17 @@ def resolve_trade(
             df.iloc[j]["Low"]
         )
 
-        hit_tp = high >= target
-        hit_sl = low <= stop
+        hit_tp = (
+            high >= target
+        )
 
-        # Same candle TP + SL:
+        hit_sl = (
+            low <= stop
+        )
+
+        # Same candle:
         # preserved as AMBIGUOUS.
+
         if hit_tp and hit_sl:
 
             return (
@@ -424,6 +493,7 @@ def build_baseline_trades(df):
 
         rows.append(
             {
+
                 "signal_date":
                     df.index[i],
 
@@ -512,6 +582,7 @@ def fred_series(
 ):
 
     params = {
+
         "series_id":
             series_id,
 
@@ -566,6 +637,7 @@ def fred_series(
             "",
             None,
         ):
+
             continue
 
         try:
@@ -669,10 +741,32 @@ def load_fred():
 
 
 # ============================================================
-# AS-OF VALUE
+# AS-OF CUTOFF
 # ============================================================
 
-def value_asof(
+def get_asof_cutoff(
+    date,
+    monthly=False,
+):
+
+    d = pd.Timestamp(date)
+
+    if monthly:
+
+        return (
+            d.to_period("M")
+            .start_time
+            - pd.Timedelta(days=1)
+        )
+
+    return d
+
+
+# ============================================================
+# AS-OF SERIES
+# ============================================================
+
+def series_asof(
     series,
     date,
     monthly=False,
@@ -682,30 +776,43 @@ def value_asof(
         series is None
         or series.empty
     ):
-        return np.nan
 
-    d = pd.Timestamp(date)
-
-    if monthly:
-
-        # Only use information available
-        # through the previous calendar month.
-
-        cutoff = (
-            d.to_period("M")
-            .start_time
-            - pd.Timedelta(days=1)
+        return pd.Series(
+            dtype=float
         )
 
-    else:
+    cutoff = get_asof_cutoff(
+        date,
+        monthly,
+    )
 
-        cutoff = d
+    return (
+        series
+        .loc[
+            series.index <= cutoff
+        ]
+        .dropna()
+    )
 
-    s = series.loc[
-        series.index <= cutoff
-    ]
+
+# ============================================================
+# AS-OF VALUE
+# ============================================================
+
+def value_asof(
+    series,
+    date,
+    monthly=False,
+):
+
+    s = series_asof(
+        series,
+        date,
+        monthly,
+    )
 
     if s.empty:
+
         return np.nan
 
     return float(
@@ -724,35 +831,14 @@ def pct_change_asof(
     monthly=False,
 ):
 
-    if (
-        series is None
-        or series.empty
-    ):
-        return np.nan
-
-    d = pd.Timestamp(date)
-
-    if monthly:
-
-        cutoff = (
-            d.to_period("M")
-            .start_time
-            - pd.Timedelta(days=1)
-        )
-
-    else:
-
-        cutoff = d
-
-    s = (
-        series
-        .loc[
-            series.index <= cutoff
-        ]
-        .dropna()
+    s = series_asof(
+        series,
+        date,
+        monthly,
     )
 
     if len(s) <= periods:
+
         return np.nan
 
     current = float(
@@ -764,11 +850,39 @@ def pct_change_asof(
     )
 
     if previous == 0:
+
         return np.nan
 
     return (
         current / previous - 1.0
     ) * 100.0
+
+
+# ============================================================
+# AS-OF ABSOLUTE CHANGE
+# ============================================================
+
+def absolute_change_asof(
+    series,
+    date,
+    periods,
+    monthly=False,
+):
+
+    s = series_asof(
+        series,
+        date,
+        monthly,
+    )
+
+    if len(s) <= periods:
+
+        return np.nan
+
+    return float(
+        s.iloc[-1]
+        - s.iloc[-1 - periods]
+    )
 
 
 # ============================================================
@@ -795,6 +909,7 @@ def inflation_yoy(
 def clip_score(x):
 
     if not np.isfinite(x):
+
         return np.nan
 
     return float(
@@ -809,7 +924,167 @@ def clip_score(x):
 
 
 # ============================================================
-# GROWTH STRESS SCORE
+# MOMENTUM CLASSIFICATION
+# ============================================================
+
+def classify_momentum(
+    current,
+    short_change,
+    medium_change,
+    stress_direction="higher",
+):
+
+    if not np.isfinite(
+        current
+    ):
+
+        return (
+            "UNAVAILABLE",
+            np.nan,
+        )
+
+    if not np.isfinite(
+        short_change
+    ):
+
+        return (
+            "UNAVAILABLE",
+            np.nan,
+        )
+
+    # --------------------------------------------------------
+    # stress_direction = higher
+    #
+    # Higher value = more stress.
+    #
+    # Example:
+    # Credit spread rising -> deterioration.
+    # Unemployment rising -> deterioration.
+    # VIX rising -> deterioration.
+    # --------------------------------------------------------
+
+    if stress_direction == "higher":
+
+        if (
+            short_change >= 15
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change >= 25
+            )
+        ):
+
+            return (
+                "STRONGLY DETERIORATING",
+                100.0,
+            )
+
+        if (
+            short_change >= 5
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change >= 10
+            )
+        ):
+
+            return (
+                "DETERIORATING",
+                75.0,
+            )
+
+        if (
+            short_change <= -5
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change <= -10
+            )
+        ):
+
+            return (
+                "IMPROVING",
+                25.0,
+            )
+
+        return (
+            "STABLE",
+            50.0,
+        )
+
+    # --------------------------------------------------------
+    # stress_direction = lower
+    #
+    # Lower value = more stress.
+    #
+    # Example:
+    # Industrial production falling.
+    # Retail sales falling.
+    # --------------------------------------------------------
+
+    if stress_direction == "lower":
+
+        if (
+            short_change <= -5
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change <= -10
+            )
+        ):
+
+            return (
+                "STRONGLY DETERIORATING",
+                100.0,
+            )
+
+        if (
+            short_change <= -2
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change <= -5
+            )
+        ):
+
+            return (
+                "DETERIORATING",
+                75.0,
+            )
+
+        if (
+            short_change >= 2
+            or (
+                np.isfinite(
+                    medium_change
+                )
+                and medium_change >= 5
+            )
+        ):
+
+            return (
+                "IMPROVING",
+                25.0,
+            )
+
+        return (
+            "STABLE",
+            50.0,
+        )
+
+    return (
+        "UNAVAILABLE",
+        np.nan,
+    )
+
+
+# ============================================================
+# GROWTH SCORE
 # ============================================================
 
 def score_growth(
@@ -850,11 +1125,11 @@ def score_growth(
 
     components = []
 
-    # --------------------------------------------------------
-    # Industrial Production
-    # --------------------------------------------------------
+    # Industrial production
 
-    if np.isfinite(indpro_yoy):
+    if np.isfinite(
+        indpro_yoy
+    ):
 
         if indpro_yoy >= 3:
             components.append(15)
@@ -871,11 +1146,11 @@ def score_growth(
         else:
             components.append(85)
 
-    # --------------------------------------------------------
-    # Retail Sales
-    # --------------------------------------------------------
+    # Retail
 
-    if np.isfinite(retail_yoy):
+    if np.isfinite(
+        retail_yoy
+    ):
 
         if retail_yoy >= 5:
             components.append(15)
@@ -892,11 +1167,11 @@ def score_growth(
         else:
             components.append(80)
 
-    # --------------------------------------------------------
     # Unemployment
-    # --------------------------------------------------------
 
-    if np.isfinite(unrate):
+    if np.isfinite(
+        unrate
+    ):
 
         if unrate < 4:
             components.append(15)
@@ -913,11 +1188,11 @@ def score_growth(
         else:
             components.append(95)
 
-    # --------------------------------------------------------
-    # Initial Claims Momentum
-    # --------------------------------------------------------
+    # Claims
 
-    if np.isfinite(claims_change):
+    if np.isfinite(
+        claims_change
+    ):
 
         if claims_change < 0:
             components.append(20)
@@ -939,10 +1214,6 @@ def score_growth(
         score = float(
             np.mean(components)
         )
-
-    # --------------------------------------------------------
-    # Reasons
-    # --------------------------------------------------------
 
     if score >= 70:
 
@@ -969,7 +1240,7 @@ def score_growth(
 
 
 # ============================================================
-# INFLATION STRESS SCORE
+# INFLATION SCORE
 # ============================================================
 
 def score_inflation(
@@ -993,11 +1264,9 @@ def score_inflation(
 
     components = []
 
-    # --------------------------------------------------------
-    # Headline PCE
-    # --------------------------------------------------------
-
-    if np.isfinite(pce_yoy):
+    if np.isfinite(
+        pce_yoy
+    ):
 
         if pce_yoy < 2:
             components.append(10)
@@ -1014,11 +1283,9 @@ def score_inflation(
         else:
             components.append(90)
 
-    # --------------------------------------------------------
-    # Core PCE
-    # --------------------------------------------------------
-
-    if np.isfinite(core_pce_yoy):
+    if np.isfinite(
+        core_pce_yoy
+    ):
 
         if core_pce_yoy < 2:
             components.append(10)
@@ -1066,7 +1333,7 @@ def score_inflation(
 
 
 # ============================================================
-# LABOR STRESS SCORE
+# LABOR SCORE
 # ============================================================
 
 def score_labor(
@@ -1093,11 +1360,9 @@ def score_labor(
 
     components = []
 
-    # --------------------------------------------------------
-    # Unemployment
-    # --------------------------------------------------------
-
-    if np.isfinite(unrate):
+    if np.isfinite(
+        unrate
+    ):
 
         if unrate < 4:
             components.append(10)
@@ -1114,11 +1379,9 @@ def score_labor(
         else:
             components.append(95)
 
-    # --------------------------------------------------------
-    # Claims Momentum
-    # --------------------------------------------------------
-
-    if np.isfinite(claims_change):
+    if np.isfinite(
+        claims_change
+    ):
 
         if claims_change < 0:
             components.append(15)
@@ -1166,7 +1429,7 @@ def score_labor(
 
 
 # ============================================================
-# RATES STRESS SCORE
+# RATES SCORE
 # ============================================================
 
 def score_rates(
@@ -1195,11 +1458,9 @@ def score_rates(
 
     components = []
 
-    # --------------------------------------------------------
-    # 10Y
-    # --------------------------------------------------------
-
-    if np.isfinite(us10y):
+    if np.isfinite(
+        us10y
+    ):
 
         if us10y < 2:
             components.append(15)
@@ -1216,11 +1477,9 @@ def score_rates(
         else:
             components.append(90)
 
-    # --------------------------------------------------------
-    # 2Y
-    # --------------------------------------------------------
-
-    if np.isfinite(us2y):
+    if np.isfinite(
+        us2y
+    ):
 
         if us2y < 1:
             components.append(15)
@@ -1237,15 +1496,9 @@ def score_rates(
         else:
             components.append(85)
 
-    # --------------------------------------------------------
-    # Yield Curve
-    #
-    # Important:
-    # Deep inversion is not automatically treated as
-    # inflation stress. It is more relevant to growth/recession.
-    # --------------------------------------------------------
-
-    if np.isfinite(curve):
+    if np.isfinite(
+        curve
+    ):
 
         if curve < -1:
             components.append(70)
@@ -1290,7 +1543,7 @@ def score_rates(
 
 
 # ============================================================
-# CREDIT STRESS SCORE
+# CREDIT SCORE
 # ============================================================
 
 def score_credit(
@@ -1321,11 +1574,9 @@ def score_credit(
 
     components = []
 
-    # --------------------------------------------------------
-    # High Yield Spread
-    # --------------------------------------------------------
-
-    if np.isfinite(hy):
+    if np.isfinite(
+        hy
+    ):
 
         if hy < 3:
             components.append(10)
@@ -1342,11 +1593,9 @@ def score_credit(
         else:
             components.append(95)
 
-    # --------------------------------------------------------
-    # Corporate OAS
-    # --------------------------------------------------------
-
-    if np.isfinite(corp):
+    if np.isfinite(
+        corp
+    ):
 
         if corp < 1.5:
             components.append(15)
@@ -1363,11 +1612,9 @@ def score_credit(
         else:
             components.append(90)
 
-    # --------------------------------------------------------
-    # HY Spread Acceleration
-    # --------------------------------------------------------
-
-    if np.isfinite(hy_change):
+    if np.isfinite(
+        hy_change
+    ):
 
         if hy_change < 0:
             components.append(15)
@@ -1415,7 +1662,7 @@ def score_credit(
 
 
 # ============================================================
-# LIQUIDITY STRESS SCORE
+# LIQUIDITY SCORE
 # ============================================================
 
 def score_liquidity(
@@ -1437,13 +1684,18 @@ def score_liquidity(
         date,
     )
 
+    dxy_change = pct_change_asof(
+        fred["DXY"],
+        date,
+        60,
+        monthly=False,
+    )
+
     components = []
 
-    # --------------------------------------------------------
-    # NFCI
-    # --------------------------------------------------------
-
-    if np.isfinite(nfci):
+    if np.isfinite(
+        nfci
+    ):
 
         if nfci < -0.5:
             components.append(10)
@@ -1460,11 +1712,9 @@ def score_liquidity(
         else:
             components.append(95)
 
-    # --------------------------------------------------------
-    # VIX
-    # --------------------------------------------------------
-
-    if np.isfinite(vix):
+    if np.isfinite(
+        vix
+    ):
 
         if vix < 15:
             components.append(10)
@@ -1481,18 +1731,9 @@ def score_liquidity(
         else:
             components.append(95)
 
-    # --------------------------------------------------------
-    # DXY momentum
-    # --------------------------------------------------------
-
-    dxy_change = pct_change_asof(
-        fred["DXY"],
-        date,
-        60,
-        monthly=False,
-    )
-
-    if np.isfinite(dxy_change):
+    if np.isfinite(
+        dxy_change
+    ):
 
         if dxy_change < 0:
             components.append(20)
@@ -1540,44 +1781,302 @@ def score_liquidity(
 
 
 # ============================================================
-# MACRO REGIME V2
+# GENERIC DIMENSION MOMENTUM
 # ============================================================
 
-def classify_macro_v2(
+def dimension_score_asof(
+    score_function,
+    fred,
+    date,
+):
+
+    try:
+
+        score, _ = score_function(
+            fred,
+            date,
+        )
+
+        return score
+
+    except Exception:
+
+        return np.nan
+
+
+def calculate_score_momentum(
+    score_function,
+    fred,
+    date,
+):
+
+    current = dimension_score_asof(
+        score_function,
+        fred,
+        date,
+    )
+
+    d = pd.Timestamp(date)
+
+    short_date = (
+        d
+        - pd.Timedelta(
+            days=DAILY_MOMENTUM_LOOKBACK
+        )
+    )
+
+    medium_date = (
+        d
+        - pd.Timedelta(
+            days=MEDIUM_DAILY_LOOKBACK
+        )
+    )
+
+    short_score = (
+        dimension_score_asof(
+            score_function,
+            fred,
+            short_date,
+        )
+    )
+
+    medium_score = (
+        dimension_score_asof(
+            score_function,
+            fred,
+            medium_date,
+        )
+    )
+
+    if (
+        np.isfinite(current)
+        and np.isfinite(short_score)
+    ):
+
+        short_change = (
+            current
+            - short_score
+        )
+
+    else:
+
+        short_change = np.nan
+
+    if (
+        np.isfinite(current)
+        and np.isfinite(medium_score)
+    ):
+
+        medium_change = (
+            current
+            - medium_score
+        )
+
+    else:
+
+        medium_change = np.nan
+
+    if not np.isfinite(
+        short_change
+    ):
+
+        return (
+            "UNAVAILABLE",
+            np.nan,
+            current,
+            short_change,
+            medium_change,
+        )
+
+    if (
+        short_change >= 15
+        or (
+            np.isfinite(
+                medium_change
+            )
+            and medium_change >= 25
+        )
+    ):
+
+        status = (
+            "STRONGLY DETERIORATING"
+        )
+
+    elif (
+        short_change >= 5
+        or (
+            np.isfinite(
+                medium_change
+            )
+            and medium_change >= 10
+        )
+    ):
+
+        status = "DETERIORATING"
+
+    elif (
+        short_change <= -5
+        or (
+            np.isfinite(
+                medium_change
+            )
+            and medium_change <= -10
+        )
+    ):
+
+        status = "IMPROVING"
+
+    else:
+
+        status = "STABLE"
+
+    return (
+        status,
+        clip_score(
+            50
+            + short_change
+        ),
+        current,
+        short_change,
+        medium_change,
+    )
+
+
+# ============================================================
+# MACRO V2 + V2.1
+# ============================================================
+
+def classify_macro_v21(
     fred,
     date,
 ):
 
     # --------------------------------------------------------
-    # SIX DIMENSIONS
+    # V2 LEVELS
     # --------------------------------------------------------
 
-    growth, growth_reasons = score_growth(
+    growth, growth_reasons = (
+        score_growth(
+            fred,
+            date,
+        )
+    )
+
+    inflation, inflation_reasons = (
+        score_inflation(
+            fred,
+            date,
+        )
+    )
+
+    labor, labor_reasons = (
+        score_labor(
+            fred,
+            date,
+        )
+    )
+
+    rates, rates_reasons = (
+        score_rates(
+            fred,
+            date,
+        )
+    )
+
+    credit, credit_reasons = (
+        score_credit(
+            fred,
+            date,
+        )
+    )
+
+    liquidity, liquidity_reasons = (
+        score_liquidity(
+            fred,
+            date,
+        )
+    )
+
+    # --------------------------------------------------------
+    # MOMENTUM
+    #
+    # Momentum is calculated from the historical change
+    # in the corresponding V2 stress score.
+    #
+    # This means:
+    #
+    # Positive change = more stress
+    # Negative change = less stress
+    # --------------------------------------------------------
+
+    (
+        growth_momentum,
+        growth_momentum_score,
+        _,
+        growth_short_change,
+        growth_medium_change,
+    ) = calculate_score_momentum(
+        score_growth,
         fred,
         date,
     )
 
-    inflation, inflation_reasons = score_inflation(
+    (
+        inflation_momentum,
+        inflation_momentum_score,
+        _,
+        inflation_short_change,
+        inflation_medium_change,
+    ) = calculate_score_momentum(
+        score_inflation,
         fred,
         date,
     )
 
-    labor, labor_reasons = score_labor(
+    (
+        labor_momentum,
+        labor_momentum_score,
+        _,
+        labor_short_change,
+        labor_medium_change,
+    ) = calculate_score_momentum(
+        score_labor,
         fred,
         date,
     )
 
-    rates, rates_reasons = score_rates(
+    (
+        rates_momentum,
+        rates_momentum_score,
+        _,
+        rates_short_change,
+        rates_medium_change,
+    ) = calculate_score_momentum(
+        score_rates,
         fred,
         date,
     )
 
-    credit, credit_reasons = score_credit(
+    (
+        credit_momentum,
+        credit_momentum_score,
+        _,
+        credit_short_change,
+        credit_medium_change,
+    ) = calculate_score_momentum(
+        score_credit,
         fred,
         date,
     )
 
-    liquidity, liquidity_reasons = score_liquidity(
+    (
+        liquidity_momentum,
+        liquidity_momentum_score,
+        _,
+        liquidity_short_change,
+        liquidity_medium_change,
+    ) = calculate_score_momentum(
+        score_liquidity,
         fred,
         date,
     )
@@ -1586,7 +2085,7 @@ def classify_macro_v2(
     # OVERALL STRESS
     # --------------------------------------------------------
 
-    scores = [
+    levels = [
         x
         for x in [
             growth,
@@ -1599,10 +2098,10 @@ def classify_macro_v2(
         if np.isfinite(x)
     ]
 
-    if scores:
+    if levels:
 
         overall_stress = float(
-            np.mean(scores)
+            np.mean(levels)
         )
 
     else:
@@ -1610,16 +2109,127 @@ def classify_macro_v2(
         overall_stress = np.nan
 
     # --------------------------------------------------------
+    # OVERALL MOMENTUM
+    # --------------------------------------------------------
+
+    momentum_scores = [
+        x
+        for x in [
+            growth_momentum_score,
+            inflation_momentum_score,
+            labor_momentum_score,
+            rates_momentum_score,
+            credit_momentum_score,
+            liquidity_momentum_score,
+        ]
+        if np.isfinite(x)
+    ]
+
+    if momentum_scores:
+
+        overall_momentum = float(
+            np.mean(momentum_scores)
+        )
+
+    else:
+
+        overall_momentum = np.nan
+
+    # --------------------------------------------------------
+    # COUNT DETERIORATING DIMENSIONS
+    # --------------------------------------------------------
+
+    momentum_statuses = [
+
+        growth_momentum,
+        inflation_momentum,
+        labor_momentum,
+        rates_momentum,
+        credit_momentum,
+        liquidity_momentum,
+
+    ]
+
+    deteriorating_count = sum(
+        x in [
+            "DETERIORATING",
+            "STRONGLY DETERIORATING",
+        ]
+        for x in momentum_statuses
+    )
+
+    strong_deteriorating_count = sum(
+        x == "STRONGLY DETERIORATING"
+        for x in momentum_statuses
+    )
+
+    improving_count = sum(
+        x == "IMPROVING"
+        for x in momentum_statuses
+    )
+
+    # --------------------------------------------------------
+    # LEADING WARNING FLAGS
+    #
+    # Credit / Labor / Liquidity receive special attention
+    # because the research objective is to detect deterioration
+    # before large drawdowns.
+    # --------------------------------------------------------
+
+    leading_warning_count = sum(
+        x in [
+            "DETERIORATING",
+            "STRONGLY DETERIORATING",
+        ]
+        for x in [
+            credit_momentum,
+            labor_momentum,
+            liquidity_momentum,
+        ]
+    )
+
+    if (
+        credit_momentum
+        == "STRONGLY DETERIORATING"
+        or labor_momentum
+        == "STRONGLY DETERIORATING"
+        or liquidity_momentum
+        == "STRONGLY DETERIORATING"
+    ):
+
+        leading_warning = (
+            "STRONG"
+        )
+
+    elif leading_warning_count >= 2:
+
+        leading_warning = (
+            "ELEVATED"
+        )
+
+    elif leading_warning_count == 1:
+
+        leading_warning = (
+            "WATCH"
+        )
+
+    else:
+
+        leading_warning = (
+            "NONE"
+        )
+
+    # --------------------------------------------------------
     # REGIME CLASSIFICATION
+    #
+    # EXACT V2 LOGIC PRESERVED.
     # --------------------------------------------------------
 
     regime = "A"
 
     regime_reason = ""
 
-    # --------------------------------------------------------
-    # F — LIQUIDITY / FINANCIAL SHOCK
-    # --------------------------------------------------------
+    # F
 
     if (
         np.isfinite(credit)
@@ -1634,9 +2244,7 @@ def classify_macro_v2(
             "Severe credit and liquidity stress."
         )
 
-    # --------------------------------------------------------
-    # E — RECESSION / BEAR RISK
-    # --------------------------------------------------------
+    # E
 
     elif (
         np.isfinite(growth)
@@ -1652,9 +2260,7 @@ def classify_macro_v2(
             "significant economic deterioration."
         )
 
-    # --------------------------------------------------------
-    # D — GROWTH + INFLATION
-    # --------------------------------------------------------
+    # D
 
     elif (
         np.isfinite(growth)
@@ -1670,9 +2276,7 @@ def classify_macro_v2(
             "elevated inflation pressure."
         )
 
-    # --------------------------------------------------------
-    # C — INFLATION / RATES SHOCK
-    # --------------------------------------------------------
+    # C
 
     elif (
         np.isfinite(inflation)
@@ -1688,9 +2292,7 @@ def classify_macro_v2(
             "significant pressure."
         )
 
-    # --------------------------------------------------------
-    # B — GROWTH SCARE
-    # --------------------------------------------------------
+    # B
 
     elif (
         np.isfinite(growth)
@@ -1708,9 +2310,7 @@ def classify_macro_v2(
             "inflation pressure remains relatively contained."
         )
 
-    # --------------------------------------------------------
-    # A — HEALTHY / TECHNICAL PULLBACK
-    # --------------------------------------------------------
+    # A
 
     else:
 
@@ -1722,7 +2322,7 @@ def classify_macro_v2(
         )
 
     # --------------------------------------------------------
-    # SNAPSHOT VALUES
+    # SNAPSHOT
     # --------------------------------------------------------
 
     snapshot = {
@@ -1832,11 +2432,19 @@ def classify_macro_v2(
 
     return {
 
+        # ----------------------------------------------------
+        # REGIME
+        # ----------------------------------------------------
+
         "macro_regime":
             regime,
 
         "macro_regime_reason":
             regime_reason,
+
+        # ----------------------------------------------------
+        # LEVEL
+        # ----------------------------------------------------
 
         "macro_stress":
             overall_stress,
@@ -1859,6 +2467,116 @@ def classify_macro_v2(
         "liquidity_stress":
             liquidity,
 
+        # ----------------------------------------------------
+        # MOMENTUM STATUS
+        # ----------------------------------------------------
+
+        "growth_momentum":
+            growth_momentum,
+
+        "inflation_momentum":
+            inflation_momentum,
+
+        "labor_momentum":
+            labor_momentum,
+
+        "rates_momentum":
+            rates_momentum,
+
+        "credit_momentum":
+            credit_momentum,
+
+        "liquidity_momentum":
+            liquidity_momentum,
+
+        # ----------------------------------------------------
+        # MOMENTUM SCORES
+        # ----------------------------------------------------
+
+        "growth_momentum_score":
+            growth_momentum_score,
+
+        "inflation_momentum_score":
+            inflation_momentum_score,
+
+        "labor_momentum_score":
+            labor_momentum_score,
+
+        "rates_momentum_score":
+            rates_momentum_score,
+
+        "credit_momentum_score":
+            credit_momentum_score,
+
+        "liquidity_momentum_score":
+            liquidity_momentum_score,
+
+        "macro_momentum":
+            overall_momentum,
+
+        # ----------------------------------------------------
+        # MOMENTUM CHANGES
+        # ----------------------------------------------------
+
+        "growth_short_change":
+            growth_short_change,
+
+        "growth_medium_change":
+            growth_medium_change,
+
+        "inflation_short_change":
+            inflation_short_change,
+
+        "inflation_medium_change":
+            inflation_medium_change,
+
+        "labor_short_change":
+            labor_short_change,
+
+        "labor_medium_change":
+            labor_medium_change,
+
+        "rates_short_change":
+            rates_short_change,
+
+        "rates_medium_change":
+            rates_medium_change,
+
+        "credit_short_change":
+            credit_short_change,
+
+        "credit_medium_change":
+            credit_medium_change,
+
+        "liquidity_short_change":
+            liquidity_short_change,
+
+        "liquidity_medium_change":
+            liquidity_medium_change,
+
+        # ----------------------------------------------------
+        # WARNING COUNTS
+        # ----------------------------------------------------
+
+        "deteriorating_count":
+            deteriorating_count,
+
+        "strong_deteriorating_count":
+            strong_deteriorating_count,
+
+        "improving_count":
+            improving_count,
+
+        "leading_warning":
+            leading_warning,
+
+        "leading_warning_count":
+            leading_warning_count,
+
+        # ----------------------------------------------------
+        # REASONS
+        # ----------------------------------------------------
+
         "macro_reasons":
             " | ".join(
                 all_reasons
@@ -1869,7 +2587,7 @@ def classify_macro_v2(
 
 
 # ============================================================
-# ATTACH MACRO DATA TO TRADES
+# ATTACH MACRO
 # ============================================================
 
 def attach_macro(
@@ -1881,7 +2599,7 @@ def attach_macro(
 
     for _, trade in trades.iterrows():
 
-        snap = classify_macro_v2(
+        snap = classify_macro_v21(
             fred,
             trade["signal_date"],
         )
@@ -2067,7 +2785,82 @@ def regime_report(
 
 
 # ============================================================
-# ADD RUNNING-MARKET DRAWDOWN
+# MOMENTUM STATUS REPORT
+# ============================================================
+
+def momentum_report(
+    trades,
+    column,
+):
+
+    rows = []
+
+    for (
+        status,
+        g,
+    ) in trades.groupby(
+        column,
+        dropna=False,
+    ):
+
+        s = summarize_group(g)
+
+        s[
+            "momentum_status"
+        ] = status
+
+        rows.append(s)
+
+    if not rows:
+
+        return pd.DataFrame()
+
+    return pd.DataFrame(
+        rows
+    ).sort_values(
+        "momentum_status"
+    )
+
+
+# ============================================================
+# LEADING WARNING REPORT
+# ============================================================
+
+def leading_warning_report(
+    trades,
+):
+
+    rows = []
+
+    for (
+        warning,
+        g,
+    ) in trades.groupby(
+        "leading_warning",
+        dropna=False,
+    ):
+
+        s = summarize_group(g)
+
+        s[
+            "leading_warning"
+        ] = warning
+
+        rows.append(s)
+
+    if not rows:
+
+        return pd.DataFrame()
+
+    return pd.DataFrame(
+        rows
+    ).sort_values(
+        "leading_warning"
+    )
+
+
+# ============================================================
+# ADD RUNNING MARKET DRAWDOWN
 # ============================================================
 
 def add_drawdown(
@@ -2125,128 +2918,16 @@ def add_drawdown(
 
         rows.append(row)
 
-    return pd.DataFrame(rows)
-
-
-# ============================================================
-# FROZEN BASELINE CHECK
-# ============================================================
-
-def print_baseline_check(
-    trades,
-):
-
-    s = summarize_group(
-        trades
-    )
-
-    print()
-    print("=" * 72)
-    print("FROZEN BASELINE CHECK")
-    print("=" * 72)
-
-    for key in [
-        "signals",
-        "valid",
-        "invalid_sl",
-        "resolved",
-        "wins",
-        "losses",
-        "ambiguous",
-        "open",
-        "win_rate",
-        "avg_R",
-        "total_R",
-        "profit_factor",
-    ]:
-
-        print(
-            f"{key:18s}: "
-            f"{s[key]}"
-        )
-
-    print()
-    print("Expected:")
-    print("signals=119")
-    print("valid=117")
-    print("invalid_sl=2")
-    print("resolved=109")
-    print("wins=36")
-    print("losses=73")
-    print("ambiguous=3")
-    print("open=5")
-    print("total_R=71")
-    print("profit_factor~=1.973")
-
-
-# ============================================================
-# MACRO DIMENSION REPORT
-# ============================================================
-
-def print_dimension_report(
-    trades,
-):
-
-    print()
-    print("=" * 72)
-    print("MACRO DIMENSION SCORES")
-    print("=" * 72)
-
-    dimension_columns = [
-
-        "growth_stress",
-
-        "inflation_stress",
-
-        "labor_stress",
-
-        "rates_stress",
-
-        "credit_stress",
-
-        "liquidity_stress",
-
-        "macro_stress",
-    ]
-
-    available_dimensions = [
-        column
-        for column
-        in dimension_columns
-        if column in trades.columns
-    ]
-
-    if not available_dimensions:
-
-        print(
-            "No macro dimension data available."
-        )
-
-        return
-
-    output_columns = [
-        "signal_date",
-        "macro_regime",
-    ] + available_dimensions
-
-    print(
-        trades[
-            output_columns
-        ]
-        .sort_values(
-            "signal_date"
-        )
-        .to_string(
-            index=False
-        )
+    return pd.DataFrame(
+        rows
     )
 
 
 # ============================================================
-# DRAWDOWN BUCKET REPORT
+# DRAWDOWN BUCKET
 # ============================================================
 
-def build_drawdown_regime_report(
+def add_drawdown_bucket(
     trades,
 ):
 
@@ -2282,31 +2963,88 @@ def build_drawdown_regime_report(
         right=True,
     )
 
+    return trades
+
+
+# ============================================================
+# DRAWDOWN x LEADING WARNING
+# ============================================================
+
+def build_drawdown_warning_report(
+    trades,
+):
+
     rows = []
 
     for (
-        regime,
         bucket,
+        warning,
     ), g in trades.groupby(
         [
-            "macro_regime",
             "drawdown_bucket",
+            "leading_warning",
         ],
         observed=False,
     ):
 
         if len(g) == 0:
+
             continue
 
         s = summarize_group(g)
 
         s[
-            "macro_regime"
-        ] = regime
+            "drawdown_bucket"
+        ] = str(bucket)
+
+        s[
+            "leading_warning"
+        ] = warning
+
+        rows.append(s)
+
+    if not rows:
+
+        return pd.DataFrame()
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# DRAWDOWN x MOMENTUM
+# ============================================================
+
+def build_drawdown_momentum_report(
+    trades,
+    momentum_column,
+):
+
+    rows = []
+
+    for (
+        bucket,
+        status,
+    ), g in trades.groupby(
+        [
+            "drawdown_bucket",
+            momentum_column,
+        ],
+        observed=False,
+    ):
+
+        if len(g) == 0:
+
+            continue
+
+        s = summarize_group(g)
 
         s[
             "drawdown_bucket"
         ] = str(bucket)
+
+        s[
+            "momentum_status"
+        ] = status
 
         rows.append(s)
 
@@ -2316,6 +3054,309 @@ def build_drawdown_regime_report(
 
     return pd.DataFrame(
         rows
+    )
+
+
+# ============================================================
+# MACRO STRESS ZONE
+# ============================================================
+
+def classify_stress_zone(
+    score,
+):
+
+    if not np.isfinite(
+        score
+    ):
+
+        return "UNAVAILABLE"
+
+    if score < 25:
+
+        return "LOW"
+
+    if score < 50:
+
+        return "MODERATE"
+
+    if score < 75:
+
+        return "HIGH"
+
+    return "EXTREME"
+
+
+# ============================================================
+# ADD STRESS ZONES
+# ============================================================
+
+def add_stress_zones(
+    trades,
+):
+
+    trades = trades.copy()
+
+    trades[
+        "macro_stress_zone"
+    ] = trades[
+        "macro_stress"
+    ].apply(
+        classify_stress_zone
+    )
+
+    trades[
+        "macro_momentum_zone"
+    ] = trades[
+        "macro_momentum"
+    ].apply(
+        classify_stress_zone
+    )
+
+    return trades
+
+
+# ============================================================
+# PRINT BASELINE CHECK
+# ============================================================
+
+def print_baseline_check(
+    trades,
+):
+
+    s = summarize_group(
+        trades
+    )
+
+    print()
+    print("=" * 72)
+    print("FROZEN BASELINE CHECK")
+    print("=" * 72)
+
+    for key in [
+
+        "signals",
+        "valid",
+        "invalid_sl",
+        "resolved",
+        "wins",
+        "losses",
+        "ambiguous",
+        "open",
+        "win_rate",
+        "avg_R",
+        "total_R",
+        "profit_factor",
+
+    ]:
+
+        print(
+            f"{key:18s}: "
+            f"{s[key]}"
+        )
+
+    print()
+    print("Expected:")
+    print("signals=119")
+    print("valid=117")
+    print("invalid_sl=2")
+    print("resolved=109")
+    print("wins=36")
+    print("losses=73")
+    print("ambiguous=3")
+    print("open=5")
+    print("total_R=71")
+    print("profit_factor~=1.973")
+
+
+# ============================================================
+# PRINT MOMENTUM SUMMARY
+# ============================================================
+
+def print_momentum_summary(
+    trades,
+):
+
+    dimensions = [
+
+        (
+            "growth_momentum",
+            "Growth",
+        ),
+
+        (
+            "inflation_momentum",
+            "Inflation",
+        ),
+
+        (
+            "labor_momentum",
+            "Labor",
+        ),
+
+        (
+            "rates_momentum",
+            "Rates",
+        ),
+
+        (
+            "credit_momentum",
+            "Credit",
+        ),
+
+        (
+            "liquidity_momentum",
+            "Liquidity",
+        ),
+
+    ]
+
+    print()
+    print("=" * 72)
+    print("MACRO MOMENTUM SUMMARY")
+    print("=" * 72)
+
+    for (
+        column,
+        label,
+    ) in dimensions:
+
+        if column not in trades.columns:
+
+            continue
+
+        report = momentum_report(
+            trades,
+            column,
+        )
+
+        print()
+        print(
+            f"--- {label} ---"
+        )
+
+        print(
+            report[
+                [
+                    "momentum_status",
+                    "signals",
+                    "resolved",
+                    "wins",
+                    "losses",
+                    "win_rate",
+                    "avg_R",
+                    "total_R",
+                    "profit_factor",
+                ]
+            ].to_string(
+                index=False
+            )
+        )
+
+
+# ============================================================
+# PRINT LEADING WARNING
+# ============================================================
+
+def print_leading_warning(
+    trades,
+):
+
+    report = leading_warning_report(
+        trades
+    )
+
+    print()
+    print("=" * 72)
+    print("LEADING WARNING BACKTEST")
+    print("=" * 72)
+
+    if report.empty:
+
+        print(
+            "No leading warning data."
+        )
+
+        return
+
+    print(
+        report[
+            [
+                "leading_warning",
+                "signals",
+                "resolved",
+                "wins",
+                "losses",
+                "win_rate",
+                "avg_R",
+                "total_R",
+                "profit_factor",
+            ]
+        ].to_string(
+            index=False
+        )
+    )
+
+
+# ============================================================
+# PRINT DIMENSIONS
+# ============================================================
+
+def print_dimension_report(
+    trades,
+):
+
+    print()
+    print("=" * 72)
+    print("MACRO V2.1 DIMENSIONS")
+    print("=" * 72)
+
+    columns = [
+
+        "signal_date",
+        "macro_regime",
+
+        "macro_stress",
+        "macro_momentum",
+
+        "growth_stress",
+        "growth_momentum",
+
+        "inflation_stress",
+        "inflation_momentum",
+
+        "labor_stress",
+        "labor_momentum",
+
+        "rates_stress",
+        "rates_momentum",
+
+        "credit_stress",
+        "credit_momentum",
+
+        "liquidity_stress",
+        "liquidity_momentum",
+
+        "leading_warning",
+        "leading_warning_count",
+
+    ]
+
+    available = [
+        x
+        for x in columns
+        if x in trades.columns
+    ]
+
+    print(
+        trades[
+            available
+        ]
+        .sort_values(
+            "signal_date"
+        )
+        .to_string(
+            index=False
+        )
     )
 
 
@@ -2349,24 +3390,18 @@ def main():
         )
     )
 
-    # --------------------------------------------------------
-    # CRITICAL:
-    #
-    # Macro analysis happens AFTER this check.
-    # --------------------------------------------------------
-
     print_baseline_check(
         baseline
     )
 
     # ========================================================
-    # LOAD MACRO
+    # LOAD FRED
     # ========================================================
 
     fred = load_fred()
 
     # ========================================================
-    # ATTACH V2 MACRO
+    # MACRO V2.1
     # ========================================================
 
     trades = attach_macro(
@@ -2375,12 +3410,20 @@ def main():
     )
 
     # ========================================================
-    # ADD DRAWDOWN
+    # DRAWDOWN
     # ========================================================
 
     trades = add_drawdown(
         trades,
         market,
+    )
+
+    trades = add_drawdown_bucket(
+        trades
+    )
+
+    trades = add_stress_zones(
+        trades
     )
 
     # ========================================================
@@ -2393,7 +3436,7 @@ def main():
 
     print()
     print("=" * 72)
-    print("MACRO REGIME BACKTEST V2")
+    print("MACRO REGIME BACKTEST V2.1")
     print("=" * 72)
 
     if report.empty:
@@ -2427,7 +3470,23 @@ def main():
         )
 
     # ========================================================
-    # MACRO DIMENSIONS
+    # MOMENTUM
+    # ========================================================
+
+    print_momentum_summary(
+        trades
+    )
+
+    # ========================================================
+    # LEADING WARNING
+    # ========================================================
+
+    print_leading_warning(
+        trades
+    )
+
+    # ========================================================
+    # DIMENSIONS
     # ========================================================
 
     print_dimension_report(
@@ -2435,33 +3494,33 @@ def main():
     )
 
     # ========================================================
-    # DRAWDOWN x REGIME
+    # DRAWDOWN x LEADING WARNING
     # ========================================================
 
-    dd_report = (
-        build_drawdown_regime_report(
+    warning_dd_report = (
+        build_drawdown_warning_report(
             trades
         )
     )
 
     print()
     print("=" * 72)
-    print("DRAWDOWN x MACRO REGIME V2")
+    print("DRAWDOWN x LEADING WARNING")
     print("=" * 72)
 
-    if dd_report.empty:
+    if warning_dd_report.empty:
 
         print(
-            "No drawdown/regime data available."
+            "No data available."
         )
 
     else:
 
         print(
-            dd_report[
+            warning_dd_report[
                 [
-                    "macro_regime",
                     "drawdown_bucket",
+                    "leading_warning",
                     "signals",
                     "wins",
                     "losses",
@@ -2478,113 +3537,74 @@ def main():
         )
 
     # ========================================================
-    # SAVE TRADES
+    # DRAWDOWN x CREDIT MOMENTUM
     # ========================================================
 
-    trades.to_csv(
-        "macro_backtest_v2_trades.csv",
-        index=False,
+    credit_dd_report = (
+        build_drawdown_momentum_report(
+            trades,
+            "credit_momentum",
+        )
     )
-
-    # ========================================================
-    # SAVE REGIME REPORT
-    # ========================================================
-
-    report.to_csv(
-        "macro_backtest_v2_regimes.csv",
-        index=False,
-    )
-
-    # ========================================================
-    # SAVE DRAWDOWN REPORT
-    # ========================================================
-
-    dd_report.to_csv(
-        "macro_backtest_v2_drawdown_regime.csv",
-        index=False,
-    )
-
-    # ========================================================
-    # SAVE DIMENSION REPORT
-    # ========================================================
-
-    dimension_columns = [
-
-        "signal_date",
-
-        "macro_regime",
-
-        "macro_regime_reason",
-
-        "macro_stress",
-
-        "growth_stress",
-
-        "inflation_stress",
-
-        "labor_stress",
-
-        "rates_stress",
-
-        "credit_stress",
-
-        "liquidity_stress",
-
-        "macro_reasons",
-    ]
-
-    available_columns = [
-        column
-        for column
-        in dimension_columns
-        if column in trades.columns
-    ]
-
-    trades[
-        available_columns
-    ].to_csv(
-        "macro_backtest_v2_dimensions.csv",
-        index=False,
-    )
-
-    # ========================================================
-    # OUTPUT
-    # ========================================================
 
     print()
     print("=" * 72)
-    print("OUTPUT FILES")
+    print("DRAWDOWN x CREDIT MOMENTUM")
     print("=" * 72)
 
-    print(
-        "macro_backtest_v2_trades.csv"
-    )
+    if credit_dd_report.empty:
 
-    print(
-        "macro_backtest_v2_regimes.csv"
-    )
+        print(
+            "No data available."
+        )
 
-    print(
-        "macro_backtest_v2_drawdown_regime.csv"
-    )
+    else:
 
-    print(
-        "macro_backtest_v2_dimensions.csv"
-    )
+        print(
+            credit_dd_report[
+                [
+                    "drawdown_bucket",
+                    "momentum_status",
+                    "signals",
+                    "wins",
+                    "losses",
+                    "ambiguous",
+                    "open",
+                    "win_rate",
+                    "avg_R",
+                    "total_R",
+                    "profit_factor",
+                ]
+            ].to_string(
+                index=False
+            )
+        )
 
     # ========================================================
-    # COMPLETE
+    # DRAWDOWN x LABOR MOMENTUM
     # ========================================================
+
+    labor_dd_report = (
+        build_drawdown_momentum_report(
+            trades,
+            "labor_momentum",
+        )
+    )
 
     print()
     print("=" * 72)
-    print("MACRO BACKTEST V2 COMPLETE")
+    print("DRAWDOWN x LABOR MOMENTUM")
     print("=" * 72)
 
+    if labor_dd_report.empty:
 
-# ============================================================
-# RUN
-# ============================================================
+        print(
+            "No data available."
+        )
 
-if __name__ == "__main__":
-    main()
+    else:
+
+        print(
+            labor_dd_report[
+                [
+                 
