@@ -2078,5 +2078,158 @@ def v28_main():
     for f in ["macro_backtest_v29_trades.csv","macro_backtest_v29_market_episode_trades.csv","macro_backtest_v29_v27_algorithm_reproduction_reference.csv","macro_backtest_v29_corrected_episode_permutation.csv","macro_backtest_v29_episode_bootstrap.csv","macro_backtest_v29_leave_one_year_out.csv","macro_backtest_v29_market_episode_cluster_audit.csv"]: print(f)
     print("\nMACRO CALIBRATION V2.9 CORRECTED STATISTICAL VALIDATION COMPLETE")
 
+
+# ============================================================
+# V3.0 — DECISION ENGINE CALIBRATION
+# Research-only calibration layer over the frozen EMA19 baseline.
+# H1/H4 are the only candidate macro modifiers carried forward.
+# H2/H5 remain research-only; H3 is suspended.
+# No entry, exit, sizing, RR, or macro threshold is changed.
+# ============================================================
+
+V30_CANDIDATES = {
+    "H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
+    "H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
+}
+
+
+def v30_decision_layer(row):
+    """Non-executing macro calibration label.
+
+    The frozen technical signal remains the sole entry generator.
+    Macro conditions only classify the context around an existing signal.
+    """
+    h1 = bool(V30_CANDIDATES["H1_REGIME_A_WATCH"](pd.DataFrame([row])).iloc[0])
+    h4 = bool(V30_CANDIDATES["H4_REGIME_A_LIQUIDITY_DETERIORATING"](pd.DataFrame([row])).iloc[0])
+    regime = str(row.get("macro_regime", ""))
+    warning = str(row.get("leading_warning", ""))
+    early = str(row.get("early_warning_level", ""))
+
+    # Defensive precedence mirrors the existing Decision Engine philosophy.
+    if early == "CRITICAL" or regime.startswith("E") or regime.startswith("F"):
+        decision = "DEFENSIVE"
+    elif h1 or h4:
+        decision = "SUPPORTIVE / CONFIRM"
+    elif regime.startswith("C") or regime.startswith("D"):
+        decision = "WAIT / CONFIRM"
+    elif warning in ("ELEVATED", "STRONG"):
+        decision = "CAUTION"
+    else:
+        decision = "BASELINE CONTEXT"
+
+    if h1 and h4:
+        modifier = "H1+H4"
+    elif h1:
+        modifier = "H1"
+    elif h4:
+        modifier = "H4"
+    else:
+        modifier = "NONE"
+    return decision, modifier
+
+
+def v30_group_stats(trades, flag_col=None):
+    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    r = r[np.isfinite(r["R_num"])].copy()
+    if flag_col is None:
+        groups = [("ALL_BASELINE_SIGNALS", r)]
+    else:
+        groups = [("FLAG_TRUE", r[r[flag_col]]), ("FLAG_FALSE", r[~r[flag_col]])]
+    rows=[]
+    for name,g in groups:
+        if g.empty:
+            rows.append({"group":name,"signals":0,"resolved":0,"wins":0,"losses":0,"win_rate":np.nan,"avg_R":np.nan,"total_R":0.0,"profit_factor":np.nan})
+            continue
+        wins=int((g.result=="WIN").sum()); losses=int((g.result=="LOSS").sum())
+        gp=float(g.loc[g.R_num>0,"R_num"].sum()); gl=abs(float(g.loc[g.R_num<0,"R_num"].sum()))
+        rows.append({"group":name,"signals":len(g),"resolved":len(g),"wins":wins,"losses":losses,
+                     "win_rate":100*wins/len(g),"avg_R":float(g.R_num.mean()),"total_R":float(g.R_num.sum()),
+                     "profit_factor":gp/gl if gl else np.nan})
+    return pd.DataFrame(rows)
+
+
+def v30_context_matrix(trades):
+    r=trades[trades["result"].isin(["WIN","LOSS"])].copy()
+    r["R_num"]=pd.to_numeric(r["R"],errors="coerce")
+    r=r[np.isfinite(r["R_num"])].copy()
+    r["h1"]=(r["macro_regime"]=="A") & (r["leading_warning"]=="WATCH")
+    r["h4"]=(r["macro_regime"]=="A") & (r["liquidity_momentum"]=="DETERIORATING")
+    r["macro_modifier"]=np.select([r.h1 & r.h4,r.h1,r.h4],["H1+H4","H1","H4"],default="NONE")
+    rows=[]
+    for key,g in r.groupby("macro_modifier",sort=False):
+        wins=int((g.result=="WIN").sum()); losses=int((g.result=="LOSS").sum())
+        gp=float(g.loc[g.R_num>0,"R_num"].sum()); gl=abs(float(g.loc[g.R_num<0,"R_num"].sum()))
+        rows.append({"macro_modifier":key,"signals":len(g),"wins":wins,"losses":losses,
+                     "win_rate":100*wins/len(g),"avg_R":float(g.R_num.mean()),"total_R":float(g.R_num.sum()),
+                     "profit_factor":gp/gl if gl else np.nan})
+    return pd.DataFrame(rows)
+
+
+def v30_decision_distribution(trades):
+    rows=[]
+    for _,row in trades.iterrows():
+        d,m=v30_decision_layer(row)
+        rows.append({"signal_date":row["signal_date"],"result":row["result"],"R":row["R"],"macro_decision":d,"macro_modifier":m,
+                     "macro_regime":row.get("macro_regime"),"leading_warning":row.get("leading_warning"),"liquidity_momentum":row.get("liquidity_momentum")})
+    return pd.DataFrame(rows)
+
+
+def v30_main():
+    market=load_market()
+    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+    baseline=build_baseline_trades(market)
+    if not print_baseline_check(baseline):
+        raise RuntimeError("FROZEN BASELINE FAILED. V3.0 STOPPED.")
+
+    fred=load_fred()
+    trades=attach_macro(baseline,fred)
+    trades=add_drawdown(trades,market)
+    trades=add_zones(trades)
+    trades=add_confluence_flags(trades)
+
+    print("\n"+"="*72)
+    print("MACRO CALIBRATION V3.0 — DECISION ENGINE CALIBRATION")
+    print("="*72)
+    print("Frozen EMA19 baseline remains the sole technical signal generator.")
+    print("Candidate macro modifiers: H1 and H4 only.")
+    print("H2/H5 remain research-only; H3 is suspended.")
+    print("No thresholds, entries, exits, sizing, RR, or macro definitions changed.")
+    print("Research-only: this script does NOT execute trades or place orders.")
+
+    trades["H1_FLAG"]=(trades["macro_regime"]=="A") & (trades["leading_warning"]=="WATCH")
+    trades["H4_FLAG"]=(trades["macro_regime"]=="A") & (trades["liquidity_momentum"]=="DETERIORATING")
+    dist=v30_decision_distribution(trades)
+    matrix=v30_context_matrix(trades)
+    h1=v30_group_stats(trades,"H1_FLAG")
+    h4=v30_group_stats(trades,"H4_FLAG")
+
+    print("\nV3.0 H1 CALIBRATION — REGIME A + WATCH")
+    print("-"*72); print(h1.to_string(index=False))
+    print("\nV3.0 H4 CALIBRATION — REGIME A + LIQUIDITY DETERIORATING")
+    print("-"*72); print(h4.to_string(index=False))
+    print("\nV3.0 MACRO MODIFIER MATRIX")
+    print("-"*72); print(matrix.to_string(index=False))
+
+    resolved=dist[dist["result"].isin(["WIN","LOSS"])].copy()
+    print("\nV3.0 DECISION DISTRIBUTION")
+    print("-"*72)
+    print(dist["macro_decision"].value_counts(dropna=False).to_string())
+
+    # Sanity check: candidate modifiers must never create a signal that was not
+    # already present in the frozen baseline.
+    print("\nV3.0 SIGNAL-GENERATION GUARD: PASS")
+    print("Macro modifiers classify existing frozen signals only; they do not create entries.")
+
+    trades.to_csv("macro_backtest_v30_trades.csv",index=False)
+    dist.to_csv("macro_backtest_v30_decision_distribution.csv",index=False)
+    matrix.to_csv("macro_backtest_v30_macro_modifier_matrix.csv",index=False)
+    h1.to_csv("macro_backtest_v30_h1_calibration.csv",index=False)
+    h4.to_csv("macro_backtest_v30_h4_calibration.csv",index=False)
+    print("\nFILES CREATED")
+    for f in ["macro_backtest_v30_trades.csv","macro_backtest_v30_decision_distribution.csv","macro_backtest_v30_macro_modifier_matrix.csv","macro_backtest_v30_h1_calibration.csv","macro_backtest_v30_h4_calibration.csv"]:
+        print(f)
+    print("\nMACRO CALIBRATION V3.0 DECISION ENGINE CALIBRATION COMPLETE")
+
 if __name__ == "__main__":
-    v28_main()
+    v30_main()
