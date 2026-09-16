@@ -897,6 +897,115 @@ def v24_yearly_holdout(trades):
             rows.append({"hypothesis": name, "year": int(year), **st})
     return pd.DataFrame(rows)
 
+
+# ============================================================
+# V2.5 WALK-FORWARD / ROLLING ROBUSTNESS
+# ============================================================
+def v25_hypotheses():
+    """Exactly the V2.3 pre-specified hypotheses; no re-optimization."""
+    return [
+        ("H1_REGIME_A_WATCH", lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH")),
+        ("H2_SHALLOW_DD_WATCH", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH")),
+        ("H3_DD_10_TO_5_REGIME_B", lambda x: (x["drawdown_bucket"] == "-10% to -5%") & (x["macro_regime"] == "B")),
+        ("H4_REGIME_A_LIQUIDITY_DETERIORATING", lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING")),
+        ("H5_SHALLOW_DD_LEADING_STRESS_COUNT_1", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1)),
+    ]
+
+
+def v25_walk_forward(trades, first_test_year=2023, last_test_year=None):
+    """
+    Expanding chronological walk-forward report.
+
+    For each test year Y:
+      TRAIN/AVAILABLE: all observations before Y
+      TEST: observations in calendar year Y
+
+    The hypotheses are fixed in advance and are never selected or optimized
+    from the training period. The prior-period column is descriptive only.
+    """
+    out = trades.copy()
+    out["signal_date"] = pd.to_datetime(out["signal_date"])
+    min_year = int(out["signal_date"].dt.year.min())
+    max_year = int(out["signal_date"].dt.year.max())
+    first_test_year = max(first_test_year, min_year + 1)
+    if last_test_year is None:
+        last_test_year = max_year
+
+    rows = []
+    for test_year in range(first_test_year, last_test_year + 1):
+        train = out[out["signal_date"].dt.year < test_year]
+        test = out[out["signal_date"].dt.year == test_year]
+        if test.empty:
+            continue
+
+        for name, fn in v25_hypotheses():
+            train_g = train.loc[fn(train)].copy()
+            test_g = test.loc[fn(test)].copy()
+            train_st = summarize(train_g)
+            test_st = summarize(test_g)
+
+            row = {
+                "hypothesis": name,
+                "test_year": test_year,
+                "train_start": train["signal_date"].min().date().isoformat() if not train.empty else "",
+                "train_end": train["signal_date"].max().date().isoformat() if not train.empty else "",
+                "train_signals": train_st["signals"],
+                "train_resolved": train_st["resolved"],
+                "train_wins": train_st["wins"],
+                "train_losses": train_st["losses"],
+                "train_win_rate": train_st["win_rate"],
+                "train_avg_R": train_st["avg_R"],
+                "train_total_R": train_st["total_R"],
+                "train_profit_factor": train_st["profit_factor"],
+                "test_signals": test_st["signals"],
+                "test_valid": test_st["valid"],
+                "test_invalid_sl": test_st["invalid_sl"],
+                "test_resolved": test_st["resolved"],
+                "test_wins": test_st["wins"],
+                "test_losses": test_st["losses"],
+                "test_ambiguous": test_st["ambiguous"],
+                "test_open": test_st["open"],
+                "test_win_rate": test_st["win_rate"],
+                "test_avg_R": test_st["avg_R"],
+                "test_total_R": test_st["total_R"],
+                "test_profit_factor": test_st["profit_factor"],
+            }
+            rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def v25_stability_summary(walk):
+    """Summarize OOS test-year consistency without ranking hypotheses."""
+    if walk.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for name, g in walk.groupby("hypothesis"):
+        tested = g[g["test_resolved"] > 0].copy()
+        positive = int((tested["test_total_R"] > 0).sum())
+        nonnegative = int((tested["test_total_R"] >= 0).sum())
+        rows.append({
+            "hypothesis": name,
+            "test_years_with_resolved_trades": len(tested),
+            "positive_test_years": positive,
+            "nonnegative_test_years": nonnegative,
+            "test_years_total_R": float(tested["test_total_R"].sum()) if not tested.empty else 0.0,
+            "test_resolved_total": int(tested["test_resolved"].sum()) if not tested.empty else 0,
+            "test_wins_total": int(tested["test_wins"].sum()) if not tested.empty else 0,
+            "test_losses_total": int(tested["test_losses"].sum()) if not tested.empty else 0,
+            "test_win_rate_pooled": (
+                100.0 * tested["test_wins"].sum() / tested["test_resolved"].sum()
+                if not tested.empty and tested["test_resolved"].sum() else np.nan
+            ),
+            "test_avg_R_pooled": (
+                float(tested["test_total_R"].sum() / tested["test_resolved"].sum())
+                if not tested.empty and tested["test_resolved"].sum() else np.nan
+            ),
+        })
+    return pd.DataFrame(rows)
+
+
 def main():
     market = load_market()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
@@ -964,20 +1073,52 @@ def main():
     else:
         print(yearly.to_string(index=False))
 
+    # ------------------------------------------------------------
+    # V2.5 WALK-FORWARD — SAME FIXED HYPOTHESES
+    # ------------------------------------------------------------
+    walk = v25_walk_forward(trades, first_test_year=2023)
+    stability = v25_stability_summary(walk)
+
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V2.5 — WALK-FORWARD / ROLLING ROBUSTNESS")
+    print("=" * 72)
+    print("Expanding chronology: all data before test year is TRAIN/AVAILABLE;")
+    print("the calendar test year is evaluated as unseen TEST data.")
+    print("Hypotheses are fixed from V2.3 and are NOT optimized during walk-forward.")
+    print("Research-only; no trade execution; no Decision Engine calibration.")
+
+    print("\nWALK-FORWARD TEST-YEAR RESULTS")
+    print("-" * 72)
+    if walk.empty:
+        print("No walk-forward observations.")
+    else:
+        print(walk.to_string(index=False))
+
+    print("\nWALK-FORWARD STABILITY SUMMARY")
+    print("-" * 72)
+    if stability.empty:
+        print("No resolved walk-forward observations.")
+    else:
+        print(stability.to_string(index=False))
+
     # Export everything for auditability.
-    trades.to_csv("macro_backtest_v24_trades.csv", index=False)
-    candidate.to_csv("macro_backtest_v24_candidate_hypotheses.csv", index=False)
-    groups.to_csv("macro_backtest_v24_group_robustness.csv", index=False)
-    sensitivity.to_csv("macro_backtest_v24_drawdown_sensitivity.csv", index=False)
-    yearly.to_csv("macro_backtest_v24_holdout_yearly.csv", index=False)
+    trades.to_csv("macro_backtest_v25_trades.csv", index=False)
+    candidate.to_csv("macro_backtest_v25_candidate_hypotheses_v24_reference.csv", index=False)
+    groups.to_csv("macro_backtest_v25_group_robustness_v24_reference.csv", index=False)
+    sensitivity.to_csv("macro_backtest_v25_drawdown_sensitivity_v24_reference.csv", index=False)
+    yearly.to_csv("macro_backtest_v25_holdout_yearly_v24_reference.csv", index=False)
+    walk.to_csv("macro_backtest_v25_walk_forward.csv", index=False)
+    stability.to_csv("macro_backtest_v25_stability_summary.csv", index=False)
 
     print("\nFILES CREATED")
-    print("macro_backtest_v24_trades.csv")
-    print("macro_backtest_v24_candidate_hypotheses.csv")
-    print("macro_backtest_v24_group_robustness.csv")
-    print("macro_backtest_v24_drawdown_sensitivity.csv")
-    print("macro_backtest_v24_holdout_yearly.csv")
-    print("\nMACRO CALIBRATION V2.4 OUT-OF-SAMPLE + ROBUSTNESS TEST COMPLETE")
+    print("macro_backtest_v25_trades.csv")
+    print("macro_backtest_v25_candidate_hypotheses_v24_reference.csv")
+    print("macro_backtest_v25_group_robustness_v24_reference.csv")
+    print("macro_backtest_v25_drawdown_sensitivity_v24_reference.csv")
+    print("macro_backtest_v25_holdout_yearly_v24_reference.csv")
+    print("macro_backtest_v25_walk_forward.csv")
+    print("macro_backtest_v25_stability_summary.csv")
+    print("\nMACRO CALIBRATION V2.5 WALK-FORWARD / ROLLING ROBUSTNESS COMPLETE")
 
 if __name__ == "__main__":
     main()
