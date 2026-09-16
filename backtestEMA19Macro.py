@@ -1,5 +1,5 @@
 # ============================================================
-# US500 MACRO BACKTEST V2.2 - LEAD ANALYSIS
+# US500 MACRO BACKTEST V2.2.2 - INDEPENDENT EPISODE ANALYSIS
 # FROZEN EMA19 BASELINE + MACRO V2.1 + DRAWdown LEAD EVENT STUDY
 # ============================================================
 # Frozen baseline configuration validated by V3:
@@ -786,7 +786,7 @@ def main():
     lead_warning = build_lead_warning_report(lead_detail)
 
     print("\n" + "=" * 72)
-    print("V2.2.1 INDEPENDENT DRAWDOWN EPISODE STUDY")
+    print("V2.2.2 INDEPENDENT DRAWDOWN EPISODE STUDY")
     print("=" * 72)
     if lead_detail.empty:
         print("No -10%/-20% drawdown threshold events detected.")
@@ -801,6 +801,10 @@ def main():
 
         print("\nINDEPENDENT DRAWDOWN EPISODES")
         print(lead_detail[["threshold", "episode_id", "event_date", "event_drawdown_pct"]].to_string(index=False))
+
+        print("\nEPISODE COUNT BY THRESHOLD")
+        episode_counts = (lead_detail.groupby("threshold")["episode_id"].nunique().rename("independent_episodes").reset_index())
+        print(episode_counts.to_string(index=False))
 
         print("\nDIMENSION LEAD SUMMARY — INDEPENDENT EPISODES")
         print(episode_dim.to_string(index=False))
@@ -828,11 +832,11 @@ def main():
     lead_dim.to_csv("macro_backtest_v22_lead_dimension_summary.csv", index=False)
     lead_transition.to_csv("macro_backtest_v22_lead_transitions.csv", index=False)
     lead_warning.to_csv("macro_backtest_v22_lead_warning.csv", index=False)
-    episode_comparison.to_csv("macro_backtest_v221_episode_comparison.csv", index=False)
-    episode_dim.to_csv("macro_backtest_v221_episode_dimension_summary.csv", index=False)
-    episode_transition.to_csv("macro_backtest_v221_episode_transitions.csv", index=False)
-    episode_warning.to_csv("macro_backtest_v221_episode_warning.csv", index=False)
-    print("\nMACRO CALIBRATION V2.2.1 INDEPENDENT EPISODE ANALYSIS COMPLETE")
+    episode_comparison.to_csv("macro_backtest_v222_episode_comparison.csv", index=False)
+    episode_dim.to_csv("macro_backtest_v222_episode_dimension_summary.csv", index=False)
+    episode_transition.to_csv("macro_backtest_v222_episode_transitions.csv", index=False)
+    episode_warning.to_csv("macro_backtest_v222_episode_warning.csv", index=False)
+    print("\nMACRO CALIBRATION V2.2.2 INDEPENDENT EPISODE ANALYSIS COMPLETE")
 
 if __name__ == "__main__":
     main()
