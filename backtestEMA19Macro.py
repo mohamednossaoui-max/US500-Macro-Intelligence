@@ -452,22 +452,38 @@ def print_report(title, report, key):
 def detect_drawdown_events(market, thresholds=(-10.0, -20.0)):
     """Return independent drawdown episodes for each threshold.
 
-    An episode starts on the first trading day that closes at or below the
-    threshold. No second event is created while the index remains below that
-    threshold. The episode is considered recovered only when drawdown returns
-    to 0% (a new cumulative-high close). This prevents 2022-style prolonged
-    drawdowns from being counted as many independent events.
+    Entry into an episode is still defined exactly as before: the daily Close
+    reaches or falls below the threshold relative to the cumulative maximum
+    High.
+
+    IMPORTANT: recovery is defined by a *new intraday high* (current High >=
+    the prior cumulative reference High), not by requiring the Close itself to
+    equal the historical High. This distinction matters because a market can
+    establish a new all-time High intraday while closing below that High.
+    Requiring Close / cumulative-High - 1 >= 0 could therefore keep an episode
+    artificially open for a very long time and suppress later independent
+    episodes (such as the 2022 drawdown).
     """
     ref_high = market["High"].cummax()
     dd = (market["Close"] / ref_high - 1.0) * 100.0
+
+    # A recovery/new-high day is one whose High reaches the cumulative High
+    # that existed before that day.  Shift prevents the current day's High
+    # from trivially qualifying because ref_high includes the current day.
+    prior_ref_high = ref_high.shift(1)
+    recovered = prior_ref_high.notna() & (market["High"] >= prior_ref_high)
+
     events = []
 
     for threshold in thresholds:
         in_episode = False
         episode_id = 0
+
         for pos, idx in enumerate(market.index):
             value = float(dd.iloc[pos])
 
+            # A new episode begins only after the previous episode has fully
+            # recovered to a new cumulative high.
             if not in_episode and value <= threshold:
                 episode_id += 1
                 in_episode = True
@@ -480,8 +496,10 @@ def detect_drawdown_events(market, thresholds=(-10.0, -20.0)):
                     "reference_high": float(ref_high.iloc[pos]),
                 })
 
-            # Recovery is defined strictly by return to 0% drawdown.
-            if in_episode and value >= 0.0:
+            # Do not let the event day itself immediately recover. Recovery
+            # must occur after the threshold event and must be a genuine new
+            # High relative to the pre-day reference High.
+            elif in_episode and bool(recovered.iloc[pos]):
                 in_episode = False
 
     return pd.DataFrame(events).sort_values(
@@ -784,7 +802,7 @@ def main():
         print("\nINDEPENDENT DRAWDOWN EPISODES")
         print(lead_detail[["threshold", "episode_id", "event_date", "event_drawdown_pct"]].to_string(index=False))
 
-        print("\nDIMENSION LEAD SUMMARY â INDEPENDENT EPISODES")
+        print("\nDIMENSION LEAD SUMMARY — INDEPENDENT EPISODES")
         print(episode_dim.to_string(index=False))
 
         print("\nSTRESS TRANSITIONS BY EPISODE")
