@@ -429,6 +429,17 @@ def grouped_report(trades, col):
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
+def grouped_2d_report(trades, col_a, col_b):
+    rows = []
+    for (key_a, key_b), g in trades.groupby([col_a, col_b], dropna=False, observed=False):
+        s = summarize(g)
+        s[col_a] = key_a
+        s[col_b] = key_b
+        s["group"] = f"{key_a} | {key_b}"
+        rows.append(s)
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
 def print_report(title, report, key):
     print("\n" + "=" * 72); print(title); print("=" * 72)
     if report.empty:
@@ -455,7 +466,8 @@ def main():
     for dim in DIMENSIONS:
         print_report(f"{dim.upper()} MOMENTUM", grouped_report(trades, f"{dim}_momentum"), f"{dim}_momentum")
     for dim in ("credit", "labor", "liquidity"):
-        print_report(f"DRAWDOWN x {dim.upper()} MOMENTUM", grouped_report(trades, "drawdown_bucket"), "drawdown_bucket")
+        report_2d = grouped_2d_report(trades, "drawdown_bucket", f"{dim}_momentum")
+        print_report(f"DRAWDOWN x {dim.upper()} MOMENTUM", report_2d, "group")
 
     trades.to_csv("macro_backtest_v21_trades.csv", index=False)
     grouped_report(trades, "macro_regime").to_csv("macro_backtest_v21_regimes.csv", index=False)
