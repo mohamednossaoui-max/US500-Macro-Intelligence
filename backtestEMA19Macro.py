@@ -1120,5 +1120,334 @@ def main():
     print("macro_backtest_v25_stability_summary.csv")
     print("\nMACRO CALIBRATION V2.5 WALK-FORWARD / ROLLING ROBUSTNESS COMPLETE")
 
+
+# ============================================================
+# V2.6 STATISTICAL ROBUSTNESS / NULL TESTING
+# ============================================================
+# Research-only. The five hypotheses are frozen from V2.3/V2.5.
+# No threshold optimization, no entry/exit changes, no Decision Engine.
+
+V26_SEED = 2606
+V26_BOOTSTRAPS = 10000
+V26_PERMUTATIONS = 10000
+V26_BLOCK_LEN = 3
+
+
+def _resolved_r(g):
+    if g.empty or "R" not in g.columns:
+        return np.array([], dtype=float)
+    x = pd.to_numeric(g.loc[g["result"].isin(["WIN", "LOSS"]), "R"], errors="coerce").dropna()
+    return x.to_numpy(dtype=float)
+
+
+def _bootstrap_mean_ci(values, rng, n=V26_BOOTSTRAPS, alpha=0.05):
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return np.nan, np.nan
+    if len(values) == 1:
+        return float(values[0]), float(values[0])
+    samples = rng.choice(values, size=(n, len(values)), replace=True)
+    means = samples.mean(axis=1)
+    return float(np.quantile(means, alpha/2)), float(np.quantile(means, 1-alpha/2))
+
+
+def _bootstrap_total_ci(values, rng, n=V26_BOOTSTRAPS, alpha=0.05):
+    values = np.asarray(values, dtype=float)
+    if len(values) == 0:
+        return np.nan, np.nan
+    if len(values) == 1:
+        return float(values[0]), float(values[0])
+    samples = rng.choice(values, size=(n, len(values)), replace=True)
+    totals = samples.sum(axis=1)
+    return float(np.quantile(totals, alpha/2)), float(np.quantile(totals, 1-alpha/2))
+
+
+def _block_bootstrap_mean_ci(values, rng, block_len=V26_BLOCK_LEN, n=V26_BOOTSTRAPS, alpha=0.05):
+    values = np.asarray(values, dtype=float)
+    m = len(values)
+    if m == 0:
+        return np.nan, np.nan
+    if m < 2:
+        return float(values.mean()), float(values.mean())
+    L = max(1, min(int(block_len), m))
+    means = np.empty(n, dtype=float)
+    for b in range(n):
+        sample = []
+        while len(sample) < m:
+            start = int(rng.integers(0, m))
+            for k in range(L):
+                sample.append(values[(start + k) % m])
+                if len(sample) >= m:
+                    break
+        means[b] = np.mean(sample)
+    return float(np.quantile(means, alpha/2)), float(np.quantile(means, 1-alpha/2))
+
+
+def _permutation_p_value(all_r, mask, observed_mean, rng, n=V26_PERMUTATIONS):
+    all_r = np.asarray(all_r, dtype=float)
+    mask = np.asarray(mask, dtype=bool)
+    k = int(mask.sum())
+    if k == 0 or len(all_r) <= 1 or not np.isfinite(observed_mean):
+        return np.nan
+    extreme = 0
+    # Randomly reassign the same number of labels to resolved trades.
+    for _ in range(n):
+        idx = rng.choice(len(all_r), size=k, replace=False)
+        stat = float(all_r[idx].mean())
+        if stat >= observed_mean - 1e-12:
+            extreme += 1
+    return float((extreme + 1) / (n + 1))
+
+
+def _permutation_diff_p_value(all_r, mask, observed_diff, rng, n=V26_PERMUTATIONS):
+    all_r = np.asarray(all_r, dtype=float)
+    mask = np.asarray(mask, dtype=bool)
+    k = int(mask.sum())
+    if k == 0 or k == len(all_r) or len(all_r) <= 1 or not np.isfinite(observed_diff):
+        return np.nan
+    extreme = 0
+    for _ in range(n):
+        idx = rng.choice(len(all_r), size=k, replace=False)
+        sel = np.zeros(len(all_r), dtype=bool)
+        sel[idx] = True
+        diff = float(all_r[sel].mean() - all_r[~sel].mean())
+        if diff >= observed_diff - 1e-12:
+            extreme += 1
+    return float((extreme + 1) / (n + 1))
+
+
+def _placebo_shift_p_value(all_r, mask, observed_mean, rng, n=V26_PERMUTATIONS):
+    """Circularly shift the fixed hypothesis membership across chronological trades."""
+    all_r = np.asarray(all_r, dtype=float)
+    mask = np.asarray(mask, dtype=bool)
+    k = int(mask.sum())
+    N = len(all_r)
+    if k == 0 or N <= 1 or not np.isfinite(observed_mean):
+        return np.nan
+    extreme = 0
+    shifts = rng.integers(1, N, size=n)
+    for shift in shifts:
+        shifted = np.roll(mask, int(shift))
+        stat = float(all_r[shifted].mean())
+        if stat >= observed_mean - 1e-12:
+            extreme += 1
+    return float((extreme + 1) / (n + 1))
+
+
+def _bh_adjust(pvalues):
+    vals = np.asarray(pvalues, dtype=float)
+    out = np.full(vals.shape, np.nan, dtype=float)
+    good = np.isfinite(vals)
+    if not good.any():
+        return out
+    idx = np.where(good)[0]
+    order = idx[np.argsort(vals[good])]
+    m = len(order)
+    prev = 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank-1]
+        q = vals[i] * m / rank
+        prev = min(prev, q)
+        out[i] = prev
+    return out
+
+
+def _winner_concentration(values):
+    values = np.sort(np.asarray(values, dtype=float))[::-1]
+    total = float(values.sum()) if len(values) else 0.0
+    out = {"total_R": total}
+    for n in [1, 2, 3]:
+        if len(values) > n:
+            out[f"total_R_excl_top_{n}"] = float(values[n:].sum())
+        else:
+            out[f"total_R_excl_top_{n}"] = np.nan
+    return out
+
+
+def v26_statistical_robustness(trades):
+    """Statistical tests for the five frozen hypotheses.
+
+    The null tests ask whether a hypothesis group's observed R distribution is
+    unusually positive relative to random reassignment of the same group size.
+    They do not change the trading strategy or select new thresholds.
+    """
+    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
+    all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
+    valid_all = np.isfinite(all_r)
+    resolved = resolved.loc[valid_all].reset_index(drop=True)
+    all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
+    baseline_mean = float(all_r.mean()) if len(all_r) else np.nan
+
+    rows = []
+    rng = np.random.default_rng(V26_SEED)
+    pvals = []
+    raw_rows = []
+
+    for name, fn in v25_hypotheses():
+        mask = np.asarray(fn(resolved), dtype=bool)
+        vals = all_r[mask]
+        k = len(vals)
+        if k == 0:
+            raw_rows.append({"hypothesis": name, "resolved": 0})
+            pvals.append(np.nan)
+            continue
+
+        mean_r = float(vals.mean())
+        total_r = float(vals.sum())
+        complement = all_r[~mask]
+        comp_mean = float(complement.mean()) if len(complement) else np.nan
+        diff = mean_r - comp_mean if np.isfinite(comp_mean) else np.nan
+        ci_lo, ci_hi = _bootstrap_mean_ci(vals, rng)
+        total_lo, total_hi = _bootstrap_total_ci(vals, rng)
+        block_lo, block_hi = _block_bootstrap_mean_ci(vals, rng)
+        perm_p = _permutation_p_value(all_r, mask, mean_r, rng)
+        diff_p = _permutation_diff_p_value(all_r, mask, diff, rng)
+        placebo_p = _placebo_shift_p_value(all_r, mask, mean_r, rng)
+        concentration = _winner_concentration(vals)
+        wins = int((resolved.loc[mask, "result"] == "WIN").sum())
+        losses = int((resolved.loc[mask, "result"] == "LOSS").sum())
+
+        row = {
+            "hypothesis": name,
+            "resolved": k,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": 100.0 * wins / k if k else np.nan,
+            "mean_R": mean_r,
+            "mean_R_bootstrap_ci_low": ci_lo,
+            "mean_R_bootstrap_ci_high": ci_hi,
+            "mean_R_block_bootstrap_ci_low": block_lo,
+            "mean_R_block_bootstrap_ci_high": block_hi,
+            "total_R": total_r,
+            "total_R_bootstrap_ci_low": total_lo,
+            "total_R_bootstrap_ci_high": total_hi,
+            "baseline_mean_R": baseline_mean,
+            "vs_complement_mean_R": comp_mean,
+            "mean_R_difference_vs_complement": diff,
+            "permutation_p_mean": perm_p,
+            "permutation_p_vs_complement": diff_p,
+            "placebo_circular_shift_p": placebo_p,
+            **concentration,
+        }
+        raw_rows.append(row)
+        pvals.append(perm_p)
+
+    report = pd.DataFrame(raw_rows)
+    if not report.empty and "permutation_p_mean" in report.columns:
+        report["permutation_q_mean_bh"] = _bh_adjust(report["permutation_p_mean"].to_numpy(dtype=float))
+    return report
+
+
+def v26_crisis_exclusion(trades):
+    """Sensitivity after excluding major stress years 2020 and 2022."""
+    work = trades.copy()
+    work["signal_date"] = pd.to_datetime(work["signal_date"])
+    work = work[~work["signal_date"].dt.year.isin([2020, 2022])]
+    rows = []
+    for name, fn in v25_hypotheses():
+        g = work.loc[fn(work) & work["result"].isin(["WIN", "LOSS"])].copy()
+        r = _resolved_r(g)
+        wins = int((g["result"] == "WIN").sum())
+        losses = int((g["result"] == "LOSS").sum())
+        rows.append({
+            "hypothesis": name,
+            "resolved": len(r),
+            "wins": wins,
+            "losses": losses,
+            "win_rate": 100.0 * wins / len(r) if len(r) else np.nan,
+            "avg_R": float(r.mean()) if len(r) else np.nan,
+            "total_R": float(r.sum()) if len(r) else 0.0,
+        })
+    return pd.DataFrame(rows)
+
+
+def v26_walk_forward_nulls(trades):
+    """Null testing restricted to the chronological V2.5 test years."""
+    rows = []
+    walk = v25_walk_forward(trades, first_test_year=2023)
+    if walk.empty:
+        return pd.DataFrame()
+    for _, w in walk.iterrows():
+        year = int(w["test_year"])
+        test = trades[pd.to_datetime(trades["signal_date"]).dt.year == year].copy()
+        if test.empty:
+            continue
+        resolved = test[test["result"].isin(["WIN", "LOSS"])].copy().sort_values("signal_date").reset_index(drop=True)
+        all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
+        if len(all_r) == 0:
+            continue
+        name = w["hypothesis"]
+        fn = dict(v25_hypotheses())[name]
+        mask = np.asarray(fn(resolved), dtype=bool)
+        if mask.sum() == 0:
+            continue
+        rng = np.random.default_rng(V26_SEED + year)
+        obs = float(all_r[mask].mean())
+        rows.append({
+            "hypothesis": name,
+            "test_year": year,
+            "resolved": int(mask.sum()),
+            "observed_mean_R": obs,
+            "permutation_p_mean": _permutation_p_value(all_r, mask, obs, rng, n=V26_PERMUTATIONS),
+        })
+    return pd.DataFrame(rows)
+
+
+def v26_main():
+    market = load_market()
+    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+
+    baseline = build_baseline_trades(market)
+    if not print_baseline_check(baseline):
+        raise RuntimeError("FROZEN BASELINE FAILED. V2.6 is stopped; do not use these results.")
+
+    fred = load_fred()
+    trades = attach_macro(baseline, fred)
+    trades = add_drawdown(trades, market)
+    trades = add_zones(trades)
+    trades = add_confluence_flags(trades)
+    trades = add_v24_period(trades, "2025-01-01")
+
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V2.6 — STATISTICAL ROBUSTNESS / NULL TESTING")
+    print("=" * 72)
+    print("Frozen hypotheses: H1/H2/H3/H4/H5 from V2.3/V2.5.")
+    print("Bootstrap, permutation, placebo, block-bootstrap, crisis-exclusion and winner-concentration tests.")
+    print("Research-only; no trade execution; no Decision Engine calibration.")
+
+    stats = v26_statistical_robustness(trades)
+    crisis = v26_crisis_exclusion(trades)
+    wf_nulls = v26_walk_forward_nulls(trades)
+
+    print("\nSTATISTICAL ROBUSTNESS — FROZEN HYPOTHESES")
+    print("-" * 72)
+    print(stats.to_string(index=False))
+
+    print("\nCRISIS-EXCLUSION SENSITIVITY — EXCLUDING 2020 AND 2022")
+    print("-" * 72)
+    print(crisis.to_string(index=False))
+
+    print("\nWALK-FORWARD TEST-YEAR NULL CHECK")
+    print("-" * 72)
+    if wf_nulls.empty:
+        print("No resolved walk-forward null observations.")
+    else:
+        print(wf_nulls.to_string(index=False))
+
+    trades.to_csv("macro_backtest_v26_trades.csv", index=False)
+    stats.to_csv("macro_backtest_v26_statistical_robustness.csv", index=False)
+    crisis.to_csv("macro_backtest_v26_crisis_exclusion.csv", index=False)
+    wf_nulls.to_csv("macro_backtest_v26_walk_forward_nulls.csv", index=False)
+
+    print("\nFILES CREATED")
+    print("macro_backtest_v26_trades.csv")
+    print("macro_backtest_v26_statistical_robustness.csv")
+    print("macro_backtest_v26_crisis_exclusion.csv")
+    print("macro_backtest_v26_walk_forward_nulls.csv")
+    print("\nMACRO CALIBRATION V2.6 STATISTICAL ROBUSTNESS / NULL TESTING COMPLETE")
+
+
 if __name__ == "__main__":
-    main()
+    v26_main()
