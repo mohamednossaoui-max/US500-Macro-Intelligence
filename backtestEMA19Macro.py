@@ -784,127 +784,200 @@ def add_confluence_flags(trades):
     out["technical_context"] = "NOT_INCLUDED"
     return out
 
+
+def summarize_period(g):
+    """Summary with no changes to the frozen trade engine."""
+    if g.empty:
+        return summarize(g)
+    return summarize(g)
+
+
+def add_v24_period(trades, split_date="2025-01-01"):
+    out = trades.copy()
+    d = pd.to_datetime(out["signal_date"])
+    split = pd.Timestamp(split_date)
+    out["sample"] = np.where(d < split, "DISCOVERY", "HOLDOUT")
+    return out
+
+
+def v24_candidate_tests(trades):
+    """Pre-specified V2.3 hypotheses tested unchanged in discovery and holdout."""
+    tests = [
+        ("H1_REGIME_A_WATCH", lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH")),
+        ("H2_SHALLOW_DD_WATCH", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH")),
+        ("H3_DD_10_TO_5_REGIME_B", lambda x: (x["drawdown_bucket"] == "-10% to -5%") & (x["macro_regime"] == "B")),
+        ("H4_REGIME_A_LIQUIDITY_DETERIORATING", lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING")),
+        ("H5_SHALLOW_DD_LEADING_STRESS_COUNT_1", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1)),
+    ]
+    rows = []
+    for name, fn in tests:
+        mask = fn(trades)
+        for sample in ["DISCOVERY", "HOLDOUT"]:
+            g = trades.loc[mask & (trades["sample"] == sample)].copy()
+            st = summarize(g)
+            rows.append({"hypothesis": name, "sample": sample, **st})
+    return pd.DataFrame(rows)
+
+
+def v24_group_robustness(trades):
+    """Compare the same pre-specified group definitions across periods."""
+    specs = [
+        ("REGIME x WARNING", ["macro_regime", "leading_warning"]),
+        ("DRAWDOWN x WARNING", ["drawdown_bucket", "leading_warning"]),
+        ("DRAWDOWN x REGIME", ["drawdown_bucket", "macro_regime"]),
+        ("REGIME x LIQUIDITY", ["macro_regime", "liquidity_momentum"]),
+        ("LEADING STRESS COUNT", ["leading_stress_count"]),
+    ]
+    rows = []
+    for title, cols in specs:
+        for sample in ["DISCOVERY", "HOLDOUT"]:
+            part = trades[trades["sample"] == sample]
+            rep = build_confluence_report(part, cols, min_signals=1)
+            if rep.empty:
+                continue
+            rep.insert(0, "sample", sample)
+            rep.insert(0, "study", title)
+            rows.append(rep)
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def make_drawdown_bucket(value, boundaries):
+    """Research-only drawdown bucketing for robustness sensitivity; baseline is untouched."""
+    b3, b5, b10, b20 = boundaries
+    if pd.isna(value):
+        return np.nan
+    v = float(value)
+    if v <= b20:
+        return f"<={b20:g}%"
+    if v <= b10:
+        return f"{b20:g}% to {b10:g}%"
+    if v <= b5:
+        return f"{b10:g}% to {b5:g}%"
+    if v <= b3:
+        return f"{b5:g}% to {b3:g}%"
+    return f"{b3:g}% to 0%"
+
+
+def v24_drawdown_sensitivity(trades):
+    """Sensitivity around drawdown boundaries, without changing any trade outcomes."""
+    schemes = {
+        "CANONICAL": (-3.0, -5.0, -10.0, -20.0),
+        "SHIFTED_0_5_PP": (-2.5, -4.5, -9.5, -19.5),
+        "SHIFTED_1_0_PP": (-2.0, -4.0, -9.0, -19.0),
+    }
+    rows = []
+    for name, bounds in schemes.items():
+        work = trades.copy()
+        work["sensitivity_drawdown_bucket"] = work["drawdown_pct"].apply(lambda v: make_drawdown_bucket(v, bounds))
+        mask = work["leading_warning"].eq("WATCH")
+        for sample in ["DISCOVERY", "HOLDOUT"]:
+            g = work.loc[mask & work["sample"].eq(sample)]
+            st = summarize(g)
+            rows.append({"scheme": name, "sample": sample, "boundaries": str(bounds), **st})
+    return pd.DataFrame(rows)
+
+
+def v24_yearly_holdout(trades):
+    """Year-by-year holdout stability for the pre-specified hypotheses."""
+    tests = {
+        "H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
+        "H2_SHALLOW_DD_WATCH": lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH"),
+        "H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
+        "H5_SHALLOW_DD_LEADING_STRESS_COUNT_1": lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1),
+    }
+    hold = trades[trades["sample"] == "HOLDOUT"].copy()
+    rows = []
+    if hold.empty:
+        return pd.DataFrame()
+    hold["holdout_year"] = pd.to_datetime(hold["signal_date"]).dt.year
+    for name, fn in tests.items():
+        mask = fn(hold)
+        for year, g0 in hold.loc[mask].groupby("holdout_year"):
+            st = summarize(g0)
+            rows.append({"hypothesis": name, "year": int(year), **st})
+    return pd.DataFrame(rows)
+
 def main():
     market = load_market()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+
+    # ------------------------------------------------------------
+    # FROZEN BASELINE — MUST REMAIN IDENTICAL TO V2.3
+    # ------------------------------------------------------------
     baseline = build_baseline_trades(market)
     baseline_ok = print_baseline_check(baseline)
     if not baseline_ok:
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.1 calibration is stopped; do not use these results.")
+        raise RuntimeError("FROZEN BASELINE FAILED. V2.4 is stopped; do not use these results.")
 
     fred = load_fred()
     trades = attach_macro(baseline, fred)
     trades = add_drawdown(trades, market)
     trades = add_zones(trades)
-
-    print_report("MACRO REGIME BACKTEST V2.1", grouped_report(trades, "macro_regime"), "macro_regime")
-    print_report("LEADING WARNING BACKTEST", grouped_report(trades, "leading_warning"), "leading_warning")
-    for dim in DIMENSIONS:
-        print_report(f"{dim.upper()} MOMENTUM", grouped_report(trades, f"{dim}_momentum"), f"{dim}_momentum")
-    for dim in ("credit", "labor", "liquidity"):
-        report_2d = grouped_2d_report(trades, "drawdown_bucket", f"{dim}_momentum")
-        print_report(f"DRAWDOWN x {dim.upper()} MOMENTUM", report_2d, "group")
-
-    # ------------------------------------------------------------
-    # V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY
-    # Descriptive only: no entries, exits, sizing, or Decision Engine changes.
-    # ------------------------------------------------------------
     trades = add_confluence_flags(trades)
-    print("\n" + "=" * 72)
-    print("V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY")
-    print("=" * 72)
-    print("Research-only trade-level grouping. Frozen baseline remains unchanged.")
 
-    confluence_specs = [
-        ("DRAWDOWN x LEADING WARNING", ["drawdown_bucket", "leading_warning"]),
-        ("DRAWDOWN x MACRO REGIME", ["drawdown_bucket", "macro_regime"]),
-        ("MACRO REGIME x LEADING WARNING", ["macro_regime", "leading_warning"]),
-        ("LEADING WARNING x LIQUIDITY MOMENTUM", ["leading_warning", "liquidity_momentum"]),
-        ("LEADING WARNING x CREDIT MOMENTUM", ["leading_warning", "credit_momentum"]),
-        ("LEADING WARNING x LABOR MOMENTUM", ["leading_warning", "labor_momentum"]),
-        ("MACRO REGIME x LIQUIDITY MOMENTUM", ["macro_regime", "liquidity_momentum"]),
-        ("DRAWDOWN x LEADING STRESS COUNT", ["drawdown_bucket", "leading_stress_count"]),
-        ("DRAWDOWN x MACRO DETERIORATION COUNT", ["drawdown_bucket", "macro_deterioration_count"]),
-        ("FULL MACRO CONFLUENCE", ["drawdown_bucket", "macro_regime", "leading_warning"]),
-    ]
-    confluence_reports = {}
-    for title, cols in confluence_specs:
-        report = build_confluence_report(trades, cols, min_signals=1)
-        confluence_reports[title] = report
-        print("\n" + "-" * 72)
-        print(title)
-        print("-" * 72)
-        if report.empty:
-            print("No data available.")
-        else:
-            display_cols = cols + ["signals", "valid", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor"]
-            print(report[display_cols].to_string(index=False))
-
-    # Tests macro state 60/20/10/5 trading days BEFORE the first
-    # close-based crossing of -10% and -20% drawdown.
-    # ------------------------------------------------------------
-    lead_detail = build_lead_event_study(market, fred)
-    lead_dim = build_lead_dimension_report(lead_detail)
-    lead_transition = build_lead_transition_report(lead_detail)
-    lead_warning = build_lead_warning_report(lead_detail)
+    # Fixed chronological split. No optimization on the holdout.
+    SPLIT_DATE = "2025-01-01"
+    trades = add_v24_period(trades, SPLIT_DATE)
 
     print("\n" + "=" * 72)
-    print("V2.2.2 INDEPENDENT DRAWDOWN EPISODE STUDY")
+    print("MACRO CALIBRATION V2.4 — OUT-OF-SAMPLE + ROBUSTNESS TEST")
     print("=" * 72)
-    if lead_detail.empty:
-        print("No -10%/-20% drawdown threshold events detected.")
+    print(f"Chronological split: DISCOVERY < {SPLIT_DATE} | HOLDOUT >= {SPLIT_DATE}")
+    print("Frozen EMA19 entries/exits/RR are unchanged. Research-only; no trade execution.")
+
+    print("\nSAMPLE SIZES")
+    print(trades.groupby("sample").size().rename("signals").to_string())
+
+    # 1) Pre-specified V2.3 hypotheses.
+    candidate = v24_candidate_tests(trades)
+    print("\n" + "-" * 72)
+    print("PRE-SPECIFIED V2.3 HYPOTHESES — DISCOVERY vs HOLDOUT")
+    print("-" * 72)
+    print(candidate.to_string(index=False))
+
+    # 2) Same group definitions in both samples.
+    groups = v24_group_robustness(trades)
+    print("\n" + "-" * 72)
+    print("GROUP ROBUSTNESS — SAME DEFINITIONS IN BOTH SAMPLES")
+    print("-" * 72)
+    if groups.empty:
+        print("No grouped results.")
     else:
-        print("Threshold events:")
-        print(lead_detail[["threshold", "event_date", "event_drawdown_pct"]].to_string(index=False))
+        cols = ["study", "sample"] + [c for c in groups.columns if c not in {"study", "sample", "signals", "valid", "invalid_sl", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor", "confluence_group"}] + ["signals", "valid", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor"]
+        cols = [c for c in cols if c in groups.columns]
+        print(groups[cols].to_string(index=False))
 
-        episode_dim = build_episode_dimension_summary(lead_detail)
-        episode_transition = build_episode_stress_transitions(lead_detail)
-        episode_warning = build_episode_warning_summary(lead_detail)
-        episode_comparison = build_episode_comparison(lead_detail)
+    # 3) Boundary sensitivity: only labels change, not trades/results.
+    sensitivity = v24_drawdown_sensitivity(trades)
+    print("\n" + "-" * 72)
+    print("DRAWDOWN BOUNDARY SENSITIVITY — WATCH GROUP")
+    print("-" * 72)
+    print(sensitivity.to_string(index=False))
 
-        print("\nINDEPENDENT DRAWDOWN EPISODES")
-        print(lead_detail[["threshold", "episode_id", "event_date", "event_drawdown_pct"]].to_string(index=False))
+    # 4) Holdout year-by-year stability.
+    yearly = v24_yearly_holdout(trades)
+    print("\n" + "-" * 72)
+    print("HOLDOUT YEAR-BY-YEAR STABILITY")
+    print("-" * 72)
+    if yearly.empty:
+        print("No holdout observations for the pre-specified hypotheses.")
+    else:
+        print(yearly.to_string(index=False))
 
-        print("\nEPISODE COUNT BY THRESHOLD")
-        episode_counts = (lead_detail.groupby("threshold")["episode_id"].nunique().rename("independent_episodes").reset_index())
-        print(episode_counts.to_string(index=False))
+    # Export everything for auditability.
+    trades.to_csv("macro_backtest_v24_trades.csv", index=False)
+    candidate.to_csv("macro_backtest_v24_candidate_hypotheses.csv", index=False)
+    groups.to_csv("macro_backtest_v24_group_robustness.csv", index=False)
+    sensitivity.to_csv("macro_backtest_v24_drawdown_sensitivity.csv", index=False)
+    yearly.to_csv("macro_backtest_v24_holdout_yearly.csv", index=False)
 
-        print("\nDIMENSION LEAD SUMMARY — INDEPENDENT EPISODES")
-        print(episode_dim.to_string(index=False))
-
-        print("\nSTRESS TRANSITIONS BY EPISODE")
-        print(episode_transition.to_string(index=False))
-
-        print("\nLEADING WARNING BY EPISODE")
-        print(episode_warning.to_string(index=False))
-
-        print("\nEPISODE COMPARISON")
-        print(episode_comparison.to_string(index=False))
-
-    if lead_detail.empty:
-        episode_dim = pd.DataFrame()
-        episode_transition = pd.DataFrame()
-        episode_warning = pd.DataFrame()
-        episode_comparison = pd.DataFrame()
-    trades.to_csv("macro_backtest_v21_trades.csv", index=False)
-    grouped_report(trades, "macro_regime").to_csv("macro_backtest_v21_regimes.csv", index=False)
-    grouped_report(trades, "leading_warning").to_csv("macro_backtest_v21_leading_warning.csv", index=False)
-    grouped_report(trades, "macro_stress_zone").to_csv("macro_backtest_v21_stress_zones.csv", index=False)
-    grouped_report(trades, "macro_momentum_zone").to_csv("macro_backtest_v21_momentum_zones.csv", index=False)
-    trades.to_csv("macro_backtest_v23_trade_confluence_trades.csv", index=False)
-    for title, report in confluence_reports.items():
-        slug = title.lower().replace(" ", "_").replace("x", "x")
-        slug = "".join(ch for ch in slug if ch.isalnum() or ch == "_")
-        report.to_csv(f"macro_backtest_v23_{slug}.csv", index=False)
-    lead_detail.to_csv("macro_backtest_v22_lead_event_detail.csv", index=False)
-    lead_dim.to_csv("macro_backtest_v22_lead_dimension_summary.csv", index=False)
-    lead_transition.to_csv("macro_backtest_v22_lead_transitions.csv", index=False)
-    lead_warning.to_csv("macro_backtest_v22_lead_warning.csv", index=False)
-    episode_comparison.to_csv("macro_backtest_v222_episode_comparison.csv", index=False)
-    episode_dim.to_csv("macro_backtest_v222_episode_dimension_summary.csv", index=False)
-    episode_transition.to_csv("macro_backtest_v222_episode_transitions.csv", index=False)
-    episode_warning.to_csv("macro_backtest_v222_episode_warning.csv", index=False)
-    print("\nMACRO CALIBRATION V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY COMPLETE")
+    print("\nFILES CREATED")
+    print("macro_backtest_v24_trades.csv")
+    print("macro_backtest_v24_candidate_hypotheses.csv")
+    print("macro_backtest_v24_group_robustness.csv")
+    print("macro_backtest_v24_drawdown_sensitivity.csv")
+    print("macro_backtest_v24_holdout_yearly.csv")
+    print("\nMACRO CALIBRATION V2.4 OUT-OF-SAMPLE + ROBUSTNESS TEST COMPLETE")
 
 if __name__ == "__main__":
     main()
