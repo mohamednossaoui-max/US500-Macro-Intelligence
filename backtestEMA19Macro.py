@@ -1,5 +1,5 @@
 # ============================================================
-# US500 MACRO BACKTEST V2.8 - EPISODE INTEGRITY + STATISTICAL AUDIT
+# US500 MACRO BACKTEST V2.9 - EPISODE INTEGRITY + STATISTICAL AUDIT
 # FROZEN EMA19 BASELINE + MACRO V2.1 + DRAWdown LEAD EVENT STUDY
 # ============================================================
 # Frozen baseline configuration validated by V3:
@@ -1764,7 +1764,7 @@ def v27_main():
 
 
 # ============================================================
-# V2.8 EPISODE INTEGRITY + STATISTICAL AUDIT
+# V2.9 EPISODE INTEGRITY + STATISTICAL AUDIT
 # ============================================================
 # Research-only audit of V2.7. No frozen baseline, hypothesis,
 # entry, exit, sizing, or Decision Engine logic is changed.
@@ -1823,97 +1823,91 @@ def v28_attach_market_episodes(trades, market, threshold=V28_THRESHOLD):
     return out
 
 
-def v28_exact_episode_permutation(trades, episode_col, n_mc=5000):
-    """Exact finite permutation test over episode assignments.
+def bh_adjust(p_values):
+    p=np.asarray(p_values,dtype=float); m=len(p)
+    if m==0: return np.array([])
+    order=np.argsort(p); q=np.empty(m,float); running=1.0
+    for rank,idx in reversed(list(enumerate(order,start=1))):
+        running=min(running,p[idx]*m/rank); q[idx]=running
+    return q
 
-    The statistic is the mean of episode-level mean R values. The null
-    assigns the same number of episodes as the hypothesis uses, without
-    replacement. Exact enumeration is used whenever combinations are
-    computationally manageable; otherwise Monte Carlo is used and flagged.
 
-    This deliberately treats an episode as the unit of evidence.
-    """
-    rows = []
-    rng = np.random.default_rng(V27_SEED + 2800)
-
-    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-
-    for name, fn in v25_hypotheses():
-        mask = np.asarray(fn(resolved), dtype=bool)
-        g = resolved.loc[mask].copy()
-        if g.empty:
-            continue
-
-        g["R_num"] = pd.to_numeric(g["R"], errors="coerce")
-        g = g[np.isfinite(g["R_num"])].copy()
-        if g.empty:
-            continue
-
-        # Only episodes represented by resolved trades are eligible.
-        all_ep = []
-        ep_means = {}
-        for ep, eg in resolved.groupby(episode_col, dropna=False):
-            rr = pd.to_numeric(eg["R"], errors="coerce").dropna()
-            if len(rr):
-                ep_means[ep] = float(rr.mean())
-                all_ep.append(ep)
-
-        selected_ep = list(pd.unique(g[episode_col]))
-        selected_ep = [e for e in selected_ep if e in ep_means]
-        total_eps = len(all_ep)
-        k = len(selected_ep)
-
-        observed = float(g["R_num"].mean())
-
-        if total_eps == 0 or k == 0 or k > total_eps:
-            exact_p = np.nan
-            combinations_total = 0
-            extreme = 0
-            null_min = np.nan
-            null_max = np.nan
+def v29_corrected_episode_permutation(trades, episode_col, n_mc=10000):
+    """Correct episode-level permutation with matched observed/null statistics."""
+    rows=[]; rng=np.random.default_rng(V27_SEED+2900)
+    resolved=trades[trades['result'].isin(['WIN','LOSS'])].copy()
+    for name,fn in v25_hypotheses():
+        g=resolved.loc[np.asarray(fn(resolved),dtype=bool)].copy()
+        g['R_num']=pd.to_numeric(g['R'],errors='coerce'); g=g[np.isfinite(g['R_num'])].copy()
+        if g.empty: continue
+        stats={}
+        for ep,eg in resolved.groupby(episode_col,dropna=False):
+            rr=pd.to_numeric(eg['R'],errors='coerce').dropna()
+            if len(rr): stats[ep]={'mean':float(rr.mean()),'n':len(rr),'sum':float(rr.sum())}
+        selected=[e for e in pd.unique(g[episode_col]) if e in stats]
+        all_eps=list(stats); k=len(selected); total=len(all_eps)
+        obs_ep=float(np.mean([stats[e]['mean'] for e in selected])) if k else np.nan
+        obs_tw=float(g['R_num'].mean())
+        if not k or k>total: continue
+        extreme_ep=extreme_tw=0; assignments=0
+        if total<=20:
+            for combo in combinations(all_eps,k):
+                assignments+=1
+                se=float(np.mean([stats[e]['mean'] for e in combo]))
+                n=sum(stats[e]['n'] for e in combo); st=sum(stats[e]['sum'] for e in combo)/n
+                extreme_ep += se >= obs_ep-1e-12
+                extreme_tw += st >= obs_tw-1e-12
+            p_ep=extreme_ep/assignments; p_tw=extreme_tw/assignments; method='exact'
         else:
-            combo_count = 0
-            extreme = 0
-            null_stats = []
-            if total_eps <= 20:
-                for combo in combinations(all_ep, k):
-                    stat = float(np.mean([ep_means[e] for e in combo]))
-                    null_stats.append(stat)
-                    combo_count += 1
-                    if stat >= observed - 1e-12:
-                        extreme += 1
-                # Randomization-test p: count / number of attainable assignments.
-                exact_p = extreme / combo_count
-                combinations_total = combo_count
-                null_min = float(min(null_stats)) if null_stats else np.nan
-                null_max = float(max(null_stats)) if null_stats else np.nan
-            else:
-                for _ in range(n_mc):
-                    chosen = rng.choice(all_ep, size=k, replace=False)
-                    stat = float(np.mean([ep_means[e] for e in chosen]))
-                    if stat >= observed - 1e-12:
-                        extreme += 1
-                exact_p = float((extreme + 1) / (n_mc + 1))
-                combinations_total = np.nan
-                null_min = np.nan
-                null_max = np.nan
+            for _ in range(n_mc):
+                chosen=rng.choice(all_eps,size=k,replace=False)
+                se=float(np.mean([stats[e]['mean'] for e in chosen]))
+                n=sum(stats[e]['n'] for e in chosen); st=sum(stats[e]['sum'] for e in chosen)/n
+                extreme_ep += se >= obs_ep-1e-12; extreme_tw += st >= obs_tw-1e-12
+            assignments=n_mc; p_ep=(extreme_ep+1)/(n_mc+1); p_tw=(extreme_tw+1)/(n_mc+1); method='monte_carlo'
+        rows.append({'hypothesis':name,'episode_definition':episode_col,'resolved':len(g),
+                     'selected_episode_count':k,'total_resolved_episode_count':total,
+                     'observed_episode_mean_R':obs_ep,'observed_trade_mean_R':obs_tw,
+                     'episode_mean_p':p_ep,'trade_weighted_p':p_tw,'method':method,
+                     'extreme_episode_mean':extreme_ep,'extreme_trade_weighted':extreme_tw,
+                     'total_assignments':assignments,'selected_episodes':str([str(e) for e in selected])})
+    out=pd.DataFrame(rows)
+    if not out.empty:
+        out['episode_mean_q_bh']=bh_adjust(out['episode_mean_p'].to_numpy())
+        out['trade_weighted_q_bh']=bh_adjust(out['trade_weighted_p'].to_numpy())
+    return out
 
-        rows.append({
-            "hypothesis": name,
-            "episode_definition": episode_col,
-            "resolved": int(len(g)),
-            "observed_mean_R_trade_level": observed,
-            "observed_episode_count": int(k),
-            "total_resolved_episode_count": int(total_eps),
-            "episode_means": str({str(e): round(ep_means[e], 6) for e in all_ep}),
-            "exact_or_mc_p": exact_p,
-            "extreme_assignments": int(extreme),
-            "total_assignments": combinations_total,
-            "null_stat_min": null_min,
-            "null_stat_max": null_max,
-            "selected_episodes": str([str(e) for e in selected_ep]),
-        })
+
+def v29_episode_bootstrap(trades, episode_col, n=20000):
+    """Bootstrap independent episodes while preserving within-episode trade blocks."""
+    rows=[]; rng=np.random.default_rng(V27_SEED+2950)
+    resolved=trades[trades['result'].isin(['WIN','LOSS'])].copy()
+    for name,fn in v25_hypotheses():
+        g=resolved.loc[np.asarray(fn(resolved),dtype=bool)].copy(); g['R_num']=pd.to_numeric(g['R'],errors='coerce'); g=g[np.isfinite(g['R_num'])]
+        eps=[]
+        for ep,eg in g.groupby(episode_col,dropna=False): eps.append((float(eg['R_num'].mean()),len(eg),float(eg['R_num'].sum())))
+        if not eps: continue
+        k=len(eps); x=np.array([e[0] for e in eps]); bm=[]; tw=[]
+        for _ in range(n):
+            idx=rng.integers(0,k,size=k); bm.append(x[idx].mean())
+            nn=sum(eps[j][1] for j in idx); tw.append(sum(eps[j][2] for j in idx)/nn)
+        rows.append({'hypothesis':name,'episode_count':k,'observed_episode_mean_R':float(x.mean()),
+                     'episode_bootstrap_ci_low':float(np.quantile(bm,.025)), 'episode_bootstrap_ci_high':float(np.quantile(bm,.975)),
+                     'observed_trade_mean_R':float(g['R_num'].mean()), 'trade_weighted_episode_bootstrap_ci_low':float(np.quantile(tw,.025)),
+                     'trade_weighted_episode_bootstrap_ci_high':float(np.quantile(tw,.975))})
+    return pd.DataFrame(rows)
+
+
+def v29_leave_one_year_out(trades):
+    rows=[]; r=trades[trades['result'].isin(['WIN','LOSS'])].copy(); r['R_num']=pd.to_numeric(r['R'],errors='coerce'); r=r[np.isfinite(r['R_num'])].copy(); r['year']=pd.to_datetime(r['signal_date']).dt.year
+    for name,fn in v25_hypotheses():
+        g=r.loc[np.asarray(fn(r),dtype=bool)].copy()
+        if g.empty: continue
+        vals=[]
+        for y in sorted(g['year'].unique()):
+            keep=g['year']!=y
+            if keep.sum(): vals.append(float(g.loc[keep,'R_num'].mean()))
+        rows.append({'hypothesis':name,'year_count':g['year'].nunique(),'loo_year_min_mean_R':min(vals) if vals else np.nan,'loo_year_max_mean_R':max(vals) if vals else np.nan,'years':str(sorted(g['year'].unique()))})
     return pd.DataFrame(rows)
 
 
@@ -2039,7 +2033,7 @@ def v28_main():
 
     baseline = build_baseline_trades(market)
     if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.8 is stopped.")
+        raise RuntimeError("FROZEN BASELINE FAILED. V2.9 is stopped.")
 
     fred = load_fred()
     trades = attach_macro(baseline, fred)
@@ -2049,7 +2043,7 @@ def v28_main():
     trades = add_v24_period(trades, "2025-01-01")
 
     print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.8 — EPISODE INTEGRITY + STATISTICAL AUDIT")
+    print("MACRO CALIBRATION V2.9 — EPISODE INTEGRITY + STATISTICAL AUDIT")
     print("=" * 72)
     print("V2.7 hypotheses remain frozen: H1/H2/H4/H5; H3 retained for audit.")
     print("No thresholds, entries, exits, sizing, or Decision Engine logic are changed.")
@@ -2057,55 +2051,32 @@ def v28_main():
 
     v27_mc = v28_reproduce_v27_mc(trades)
     market_ep = v28_attach_market_episodes(trades, market)
-    exact_trade_ep = v28_exact_episode_permutation(market_ep, "market_episode_id")
-    exact_v27_ep = v28_exact_episode_permutation(
-        add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD),
-        "dd3_episode_id"
-    )
+    corrected = v29_corrected_episode_permutation(market_ep, "market_episode_id")
+    boot = v29_episode_bootstrap(market_ep, "market_episode_id")
+    loo_year = v29_leave_one_year_out(market_ep)
     audit_market = v28_cluster_audit(market_ep, "market_episode_id")
-    audit_v27 = v28_cluster_audit(
-        add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD),
-        "dd3_episode_id"
-    )
 
-    print("\nV2.7 ALGORITHM REPRODUCTION CHECK")
-    print("-" * 72)
-    print(v27_mc.to_string(index=False))
+    print("\nV2.7 ALGORITHM REPRODUCTION CHECK — AUDIT REFERENCE")
+    print("-" * 72); print(v27_mc.to_string(index=False))
+    print("\nV2.9 CORRECTED EPISODE PERMUTATION — MARKET EPISODES")
+    print("-" * 72); print(corrected.to_string(index=False))
+    print("\nV2.9 EPISODE BOOTSTRAP")
+    print("-" * 72); print(boot.to_string(index=False))
+    print("\nV2.9 LEAVE-ONE-YEAR-OUT")
+    print("-" * 72); print(loo_year.to_string(index=False))
+    print("\nV2.9 CLUSTER / LEAVE-ONE-EPISODE AUDIT — MARKET EPISODES")
+    print("-" * 72); print(audit_market.to_string(index=False))
 
-    print("\nEXACT EPISODE PERMUTATION — MARKET-BASED INDEPENDENT EPISODES")
-    print("-" * 72)
-    print(exact_trade_ep.to_string(index=False))
-
-    print("\nEXACT EPISODE PERMUTATION — ORIGINAL V2.7 TRADE-DATE EPISODES")
-    print("-" * 72)
-    print(exact_v27_ep.to_string(index=False))
-
-    print("\nCLUSTER / LEAVE-ONE-EPISODE AUDIT — MARKET EPISODES")
-    print("-" * 72)
-    print(audit_market.to_string(index=False))
-
-    print("\nCLUSTER / LEAVE-ONE-EPISODE AUDIT — ORIGINAL V2.7 EPISODES")
-    print("-" * 72)
-    print(audit_v27.to_string(index=False))
-
-    trades.to_csv("macro_backtest_v28_trades.csv", index=False)
-    market_ep.to_csv("macro_backtest_v28_market_episode_trades.csv", index=False)
-    v27_mc.to_csv("macro_backtest_v28_v27_algorithm_reproduction.csv", index=False)
-    exact_trade_ep.to_csv("macro_backtest_v28_exact_market_episode_permutation.csv", index=False)
-    exact_v27_ep.to_csv("macro_backtest_v28_exact_v27_episode_permutation.csv", index=False)
-    audit_market.to_csv("macro_backtest_v28_market_episode_cluster_audit.csv", index=False)
-    audit_v27.to_csv("macro_backtest_v28_v27_episode_cluster_audit.csv", index=False)
-
+    trades.to_csv("macro_backtest_v29_trades.csv", index=False)
+    market_ep.to_csv("macro_backtest_v29_market_episode_trades.csv", index=False)
+    v27_mc.to_csv("macro_backtest_v29_v27_algorithm_reproduction_reference.csv", index=False)
+    corrected.to_csv("macro_backtest_v29_corrected_episode_permutation.csv", index=False)
+    boot.to_csv("macro_backtest_v29_episode_bootstrap.csv", index=False)
+    loo_year.to_csv("macro_backtest_v29_leave_one_year_out.csv", index=False)
+    audit_market.to_csv("macro_backtest_v29_market_episode_cluster_audit.csv", index=False)
     print("\nFILES CREATED")
-    print("macro_backtest_v28_trades.csv")
-    print("macro_backtest_v28_market_episode_trades.csv")
-    print("macro_backtest_v28_v27_algorithm_reproduction.csv")
-    print("macro_backtest_v28_exact_market_episode_permutation.csv")
-    print("macro_backtest_v28_exact_v27_episode_permutation.csv")
-    print("macro_backtest_v28_market_episode_cluster_audit.csv")
-    print("macro_backtest_v28_v27_episode_cluster_audit.csv")
-    print("\nMACRO CALIBRATION V2.8 EPISODE INTEGRITY + STATISTICAL AUDIT COMPLETE")
-
+    for f in ["macro_backtest_v29_trades.csv","macro_backtest_v29_market_episode_trades.csv","macro_backtest_v29_v27_algorithm_reproduction_reference.csv","macro_backtest_v29_corrected_episode_permutation.csv","macro_backtest_v29_episode_bootstrap.csv","macro_backtest_v29_leave_one_year_out.csv","macro_backtest_v29_market_episode_cluster_audit.csv"]: print(f)
+    print("\nMACRO CALIBRATION V2.9 CORRECTED STATISTICAL VALIDATION COMPLETE")
 
 if __name__ == "__main__":
     v28_main()
