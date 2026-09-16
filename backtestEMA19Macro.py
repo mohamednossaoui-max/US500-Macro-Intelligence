@@ -2143,4 +2143,1731 @@ momentum_statuses = [
 
 growth_momentum,
 inflation_momentum,
-…
+labor_momentum,
+rates_momentum,
+credit_momentum,
+liquidity_momentum,
+
+]
+
+deteriorating_count = sum(
+x in [
+"DETERIORATING",
+"STRONGLY DETERIORATING",
+]
+for x in momentum_statuses
+)
+
+strong_deteriorating_count = sum(
+x == "STRONGLY DETERIORATING"
+for x in momentum_statuses
+)
+
+improving_count = sum(
+x == "IMPROVING"
+for x in momentum_statuses
+)
+
+# --------------------------------------------------------
+# LEADING WARNING FLAGS
+#
+# Credit / Labor / Liquidity receive special attention
+# because the research objective is to detect deterioration
+# before large drawdowns.
+# --------------------------------------------------------
+
+leading_warning_count = sum(
+x in [
+"DETERIORATING",
+"STRONGLY DETERIORATING",
+]
+for x in [
+credit_momentum,
+labor_momentum,
+liquidity_momentum,
+]
+)
+
+if (
+credit_momentum
+== "STRONGLY DETERIORATING"
+or labor_momentum
+== "STRONGLY DETERIORATING"
+or liquidity_momentum
+== "STRONGLY DETERIORATING"
+):
+
+leading_warning = (
+"STRONG"
+)
+
+elif leading_warning_count >= 2:
+
+leading_warning = (
+"ELEVATED"
+)
+
+elif leading_warning_count == 1:
+
+leading_warning = (
+"WATCH"
+)
+
+else:
+
+leading_warning = (
+"NONE"
+)
+
+# --------------------------------------------------------
+# REGIME CLASSIFICATION
+#
+# EXACT V2 LOGIC PRESERVED.
+# --------------------------------------------------------
+
+regime = "A"
+
+regime_reason = ""
+
+# F
+
+if (
+np.isfinite(credit)
+and np.isfinite(liquidity)
+and credit >= 75
+and liquidity >= 75
+):
+
+regime = "F"
+
+regime_reason = (
+"Severe credit and liquidity stress."
+)
+
+# E
+
+elif (
+np.isfinite(growth)
+and np.isfinite(labor)
+and growth >= 70
+and labor >= 70
+):
+
+regime = "E"
+
+regime_reason = (
+"Growth and labor conditions indicate "
+"significant economic deterioration."
+)
+
+# D
+
+elif (
+np.isfinite(growth)
+and np.isfinite(inflation)
+and growth >= 65
+and inflation >= 65
+):
+
+regime = "D"
+
+regime_reason = (
+"Growth deterioration is occurring alongside "
+"elevated inflation pressure."
+)
+
+# C
+
+elif (
+np.isfinite(inflation)
+and np.isfinite(rates)
+and inflation >= 65
+and rates >= 60
+):
+
+regime = "C"
+
+regime_reason = (
+"Inflation and rates are exerting "
+"significant pressure."
+)
+
+# B
+
+elif (
+np.isfinite(growth)
+and growth >= 60
+and (
+not np.isfinite(inflation)
+or inflation < 55
+)
+):
+
+regime = "B"
+
+regime_reason = (
+"Growth conditions are deteriorating while "
+"inflation pressure remains relatively contained."
+)
+
+# A
+
+else:
+
+regime = "A"
+
+regime_reason = (
+"No dominant combination of macro stresses "
+"meets the thresholds for B-F."
+)
+
+# --------------------------------------------------------
+# SNAPSHOT
+# --------------------------------------------------------
+
+snapshot = {
+
+"US10Y":
+value_asof(
+fred["US10Y"],
+date,
+),
+
+"US2Y":
+value_asof(
+fred["US2Y"],
+date,
+),
+
+"T10Y2Y":
+value_asof(
+fred["T10Y2Y"],
+date,
+),
+
+"VIX":
+value_asof(
+fred["VIX"],
+date,
+),
+
+"DXY":
+value_asof(
+fred["DXY"],
+date,
+),
+
+"UNRATE":
+value_asof(
+fred["UNRATE"],
+date,
+monthly=True,
+),
+
+"INITIAL_CLAIMS_4W":
+value_asof(
+fred["INITIAL_CLAIMS_4W"],
+date,
+),
+
+"HY_SPREAD":
+value_asof(
+fred["HY_SPREAD"],
+date,
+),
+
+"CORP_OAS":
+value_asof(
+fred["CORP_OAS"],
+date,
+),
+
+"NFCI":
+value_asof(
+fred["NFCI"],
+date,
+),
+
+"INDPRO_YOY":
+pct_change_asof(
+fred["INDPRO"],
+date,
+12,
+monthly=True,
+),
+
+"RETAIL_YOY":
+pct_change_asof(
+fred["RETAIL"],
+date,
+12,
+monthly=True,
+),
+
+"PCE_YOY":
+inflation_yoy(
+fred["PCE"],
+date,
+),
+
+"CORE_PCE_YOY":
+inflation_yoy(
+fred["CORE_PCE"],
+date,
+),
+}
+
+# --------------------------------------------------------
+# REASONS
+# --------------------------------------------------------
+
+all_reasons = (
+growth_reasons
++ inflation_reasons
++ labor_reasons
++ rates_reasons
++ credit_reasons
++ liquidity_reasons
+)
+
+return {
+
+# ----------------------------------------------------
+# REGIME
+# ----------------------------------------------------
+
+"macro_regime":
+regime,
+
+"macro_regime_reason":
+regime_reason,
+
+# ----------------------------------------------------
+# LEVEL
+# ----------------------------------------------------
+
+"macro_stress":
+overall_stress,
+
+"growth_stress":
+growth,
+
+"inflation_stress":
+inflation,
+
+"labor_stress":
+labor,
+
+"rates_stress":
+rates,
+
+"credit_stress":
+credit,
+
+"liquidity_stress":
+liquidity,
+
+# ----------------------------------------------------
+# MOMENTUM STATUS
+# ----------------------------------------------------
+
+"growth_momentum":
+growth_momentum,
+
+"inflation_momentum":
+inflation_momentum,
+
+"labor_momentum":
+labor_momentum,
+
+"rates_momentum":
+rates_momentum,
+
+"credit_momentum":
+credit_momentum,
+
+"liquidity_momentum":
+liquidity_momentum,
+
+# ----------------------------------------------------
+# MOMENTUM SCORES
+# ----------------------------------------------------
+
+"growth_momentum_score":
+growth_momentum_score,
+
+"inflation_momentum_score":
+inflation_momentum_score,
+
+"labor_momentum_score":
+labor_momentum_score,
+
+"rates_momentum_score":
+rates_momentum_score,
+
+"credit_momentum_score":
+credit_momentum_score,
+
+"liquidity_momentum_score":
+liquidity_momentum_score,
+
+"macro_momentum":
+overall_momentum,
+
+# ----------------------------------------------------
+# MOMENTUM CHANGES
+# ----------------------------------------------------
+
+"growth_short_change":
+growth_short_change,
+
+"growth_medium_change":
+growth_medium_change,
+
+"inflation_short_change":
+inflation_short_change,
+
+"inflation_medium_change":
+inflation_medium_change,
+
+"labor_short_change":
+labor_short_change,
+
+"labor_medium_change":
+labor_medium_change,
+
+"rates_short_change":
+rates_short_change,
+
+"rates_medium_change":
+rates_medium_change,
+
+"credit_short_change":
+credit_short_change,
+
+"credit_medium_change":
+credit_medium_change,
+
+"liquidity_short_change":
+liquidity_short_change,
+
+"liquidity_medium_change":
+liquidity_medium_change,
+
+# ----------------------------------------------------
+# WARNING COUNTS
+# ----------------------------------------------------
+
+"deteriorating_count":
+deteriorating_count,
+
+"strong_deteriorating_count":
+strong_deteriorating_count,
+
+"improving_count":
+improving_count,
+
+"leading_warning":
+leading_warning,
+
+"leading_warning_count":
+leading_warning_count,
+
+# ----------------------------------------------------
+# REASONS
+# ----------------------------------------------------
+
+"macro_reasons":
+" | ".join(
+all_reasons
+),
+
+**snapshot,
+}
+
+
+# ============================================================
+# ATTACH MACRO
+# ============================================================
+
+def attach_macro(
+trades,
+fred,
+):
+
+rows = []
+
+for _, trade in trades.iterrows():
+
+snap = classify_macro_v21(
+fred,
+trade["signal_date"],
+)
+
+row = trade.to_dict()
+
+row.update(snap)
+
+rows.append(row)
+
+return pd.DataFrame(rows)
+
+
+# ============================================================
+# SUMMARY
+# ============================================================
+
+def summarize_group(g):
+
+wins = int(
+(
+g["result"]
+== "WIN"
+).sum()
+)
+
+losses = int(
+(
+g["result"]
+== "LOSS"
+).sum()
+)
+
+ambiguous = int(
+(
+g["result"]
+== "AMBIGUOUS"
+).sum()
+)
+
+open_trades = int(
+(
+g["result"]
+== "OPEN"
+).sum()
+)
+
+invalid = int(
+(
+g["result"]
+== "INVALID_SL"
+).sum()
+)
+
+resolved = (
+wins
++ losses
+)
+
+total_r = float(
+g["R"]
+.dropna()
+.sum()
+)
+
+gross_profit = float(
+g.loc[
+g["R"] > 0,
+"R",
+].sum()
+)
+
+gross_loss = abs(
+float(
+g.loc[
+g["R"] < 0,
+"R",
+].sum()
+)
+)
+
+if gross_loss > 0:
+
+pf = (
+gross_profit
+/ gross_loss
+)
+
+else:
+
+pf = np.nan
+
+return {
+
+"signals":
+len(g),
+
+"valid":
+len(g) - invalid,
+
+"invalid_sl":
+invalid,
+
+"resolved":
+resolved,
+
+"wins":
+wins,
+
+"losses":
+losses,
+
+"ambiguous":
+ambiguous,
+
+"open":
+open_trades,
+
+"win_rate":
+(
+100 * wins / resolved
+if resolved
+else np.nan
+),
+
+"avg_R":
+(
+float(
+g["R"]
+.dropna()
+.mean()
+)
+if g["R"]
+.notna()
+.any()
+else np.nan
+),
+
+"total_R":
+total_r,
+
+"profit_factor":
+pf,
+}
+
+
+# ============================================================
+# REGIME REPORT
+# ============================================================
+
+def regime_report(
+trades,
+):
+
+rows = []
+
+for (
+regime,
+g,
+) in trades.groupby(
+"macro_regime",
+dropna=False,
+):
+
+s = summarize_group(g)
+
+s[
+"macro_regime"
+] = regime
+
+rows.append(s)
+
+if not rows:
+
+return pd.DataFrame()
+
+return (
+pd.DataFrame(rows)
+.sort_values(
+"macro_regime"
+)
+)
+
+
+# ============================================================
+# MOMENTUM STATUS REPORT
+# ============================================================
+
+def momentum_report(
+trades,
+column,
+):
+
+rows = []
+
+for (
+status,
+g,
+) in trades.groupby(
+column,
+dropna=False,
+):
+
+s = summarize_group(g)
+
+s[
+"momentum_status"
+] = status
+
+rows.append(s)
+
+if not rows:
+
+return pd.DataFrame()
+
+return pd.DataFrame(
+rows
+).sort_values(
+"momentum_status"
+)
+
+
+# ============================================================
+# LEADING WARNING REPORT
+# ============================================================
+
+def leading_warning_report(
+trades,
+):
+
+rows = []
+
+for (
+warning,
+g,
+) in trades.groupby(
+"leading_warning",
+dropna=False,
+):
+
+s = summarize_group(g)
+
+s[
+"leading_warning"
+] = warning
+
+rows.append(s)
+
+if not rows:
+
+return pd.DataFrame()
+
+return pd.DataFrame(
+rows
+).sort_values(
+"leading_warning"
+)
+
+
+# ============================================================
+# ADD RUNNING MARKET DRAWDOWN
+# ============================================================
+
+def add_drawdown(
+trades,
+market,
+):
+
+running_high = (
+market["High"]
+.cummax()
+)
+
+rows = []
+
+for _, trade in trades.iterrows():
+
+d = trade[
+"signal_date"
+]
+
+if d not in running_high.index:
+
+dd = np.nan
+ref_high = np.nan
+
+else:
+
+ref_high = float(
+running_high.loc[d]
+)
+
+if ref_high > 0:
+
+dd = (
+float(
+trade["entry"]
+)
+/ ref_high
+- 1
+) * 100
+
+else:
+
+dd = np.nan
+
+row = trade.to_dict()
+
+row[
+"reference_high"
+] = ref_high
+
+row[
+"drawdown_pct"
+] = dd
+
+rows.append(row)
+
+return pd.DataFrame(
+rows
+)
+
+
+# ============================================================
+# DRAWDOWN BUCKET
+# ============================================================
+
+def add_drawdown_bucket(
+trades,
+):
+
+trades = trades.copy()
+
+trades[
+"drawdown_bucket"
+] = pd.cut(
+
+trades[
+"drawdown_pct"
+],
+
+bins=[
+-np.inf,
+-20,
+-10,
+-5,
+-3,
+0,
+np.inf,
+],
+
+labels=[
+"<=-20%",
+"-20% to -10%",
+"-10% to -5%",
+"-5% to -3%",
+"-3% to 0%",
+">0%",
+],
+
+right=True,
+)
+
+return trades
+
+
+# ============================================================
+# DRAWDOWN x LEADING WARNING
+# ============================================================
+
+def build_drawdown_warning_report(
+trades,
+):
+
+rows = []
+
+for (
+bucket,
+warning,
+), g in trades.groupby(
+[
+"drawdown_bucket",
+"leading_warning",
+],
+observed=False,
+):
+
+if len(g) == 0:
+
+continue
+
+s = summarize_group(g)
+
+s[
+"drawdown_bucket"
+] = str(bucket)
+
+s[
+"leading_warning"
+] = warning
+
+rows.append(s)
+
+if not rows:
+
+return pd.DataFrame()
+
+return pd.DataFrame(rows)
+
+
+# ============================================================
+# DRAWDOWN x MOMENTUM
+# ============================================================
+
+def build_drawdown_momentum_report(
+trades,
+momentum_column,
+):
+
+rows = []
+
+for (
+bucket,
+status,
+), g in trades.groupby(
+[
+"drawdown_bucket",
+momentum_column,
+],
+observed=False,
+):
+
+if len(g) == 0:
+
+continue
+
+s = summarize_group(g)
+
+s[
+"drawdown_bucket"
+] = str(bucket)
+
+s[
+"momentum_status"
+] = status
+
+rows.append(s)
+
+if not rows:
+
+return pd.DataFrame()
+
+return pd.DataFrame(
+rows
+)
+
+
+# ============================================================
+# MACRO STRESS ZONE
+# ============================================================
+
+def classify_stress_zone(
+score,
+):
+
+if not np.isfinite(
+score
+):
+
+return "UNAVAILABLE"
+
+if score < 25:
+
+return "LOW"
+
+if score < 50:
+
+return "MODERATE"
+
+if score < 75:
+
+return "HIGH"
+
+return "EXTREME"
+
+
+# ============================================================
+# ADD STRESS ZONES
+# ============================================================
+
+def add_stress_zones(
+trades,
+):
+
+trades = trades.copy()
+
+trades[
+"macro_stress_zone"
+] = trades[
+"macro_stress"
+].apply(
+classify_stress_zone
+)
+
+trades[
+"macro_momentum_zone"
+] = trades[
+"macro_momentum"
+].apply(
+classify_stress_zone
+)
+
+return trades
+
+
+# ============================================================
+# PRINT BASELINE CHECK
+# ============================================================
+
+def print_baseline_check(
+trades,
+):
+
+s = summarize_group(
+trades
+)
+
+print()
+print("=" * 72)
+print("FROZEN BASELINE CHECK")
+print("=" * 72)
+
+for key in [
+
+"signals",
+"valid",
+"invalid_sl",
+"resolved",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+
+]:
+
+print(
+f"{key:18s}: "
+f"{s[key]}"
+)
+
+print()
+print("Expected:")
+print("signals=119")
+print("valid=117")
+print("invalid_sl=2")
+print("resolved=109")
+print("wins=36")
+print("losses=73")
+print("ambiguous=3")
+print("open=5")
+print("total_R=71")
+print("profit_factor~=1.973")
+
+
+# ============================================================
+# PRINT MOMENTUM SUMMARY
+# ============================================================
+
+def print_momentum_summary(
+trades,
+):
+
+dimensions = [
+
+(
+"growth_momentum",
+"Growth",
+),
+
+(
+"inflation_momentum",
+"Inflation",
+),
+
+(
+"labor_momentum",
+"Labor",
+),
+
+(
+"rates_momentum",
+"Rates",
+),
+
+(
+"credit_momentum",
+"Credit",
+),
+
+(
+"liquidity_momentum",
+"Liquidity",
+),
+
+]
+
+print()
+print("=" * 72)
+print("MACRO MOMENTUM SUMMARY")
+print("=" * 72)
+
+for (
+column,
+label,
+) in dimensions:
+
+if column not in trades.columns:
+
+continue
+
+report = momentum_report(
+trades,
+column,
+)
+
+print()
+print(
+f"--- {label} ---"
+)
+
+print(
+report[
+[
+"momentum_status",
+"signals",
+"resolved",
+"wins",
+"losses",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+
+# ============================================================
+# PRINT LEADING WARNING
+# ============================================================
+
+def print_leading_warning(
+trades,
+):
+
+report = leading_warning_report(
+trades
+)
+
+print()
+print("=" * 72)
+print("LEADING WARNING BACKTEST")
+print("=" * 72)
+
+if report.empty:
+
+print(
+"No leading warning data."
+)
+
+return
+
+print(
+report[
+[
+"leading_warning",
+"signals",
+"resolved",
+"wins",
+"losses",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+
+# ============================================================
+# PRINT DIMENSIONS
+# ============================================================
+
+def print_dimension_report(
+trades,
+):
+
+print()
+print("=" * 72)
+print("MACRO V2.1 DIMENSIONS")
+print("=" * 72)
+
+columns = [
+
+"signal_date",
+"macro_regime",
+
+"macro_stress",
+"macro_momentum",
+
+"growth_stress",
+"growth_momentum",
+
+"inflation_stress",
+"inflation_momentum",
+
+"labor_stress",
+"labor_momentum",
+
+"rates_stress",
+"rates_momentum",
+
+"credit_stress",
+"credit_momentum",
+
+"liquidity_stress",
+"liquidity_momentum",
+
+"leading_warning",
+"leading_warning_count",
+
+]
+
+available = [
+x
+for x in columns
+if x in trades.columns
+]
+
+print(
+trades[
+available
+]
+.sort_values(
+"signal_date"
+)
+.to_string(
+index=False
+)
+)
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+# ========================================================
+# MARKET
+# ========================================================
+
+market = load_market()
+
+print(
+f"Market rows: "
+f"{len(market)} | "
+f"{market.index.min().date()} "
+f"-> "
+f"{market.index.max().date()}"
+)
+
+# ========================================================
+# FROZEN BASELINE
+# ========================================================
+
+baseline = (
+build_baseline_trades(
+market
+)
+)
+
+print_baseline_check(
+baseline
+)
+
+# ========================================================
+# LOAD FRED
+# ========================================================
+
+fred = load_fred()
+
+# ========================================================
+# MACRO V2.1
+# ========================================================
+
+trades = attach_macro(
+baseline,
+fred,
+)
+
+# ========================================================
+# DRAWDOWN
+# ========================================================
+
+trades = add_drawdown(
+trades,
+market,
+)
+
+trades = add_drawdown_bucket(
+trades
+)
+
+trades = add_stress_zones(
+trades
+)
+
+# ========================================================
+# REGIME REPORT
+# ========================================================
+
+report = regime_report(
+trades
+)
+
+print()
+print("=" * 72)
+print("MACRO REGIME BACKTEST V2.1")
+print("=" * 72)
+
+if report.empty:
+
+print(
+"No regime classifications available."
+)
+
+else:
+
+print(
+report[
+[
+"macro_regime",
+"signals",
+"valid",
+"invalid_sl",
+"resolved",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+# ========================================================
+# MOMENTUM
+# ========================================================
+
+print_momentum_summary(
+trades
+)
+
+# ========================================================
+# LEADING WARNING
+# ========================================================
+
+print_leading_warning(
+trades
+)
+
+# ========================================================
+# DIMENSIONS
+# ========================================================
+
+print_dimension_report(
+trades
+)
+
+# ========================================================
+# DRAWDOWN x LEADING WARNING
+# ========================================================
+
+warning_dd_report = (
+build_drawdown_warning_report(
+trades
+)
+)
+
+print()
+print("=" * 72)
+print("DRAWDOWN x LEADING WARNING")
+print("=" * 72)
+
+if warning_dd_report.empty:
+
+print(
+"No data available."
+)
+
+else:
+
+print(
+warning_dd_report[
+[
+"drawdown_bucket",
+"leading_warning",
+"signals",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+# ========================================================
+# DRAWDOWN x CREDIT MOMENTUM
+# ========================================================
+
+credit_dd_report = (
+build_drawdown_momentum_report(
+trades,
+"credit_momentum",
+)
+)
+
+print()
+print("=" * 72)
+print("DRAWDOWN x CREDIT MOMENTUM")
+print("=" * 72)
+
+if credit_dd_report.empty:
+
+print(
+"No data available."
+)
+
+else:
+
+print(
+credit_dd_report[
+[
+"drawdown_bucket",
+"momentum_status",
+"signals",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+# ========================================================
+# DRAWDOWN x LABOR MOMENTUM
+# ========================================================
+
+labor_dd_report = (
+build_drawdown_momentum_report(
+trades,
+"labor_momentum",
+)
+)
+
+print()
+print("=" * 72)
+print("DRAWDOWN x LABOR MOMENTUM")
+print("=" * 72)
+
+if labor_dd_report.empty:
+
+print(
+"No data available."
+)
+
+else:
+
+print(
+labor_dd_report[
+[
+"drawdown_bucket",
+"momentum_status",
+"signals",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+# ========================================================
+# DRAWDOWN x LIQUIDITY MOMENTUM
+# ========================================================
+
+liquidity_dd_report = (
+build_drawdown_momentum_report(
+trades,
+"liquidity_momentum",
+)
+)
+
+print()
+print("=" * 72)
+print("DRAWDOWN x LIQUIDITY MOMENTUM")
+print("=" * 72)
+
+if liquidity_dd_report.empty:
+
+print(
+"No data available."
+)
+
+else:
+
+print(
+liquidity_dd_report[
+[
+"drawdown_bucket",
+"momentum_status",
+"signals",
+"wins",
+"losses",
+"ambiguous",
+"open",
+"win_rate",
+"avg_R",
+"total_R",
+"profit_factor",
+]
+].to_string(
+index=False
+)
+)
+
+# ========================================================
+# SAVE FULL TRADE DATA
+# ========================================================
+
+trades.to_csv(
+"macro_backtest_v21_trades.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE REGIME REPORT
+# ========================================================
+
+report.to_csv(
+"macro_backtest_v21_regimes.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE LEADING WARNING
+# ========================================================
+
+leading_report = (
+leading_warning_report(
+trades
+)
+)
+
+leading_report.to_csv(
+"macro_backtest_v21_leading_warning.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE CREDIT DD
+# ========================================================
+
+credit_dd_report.to_csv(
+"macro_backtest_v21_credit_momentum_dd.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE LABOR DD
+# ========================================================
+
+labor_dd_report.to_csv(
+"macro_backtest_v21_labor_momentum_dd.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE LIQUIDITY DD
+# ========================================================
+
+liquidity_dd_report.to_csv(
+"macro_backtest_v21_liquidity_momentum_dd.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE WARNING x DD
+# ========================================================
+
+warning_dd_report.to_csv(
+"macro_backtest_v21_warning_dd.csv",
+index=False,
+)
+
+# ========================================================
+# SAVE DIMENSIONS
+# ========================================================
+
+dimension_columns = [
+
+"signal_date",
+
+"macro_regime",
+"macro_regime_reason",
+
+"macro_stress",
+"macro_stress_zone",
+
+"macro_momentum",
+"macro_momentum_zone",
+
+"growth_stress",
+"growth_momentum",
+
+"inflation_stress",
+"inflation_momentum",
+
+"labor_stress",
+"labor_momentum",
+
+"rates_stress",
+"rates_momentum",
+
+"credit_stress",
+"credit_momentum",
+
+"liquidity_stress",
+"liquidity_momentum",
+
+"growth_short_change",
+"growth_medium_change",
+
+"inflation_short_change",
+"inflation_medium_change",
+
+"labor_short_change",
+"labor_medium_change",
+
+"rates_short_change",
+"rates_medium_change",
+
+"credit_short_change",
+"credit_medium_change",
+
+"liquidity_short_change",
+"liquidity_medium_change",
+
+"deteriorating_count",
+"strong_deteriorating_count",
+"improving_count",
+
+"leading_warning",
+"leading_warning_count",
+
+"macro_reasons",
+
+]
+
+available_columns = [
+column
+for column in dimension_columns
+if column in trades.columns
+]
+
+trades[
+available_columns
+].to_csv(
+"macro_backtest_v21_dimensions.csv",
+index=False,
+)
+
+# ========================================================
+# OUTPUT FILES
+# ========================================================
+
+print()
+print("=" * 72)
+print("OUTPUT FILES")
+print("=" * 72)
+
+print(
+"macro_backtest_v21_trades.csv"
+)
+
+print(
+"macro_backtest_v21_regimes.csv"
+)
+
+print(
+"macro_backtest_v21_leading_warning.csv"
+)
+
+print(
+"macro_backtest_v21_credit_momentum_dd.csv"
+)
+
+print(
+"macro_backtest_v21_labor_momentum_dd.csv"
+)
+
+print(
+"macro_backtest_v21_liquidity_momentum_dd.csv"
+)
+
+print(
+"macro_backtest_v21_warning_dd.csv"
+)
+
+print(
+"macro_backtest_v21_dimensions.csv"
+)
+
+# ========================================================
+# COMPLETE
+# ========================================================
+
+print()
+print("=" * 72)
+print("MACRO CALIBRATION V2.1 COMPLETE")
+print("=" * 72)
+
+
+# ============================================================
+# RUN
+# ============================================================
+
+if __name__ == "__main__":
+main()
