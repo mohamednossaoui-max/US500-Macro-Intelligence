@@ -754,6 +754,36 @@ def build_episode_warning_summary(detail, windows=(60, 20, 10, 5)):
     return pd.DataFrame(rows)
 
 
+
+def build_confluence_report(trades, columns, min_signals=1):
+    """Trade-level macro confluence study. No thresholds or baseline logic are changed."""
+    rows = []
+    work = trades.copy()
+    for c in columns:
+        if c not in work.columns:
+            raise KeyError(f"Missing confluence column: {c}")
+    for keys, g in work.groupby(columns, dropna=False, observed=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        s = summarize(g)
+        if s["signals"] < min_signals:
+            continue
+        row = {c: k for c, k in zip(columns, keys)}
+        row.update(s)
+        row["confluence_group"] = " | ".join(str(k) for k in keys)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def add_confluence_flags(trades):
+    """Descriptive confluence flags; these are research labels only."""
+    out = trades.copy()
+    out["leading_stress_count"] = out[["credit_momentum", "labor_momentum", "liquidity_momentum"]].isin(["DETERIORATING", "STRONGLY DETERIORATING"]).sum(axis=1)
+    out["macro_deterioration_count"] = out[[f"{d}_momentum" for d in DIMENSIONS]].isin(["DETERIORATING", "STRONGLY DETERIORATING"]).sum(axis=1)
+    out["macro_improvement_count"] = out[[f"{d}_momentum" for d in DIMENSIONS]].eq("IMPROVING").sum(axis=1)
+    out["technical_context"] = "NOT_INCLUDED"
+    return out
+
 def main():
     market = load_market()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
@@ -776,7 +806,40 @@ def main():
         print_report(f"DRAWDOWN x {dim.upper()} MOMENTUM", report_2d, "group")
 
     # ------------------------------------------------------------
-    # V2.2 LEAD EVENT STUDY
+    # V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY
+    # Descriptive only: no entries, exits, sizing, or Decision Engine changes.
+    # ------------------------------------------------------------
+    trades = add_confluence_flags(trades)
+    print("\n" + "=" * 72)
+    print("V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY")
+    print("=" * 72)
+    print("Research-only trade-level grouping. Frozen baseline remains unchanged.")
+
+    confluence_specs = [
+        ("DRAWDOWN x LEADING WARNING", ["drawdown_bucket", "leading_warning"]),
+        ("DRAWDOWN x MACRO REGIME", ["drawdown_bucket", "macro_regime"]),
+        ("MACRO REGIME x LEADING WARNING", ["macro_regime", "leading_warning"]),
+        ("LEADING WARNING x LIQUIDITY MOMENTUM", ["leading_warning", "liquidity_momentum"]),
+        ("LEADING WARNING x CREDIT MOMENTUM", ["leading_warning", "credit_momentum"]),
+        ("LEADING WARNING x LABOR MOMENTUM", ["leading_warning", "labor_momentum"]),
+        ("MACRO REGIME x LIQUIDITY MOMENTUM", ["macro_regime", "liquidity_momentum"]),
+        ("DRAWDOWN x LEADING STRESS COUNT", ["drawdown_bucket", "leading_stress_count"]),
+        ("DRAWDOWN x MACRO DETERIORATION COUNT", ["drawdown_bucket", "macro_deterioration_count"]),
+        ("FULL MACRO CONFLUENCE", ["drawdown_bucket", "macro_regime", "leading_warning"]),
+    ]
+    confluence_reports = {}
+    for title, cols in confluence_specs:
+        report = build_confluence_report(trades, cols, min_signals=1)
+        confluence_reports[title] = report
+        print("\n" + "-" * 72)
+        print(title)
+        print("-" * 72)
+        if report.empty:
+            print("No data available.")
+        else:
+            display_cols = cols + ["signals", "valid", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor"]
+            print(report[display_cols].to_string(index=False))
+
     # Tests macro state 60/20/10/5 trading days BEFORE the first
     # close-based crossing of -10% and -20% drawdown.
     # ------------------------------------------------------------
@@ -828,6 +891,11 @@ def main():
     grouped_report(trades, "leading_warning").to_csv("macro_backtest_v21_leading_warning.csv", index=False)
     grouped_report(trades, "macro_stress_zone").to_csv("macro_backtest_v21_stress_zones.csv", index=False)
     grouped_report(trades, "macro_momentum_zone").to_csv("macro_backtest_v21_momentum_zones.csv", index=False)
+    trades.to_csv("macro_backtest_v23_trade_confluence_trades.csv", index=False)
+    for title, report in confluence_reports.items():
+        slug = title.lower().replace(" ", "_").replace("x", "x")
+        slug = "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+        report.to_csv(f"macro_backtest_v23_{slug}.csv", index=False)
     lead_detail.to_csv("macro_backtest_v22_lead_event_detail.csv", index=False)
     lead_dim.to_csv("macro_backtest_v22_lead_dimension_summary.csv", index=False)
     lead_transition.to_csv("macro_backtest_v22_lead_transitions.csv", index=False)
@@ -836,7 +904,7 @@ def main():
     episode_dim.to_csv("macro_backtest_v222_episode_dimension_summary.csv", index=False)
     episode_transition.to_csv("macro_backtest_v222_episode_transitions.csv", index=False)
     episode_warning.to_csv("macro_backtest_v222_episode_warning.csv", index=False)
-    print("\nMACRO CALIBRATION V2.2.2 INDEPENDENT EPISODE ANALYSIS COMPLETE")
+    print("\nMACRO CALIBRATION V2.3 TRADE-LEVEL MACRO CONFLUENCE STUDY COMPLETE")
 
 if __name__ == "__main__":
     main()
