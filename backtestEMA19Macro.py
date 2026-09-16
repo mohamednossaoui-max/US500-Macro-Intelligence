@@ -450,33 +450,47 @@ def print_report(title, report, key):
 
 
 def detect_drawdown_events(market, thresholds=(-10.0, -20.0)):
-    """Return the first trading day of each drawdown episode crossing each threshold.
+    """Return independent drawdown episodes for each threshold.
 
-    Drawdown uses the same reference-high concept as the trade analysis:
-    current Close divided by cumulative maximum High minus one.
-    An event is recorded only on the first day a threshold is crossed in an
-    episode; recovery above the threshold allows a later episode to count.
+    An episode starts on the first trading day that closes at or below the
+    threshold. No second event is created while the index remains below that
+    threshold. The episode is considered recovered only when drawdown returns
+    to 0% (a new cumulative-high close). This prevents 2022-style prolonged
+    drawdowns from being counted as many independent events.
     """
     ref_high = market["High"].cummax()
     dd = (market["Close"] / ref_high - 1.0) * 100.0
     events = []
+
     for threshold in thresholds:
-        breached = dd <= threshold
-        first = breached & ~breached.shift(1, fill_value=False)
-        for idx in market.index[first]:
-            pos = market.index.get_loc(idx)
-            events.append({
-                "threshold": float(threshold),
-                "event_date": pd.Timestamp(idx),
-                "event_index": int(pos),
-                "event_drawdown_pct": float(dd.loc[idx]),
-                "reference_high": float(ref_high.loc[idx]),
-            })
-    return pd.DataFrame(events).sort_values(["threshold", "event_date"]).reset_index(drop=True)
+        in_episode = False
+        episode_id = 0
+        for pos, idx in enumerate(market.index):
+            value = float(dd.iloc[pos])
+
+            if not in_episode and value <= threshold:
+                episode_id += 1
+                in_episode = True
+                events.append({
+                    "threshold": float(threshold),
+                    "episode_id": int(episode_id),
+                    "event_date": pd.Timestamp(idx),
+                    "event_index": int(pos),
+                    "event_drawdown_pct": value,
+                    "reference_high": float(ref_high.iloc[pos]),
+                })
+
+            # Recovery is defined strictly by return to 0% drawdown.
+            if in_episode and value >= 0.0:
+                in_episode = False
+
+    return pd.DataFrame(events).sort_values(
+        ["threshold", "event_date"]
+    ).reset_index(drop=True)
 
 
 def build_lead_event_study(market, fred, thresholds=(-10.0, -20.0), windows=(60, 20, 10, 5)):
-    """Evaluate macro state only on trading days before drawdown threshold events."""
+    """Evaluate macro state on trading days before independent episodes."""
     events = detect_drawdown_events(market, thresholds=thresholds)
     detail = []
     for _, ev in events.iterrows():
@@ -586,6 +600,142 @@ def build_lead_warning_report(detail, windows=(60, 20, 10, 5)):
     return pd.DataFrame(rows)
 
 
+
+def build_episode_comparison(detail, windows=(60, 20, 10, 5)):
+    """One row per independent episode with compact macro trajectory fields."""
+    rows = []
+    if detail.empty:
+        return pd.DataFrame()
+
+    for _, r in detail.iterrows():
+        out = {
+            "threshold": r["threshold"],
+            "episode_id": r["episode_id"],
+            "event_date": r["event_date"],
+            "event_drawdown_pct": r["event_drawdown_pct"],
+        }
+        for window in windows:
+            prefix = f"tminus_{window}d"
+            out[f"{prefix}_date"] = r.get(f"{prefix}_date", pd.NaT)
+            out[f"{prefix}_leading_warning"] = r.get(f"{prefix}_leading_warning", np.nan)
+            out[f"{prefix}_macro_regime"] = r.get(f"{prefix}_macro_regime", np.nan)
+            out[f"{prefix}_macro_stress"] = r.get(f"{prefix}_macro_stress", np.nan)
+            out[f"{prefix}_macro_momentum"] = r.get(f"{prefix}_macro_momentum", np.nan)
+        rows.append(out)
+    return pd.DataFrame(rows)
+
+
+def build_episode_stress_transitions(detail, windows=(60, 20, 10, 5)):
+    """Calculate stress changes within each independent episode.
+
+    Positive delta = more stress according to the existing V2.1 score.
+    No thresholds or scoring rules are changed here.
+    """
+    rows = []
+    if detail.empty:
+        return pd.DataFrame()
+
+    pairs = list(zip(windows[:-1], windows[1:]))
+    for _, r in detail.iterrows():
+        for dim in DIMENSIONS:
+            for w0, w1 in pairs:
+                a = pd.to_numeric(r.get(f"tminus_{w0}d_{dim}_stress"), errors="coerce")
+                b = pd.to_numeric(r.get(f"tminus_{w1}d_{dim}_stress"), errors="coerce")
+                if not (np.isfinite(a) and np.isfinite(b)):
+                    continue
+                delta = float(b - a)
+                rows.append({
+                    "threshold": r["threshold"],
+                    "episode_id": r["episode_id"],
+                    "event_date": r["event_date"],
+                    "dimension": dim,
+                    "from_window": w0,
+                    "to_window": w1,
+                    "stress_from": float(a),
+                    "stress_to": float(b),
+                    "stress_change": delta,
+                    "direction": "WORSENED" if delta >= 5 else "IMPROVED" if delta <= -5 else "STABLE",
+                })
+
+            a = pd.to_numeric(r.get(f"tminus_{windows[0]}d_{dim}_stress"), errors="coerce")
+            b = pd.to_numeric(r.get(f"tminus_{windows[-1]}d_{dim}_stress"), errors="coerce")
+            if np.isfinite(a) and np.isfinite(b):
+                delta = float(b - a)
+                rows.append({
+                    "threshold": r["threshold"],
+                    "episode_id": r["episode_id"],
+                    "event_date": r["event_date"],
+                    "dimension": dim,
+                    "from_window": windows[0],
+                    "to_window": windows[-1],
+                    "stress_from": float(a),
+                    "stress_to": float(b),
+                    "stress_change": delta,
+                    "direction": "WORSENED" if delta >= 5 else "IMPROVED" if delta <= -5 else "STABLE",
+                })
+    return pd.DataFrame(rows)
+
+
+def build_episode_dimension_summary(detail, windows=(60, 20, 10, 5)):
+    """Summary across independent episodes, with mathematically valid percentages."""
+    rows = []
+    if detail.empty:
+        return pd.DataFrame()
+
+    for threshold in sorted(detail["threshold"].dropna().unique()):
+        subset = detail[detail["threshold"] == threshold]
+        for dim in DIMENSIONS:
+            for window in windows:
+                status_col = f"tminus_{window}d_{dim}_momentum"
+                stress_col = f"tminus_{window}d_{dim}_stress"
+                if status_col not in subset.columns:
+                    continue
+                s = subset[status_col]
+                stress = pd.to_numeric(subset[stress_col], errors="coerce")
+                valid = s.notna()
+                n = int(valid.sum())
+                if n == 0:
+                    continue
+                ss = s[valid]
+                vv = stress[stress.notna()]
+                rows.append({
+                    "threshold": threshold,
+                    "dimension": dim,
+                    "window_trading_days": window,
+                    "episodes": n,
+                    "deteriorating_pct": 100 * ss.isin(["DETERIORATING", "STRONGLY DETERIORATING"]).mean(),
+                    "strongly_deteriorating_pct": 100 * (ss == "STRONGLY DETERIORATING").mean(),
+                    "improving_pct": 100 * (ss == "IMPROVING").mean(),
+                    "stable_pct": 100 * (ss == "STABLE").mean(),
+                    "mean_stress": float(vv.mean()) if len(vv) else np.nan,
+                    "median_stress": float(vv.median()) if len(vv) else np.nan,
+                })
+    return pd.DataFrame(rows)
+
+
+def build_episode_warning_summary(detail, windows=(60, 20, 10, 5)):
+    rows = []
+    if detail.empty:
+        return pd.DataFrame()
+    for threshold in sorted(detail["threshold"].dropna().unique()):
+        subset = detail[detail["threshold"] == threshold]
+        for window in windows:
+            col = f"tminus_{window}d_leading_warning"
+            if col not in subset.columns:
+                continue
+            s = subset[col].dropna()
+            n = len(s)
+            for state in ["NONE", "WATCH", "ELEVATED", "STRONG"]:
+                rows.append({
+                    "threshold": threshold,
+                    "window_trading_days": window,
+                    "leading_warning": state,
+                    "episodes": n,
+                    "pct": 100 * (s == state).mean() if n else np.nan,
+                })
+    return pd.DataFrame(rows)
+
+
 def main():
     market = load_market()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
@@ -618,7 +768,7 @@ def main():
     lead_warning = build_lead_warning_report(lead_detail)
 
     print("\n" + "=" * 72)
-    print("V2.2 DRAWdown LEAD EVENT STUDY")
+    print("V2.2.1 INDEPENDENT DRAWDOWN EPISODE STUDY")
     print("=" * 72)
     if lead_detail.empty:
         print("No -10%/-20% drawdown threshold events detected.")
@@ -626,15 +776,31 @@ def main():
         print("Threshold events:")
         print(lead_detail[["threshold", "event_date", "event_drawdown_pct"]].to_string(index=False))
 
-        print("\nLEAD DIMENSION SUMMARY")
-        print(lead_dim.to_string(index=False))
+        episode_dim = build_episode_dimension_summary(lead_detail)
+        episode_transition = build_episode_stress_transitions(lead_detail)
+        episode_warning = build_episode_warning_summary(lead_detail)
+        episode_comparison = build_episode_comparison(lead_detail)
 
-        print("\nLEAD STRESS TRANSITIONS FROM T-60")
-        print(lead_transition.to_string(index=False))
+        print("\nINDEPENDENT DRAWDOWN EPISODES")
+        print(lead_detail[["threshold", "episode_id", "event_date", "event_drawdown_pct"]].to_string(index=False))
 
-        print("\nLEADING WARNING BY PRE-EVENT WINDOW")
-        print(lead_warning.to_string(index=False))
+        print("\nDIMENSION LEAD SUMMARY â INDEPENDENT EPISODES")
+        print(episode_dim.to_string(index=False))
 
+        print("\nSTRESS TRANSITIONS BY EPISODE")
+        print(episode_transition.to_string(index=False))
+
+        print("\nLEADING WARNING BY EPISODE")
+        print(episode_warning.to_string(index=False))
+
+        print("\nEPISODE COMPARISON")
+        print(episode_comparison.to_string(index=False))
+
+    if lead_detail.empty:
+        episode_dim = pd.DataFrame()
+        episode_transition = pd.DataFrame()
+        episode_warning = pd.DataFrame()
+        episode_comparison = pd.DataFrame()
     trades.to_csv("macro_backtest_v21_trades.csv", index=False)
     grouped_report(trades, "macro_regime").to_csv("macro_backtest_v21_regimes.csv", index=False)
     grouped_report(trades, "leading_warning").to_csv("macro_backtest_v21_leading_warning.csv", index=False)
@@ -644,7 +810,11 @@ def main():
     lead_dim.to_csv("macro_backtest_v22_lead_dimension_summary.csv", index=False)
     lead_transition.to_csv("macro_backtest_v22_lead_transitions.csv", index=False)
     lead_warning.to_csv("macro_backtest_v22_lead_warning.csv", index=False)
-    print("\nMACRO CALIBRATION V2.2 LEAD ANALYSIS COMPLETE")
+    episode_comparison.to_csv("macro_backtest_v221_episode_comparison.csv", index=False)
+    episode_dim.to_csv("macro_backtest_v221_episode_dimension_summary.csv", index=False)
+    episode_transition.to_csv("macro_backtest_v221_episode_transitions.csv", index=False)
+    episode_warning.to_csv("macro_backtest_v221_episode_warning.csv", index=False)
+    print("\nMACRO CALIBRATION V2.2.1 INDEPENDENT EPISODE ANALYSIS COMPLETE")
 
 if __name__ == "__main__":
     main()
