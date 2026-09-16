@@ -1449,5 +1449,318 @@ def v26_main():
     print("\nMACRO CALIBRATION V2.6 STATISTICAL ROBUSTNESS / NULL TESTING COMPLETE")
 
 
+# V2.6 main guard disabled when running V2.7.
+
+
+# ============================================================
+# V2.7 TEMPORAL / DEPENDENCY ROBUSTNESS
+# ============================================================
+
+V27_BOOTSTRAPS = 5000
+V27_SEED = 2707
+
+def add_independent_drawdown_episodes(trades, threshold=-3.0):
+    """Assign independent drawdown episodes.
+
+    An episode starts on the first observed trade-date at or below the
+    threshold after the prior episode has recovered to >= 0% drawdown.
+    Trades before the first threshold crossing are assigned NORMAL_0.
+    This is deliberately a coarse market-state cluster, not a new trading rule.
+    """
+    work = trades.copy()
+    work["signal_date"] = pd.to_datetime(work["signal_date"])
+    work = work.sort_values("signal_date").reset_index(drop=True)
+
+    episode = 0
+    active = False
+    ids = []
+    for _, row in work.iterrows():
+        dd = row.get("drawdown_pct", np.nan)
+        if not active:
+            if np.isfinite(dd) and float(dd) <= threshold:
+                episode += 1
+                active = True
+        ids.append(episode)
+        if active and np.isfinite(dd) and float(dd) >= 0:
+            active = False
+    work["dd3_episode_id"] = ids
+    work["dd3_episode"] = work["dd3_episode_id"].apply(
+        lambda x: f"EP_{int(x)}" if int(x) > 0 else "NORMAL"
+    )
+    return work
+
+
+def _cluster_bootstrap_mean(values, clusters, rng, n=V27_BOOTSTRAPS, alpha=0.05):
+    """Bootstrap clusters, keeping all observations inside a cluster together."""
+    values = np.asarray(values, dtype=float)
+    clusters = np.asarray(clusters)
+    if len(values) == 0:
+        return np.nan, np.nan
+    unique = pd.unique(clusters)
+    if len(unique) == 1:
+        return float(values.mean()), float(values.mean())
+
+    cluster_values = {c: values[clusters == c] for c in unique}
+    means = np.empty(n, dtype=float)
+    for b in range(n):
+        sampled = rng.choice(unique, size=len(unique), replace=True)
+        vals = np.concatenate([cluster_values[c] for c in sampled])
+        means[b] = float(np.mean(vals))
+    return (
+        float(np.quantile(means, alpha / 2)),
+        float(np.quantile(means, 1 - alpha / 2)),
+    )
+
+
+def _episode_leave_one_out(values, clusters):
+    """Return min/max mean after removing one independent episode/cluster."""
+    values = np.asarray(values, dtype=float)
+    clusters = np.asarray(clusters)
+    unique = pd.unique(clusters)
+    if len(unique) <= 1:
+        return np.nan, np.nan, len(unique)
+
+    means = []
+    for c in unique:
+        keep = clusters != c
+        if keep.sum():
+            means.append(float(values[keep].mean()))
+    return float(min(means)), float(max(means)), len(unique)
+
+
+def _cluster_concentration(values, clusters):
+    """Measure whether a result is dominated by one temporal cluster."""
+    values = np.asarray(values, dtype=float)
+    clusters = np.asarray(clusters)
+    unique = pd.unique(clusters)
+    totals = {c: float(values[clusters == c].sum()) for c in unique}
+    ranked = sorted(totals.values(), reverse=True)
+    total = float(values.sum())
+    return {
+        "cluster_count": len(unique),
+        "top_cluster_R": ranked[0] if ranked else np.nan,
+        "total_R_excl_top_cluster": (
+            total - ranked[0] if ranked else total
+        ),
+        "top_2_cluster_R": (
+            sum(ranked[:2]) if ranked else np.nan
+        ),
+        "total_R_excl_top_2_clusters": (
+            total - sum(ranked[:2]) if ranked else total
+        ),
+    }
+
+
+def v27_temporal_robustness(trades):
+    """Evaluate frozen hypotheses using temporal clusters rather than
+    treating every trade as independent evidence."""
+    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
+    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
+    resolved["year_cluster"] = resolved["signal_date"].dt.year.astype(str)
+
+    rows = []
+    rng = np.random.default_rng(V27_SEED)
+
+    for name, fn in v25_hypotheses():
+        mask = np.asarray(fn(resolved), dtype=bool)
+        g = resolved.loc[mask].copy()
+        if g.empty:
+            rows.append({
+                "hypothesis": name,
+                "resolved": 0,
+                "dd3_episode_clusters": 0,
+                "year_clusters": 0,
+            })
+            continue
+
+        r = pd.to_numeric(g["R"], errors="coerce").to_numpy(dtype=float)
+        ok = np.isfinite(r)
+        g = g.loc[ok].reset_index(drop=True)
+        r = pd.to_numeric(g["R"], errors="coerce").to_numpy(dtype=float)
+
+        dd_clusters = g["dd3_episode_id"].to_numpy()
+        year_clusters = g["year_cluster"].to_numpy()
+
+        dd_lo, dd_hi = _cluster_bootstrap_mean(r, dd_clusters, rng)
+        yr_lo, yr_hi = _cluster_bootstrap_mean(r, year_clusters, rng)
+
+        dd_loo_min, dd_loo_max, dd_n = _episode_leave_one_out(r, dd_clusters)
+        yr_loo_min, yr_loo_max, yr_n = _episode_leave_one_out(r, year_clusters)
+
+        row = {
+            "hypothesis": name,
+            "resolved": len(r),
+            "wins": int((g["result"] == "WIN").sum()),
+            "losses": int((g["result"] == "LOSS").sum()),
+            "mean_R": float(r.mean()),
+            "total_R": float(r.sum()),
+            "dd3_episode_clusters": dd_n,
+            "dd3_cluster_bootstrap_ci_low": dd_lo,
+            "dd3_cluster_bootstrap_ci_high": dd_hi,
+            "dd3_leave_one_episode_out_min_mean_R": dd_loo_min,
+            "dd3_leave_one_episode_out_max_mean_R": dd_loo_max,
+            "year_clusters": yr_n,
+            "year_cluster_bootstrap_ci_low": yr_lo,
+            "year_cluster_bootstrap_ci_high": yr_hi,
+            "year_leave_one_out_min_mean_R": yr_loo_min,
+            "year_leave_one_out_max_mean_R": yr_loo_max,
+            **_cluster_concentration(r, dd_clusters),
+        }
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def v27_episode_permutation(trades, n=V27_BOOTSTRAPS):
+    """Episode-level placebo: preserve complete temporal clusters and compare
+    observed hypothesis-group mean with random episode assignment.
+
+    This is intentionally conservative. It does not pretend trades within
+    one market episode are independent observations.
+    """
+    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
+    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
+
+    rows = []
+    rng = np.random.default_rng(V27_SEED + 100)
+
+    for name, fn in v25_hypotheses():
+        mask = np.asarray(fn(resolved), dtype=bool)
+        if not mask.any():
+            continue
+
+        observed = float(pd.to_numeric(
+            resolved.loc[mask, "R"], errors="coerce"
+        ).dropna().mean())
+
+        # A hypothesis is considered represented by the set of episodes in
+        # which it appears. Randomly select the same number of episodes and
+        # pool all trades from those episodes.
+        episode_labels = resolved["dd3_episode_id"].to_numpy()
+        unique = pd.unique(episode_labels)
+        selected_obs = pd.unique(episode_labels[mask])
+        k = len(selected_obs)
+
+        if k == 0 or len(unique) <= 1:
+            p = np.nan
+        else:
+            episode_means = {
+                e: float(pd.to_numeric(
+                    resolved.loc[episode_labels == e, "R"],
+                    errors="coerce"
+                ).dropna().mean())
+                for e in unique
+            }
+            valid_eps = [e for e, v in episode_means.items() if np.isfinite(v)]
+            k = min(k, len(valid_eps))
+            extreme = 0
+            for _ in range(n):
+                chosen = rng.choice(valid_eps, size=k, replace=False)
+                vals = [episode_means[e] for e in chosen]
+                stat = float(np.mean(vals))
+                if stat >= observed - 1e-12:
+                    extreme += 1
+            p = float((extreme + 1) / (n + 1))
+
+        rows.append({
+            "hypothesis": name,
+            "resolved": int(mask.sum()),
+            "observed_mean_R": observed,
+            "observed_episode_count": int(len(selected_obs)),
+            "total_episode_count": int(len(unique)),
+            "episode_level_permutation_p": p,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def v27_exclusion_sensitivity(trades):
+    """Leave-one-year and leave-one-major-episode sensitivity."""
+    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
+    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
+    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
+
+    rows = []
+    exclusion_sets = {
+        "NONE": set(),
+        "EXCLUDE_2020": {2020},
+        "EXCLUDE_2022": {2022},
+        "EXCLUDE_2020_2022": {2020, 2022},
+        "EXCLUDE_2025": {2025},
+    }
+
+    for name, fn in v25_hypotheses():
+        base = resolved.loc[fn(resolved)].copy()
+        for label, years in exclusion_sets.items():
+            g = base[~base["signal_date"].dt.year.isin(years)]
+            r = pd.to_numeric(g["R"], errors="coerce").dropna()
+            rows.append({
+                "hypothesis": name,
+                "exclusion": label,
+                "resolved": len(r),
+                "wins": int((g["result"] == "WIN").sum()),
+                "losses": int((g["result"] == "LOSS").sum()),
+                "avg_R": float(r.mean()) if len(r) else np.nan,
+                "total_R": float(r.sum()) if len(r) else 0.0,
+            })
+    return pd.DataFrame(rows)
+
+
+def v27_main():
+    market = load_market()
+    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+
+    baseline = build_baseline_trades(market)
+    if not print_baseline_check(baseline):
+        raise RuntimeError("FROZEN BASELINE FAILED. V2.7 is stopped; do not use these results.")
+
+    fred = load_fred()
+    trades = attach_macro(baseline, fred)
+    trades = add_drawdown(trades, market)
+    trades = add_zones(trades)
+    trades = add_confluence_flags(trades)
+    trades = add_v24_period(trades, "2025-01-01")
+
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V2.7 — TEMPORAL / DEPENDENCY ROBUSTNESS")
+    print("=" * 72)
+    print("Frozen hypotheses: H1/H2/H4/H5 from V2.3/V2.5; H3 retained for audit.")
+    print("Trade-level results are re-tested with independent drawdown episodes and year clusters.")
+    print("No thresholds, entries, exits or hypotheses are optimized.")
+    print("Research-only; no trade execution; no Decision Engine calibration.")
+
+    temporal = v27_temporal_robustness(trades)
+    episode_perm = v27_episode_permutation(trades)
+    exclusions = v27_exclusion_sensitivity(trades)
+
+    print("\nTEMPORAL / CLUSTER ROBUSTNESS")
+    print("-" * 72)
+    print(temporal.to_string(index=False))
+
+    print("\nEPISODE-LEVEL PERMUTATION / PLACEBO")
+    print("-" * 72)
+    print(episode_perm.to_string(index=False))
+
+    print("\nYEAR / CRISIS EXCLUSION SENSITIVITY")
+    print("-" * 72)
+    print(exclusions.to_string(index=False))
+
+    trades.to_csv("macro_backtest_v27_trades.csv", index=False)
+    temporal.to_csv("macro_backtest_v27_temporal_robustness.csv", index=False)
+    episode_perm.to_csv("macro_backtest_v27_episode_permutation.csv", index=False)
+    exclusions.to_csv("macro_backtest_v27_exclusion_sensitivity.csv", index=False)
+
+    print("\nFILES CREATED")
+    print("macro_backtest_v27_trades.csv")
+    print("macro_backtest_v27_temporal_robustness.csv")
+    print("macro_backtest_v27_episode_permutation.csv")
+    print("macro_backtest_v27_exclusion_sensitivity.csv")
+    print("\nMACRO CALIBRATION V2.7 TEMPORAL / DEPENDENCY ROBUSTNESS COMPLETE")
+
+
 if __name__ == "__main__":
-    v26_main()
+    v27_main()
