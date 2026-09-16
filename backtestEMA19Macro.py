@@ -1,6 +1,6 @@
 # ============================================================
-# US500 MACRO BACKTEST V2.1 - CLEAN
-# FROZEN EMA19 BASELINE + MACRO V2.1 CALIBRATION
+# US500 MACRO BACKTEST V2.2 - LEAD ANALYSIS
+# FROZEN EMA19 BASELINE + MACRO V2.1 + DRAWdown LEAD EVENT STUDY
 # ============================================================
 # Frozen baseline configuration validated by V3:
 # ATR_WILDER / TOUCH_CLOSE_ABOVE / ROW_GAP_1 / OVERLAP
@@ -8,8 +8,9 @@
 # 109 resolved, 36 wins, 73 losses, 3 ambiguous, 5 open,
 # +71R, PF ~= 1.973.
 #
-# V2.1 is research/calibration only. It does NOT modify entries,
-# exits, sizing, or the Decision Engine.
+# V2.2 is research-only. It does NOT modify entries, exits, sizing,
+# or the Decision Engine. Lead analysis tests whether macro deterioration
+# was visible 5/10/20/60 trading days before -10% and -20% drawdowns.
 # ============================================================
 
 import os
@@ -448,6 +449,143 @@ def print_report(title, report, key):
     print(report[cols].to_string(index=False))
 
 
+def detect_drawdown_events(market, thresholds=(-10.0, -20.0)):
+    """Return the first trading day of each drawdown episode crossing each threshold.
+
+    Drawdown uses the same reference-high concept as the trade analysis:
+    current Close divided by cumulative maximum High minus one.
+    An event is recorded only on the first day a threshold is crossed in an
+    episode; recovery above the threshold allows a later episode to count.
+    """
+    ref_high = market["High"].cummax()
+    dd = (market["Close"] / ref_high - 1.0) * 100.0
+    events = []
+    for threshold in thresholds:
+        breached = dd <= threshold
+        first = breached & ~breached.shift(1, fill_value=False)
+        for idx in market.index[first]:
+            pos = market.index.get_loc(idx)
+            events.append({
+                "threshold": float(threshold),
+                "event_date": pd.Timestamp(idx),
+                "event_index": int(pos),
+                "event_drawdown_pct": float(dd.loc[idx]),
+                "reference_high": float(ref_high.loc[idx]),
+            })
+    return pd.DataFrame(events).sort_values(["threshold", "event_date"]).reset_index(drop=True)
+
+
+def build_lead_event_study(market, fred, thresholds=(-10.0, -20.0), windows=(60, 20, 10, 5)):
+    """Evaluate macro state only on trading days before drawdown threshold events."""
+    events = detect_drawdown_events(market, thresholds=thresholds)
+    detail = []
+    for _, ev in events.iterrows():
+        event_index = int(ev["event_index"])
+        row = ev.to_dict()
+        for window in windows:
+            target_index = event_index - int(window)
+            prefix = f"tminus_{window}d"
+            if target_index < 0:
+                row[f"{prefix}_date"] = pd.NaT
+                row[f"{prefix}_available"] = False
+                continue
+            lead_date = pd.Timestamp(market.index[target_index])
+            macro = classify_macro_v21(fred, lead_date)
+            row[f"{prefix}_date"] = lead_date
+            row[f"{prefix}_available"] = True
+            row[f"{prefix}_leading_warning"] = macro["leading_warning"]
+            row[f"{prefix}_leading_warning_count"] = macro["leading_warning_count"]
+            row[f"{prefix}_macro_regime"] = macro["macro_regime"]
+            row[f"{prefix}_macro_stress"] = macro["macro_stress"]
+            row[f"{prefix}_macro_momentum"] = macro["macro_momentum"]
+            for dim in DIMENSIONS:
+                row[f"{prefix}_{dim}_stress"] = macro[f"{dim}_stress"]
+                row[f"{prefix}_{dim}_momentum"] = macro[f"{dim}_momentum"]
+                row[f"{prefix}_{dim}_momentum_score"] = macro[f"{dim}_momentum_score"]
+                row[f"{prefix}_{dim}_short_change"] = macro[f"{dim}_short_change"]
+                row[f"{prefix}_{dim}_medium_change"] = macro[f"{dim}_medium_change"]
+        detail.append(row)
+    return pd.DataFrame(detail)
+
+
+def build_lead_dimension_report(detail, windows=(60, 20, 10, 5)):
+    rows = []
+    for threshold in sorted(detail["threshold"].dropna().unique()):
+        subset = detail[detail["threshold"] == threshold]
+        for dim in DIMENSIONS:
+            for window in windows:
+                col = f"tminus_{window}d_{dim}_momentum"
+                score_col = f"tminus_{window}d_{dim}_stress"
+                if col not in subset.columns:
+                    continue
+                s = subset[col].dropna()
+                stress = pd.to_numeric(subset[score_col], errors="coerce").dropna()
+                n = len(s)
+                rows.append({
+                    "threshold": threshold,
+                    "dimension": dim,
+                    "window_trading_days": window,
+                    "events": n,
+                    "deteriorating_pct": 100 * s.isin(["DETERIORATING", "STRONGLY DETERIORATING"]).mean() if n else np.nan,
+                    "strongly_deteriorating_pct": 100 * (s == "STRONGLY DETERIORATING").mean() if n else np.nan,
+                    "improving_pct": 100 * (s == "IMPROVING").mean() if n else np.nan,
+                    "stable_pct": 100 * (s == "STABLE").mean() if n else np.nan,
+                    "mean_stress": float(stress.mean()) if len(stress) else np.nan,
+                    "median_stress": float(stress.median()) if len(stress) else np.nan,
+                })
+    return pd.DataFrame(rows)
+
+
+def build_lead_transition_report(detail, windows=(60, 20, 10, 5)):
+    rows = []
+    for threshold in sorted(detail["threshold"].dropna().unique()):
+        subset = detail[detail["threshold"] == threshold]
+        for dim in DIMENSIONS:
+            base_col = f"tminus_{windows[0]}d_{dim}_stress"
+            for window in windows[1:]:
+                later_col = f"tminus_{window}d_{dim}_stress"
+                if base_col not in subset or later_col not in subset:
+                    continue
+                pair = subset[[base_col, later_col]].apply(pd.to_numeric, errors="coerce").dropna()
+                if pair.empty:
+                    continue
+                delta = pair[later_col] - pair[base_col]
+                rows.append({
+                    "threshold": threshold,
+                    "dimension": dim,
+                    "from_window": windows[0],
+                    "to_window": window,
+                    "events": len(pair),
+                    "mean_stress_change": float(delta.mean()),
+                    "median_stress_change": float(delta.median()),
+                    "pct_worsened_ge_5": 100 * (delta >= 5).mean(),
+                    "pct_worsened_ge_10": 100 * (delta >= 10).mean(),
+                    "pct_improved_le_minus_5": 100 * (delta <= -5).mean(),
+                })
+    return pd.DataFrame(rows)
+
+
+def build_lead_warning_report(detail, windows=(60, 20, 10, 5)):
+    rows = []
+    for threshold in sorted(detail["threshold"].dropna().unique()):
+        subset = detail[detail["threshold"] == threshold]
+        for window in windows:
+            col = f"tminus_{window}d_leading_warning"
+            if col not in subset:
+                continue
+            s = subset[col].dropna()
+            n = len(s)
+            for state in ["NONE", "WATCH", "ELEVATED", "STRONG"]:
+                rows.append({
+                    "threshold": threshold,
+                    "window_trading_days": window,
+                    "leading_warning": state,
+                    "events": n,
+                    "pct": 100 * (s == state).mean() if n else np.nan,
+                })
+    return pd.DataFrame(rows)
+
+
 def main():
     market = load_market()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
@@ -469,12 +607,44 @@ def main():
         report_2d = grouped_2d_report(trades, "drawdown_bucket", f"{dim}_momentum")
         print_report(f"DRAWDOWN x {dim.upper()} MOMENTUM", report_2d, "group")
 
+    # ------------------------------------------------------------
+    # V2.2 LEAD EVENT STUDY
+    # Tests macro state 60/20/10/5 trading days BEFORE the first
+    # close-based crossing of -10% and -20% drawdown.
+    # ------------------------------------------------------------
+    lead_detail = build_lead_event_study(market, fred)
+    lead_dim = build_lead_dimension_report(lead_detail)
+    lead_transition = build_lead_transition_report(lead_detail)
+    lead_warning = build_lead_warning_report(lead_detail)
+
+    print("\n" + "=" * 72)
+    print("V2.2 DRAWdown LEAD EVENT STUDY")
+    print("=" * 72)
+    if lead_detail.empty:
+        print("No -10%/-20% drawdown threshold events detected.")
+    else:
+        print("Threshold events:")
+        print(lead_detail[["threshold", "event_date", "event_drawdown_pct"]].to_string(index=False))
+
+        print("\nLEAD DIMENSION SUMMARY")
+        print(lead_dim.to_string(index=False))
+
+        print("\nLEAD STRESS TRANSITIONS FROM T-60")
+        print(lead_transition.to_string(index=False))
+
+        print("\nLEADING WARNING BY PRE-EVENT WINDOW")
+        print(lead_warning.to_string(index=False))
+
     trades.to_csv("macro_backtest_v21_trades.csv", index=False)
     grouped_report(trades, "macro_regime").to_csv("macro_backtest_v21_regimes.csv", index=False)
     grouped_report(trades, "leading_warning").to_csv("macro_backtest_v21_leading_warning.csv", index=False)
     grouped_report(trades, "macro_stress_zone").to_csv("macro_backtest_v21_stress_zones.csv", index=False)
     grouped_report(trades, "macro_momentum_zone").to_csv("macro_backtest_v21_momentum_zones.csv", index=False)
-    print("\nMACRO CALIBRATION V2.1 COMPLETE")
+    lead_detail.to_csv("macro_backtest_v22_lead_event_detail.csv", index=False)
+    lead_dim.to_csv("macro_backtest_v22_lead_dimension_summary.csv", index=False)
+    lead_transition.to_csv("macro_backtest_v22_lead_transitions.csv", index=False)
+    lead_warning.to_csv("macro_backtest_v22_lead_warning.csv", index=False)
+    print("\nMACRO CALIBRATION V2.2 LEAD ANALYSIS COMPLETE")
 
 if __name__ == "__main__":
     main()
