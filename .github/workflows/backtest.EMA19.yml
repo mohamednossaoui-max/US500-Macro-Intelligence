@@ -28,7 +28,7 @@ jobs:
         run: |
           pwd
           ls -la
-          test -f backtestEMA19Macro_V3_8_STANDALONE_COMPLETE.py
+          test -f backtestEMA19Macro.py
 
       - name: Run V3.8
-        run: python backtestEMA19Macro_V3_8_STANDALONE_COMPLETE.py
+        run: python backtestEMA19Macro.py
