@@ -1,4 +1,3 @@
-name: Test V
 # ============================================================
 # US500 MACRO INTELLIGENCE — V3.8
 # STRICT OOS / WALK-FORWARD ABLATION VALIDATION
