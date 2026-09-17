@@ -1,41 +1,34 @@
-name: Backtest EMA19 Macro
+name: Test V3.8
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "**.py"
+      - "requirements.txt"
+      - ".github/workflows/**"
 
 jobs:
-  backtest-ema19-macro:
+  v38:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pandas numpy requests yfinance streamlit
+        run: pip install -r requirements.txt
 
-      - name: Run EMA19 Macro Backtest
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      - name: Verify V3.8 file
         run: |
-          python backtestEMA19Macro.py
+          pwd
+          ls -la
+          test -f backtestEMA19Macro_V3_8_STANDALONE_COMPLETE.py
 
-      - name: Upload Backtest Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: ema19-macro-backtest-results
-          path: |
-            backtestEMA19Macro_trades.csv
-            backtestEMA19Macro_regimes.csv
-            backtestEMA19Macro_yearly.csv
-            backtestEMA19Macro_summary.csv
-            backtestEMA19Macro_macro_data.csv
-            backtestEMA19Macro_data_quality.csv
-            backtestEMA19Macro_signals.csv
+      - name: Run V3.8
+        run: python backtestEMA19Macro_V3_8_STANDALONE_COMPLETE.py
