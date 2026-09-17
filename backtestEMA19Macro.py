@@ -5081,12 +5081,30 @@ def v37_main(trades, market):
     v37_integrity_guard(trades, df)
 
     # Verify V3.6 labels are reproduced exactly before conditional analysis.
+    # v30_decision_layer() returns (decision, modifier). Compare only the
+    # decision LABEL values. Do not use Series.equals() here because the
+    # Series name is metadata and can differ even when every label matches.
+    # pandas documents Series/DataFrame equality as sensitive to metadata in
+    # strict equality helpers, so this guard intentionally compares the
+    # aligned object values after resetting position.
+    actual = df["V36_DECISION_BASE"].reset_index(drop=True).astype(object)
     reference = pd.Series(
         [v30_decision_layer(row)[0] for _, row in trades.iterrows()],
+        index=actual.index,
         dtype=object,
     )
-    if not df["V36_DECISION_BASE"].reset_index(drop=True).equals(reference):
-        raise RuntimeError("V3.7 BASE DECISION REPRODUCTION GUARD FAILED.")
+
+    mismatch = pd.DataFrame({
+        "actual": actual.to_numpy(dtype=object),
+        "expected": reference.to_numpy(dtype=object),
+    })
+    mismatch = mismatch[mismatch["actual"] != mismatch["expected"]]
+
+    if not mismatch.empty:
+        raise RuntimeError(
+            "V3.7 BASE DECISION REPRODUCTION GUARD FAILED. "
+            f"Mismatches: {len(mismatch)}"
+        )
     print("V3.7 BASE DECISION REPRODUCTION GUARD: PASS")
 
     dimensions = [
