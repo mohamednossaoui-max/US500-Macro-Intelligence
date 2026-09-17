@@ -6005,26 +6005,47 @@ def v39_metric(g):
     }
 
 
-def v39_year_survival(oos):
+def v39_year_survival(signal_df):
+    """
+    Build year-by-year OOS survival directly from the authoritative V3.8
+    signal-level frozen labels.
+
+    IMPORTANT: V3.8's expanding walk-forward CSV is an aggregate audit
+    table. It contains context/test_year and summary statistics, but it
+    intentionally does NOT contain per-trade ``result`` or ``R`` columns.
+    Therefore V3.9 must not expect result/R in that walk-forward table.
+
+    The per-year R survival calculation is reconstructed from the frozen
+    signal-level labels, which preserves the exact V3.8 outcomes without
+    changing the baseline, signals, entries, stops, RR, or Decision Engine.
+    """
+    x = signal_df.copy()
+    x["signal_date"] = pd.to_datetime(x["signal_date"])
+    x["year"] = x["signal_date"].dt.year
+
+    # V3.9 evaluates the same expanding-walk-forward test years used by V3.8.
+    x = x[x["year"].isin(WALK_YEARS)].copy()
+
     rows = []
     for context in V39_CONTEXTS:
-        x = oos[oos["context"] == context].copy()
-        years = sorted(pd.to_numeric(x["test_year"], errors="coerce").dropna().astype(int).unique())
+        c = x[x["context"] == context].copy()
         positive = 0
         negative = 0
         zero = 0
         yearly_r = []
 
-        for year in years:
-            y = x[x["test_year"] == year]
+        for year in WALK_YEARS:
+            y = c[c["year"] == year]
             m = v39_metric(y)
             r = m["total_R"]
+
             if m["resolved"] == 0:
                 zero += 1
             elif r > 0:
                 positive += 1
             elif r < 0:
                 negative += 1
+
             yearly_r.append(r if m["resolved"] else np.nan)
 
         finite = [r for r in yearly_r if pd.notna(r)]
@@ -6040,6 +6061,7 @@ def v39_year_survival(oos):
             "best_year_R": float(np.max(finite)) if finite else np.nan,
             "small_N_flag": len(finite) < V39_MIN_OOS_YEARS,
         })
+
     return pd.DataFrame(rows)
 
 
@@ -6173,7 +6195,10 @@ def v39_main():
         default="__NOT_IN_V39_CONTEXT__",
     )
 
-    required_wf = {"context", "test_year", "result", "R"}
+    # V3.8 walk-forward is an aggregate audit table. It intentionally
+    # contains context/test_year and summary metrics, not per-trade result/R.
+    # Only require the structural columns that V3.8 actually exports.
+    required_wf = {"context", "test_year"}
     missing = required_wf - set(wf.columns)
     if missing:
         raise RuntimeError(
@@ -6181,7 +6206,7 @@ def v39_main():
         )
 
     aggregate = v39_oos_aggregate(labels)
-    survival = v39_year_survival(wf)
+    survival = v39_year_survival(labels)
     crisis = v39_crisis_exclusion(labels)
     verdict = v39_survival_verdict(aggregate, survival)
 
