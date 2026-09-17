@@ -6242,8 +6242,20 @@ def v39_main():
     if not pd.to_numeric(labels["R"], errors="coerce").notna().any():
         raise RuntimeError("V3.9 R integrity check failed.")
 
-    if not set(labels["context"].dropna().unique()).issubset(set(V39_CONTEXTS)):
-        raise RuntimeError("V3.9 context integrity check failed.")
+    # V3.8 contexts are overlapping research masks, not an exhaustive
+    # partition of all 119 signals. Signals outside the four V3.9
+    # research contexts are intentionally labelled __NOT_IN_V39_CONTEXT__.
+    # Integrity therefore checks only the rows assigned to a V3.9 context.
+    assigned_contexts = set(labels.loc[
+        labels["context"] != "__NOT_IN_V39_CONTEXT__", "context"
+    ].dropna().unique())
+    if not assigned_contexts.issubset(set(V39_CONTEXTS)):
+        raise RuntimeError(
+            "V3.9 context integrity check failed: unexpected assigned contexts "
+            + str(sorted(assigned_contexts - set(V39_CONTEXTS)))
+        )
+    if not assigned_contexts:
+        raise RuntimeError("V3.9 context integrity check failed: no V3.9 contexts assigned.")
 
     oos_dates = pd.to_datetime(labels.loc[
         pd.to_datetime(labels["signal_date"]) >= OOS_START,
