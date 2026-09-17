@@ -6530,10 +6530,64 @@ def v310_main():
     v39_main()
 
     labels = pd.read_csv("macro_backtest_v38_frozen_decision_labels.csv")
-    required = {"signal_date", "result", "R", "context"}
+
+    # V3.8 frozen labels do NOT export a literal `context` column.
+    # The V3.8/V3.9 contexts are overlapping research masks reconstructed
+    # from the authoritative V3.7 classification and macro fields.
+    required = {
+        "signal_date",
+        "result",
+        "R",
+        "V37_INTERACTION_CLASS",
+        "macro_regime",
+        "leading_warning",
+    }
     missing = required - set(labels.columns)
     if missing:
-        raise RuntimeError(f"V3.10 missing required frozen label columns: {sorted(missing)}")
+        raise RuntimeError(
+            f"V3.10 missing required frozen label columns: {sorted(missing)}"
+        )
+
+    labels["context"] = np.select(
+        [
+            labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
+            labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
+            labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
+            labels["macro_regime"].eq("A")
+            & labels["leading_warning"].eq("WATCH"),
+        ],
+        [
+            "H1_ONLY_CONTEXT",
+            "C3_REDUNDANT_SUPPORT",
+            "H4_ONLY_CONTEXT",
+            "A_WATCH_CONTEXT",
+        ],
+        default="__NOT_IN_V39_CONTEXT__",
+    )
+
+    # Contexts are intentionally overlapping and are not an exhaustive
+    # partition of the 119 frozen signals. Only assigned research contexts
+    # enter V3.10 temporal diagnostics.
+    assigned_contexts = set(
+        labels.loc[
+            labels["context"] != "__NOT_IN_V39_CONTEXT__", "context"
+        ].dropna().unique()
+    )
+    expected_contexts = {
+        "H1_ONLY_CONTEXT",
+        "C3_REDUNDANT_SUPPORT",
+        "H4_ONLY_CONTEXT",
+        "A_WATCH_CONTEXT",
+    }
+    if not assigned_contexts.issubset(expected_contexts):
+        raise RuntimeError(
+            "V3.10 context integrity failed: unexpected assigned contexts "
+            + str(sorted(assigned_contexts - expected_contexts))
+        )
+    if not assigned_contexts:
+        raise RuntimeError(
+            "V3.10 context integrity failed: no assigned research contexts."
+        )
 
     assigned = labels[labels["context"] != "__NOT_IN_V39_CONTEXT__"].copy()
     if assigned.empty:
