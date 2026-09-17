@@ -4363,15 +4363,26 @@ def v36_integrity_guards(original, df):
         raise RuntimeError("V3.6 C3 DEFINITION GUARD FAILED.")
 
     # Verify that BASE reproduces the current V3.4 decision labels.
+    # v30_decision_layer() returns (decision, modifier).
+    # V3.6 decision columns intentionally store only the decision label,
+    # so compare the first tuple element. The previous V3.6 version
+    # incorrectly compared a string Series with the full tuples.
     reference = [
-        v30_decision_layer(row)
+        v30_decision_layer(row)[0]
         for _, row in original.iterrows()
     ]
-    if not df["V36_DECISION_BASE"].reset_index(drop=True).equals(
-        pd.Series(reference).reset_index(drop=True)
-    ):
+    actual = df["V36_DECISION_BASE"].reset_index(drop=True)
+    expected = pd.Series(reference, index=actual.index, dtype=object)
+
+    if not actual.equals(expected):
+        mismatch = pd.DataFrame({
+            "actual": actual,
+            "expected": expected,
+        })
+        mismatch = mismatch[mismatch["actual"] != mismatch["expected"]]
         raise RuntimeError(
-            "V3.6 BASE DECISION REPRODUCTION GUARD FAILED."
+            "V3.6 BASE DECISION REPRODUCTION GUARD FAILED. "
+            f"Mismatches: {len(mismatch)}"
         )
 
     print("\nV3.6 SIGNAL COUNT GUARD: PASS")
