@@ -4533,6 +4533,345 @@ def v36_main(trades, market):
 
 
 
+
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.6.1
+# AGGREGATE ABLATION AUDIT
+#
+# Research-only continuation of V3.6.
+# V3.6.1 does NOT alter signals, entries, stops, RR, sizing,
+# results, R values, or the existing Decision Engine.
+#
+# Purpose:
+#   1) Count decision changes versus BASE.
+#   2) Audit the performance of rows whose decision changes.
+#   3) Produce BASE -> counterfactual transition matrices.
+#   4) Separate H1-only, H4-only, redundant, and true combined
+#      interaction cases.
+#   5) Audit changes by C3 / NON-C3 context and year.
+#   6) Add explicit no-trade-modification integrity guards.
+# ============================================================
+
+
+def v361_transition_matrix(df, new_col):
+    """One-row-per-transition matrix, including changed-row performance."""
+    rows = []
+    for (base_decision, counter_decision), g in df.groupby(
+        ["V36_DECISION_BASE", new_col], sort=False, dropna=False
+    ):
+        s = v36_summary(g)
+        rows.append({
+            "base_decision": base_decision,
+            "counterfactual_decision": counter_decision,
+            "changed": bool(base_decision != counter_decision),
+            "signals": s["signals"],
+            "resolved": s["resolved"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": s["win_rate"],
+            "avg_R": s["avg_R"],
+            "total_R": s["total_R"],
+            "profit_factor": s["profit_factor"],
+        })
+    return pd.DataFrame(rows)
+
+
+def v361_change_summary(df, changed_col, mode):
+    changed = df[df[changed_col]].copy()
+    unchanged = df[~df[changed_col]].copy()
+    cs = v36_summary(changed)
+    us = v36_summary(unchanged)
+    total = len(df)
+    return {
+        "mode": mode,
+        "total_signals": total,
+        "changed_signals": cs["signals"],
+        "changed_pct": 100.0 * cs["signals"] / total if total else np.nan,
+        "changed_resolved": cs["resolved"],
+        "changed_wins": cs["wins"],
+        "changed_losses": cs["losses"],
+        "changed_win_rate": cs["win_rate"],
+        "changed_avg_R": cs["avg_R"],
+        "changed_total_R": cs["total_R"],
+        "changed_profit_factor": cs["profit_factor"],
+        "unchanged_signals": us["signals"],
+        "unchanged_resolved": us["resolved"],
+        "unchanged_wins": us["wins"],
+        "unchanged_losses": us["losses"],
+        "unchanged_win_rate": us["win_rate"],
+        "unchanged_avg_R": us["avg_R"],
+        "unchanged_total_R": us["total_R"],
+        "unchanged_profit_factor": us["profit_factor"],
+    }
+
+
+def v361_interaction_classification(df):
+    """Classify how H1/H4 jointly affect the BASE decision label.
+
+    Categories are descriptive counterfactual classifications, not
+    trading rules.
+    """
+    b = df["V36_DECISION_BASE"]
+    n = df["V36_DECISION_NO_H1_H4"]
+    h1 = df["V36_DECISION_H1_ONLY"]
+    h4 = df["V36_DECISION_H4_ONLY"]
+
+    conditions = [
+        # BASE is supported, while neither component alone reproduces it.
+        (b != n) & (b != h1) & (b != h4),
+        # H1 alone reproduces BASE; H4 alone does not.
+        (b != n) & (b == h1) & (b != h4),
+        # H4 alone reproduces BASE; H1 alone does not.
+        (b != n) & (b != h1) & (b == h4),
+        # Both alone reproduce BASE, so the second component is redundant.
+        (b != n) & (b == h1) & (b == h4),
+        # No component changes the label.
+        (b == n) & (b == h1) & (b == h4),
+    ]
+    labels = [
+        "COMBINED_INTERACTION",
+        "H1_ONLY_EFFECT",
+        "H4_ONLY_EFFECT",
+        "REDUNDANT_H1_H4_SUPPORT",
+        "NO_ABLATION_EFFECT",
+    ]
+
+    out = df.copy()
+    out["V361_INTERACTION_CLASS"] = np.select(
+        conditions, labels, default="OTHER_COUNTERFACTUAL_PATTERN"
+    )
+    return out
+
+
+def v361_class_summary(df):
+    rows = []
+    for cls, g in df.groupby("V361_INTERACTION_CLASS", sort=False):
+        s = v36_summary(g)
+        rows.append({
+            "interaction_class": cls,
+            "signals": s["signals"],
+            "resolved": s["resolved"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": s["win_rate"],
+            "avg_R": s["avg_R"],
+            "total_R": s["total_R"],
+            "profit_factor": s["profit_factor"],
+        })
+    return pd.DataFrame(rows)
+
+
+def v361_context_summary(df):
+    rows = []
+    for context, g in df.groupby("V36_C3_CONTEXT", sort=False):
+        for cls, cg in g.groupby("V361_INTERACTION_CLASS", sort=False):
+            s = v36_summary(cg)
+            rows.append({
+                "c3_context": context,
+                "interaction_class": cls,
+                "signals": s["signals"],
+                "resolved": s["resolved"],
+                "wins": s["wins"],
+                "losses": s["losses"],
+                "win_rate": s["win_rate"],
+                "avg_R": s["avg_R"],
+                "total_R": s["total_R"],
+                "profit_factor": s["profit_factor"],
+            })
+    return pd.DataFrame(rows)
+
+
+def v361_yearly_change_summary(df):
+    rows = []
+    comparisons = [
+        ("NO_H1_H4", "V36_NO_H1_H4_CHANGED"),
+        ("H1_ONLY", "V36_H1_ONLY_CHANGED"),
+        ("H4_ONLY", "V36_H4_ONLY_CHANGED"),
+    ]
+    for year, g in df.groupby("year", sort=True):
+        for mode, changed_col in comparisons:
+            changed = g[g[changed_col]]
+            s = v36_summary(changed)
+            rows.append({
+                "year": int(year),
+                "mode": mode,
+                "total_signals": len(g),
+                "changed_signals": s["signals"],
+                "changed_pct": 100.0 * s["signals"] / len(g) if len(g) else np.nan,
+                "resolved": s["resolved"],
+                "wins": s["wins"],
+                "losses": s["losses"],
+                "win_rate": s["win_rate"],
+                "avg_R": s["avg_R"],
+                "total_R": s["total_R"],
+                "profit_factor": s["profit_factor"],
+            })
+    return pd.DataFrame(rows)
+
+
+def v361_decision_change_guard(original, df):
+    """Verify V3.6.1 only adds analytical columns."""
+    frozen_cols = ["signal_date", "year", "result", "R", "technical_score"]
+    for col in frozen_cols:
+        a = original[col].reset_index(drop=True)
+        b = df[col].reset_index(drop=True)
+        if col in ["R", "technical_score"]:
+            a = pd.to_numeric(a, errors="coerce")
+            b = pd.to_numeric(b, errors="coerce")
+        if not a.equals(b):
+            raise RuntimeError(f"V3.6.1 {col.upper()} GUARD FAILED.")
+
+    # Decision columns must be strings only; no trade fields are modified.
+    decision_cols = [
+        "V36_DECISION_BASE",
+        "V36_DECISION_NO_H1_H4",
+        "V36_DECISION_H1_ONLY",
+        "V36_DECISION_H4_ONLY",
+    ]
+    for col in decision_cols:
+        if col not in df.columns:
+            raise RuntimeError(f"V3.6.1 MISSING DECISION COLUMN: {col}")
+
+    print("V3.6.1 FROZEN SIGNAL/RESULT/R/TECHNICAL GUARD: PASS")
+    print("V3.6.1 NO ENTRY CREATION: PASS")
+    print("V3.6.1 NO BASELINE MODIFICATION: PASS")
+
+
+def v361_main(trades, market):
+    print("\n" + "=" * 72)
+    print("US500 MACRO INTELLIGENCE — V3.6.1")
+    print("AGGREGATE DECISION ABLATION AUDIT")
+    print("=" * 72)
+
+    # Rebuild the exact V3.6 labels from the same frozen in-memory trades.
+    df = v36_build_decision_comparison(trades)
+    df = v361_interaction_classification(df)
+    v361_decision_change_guard(trades, df)
+
+    comparisons = [
+        ("NO_H1_H4", "V36_NO_H1_H4_CHANGED"),
+        ("H1_ONLY", "V36_H1_ONLY_CHANGED"),
+        ("H4_ONLY", "V36_H4_ONLY_CHANGED"),
+    ]
+
+    change_summary = pd.DataFrame([
+        v361_change_summary(df, changed_col, mode)
+        for mode, changed_col in comparisons
+    ])
+
+    transition_no = v361_transition_matrix(df, "V36_DECISION_NO_H1_H4")
+    transition_h1 = v361_transition_matrix(df, "V36_DECISION_H1_ONLY")
+    transition_h4 = v361_transition_matrix(df, "V36_DECISION_H4_ONLY")
+
+    interaction_summary = v361_class_summary(df)
+    context_summary = v361_context_summary(df)
+    yearly = v361_yearly_change_summary(df)
+
+    # Direct C3 vs NON-C3 audit of the counterfactual effects.
+    c3_rows = []
+    for context, g in df.groupby("V36_C3_CONTEXT", sort=False):
+        for mode, changed_col in comparisons:
+            s = v36_summary(g[g[changed_col]])
+            c3_rows.append({
+                "c3_context": context,
+                "mode": mode,
+                "signals": len(g),
+                "changed_signals": s["signals"],
+                "changed_pct": 100.0 * s["signals"] / len(g) if len(g) else np.nan,
+                "resolved": s["resolved"],
+                "wins": s["wins"],
+                "losses": s["losses"],
+                "win_rate": s["win_rate"],
+                "avg_R": s["avg_R"],
+                "total_R": s["total_R"],
+                "profit_factor": s["profit_factor"],
+            })
+    c3_audit = pd.DataFrame(c3_rows)
+
+    # Compact signal-level audit focused only on rows where any ablation changes.
+    any_change = (
+        df["V36_NO_H1_H4_CHANGED"]
+        | df["V36_H1_ONLY_CHANGED"]
+        | df["V36_H4_ONLY_CHANGED"]
+    )
+    changed_rows = df.loc[
+        any_change,
+        [
+            "signal_date", "year", "result", "R",
+            "V36_H1", "V36_H4", "V36_C3", "V36_C3_CONTEXT",
+            "V361_INTERACTION_CLASS",
+            "V36_DECISION_BASE", "V36_DECISION_NO_H1_H4",
+            "V36_DECISION_H1_ONLY", "V36_DECISION_H4_ONLY",
+            "V36_NO_H1_H4_CHANGED", "V36_H1_ONLY_CHANGED",
+            "V36_H4_ONLY_CHANGED",
+        ],
+    ].copy()
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 AGGREGATE DECISION CHANGE SUMMARY")
+    print("=" * 72)
+    print(change_summary.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 INTERACTION CLASSIFICATION")
+    print("=" * 72)
+    print(interaction_summary.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 BASE -> NO H1/H4 TRANSITIONS")
+    print("=" * 72)
+    print(transition_no.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 BASE -> H1 ONLY TRANSITIONS")
+    print("=" * 72)
+    print(transition_h1.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 BASE -> H4 ONLY TRANSITIONS")
+    print("=" * 72)
+    print(transition_h4.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 C3 vs NON-C3 CHANGE AUDIT")
+    print("=" * 72)
+    print(c3_audit.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 YEARLY CHANGE AUDIT")
+    print("=" * 72)
+    print(yearly.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 CHANGED SIGNALS ONLY")
+    print("=" * 72)
+    print(changed_rows.to_string(index=False))
+
+    reports = {
+        "macro_backtest_v361_ablation_change_summary.csv": change_summary,
+        "macro_backtest_v361_interaction_classification.csv": interaction_summary,
+        "macro_backtest_v361_context_interaction_audit.csv": context_summary,
+        "macro_backtest_v361_transitions_base_vs_no_h1_h4.csv": transition_no,
+        "macro_backtest_v361_transitions_base_vs_h1_only.csv": transition_h1,
+        "macro_backtest_v361_transitions_base_vs_h4_only.csv": transition_h4,
+        "macro_backtest_v361_c3_vs_non_c3_change_audit.csv": c3_audit,
+        "macro_backtest_v361_yearly_change_audit.csv": yearly,
+        "macro_backtest_v361_changed_signals_only.csv": changed_rows,
+    }
+
+    for filename, report in reports.items():
+        report.to_csv(filename, index=False)
+
+    print("\n" + "=" * 72)
+    print("V3.6.1 COMPLETE")
+    print("=" * 72)
+    print("Research-only. No new entries were created.")
+    print("Frozen baseline, entries, stops, RR, sizing and R outcomes were not modified.")
+    print("The audit measures only how Decision Engine labels change under counterfactual ablations.")
+    print("\nFILES CREATED")
+    for filename in reports:
+        print(filename)
+
 if __name__ == "__main__":
     try:
         # Complete frozen V3.2/V3.3 pipeline.
@@ -4648,6 +4987,11 @@ if __name__ == "__main__":
         print("V3.5 COMPLETE — STARTING INTEGRATED V3.6")
         print("=" * 72)
         v36_main(trades, market)
+
+        print("\n" + "=" * 72)
+        print("V3.6 COMPLETE — STARTING V3.6.1 AGGREGATE ABLATION AUDIT")
+        print("=" * 72)
+        v361_main(trades, market)
 
     except Exception as exc:
         print("\nV3.2/V3.3/V3.4/V3.5 FAILED:")
