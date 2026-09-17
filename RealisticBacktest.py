@@ -424,7 +424,7 @@ def main():
     print(
         pd.Series(
             compare(
-                conservative_gap,
+                summary(conservative_gap),
                 summary(conservative_gap_worst_case),
             )
         ).to_string()
