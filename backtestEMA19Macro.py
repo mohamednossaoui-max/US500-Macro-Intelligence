@@ -6143,14 +6143,35 @@ def v39_main():
     labels = pd.read_csv(labels_file)
     wf = pd.read_csv(wf_file)
 
+    # V3.8 exports the frozen decision-label table without a literal
+    # ``context`` column. Contexts are derived deterministically from the
+    # frozen V3.7 interaction class and the original A+WATCH definition.
+    # This is classification only; it does not alter signals, results or R.
     required_labels = {
-        "signal_date", "result", "R", "context",
+        "signal_date", "result", "R",
+        "V37_INTERACTION_CLASS", "macro_regime", "leading_warning",
     }
     missing = required_labels - set(labels.columns)
     if missing:
         raise RuntimeError(
             f"V3.9 missing required V3.8 frozen label columns: {sorted(missing)}"
         )
+
+    labels["context"] = np.select(
+        [
+            labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
+            labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
+            labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
+            labels["macro_regime"].eq("A") & labels["leading_warning"].eq("WATCH"),
+        ],
+        [
+            "H1_ONLY_CONTEXT",
+            "C3_REDUNDANT_SUPPORT",
+            "H4_ONLY_CONTEXT",
+            "A_WATCH_CONTEXT",
+        ],
+        default="__NOT_IN_V39_CONTEXT__",
+    )
 
     required_wf = {"context", "test_year", "result", "R"}
     missing = required_wf - set(wf.columns)
