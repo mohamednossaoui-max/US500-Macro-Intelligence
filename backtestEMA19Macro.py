@@ -3583,9 +3583,12 @@ def v34_main(trades, market):
 
 # ============================================================
 # US500 MACRO INTELLIGENCE — V3.5
-# C3 CONTEXT × DRAWDOWN × EARLY WARNING × TECHNICAL
+# C3 CONTEXT × DRAWDOWN × LEADING-WARNING PROXY × TECHNICAL
 #
 # Research-only incremental-information analysis.
+# IMPORTANT: the supplied pipeline has no early_warning_level field.
+# V3.5 therefore uses the existing leading_warning classification as the
+# early-warning proxy; it does NOT invent a new early-warning score.
 #
 # C3 remains EXACTLY:
 #   H1 = Regime A + WATCH
@@ -3606,7 +3609,7 @@ V35_DRAWDOWN_LABELS = [
     ">0%",
 ]
 
-V35_EARLY_WARNING_LEVELS = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+V35_EARLY_WARNING_LEVELS = ["NONE", "WATCH", "ELEVATED", "STRONG"]
 V35_TECHNICAL_STATUSES = ["WEAK", "PARTIAL", "STRONG"]
 
 
@@ -3638,7 +3641,7 @@ def v35_build_context(df):
     )
 
     out["V35_EARLY_WARNING"] = (
-        out["early_warning_level"].astype(str).str.upper().str.strip()
+        out["leading_warning"].astype(str).str.upper().str.strip()
     )
     out["V35_TECHNICAL_STATUS"] = (
         out["technical_status"].astype(str).str.upper().str.strip()
@@ -3977,12 +3980,12 @@ def v35_main(trades, market):
     print(dd_diff.to_string(index=False))
 
     print("\n" + "=" * 72)
-    print("V3.5 C3 vs NON-C3 — EARLY WARNING")
+    print("V3.5 C3 vs NON-C3 — EARLY WARNING PROXY (LEADING WARNING)")
     print("=" * 72)
     print(ew.to_string(index=False))
 
     print("\n" + "=" * 72)
-    print("V3.5 INCREMENTAL DIFFERENCE — EARLY WARNING")
+    print("V3.5 INCREMENTAL DIFFERENCE — EARLY WARNING PROXY")
     print("=" * 72)
     print(ew_diff.to_string(index=False))
 
@@ -3997,12 +4000,12 @@ def v35_main(trades, market):
     print(tech_diff.to_string(index=False))
 
     print("\n" + "=" * 72)
-    print("V3.5 DRAWDOWN × EARLY WARNING × C3")
+    print("V3.5 DRAWDOWN × EARLY WARNING PROXY × C3")
     print("=" * 72)
     print(combined.to_string(index=False))
 
     print("\n" + "=" * 72)
-    print("V3.5 DRAWDOWN × EARLY WARNING × TECHNICAL × C3")
+    print("V3.5 DRAWDOWN × EARLY WARNING PROXY × TECHNICAL × C3")
     print("=" * 72)
     print(full.to_string(index=False))
 
@@ -4156,6 +4159,6 @@ if __name__ == "__main__":
         v35_main(trades, market)
 
     except Exception as exc:
-        print("\nV3.2/V3.3/V3.4 FAILED:")
+        print("\nV3.2/V3.3/V3.4/V3.5 FAILED:")
         print(exc)
         raise
