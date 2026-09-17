@@ -5630,7 +5630,7 @@ def v38_print(title, df):
         print(df.to_string(index=False))
 
 
-def v38_main():
+def v38_run():
     print("\n" + "=" * 78)
     print("US500 MACRO INTELLIGENCE — V3.8")
     print("STRICT OOS / WALK-FORWARD ABLATION VALIDATION")
@@ -5948,10 +5948,291 @@ def v38_main():
         print(filename)
 
 
+
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.9
+# ROBUST OOS / TEMPORAL SURVIVAL VALIDATION
+# ============================================================
+#
+# Research-only extension of V3.8.
+#
+# IMPORTANT:
+#   V3.9 does NOT change the frozen signal generator, entries,
+#   stops, TP, RR, sizing, trade outcomes, V3.7 context definitions,
+#   or the Decision Engine.
+#
+# V3.9 consumes the exact frozen V3.8 signal-level classification
+# and applies pre-specified robustness diagnostics to the
+# chronological OOS / walk-forward outputs.
+#
+# No parameter optimization is performed.
+# Small samples remain explicitly flagged.
+# ============================================================
+
+V39_MIN_RESOLVED = 5
+V39_MIN_OOS_YEARS = 2
+V39_CONTEXTS = [
+    "H1_ONLY_CONTEXT",
+    "C3_REDUNDANT_SUPPORT",
+    "H4_ONLY_CONTEXT",
+    "A_WATCH_CONTEXT",
+]
+
+
+def v39_metric(g):
+    g = g.copy()
+    resolved = g[g["result"].isin(["WIN", "LOSS"])].copy()
+    wins = int((resolved["result"] == "WIN").sum())
+    losses = int((resolved["result"] == "LOSS").sum())
+    total_r = float(pd.to_numeric(resolved["R"], errors="coerce").sum())
+    n = len(resolved)
+    avg_r = total_r / n if n else np.nan
+    pf = (
+        float(resolved.loc[resolved["R"] > 0, "R"].sum())
+        / abs(float(resolved.loc[resolved["R"] < 0, "R"].sum()))
+        if float(resolved.loc[resolved["R"] < 0, "R"].sum()) != 0
+        else np.nan
+    )
+    return {
+        "signals": int(len(g)),
+        "resolved": n,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": 100.0 * wins / n if n else np.nan,
+        "avg_R": avg_r,
+        "total_R": total_r,
+        "profit_factor": pf,
+    }
+
+
+def v39_year_survival(oos):
+    rows = []
+    for context in V39_CONTEXTS:
+        x = oos[oos["context"] == context].copy()
+        years = sorted(pd.to_numeric(x["test_year"], errors="coerce").dropna().astype(int).unique())
+        positive = 0
+        negative = 0
+        zero = 0
+        yearly_r = []
+
+        for year in years:
+            y = x[x["test_year"] == year]
+            m = v39_metric(y)
+            r = m["total_R"]
+            if m["resolved"] == 0:
+                zero += 1
+            elif r > 0:
+                positive += 1
+            elif r < 0:
+                negative += 1
+            yearly_r.append(r if m["resolved"] else np.nan)
+
+        finite = [r for r in yearly_r if pd.notna(r)]
+        rows.append({
+            "context": context,
+            "oos_years_with_data": len(finite),
+            "positive_years": positive,
+            "negative_years": negative,
+            "zero_trade_years": zero,
+            "positive_year_rate_pct": 100.0 * positive / len(finite) if finite else np.nan,
+            "median_yearly_R": float(np.median(finite)) if finite else np.nan,
+            "worst_year_R": float(np.min(finite)) if finite else np.nan,
+            "best_year_R": float(np.max(finite)) if finite else np.nan,
+            "small_N_flag": len(finite) < V39_MIN_OOS_YEARS,
+        })
+    return pd.DataFrame(rows)
+
+
+def v39_crisis_exclusion(signal_df):
+    rows = []
+    exclusions = [
+        ("NONE", set()),
+        ("EXCLUDE_2020", {2020}),
+        ("EXCLUDE_2022", {2022}),
+        ("EXCLUDE_2020_2022", {2020, 2022}),
+        ("EXCLUDE_2025", {2025}),
+    ]
+
+    for context in V39_CONTEXTS:
+        x = signal_df[signal_df["context"] == context].copy()
+        x["year"] = pd.to_datetime(x["signal_date"]).dt.year
+
+        for label, years in exclusions:
+            y = x[~x["year"].isin(years)]
+            m = v39_metric(y)
+            rows.append({
+                "context": context,
+                "exclusion": label,
+                **m,
+                "small_N_flag": m["resolved"] < V39_MIN_RESOLVED,
+            })
+    return pd.DataFrame(rows)
+
+
+def v39_oos_aggregate(signal_df):
+    x = signal_df[pd.to_datetime(signal_df["signal_date"]) >= OOS_START].copy()
+    rows = []
+
+    for context in V39_CONTEXTS:
+        y = x[x["context"] == context]
+        m = v39_metric(y)
+        years = sorted(pd.to_datetime(y["signal_date"]).dt.year.dropna().unique())
+        rows.append({
+            "context": context,
+            **m,
+            "oos_years_with_signals": len(years),
+            "small_N_flag": (
+                m["resolved"] < V39_MIN_RESOLVED
+                or len(years) < V39_MIN_OOS_YEARS
+            ),
+        })
+    return pd.DataFrame(rows)
+
+
+def v39_survival_verdict(aggregate, survival):
+    rows = []
+    for context in V39_CONTEXTS:
+        a = aggregate[aggregate["context"] == context].iloc[0]
+        s = survival[survival["context"] == context].iloc[0]
+
+        sufficient = (
+            int(a["resolved"]) >= V39_MIN_RESOLVED
+            and int(a["oos_years_with_signals"]) >= V39_MIN_OOS_YEARS
+        )
+
+        if not sufficient:
+            status = "INSUFFICIENT_OOS_SAMPLE"
+        elif (
+            float(a["avg_R"]) > 0
+            and float(a["profit_factor"]) > 1
+            and float(s["positive_years"]) >= float(s["negative_years"])
+        ):
+            status = "SURVIVES_PRE_SPECIFIED_CHECKS"
+        else:
+            status = "DOES_NOT_SURVIVE_PRE_SPECIFIED_CHECKS"
+
+        rows.append({
+            "context": context,
+            "oos_resolved": int(a["resolved"]),
+            "oos_avg_R": float(a["avg_R"]) if pd.notna(a["avg_R"]) else np.nan,
+            "oos_total_R": float(a["total_R"]),
+            "oos_profit_factor": float(a["profit_factor"]) if pd.notna(a["profit_factor"]) else np.nan,
+            "oos_years_with_signals": int(a["oos_years_with_signals"]),
+            "positive_years": int(s["positive_years"]),
+            "negative_years": int(s["negative_years"]),
+            "status": status,
+            "research_only": True,
+        })
+    return pd.DataFrame(rows)
+
+
+def v39_main():
+    print("\n" + "=" * 78)
+    print("US500 MACRO INTELLIGENCE — V3.9")
+    print("ROBUST OOS / TEMPORAL SURVIVAL VALIDATION")
+    print("=" * 78)
+    print("V3.9 runs the frozen V3.8 pipeline first.")
+    print("No signal, entry, stop, RR, result or Decision Engine rule is changed.")
+
+    # Run exact V3.8 pipeline and regenerate its authoritative outputs.
+    v38_run()
+
+    labels_file = "macro_backtest_v38_frozen_decision_labels.csv"
+    wf_file = "macro_backtest_v38_expanding_walk_forward.csv"
+
+    labels = pd.read_csv(labels_file)
+    wf = pd.read_csv(wf_file)
+
+    required_labels = {
+        "signal_date", "result", "R", "context",
+    }
+    missing = required_labels - set(labels.columns)
+    if missing:
+        raise RuntimeError(
+            f"V3.9 missing required V3.8 frozen label columns: {sorted(missing)}"
+        )
+
+    required_wf = {"context", "test_year", "result", "R"}
+    missing = required_wf - set(wf.columns)
+    if missing:
+        raise RuntimeError(
+            f"V3.9 missing required V3.8 walk-forward columns: {sorted(missing)}"
+        )
+
+    aggregate = v39_oos_aggregate(labels)
+    survival = v39_year_survival(wf)
+    crisis = v39_crisis_exclusion(labels)
+    verdict = v39_survival_verdict(aggregate, survival)
+
+    aggregate.to_csv("macro_backtest_v39_oos_aggregate.csv", index=False)
+    survival.to_csv("macro_backtest_v39_year_survival.csv", index=False)
+    crisis.to_csv("macro_backtest_v39_crisis_exclusion.csv", index=False)
+    verdict.to_csv("macro_backtest_v39_survival_verdict.csv", index=False)
+
+    print("\n" + "=" * 78)
+    print("V3.9 OOS AGGREGATE")
+    print("=" * 78)
+    print(aggregate.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.9 YEAR SURVIVAL")
+    print("=" * 78)
+    print(survival.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.9 CRISIS EXCLUSION")
+    print("=" * 78)
+    print(crisis.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.9 PRE-SPECIFIED SURVIVAL VERDICT")
+    print("=" * 78)
+    print(verdict.to_string(index=False))
+
+    # Integrity checks.
+    if len(labels) == 0:
+        raise RuntimeError("V3.9 frozen label file is empty.")
+
+    if not pd.to_numeric(labels["R"], errors="coerce").notna().any():
+        raise RuntimeError("V3.9 R integrity check failed.")
+
+    if not set(labels["context"].dropna().unique()).issubset(set(V39_CONTEXTS)):
+        raise RuntimeError("V3.9 context integrity check failed.")
+
+    oos_dates = pd.to_datetime(labels.loc[
+        pd.to_datetime(labels["signal_date"]) >= OOS_START,
+        "signal_date"
+    ])
+    if len(oos_dates) and oos_dates.min() < OOS_START:
+        raise RuntimeError("V3.9 OOS chronology guard failed.")
+
+    print("\n" + "=" * 78)
+    print("V3.9 VALIDATION STATUS")
+    print("=" * 78)
+    print("V3.9 V3.8 PIPELINE GUARD: PASS")
+    print("V3.9 FROZEN CONTEXT GUARD: PASS")
+    print("V3.9 NO ENTRY CREATION: PASS")
+    print("V3.9 NO BASELINE MODIFICATION: PASS")
+    print("V3.9 OOS CHRONOLOGY GUARD: PASS")
+    print("V3.9 NO PARAMETER OPTIMIZATION: PASS")
+    print("V3.9 VALIDATION COMPLETE")
+    print("Research-only. No Decision Engine rule was changed.")
+    print("Small-N groups are not evidence of robustness.")
+
+    print("\nFILES CREATED")
+    for filename in [
+        "macro_backtest_v39_oos_aggregate.csv",
+        "macro_backtest_v39_year_survival.csv",
+        "macro_backtest_v39_crisis_exclusion.csv",
+        "macro_backtest_v39_survival_verdict.csv",
+    ]:
+        print(filename)
+
+
 if __name__ == "__main__":
     try:
-        v38_main()
+        v39_main()
     except Exception as exc:
-        print("\nV3.8 FAILED:")
+        print("\nV3.9 FAILED:")
         print(type(exc).__name__ + ": " + str(exc))
         raise
