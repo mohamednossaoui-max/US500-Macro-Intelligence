@@ -1,2740 +1,1330 @@
+#!/usr/bin/env python3
+
 # ============================================================
-# US500 MACRO BACKTEST V3.1 - FULL DECISION ENGINE CALIBRATION
-# FROZEN EMA19 BASELINE + MACRO CONTEXT + TECHNICAL CONFIRMATION
+# US500 MACRO INTELLIGENCE — V3.3
+# C3 vs C4 INCREMENTAL INFORMATION
+# + DECISION CONTEXT CALIBRATION
 # ============================================================
-# Frozen baseline configuration validated by V3:
-# ATR_WILDER / TOUCH_CLOSE_ABOVE / ROW_GAP_1 / OVERLAP
-# Reference: 119 signals, 117 valid, 2 invalid SL,
-# 109 resolved, 36 wins, 73 losses, 3 ambiguous, 5 open,
-# +71R, PF ~= 1.973.
 #
-# V2.2 is research-only. It does NOT modify entries, exits, sizing,
-# or the Decision Engine. Lead analysis tests whether macro deterioration
-# was visible 5/10/20/60 trading days before -10% and -20% drawdowns.
+# RESEARCH ONLY
+#
+# Frozen EMA19 baseline remains untouched.
+#
+# C3 = H1 + H4
+# C4 = H1 + H4 + Strong Technical
+#
+# V3.3 DOES NOT:
+# - create signals
+# - change entries
+# - change stops
+# - change RR
+# - change macro definitions
+# - change Technical Strong definition
+# - execute trades
+#
+# It reads V3.2 outputs and performs incremental analysis.
 # ============================================================
 
-import os
-import warnings
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import requests
-import yfinance as yf
 
-warnings.filterwarnings("ignore")
 
-TICKER = "^GSPC"
-START_DATE = "2019-01-01"
-RR = 4.0
-EMA19 = 19
-EMA200 = 200
-ATR14 = 14
-LOW_LOOKBACK = 5
-FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
+# ============================================================
+# CONFIG
+# ============================================================
 
-FRED_SERIES = {
-    "US10Y": "DGS10", "US2Y": "DGS2", "T10Y2Y": "T10Y2Y",
-    "VIX": "VIXCLS", "DXY": "DTWEXBGS",
-    "UNRATE": "UNRATE", "INITIAL_CLAIMS_4W": "IC4WSA",
-    "HY_SPREAD": "BAMLH0A0HYM2", "CORP_OAS": "BAMLC0A0CM",
-    "NFCI": "NFCI", "INDPRO": "INDPRO", "RETAIL": "RSAFS",
-    "PCE": "PCE", "CORE_PCE": "PCEPILFE", "FEDFUNDS": "FEDFUNDS",
+TRADES_FILE = "macro_backtest_v32_trades.csv"
+EPISODES_FILE = "macro_backtest_v32_market_episode_trades.csv"
+
+STRONG_TECH_MIN = 4
+
+DRAWDOWN_BINS = [
+    -np.inf,
+    -20,
+    -10,
+    -5,
+    -3,
+    0,
+    np.inf,
+]
+
+DRAWDOWN_LABELS = [
+    "<=-20%",
+    "-20% to -10%",
+    "-10% to -5%",
+    "-5% to -3%",
+    "-3% to 0%",
+    ">0%",
+]
+
+BASELINE = {
+    "signals": 119,
+    "valid": 117,
+    "invalid_sl": 2,
+    "resolved": 109,
+    "wins": 36,
+    "losses": 73,
+    "ambiguous": 3,
+    "open": 5,
+    "total_R": 71.0,
 }
-MONTHLY_SERIES = {"UNRATE", "INDPRO", "RETAIL", "PCE", "CORE_PCE", "FEDFUNDS"}
-DAILY_MOMENTUM_LOOKBACK = 20
-MEDIUM_DAILY_LOOKBACK = 60
+
 
 # ============================================================
-# MARKET / FROZEN BASELINE
+# COLUMN ALIASES
 # ============================================================
 
-def load_market():
-    df = yf.download(TICKER, start=START_DATE, auto_adjust=False, progress=False)
-    if df.empty:
-        raise RuntimeError("Yahoo Finance returned no market data.")
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df = df[["Open", "High", "Low", "Close"]].copy()
-    df.index = pd.to_datetime(df.index).tz_localize(None)
-    df = df.sort_index().dropna()
-    for c in ["Open", "High", "Low", "Close"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df.dropna()
-    df["EMA19"] = df["Close"].ewm(span=EMA19, adjust=False, min_periods=EMA19).mean()
-    df["EMA200"] = df["Close"].ewm(span=EMA200, adjust=False, min_periods=EMA200).mean()
+ALIASES = {
+    "signal_date": [
+        "signal_date",
+        "date",
+    ],
+    "result": [
+        "result",
+    ],
+    "R": [
+        "R",
+        "r",
+        "r_multiple",
+    ],
+    "macro_regime": [
+        "macro_regime",
+        "regime",
+    ],
+    "leading_warning": [
+        "leading_warning",
+        "early_warning_level",
+        "leading_warning_status",
+        "early_warning_status",
+    ],
+    "liquidity_momentum": [
+        "liquidity_momentum",
+        "liquidity_status",
+        "liquidity_momentum_status",
+    ],
+    "technical_score": [
+        "technical_score",
+        "tech_score",
+    ],
+    "technical_status": [
+        "technical_status",
+        "tech_status",
+    ],
+    "drawdown_pct": [
+        "drawdown_pct",
+        "drawdown",
+        "dd_pct",
+    ],
+}
 
-    # V3.1 technical confirmation layer. These fields do NOT alter the
-    # frozen EMA19 signal generator; they only classify existing signals.
-    df["SMA20"] = df["Close"].rolling(20, min_periods=20).mean()
-    df["SMA50"] = df["Close"].rolling(50, min_periods=50).mean()
 
-    # Wilder-style RSI(14), calculated without changing any baseline rule.
-    delta = df["Close"].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
-    avg_loss = loss.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    df["RSI14"] = 100 - (100 / (1 + rs))
-    df.loc[(avg_loss == 0) & (avg_gain > 0), "RSI14"] = 100.0
-    df.loc[(avg_loss == 0) & (avg_gain == 0), "RSI14"] = 50.0
+def find_column(df, name, required=True):
 
-    pc = df["Close"].shift(1)
-    tr = pd.concat([
-        df["High"] - df["Low"],
-        (df["High"] - pc).abs(),
-        (df["Low"] - pc).abs(),
-    ], axis=1).max(axis=1)
-    df["TR"] = tr
-    # Exact V3-selected Wilder ATR.
-    df["ATR14_WILDER"] = tr.ewm(alpha=1 / ATR14, adjust=False, min_periods=ATR14).mean()
+    for col in ALIASES[name]:
+        if col in df.columns:
+            return col
+
+    if required:
+        raise RuntimeError(
+            f"\nMissing required V3.2 column: {name}\n"
+            f"Accepted aliases: {ALIASES[name]}\n"
+            f"Available columns:\n{list(df.columns)}"
+        )
+
+    return None
+
+
+# ============================================================
+# LOAD V3.2
+# ============================================================
+
+def load_trades():
+
+    path = Path(TRADES_FILE)
+
+    if not path.exists():
+        raise RuntimeError(
+            f"Missing {TRADES_FILE}. "
+            "Put the V3.2 trade CSV in the repository."
+        )
+
+    raw = pd.read_csv(path)
+
+    mapping = {}
+
+    for name in [
+        "signal_date",
+        "result",
+        "R",
+        "macro_regime",
+        "leading_warning",
+        "liquidity_momentum",
+        "technical_score",
+        "technical_status",
+        "drawdown_pct",
+    ]:
+
+        required = name not in [
+            "technical_status"
+        ]
+
+        col = find_column(
+            raw,
+            name,
+            required=required,
+        )
+
+        if col:
+            mapping[name] = col
+
+    df = raw.copy()
+
+    for logical, actual in mapping.items():
+        df[logical] = df[actual]
+
+    # Technical status can be reconstructed ONLY from the
+    # already frozen V3.1 definition.
+    if "technical_status" not in df.columns:
+
+        score = pd.to_numeric(
+            df["technical_score"],
+            errors="coerce",
+        )
+
+        df["technical_status"] = np.select(
+            [
+                score >= 4,
+                score == 3,
+            ],
+            [
+                "STRONG",
+                "PARTIAL",
+            ],
+            default="WEAK",
+        )
+
+    df["signal_date"] = pd.to_datetime(
+        df["signal_date"],
+        errors="coerce",
+    )
+
+    df["R"] = pd.to_numeric(
+        df["R"],
+        errors="coerce",
+    )
+
+    df["technical_score"] = pd.to_numeric(
+        df["technical_score"],
+        errors="coerce",
+    )
+
+    df["drawdown_pct"] = pd.to_numeric(
+        df["drawdown_pct"],
+        errors="coerce",
+    )
+
+    df = df.sort_values(
+        "signal_date"
+    ).reset_index(drop=True)
+
     return df
 
 
-def baseline_condition(df, i):
-    r = df.iloc[i]
-    return bool(
-        pd.notna(r["EMA19"])
-        and pd.notna(r["EMA200"])
-        and r["Close"] > r["EMA200"]
-        and r["EMA19"] > r["EMA200"]
-        and r["Low"] <= r["EMA19"]
-        and r["Close"] > r["EMA19"]
+# ============================================================
+# SUMMARY
+# ============================================================
+
+def summary(df):
+
+    wins = int(
+        (df["result"] == "WIN").sum()
     )
 
+    losses = int(
+        (df["result"] == "LOSS").sum()
+    )
 
-def build_baseline_signals(df):
-    raw = [i for i in range(len(df)) if baseline_condition(df, i)]
-    return [i for p, i in enumerate(raw) if p == 0 or raw[p] - raw[p - 1] > 1]
+    ambiguous = int(
+        (df["result"] == "AMBIGUOUS").sum()
+    )
 
+    open_trades = int(
+        (df["result"] == "OPEN").sum()
+    )
 
-def baseline_stop(df, i):
-    if i < LOW_LOOKBACK + 1:
-        return np.nan
-    lows = df.iloc[i - LOW_LOOKBACK:i]["Low"]
-    atr = df.iloc[i - 1]["ATR14_WILDER"]
-    if pd.isna(atr):
-        return np.nan
-    return float(lows.min() - 0.5 * atr)
+    invalid = int(
+        (df["result"] == "INVALID_SL").sum()
+    )
 
-
-def resolve_trade(df, entry_i, entry, stop):
-    if not np.isfinite(stop) or stop >= entry:
-        return "INVALID_SL", np.nan, None
-    risk = entry - stop
-    target = entry + RR * risk
-    for j in range(entry_i + 1, len(df)):
-        hi = float(df.iloc[j]["High"])
-        lo = float(df.iloc[j]["Low"])
-        tp = hi >= target
-        sl = lo <= stop
-        if tp and sl:
-            return "AMBIGUOUS", np.nan, j
-        if tp:
-            return "WIN", RR, j
-        if sl:
-            return "LOSS", -1.0, j
-    return "OPEN", np.nan, None
-
-
-def build_baseline_trades(df):
-    rows = []
-    for i in build_baseline_signals(df):
-        entry = float(df.iloc[i]["Close"])
-        stop = baseline_stop(df, i)
-        result, r_mult, exit_i = resolve_trade(df, i, entry, stop)
-        rows.append({
-            "signal_date": df.index[i], "year": int(df.index[i].year),
-            "signal_index": i, "entry": entry, "stop": stop,
-            "risk_points": entry - stop if np.isfinite(stop) else np.nan,
-            "target": entry + RR * (entry - stop) if np.isfinite(stop) and stop < entry else np.nan,
-            "result": result, "R": r_mult,
-            "exit_date": df.index[exit_i] if exit_i is not None else pd.NaT,
-        })
-    return pd.DataFrame(rows)
-
-
-def summarize(g):
-    wins = int((g["result"] == "WIN").sum())
-    losses = int((g["result"] == "LOSS").sum())
-    ambiguous = int((g["result"] == "AMBIGUOUS").sum())
-    open_trades = int((g["result"] == "OPEN").sum())
-    invalid = int((g["result"] == "INVALID_SL").sum())
     resolved = wins + losses
-    r = g["R"].dropna()
-    gp = float(g.loc[g["R"] > 0, "R"].sum())
-    gl = abs(float(g.loc[g["R"] < 0, "R"].sum()))
+
+    gross_profit = float(
+        df.loc[df["R"] > 0, "R"].sum()
+    )
+
+    gross_loss = abs(
+        float(df.loc[df["R"] < 0, "R"].sum())
+    )
+
+    pf = (
+        gross_profit / gross_loss
+        if gross_loss > 0
+        else np.nan
+    )
+
     return {
-        "signals": len(g), "valid": len(g) - invalid, "invalid_sl": invalid,
-        "resolved": resolved, "wins": wins, "losses": losses,
-        "ambiguous": ambiguous, "open": open_trades,
-        "win_rate": 100 * wins / resolved if resolved else np.nan,
-        "avg_R": float(r.mean()) if len(r) else np.nan,
-        "total_R": float(r.sum()) if len(r) else 0.0,
-        "profit_factor": gp / gl if gl else np.nan,
+        "signals": len(df),
+        "valid": len(df) - invalid,
+        "invalid_sl": invalid,
+        "resolved": resolved,
+        "wins": wins,
+        "losses": losses,
+        "ambiguous": ambiguous,
+        "open": open_trades,
+        "win_rate": (
+            100 * wins / resolved
+            if resolved else np.nan
+        ),
+        "avg_R": (
+            float(df["R"].dropna().mean())
+            if df["R"].notna().any()
+            else np.nan
+        ),
+        "total_R": float(
+            df["R"].dropna().sum()
+        ),
+        "profit_factor": pf,
     }
 
 
-def print_baseline_check(trades):
-    s = summarize(trades)
-    expected = {"signals":119, "valid":117, "invalid_sl":2, "resolved":109,
-                "wins":36, "losses":73, "ambiguous":3, "open":5, "total_R":71.0}
+# ============================================================
+# FROZEN BASELINE GUARD
+# ============================================================
+
+def baseline_guard(df):
+
+    s = summary(df)
+
     print("\n" + "=" * 72)
-    print("FROZEN BASELINE CHECK")
+    print("V3.3 FROZEN BASELINE GUARD")
     print("=" * 72)
-    for k in ["signals", "valid", "invalid_sl", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor"]:
-        print(f"{k:18s}: {s[k]}")
-    ok = all(s[k] == v for k, v in expected.items()) and abs(s["profit_factor"] - 1.9726027397260273) < 1e-9
-    print("BASELINE STATUS:", "PASS" if ok else "FAIL")
-    if not ok:
-        print("Expected:", expected, "PF~=1.973")
-    return ok
+
+    print(
+        pd.DataFrame([s])
+        .to_string(index=False)
+    )
+
+    for key in [
+        "signals",
+        "valid",
+        "invalid_sl",
+        "resolved",
+        "wins",
+        "losses",
+        "ambiguous",
+        "open",
+    ]:
+
+        if s[key] != BASELINE[key]:
+
+            raise RuntimeError(
+                f"BASELINE GUARD FAILED: "
+                f"{key}: expected {BASELINE[key]}, "
+                f"got {s[key]}"
+            )
+
+    if abs(
+        s["total_R"] - BASELINE["total_R"]
+    ) > 1e-9:
+
+        raise RuntimeError(
+            "BASELINE GUARD FAILED: total_R "
+            f"expected {BASELINE['total_R']}, "
+            f"got {s['total_R']}"
+        )
+
+    print("\nBASELINE STATUS: PASS")
+
 
 # ============================================================
-# FRED
+# BUILD V3.3 CANDIDATES
 # ============================================================
 
-def get_fred_key():
-    key = os.getenv("FRED_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError("FRED_API_KEY is missing. Configure it as a GitHub Actions secret/environment variable.")
-    return key
+def build_candidates(df):
+
+    regime = (
+        df["macro_regime"]
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    warning = (
+        df["leading_warning"]
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    liquidity = (
+        df["liquidity_momentum"]
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    technical = (
+        df["technical_score"]
+        >= STRONG_TECH_MIN
+    )
+
+    # --------------------------------------------------------
+    # H1
+    # Regime A + WATCH
+    # --------------------------------------------------------
+
+    df["H1"] = (
+        regime.eq("A")
+        & warning.eq("WATCH")
+    )
+
+    # --------------------------------------------------------
+    # H4
+    # Regime A + Liquidity Deteriorating
+    # --------------------------------------------------------
+
+    df["H4"] = (
+        regime.eq("A")
+        & liquidity.isin([
+            "DETERIORATING",
+            "STRONGLY DETERIORATING",
+        ])
+    )
+
+    # --------------------------------------------------------
+    # Strong Technical
+    # EXACT V3.1 definition
+    # --------------------------------------------------------
+
+    df["STRONG_TECH"] = technical
+
+    # --------------------------------------------------------
+    # C3
+    # --------------------------------------------------------
+
+    df["C3"] = (
+        df["H1"]
+        & df["H4"]
+    )
+
+    # --------------------------------------------------------
+    # C4
+    # --------------------------------------------------------
+
+    df["C4"] = (
+        df["H1"]
+        & df["H4"]
+        & df["STRONG_TECH"]
+    )
+
+    # --------------------------------------------------------
+    # Incremental subset
+    # --------------------------------------------------------
+
+    df["C3_NOT_C4"] = (
+        df["C3"]
+        & ~df["C4"]
+    )
+
+    df["NOT_C4"] = ~df["C4"]
+
+    # --------------------------------------------------------
+    # Research context
+    # --------------------------------------------------------
+
+    df["research_context"] = np.select(
+        [
+            df["C4"],
+            df["C3"],
+            df["H1"],
+        ],
+        [
+            "H1+H4+STRONG_TECH",
+            "H1+H4",
+            "H1",
+        ],
+        default="NONE",
+    )
+
+    # --------------------------------------------------------
+    # Drawdown
+    # --------------------------------------------------------
+
+    df["drawdown_bucket"] = pd.cut(
+        df["drawdown_pct"],
+        bins=DRAWDOWN_BINS,
+        labels=DRAWDOWN_LABELS,
+        right=True,
+    )
+
+    df["year"] = (
+        df["signal_date"]
+        .dt.year
+    )
+
+    return df
 
 
-def fred_series(series_id, api_key):
-    params = {
-        "series_id": series_id, "api_key": api_key, "file_type": "json",
-        "observation_start": "2000-01-01",
-        "observation_end": pd.Timestamp.today().strftime("%Y-%m-%d"),
+# ============================================================
+# 1 — C3 vs C4
+# ============================================================
+
+def c3_c4_report(df):
+
+    groups = {
+        "C3_ALL": df["C3"],
+        "C4_SUBSET": df["C4"],
+        "C3_NOT_C4": df["C3_NOT_C4"],
     }
-    r = requests.get(FRED_URL, params=params, timeout=30)
-    r.raise_for_status()
+
     rows = []
-    for obs in r.json().get("observations", []):
-        if obs.get("value") in (None, "", "."):
-            continue
-        try:
-            rows.append((pd.to_datetime(obs["date"]), float(obs["value"])))
-        except (TypeError, ValueError):
-            continue
-    if not rows:
-        return pd.Series(dtype=float, name=series_id)
-    s = pd.Series(dict(rows), name=series_id)
-    s.index = pd.to_datetime(s.index).tz_localize(None)
-    return s.sort_index()
 
+    for name, mask in groups.items():
 
-def load_fred():
-    key = get_fred_key()
-    out = {}
-    print("\n" + "=" * 72)
-    print("LOADING FRED MACRO DATA")
-    print("=" * 72)
-    for name, sid in FRED_SERIES.items():
-        try:
-            out[name] = fred_series(sid, key)
-            print(f"{name:20s} {sid:16s} {len(out[name]):5d} observations")
-        except Exception as exc:
-            print(f"{name:20s} {sid:16s} ERROR: {exc}")
-            out[name] = pd.Series(dtype=float, name=sid)
-    return out
+        s = summary(
+            df.loc[mask]
+        )
 
+        s["group"] = name
 
-def _cutoff(date, monthly=False):
-    d = pd.Timestamp(date)
-    return d.to_period("M").start_time - pd.Timedelta(days=1) if monthly else d
-
-
-def asof_series(series, date, monthly=False):
-    if series is None or series.empty:
-        return pd.Series(dtype=float)
-    return series.loc[series.index <= _cutoff(date, monthly)].dropna()
-
-
-def value_asof(series, date, monthly=False):
-    s = asof_series(series, date, monthly)
-    return float(s.iloc[-1]) if not s.empty else np.nan
-
-
-def pct_change_asof(series, date, periods, monthly=False):
-    s = asof_series(series, date, monthly)
-    if len(s) <= periods:
-        return np.nan
-    old = float(s.iloc[-1 - periods])
-    return np.nan if old == 0 else (float(s.iloc[-1]) / old - 1) * 100
-
-
-def clip_score(x):
-    return np.nan if not np.isfinite(x) else float(np.clip(x, 0, 100))
-
-
-def inflation_yoy(fred, date, key):
-    return pct_change_asof(fred[key], date, 12, monthly=True)
-
-# ============================================================
-# MACRO V2 LEVEL SCORES - transparent, fixed thresholds
-# ============================================================
-
-def score_growth(f, d):
-    vals = []
-    ind = pct_change_asof(f["INDPRO"], d, 12, True)
-    retail = pct_change_asof(f["RETAIL"], d, 12, True)
-    un = value_asof(f["UNRATE"], d, True)
-    claims = pct_change_asof(f["INITIAL_CLAIMS_4W"], d, 12, False)
-    if np.isfinite(ind): vals.append(15 if ind >= 3 else 30 if ind >= 1 else 45 if ind >= 0 else 65 if ind >= -2 else 85)
-    if np.isfinite(retail): vals.append(15 if retail >= 5 else 30 if retail >= 3 else 45 if retail >= 1 else 60 if retail >= 0 else 80)
-    if np.isfinite(un): vals.append(15 if un < 4 else 30 if un < 4.5 else 50 if un < 5 else 75 if un < 6 else 95)
-    if np.isfinite(claims): vals.append(20 if claims < 0 else 35 if claims < 5 else 50 if claims < 10 else 70 if claims < 20 else 90)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Growth deterioration is significant." if np.isfinite(score) and score >= 70 else "Growth indicators show some deterioration." if np.isfinite(score) and score >= 50 else "Growth conditions remain relatively strong." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-
-def score_inflation(f, d):
-    vals = []
-    pce = inflation_yoy(f, d, "PCE")
-    core = inflation_yoy(f, d, "CORE_PCE")
-    if np.isfinite(pce): vals.append(10 if pce < 2 else 25 if pce < 2.5 else 45 if pce < 3 else 70 if pce < 4 else 90)
-    if np.isfinite(core): vals.append(10 if core < 2 else 25 if core < 2.5 else 45 if core < 3 else 70 if core < 3.5 else 95)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Inflation pressure is elevated." if np.isfinite(score) and score >= 70 else "Inflation remains above a comfortable range." if np.isfinite(score) and score >= 50 else "Inflation pressure is relatively contained." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-
-def score_labor(f, d):
-    vals = []
-    un = value_asof(f["UNRATE"], d, True)
-    claims = pct_change_asof(f["INITIAL_CLAIMS_4W"], d, 12, False)
-    if np.isfinite(un): vals.append(10 if un < 4 else 30 if un < 4.5 else 50 if un < 5 else 75 if un < 6 else 95)
-    if np.isfinite(claims): vals.append(15 if claims < 0 else 30 if claims < 5 else 50 if claims < 10 else 75 if claims < 20 else 95)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Labor-market deterioration is elevated." if np.isfinite(score) and score >= 70 else "Labor indicators are showing some stress." if np.isfinite(score) and score >= 50 else "Labor conditions remain relatively healthy." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-
-def score_rates(f, d):
-    vals = []
-    y10 = value_asof(f["US10Y"], d); y2 = value_asof(f["US2Y"], d); curve = value_asof(f["T10Y2Y"], d)
-    if np.isfinite(y10): vals.append(15 if y10 < 2 else 30 if y10 < 3 else 50 if y10 < 4 else 75 if y10 < 5 else 90)
-    if np.isfinite(y2): vals.append(15 if y2 < 1 else 30 if y2 < 2 else 45 if y2 < 3 else 65 if y2 < 4 else 85)
-    if np.isfinite(curve): vals.append(70 if curve < -1 else 60 if curve < -.5 else 50 if curve < 0 else 25)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Rates are exerting significant pressure." if np.isfinite(score) and score >= 70 else "Rates remain restrictive." if np.isfinite(score) and score >= 50 else "Rates pressure is relatively limited." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-
-def score_credit(f, d):
-    vals = []
-    hy = value_asof(f["HY_SPREAD"], d); corp = value_asof(f["CORP_OAS"], d); hy60 = pct_change_asof(f["HY_SPREAD"], d, 60)
-    if np.isfinite(hy): vals.append(10 if hy < 3 else 25 if hy < 4 else 50 if hy < 5 else 75 if hy < 6 else 95)
-    if np.isfinite(corp): vals.append(15 if corp < 1.5 else 30 if corp < 2 else 50 if corp < 2.5 else 70 if corp < 3 else 90)
-    if np.isfinite(hy60): vals.append(15 if hy60 < 0 else 30 if hy60 < 10 else 50 if hy60 < 20 else 75 if hy60 < 30 else 95)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Credit conditions are materially stressed." if np.isfinite(score) and score >= 70 else "Credit conditions show increasing stress." if np.isfinite(score) and score >= 50 else "Credit conditions remain relatively calm." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-
-def score_liquidity(f, d):
-    vals = []
-    nfci = value_asof(f["NFCI"], d); vix = value_asof(f["VIX"], d); dxy60 = pct_change_asof(f["DXY"], d, 60)
-    if np.isfinite(nfci): vals.append(10 if nfci < -.5 else 25 if nfci < 0 else 45 if nfci < .5 else 70 if nfci < 1 else 95)
-    if np.isfinite(vix): vals.append(10 if vix < 15 else 25 if vix < 20 else 50 if vix < 25 else 75 if vix < 30 else 95)
-    if np.isfinite(dxy60): vals.append(20 if dxy60 < 0 else 35 if dxy60 < 5 else 55 if dxy60 < 8 else 75 if dxy60 < 12 else 90)
-    score = np.mean(vals) if vals else np.nan
-    reason = "Liquidity / financial conditions are stressed." if np.isfinite(score) and score >= 70 else "Financial conditions show some tightening." if np.isfinite(score) and score >= 50 else "Liquidity conditions remain relatively easy." if np.isfinite(score) and score <= 30 else ""
-    return clip_score(score), [reason] if reason else []
-
-DIMENSIONS = {
-    "growth": score_growth, "inflation": score_inflation, "labor": score_labor,
-    "rates": score_rates, "credit": score_credit, "liquidity": score_liquidity,
-}
-
-
-def dimension_momentum(score_fn, f, d):
-    current = score_fn(f, d)[0]
-    sd = pd.Timestamp(d) - pd.Timedelta(days=DAILY_MOMENTUM_LOOKBACK)
-    md = pd.Timestamp(d) - pd.Timedelta(days=MEDIUM_DAILY_LOOKBACK)
-    short = score_fn(f, sd)[0]
-    medium = score_fn(f, md)[0]
-    sc = current - short if np.isfinite(current) and np.isfinite(short) else np.nan
-    mc = current - medium if np.isfinite(current) and np.isfinite(medium) else np.nan
-    if not np.isfinite(sc):
-        return "UNAVAILABLE", np.nan, sc, mc
-    if sc >= 15 or (np.isfinite(mc) and mc >= 25): status = "STRONGLY DETERIORATING"
-    elif sc >= 5 or (np.isfinite(mc) and mc >= 10): status = "DETERIORATING"
-    elif sc <= -5 or (np.isfinite(mc) and mc <= -10): status = "IMPROVING"
-    else: status = "STABLE"
-    return status, clip_score(50 + sc), sc, mc
-
-
-def classify_macro_v21(f, d):
-    out = {"signal_date": pd.Timestamp(d)}
-    reasons = []
-    levels = {}
-    momentum_scores = []
-    statuses = {}
-    for name, fn in DIMENSIONS.items():
-        score, rs = fn(f, d)
-        status, mscore, sc, mc = dimension_momentum(fn, f, d)
-        levels[name] = score; statuses[name] = status
-        out[f"{name}_stress"] = score
-        out[f"{name}_momentum"] = status
-        out[f"{name}_momentum_score"] = mscore
-        out[f"{name}_short_change"] = sc
-        out[f"{name}_medium_change"] = mc
-        reasons.extend(rs)
-        if np.isfinite(mscore): momentum_scores.append(mscore)
-    valid_levels = [v for v in levels.values() if np.isfinite(v)]
-    out["macro_stress"] = float(np.mean(valid_levels)) if valid_levels else np.nan
-    out["macro_momentum"] = float(np.mean(momentum_scores)) if momentum_scores else np.nan
-    out["deteriorating_count"] = sum(v in ("DETERIORATING", "STRONGLY DETERIORATING") for v in statuses.values())
-    out["strong_deteriorating_count"] = sum(v == "STRONGLY DETERIORATING" for v in statuses.values())
-    out["improving_count"] = sum(v == "IMPROVING" for v in statuses.values())
-    lead = [statuses[x] for x in ("credit", "labor", "liquidity")]
-    lead_count = sum(v in ("DETERIORATING", "STRONGLY DETERIORATING") for v in lead)
-    out["leading_warning_count"] = lead_count
-    out["leading_warning"] = "STRONG" if any(v == "STRONGLY DETERIORATING" for v in lead) else "ELEVATED" if lead_count >= 2 else "WATCH" if lead_count == 1 else "NONE"
-    growth = levels["growth"]; inflation = levels["inflation"]; labor = levels["labor"]; rates = levels["rates"]; credit = levels["credit"]; liquidity = levels["liquidity"]
-    if np.isfinite(credit) and np.isfinite(liquidity) and credit >= 75 and liquidity >= 75:
-        regime, reason = "F", "Severe credit and liquidity stress."
-    elif np.isfinite(growth) and np.isfinite(labor) and growth >= 70 and labor >= 70:
-        regime, reason = "E", "Growth and labor conditions indicate significant economic deterioration."
-    elif np.isfinite(growth) and np.isfinite(inflation) and growth >= 65 and inflation >= 65:
-        regime, reason = "D", "Growth deterioration is occurring alongside elevated inflation pressure."
-    elif np.isfinite(inflation) and np.isfinite(rates) and inflation >= 65 and rates >= 60:
-        regime, reason = "C", "Inflation and rates are exerting significant pressure."
-    elif np.isfinite(growth) and growth >= 60 and (not np.isfinite(inflation) or inflation < 55):
-        regime, reason = "B", "Growth conditions are deteriorating while inflation pressure remains relatively contained."
-    else:
-        regime, reason = "A", "No dominant combination of macro stresses meets the thresholds for B-F."
-    out["macro_regime"] = regime; out["macro_regime_reason"] = reason; out["macro_reasons"] = " | ".join(x for x in reasons if x)
-    return out
-
-# ============================================================
-# REPORTS / CALIBRATION
-# ============================================================
-
-def attach_macro(trades, fred):
-    rows = []
-    for _, t in trades.iterrows():
-        r = t.to_dict(); r.update(classify_macro_v21(fred, t["signal_date"])); rows.append(r)
-    return pd.DataFrame(rows)
-
-
-def add_drawdown(trades, market):
-    rh = market["High"].cummax()
-    out = trades.copy()
-    out["reference_high"] = out["signal_date"].map(rh)
-    out["drawdown_pct"] = (out["entry"] / out["reference_high"] - 1) * 100
-    return out
-
-
-def add_zones(trades):
-    out = trades.copy()
-    def zone(x):
-        if not np.isfinite(x): return "UNAVAILABLE"
-        return "LOW" if x < 25 else "MODERATE" if x < 50 else "HIGH" if x < 75 else "EXTREME"
-    out["macro_stress_zone"] = out["macro_stress"].apply(zone)
-    out["macro_momentum_zone"] = out["macro_momentum"].apply(zone)
-    out["drawdown_bucket"] = pd.cut(out["drawdown_pct"], [-np.inf,-20,-10,-5,-3,0,np.inf], labels=["<=-20%","-20% to -10%","-10% to -5%","-5% to -3%","-3% to 0%",">0%"])
-    return out
-
-
-def grouped_report(trades, col):
-    rows = []
-    for key, g in trades.groupby(col, dropna=False, observed=False):
-        s = summarize(g); s[col] = key; rows.append(s)
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
-
-
-def grouped_2d_report(trades, col_a, col_b):
-    rows = []
-    for (key_a, key_b), g in trades.groupby([col_a, col_b], dropna=False, observed=False):
-        s = summarize(g)
-        s[col_a] = key_a
-        s[col_b] = key_b
-        s["group"] = f"{key_a} | {key_b}"
         rows.append(s)
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
-
-def print_report(title, report, key):
-    print("\n" + "=" * 72); print(title); print("=" * 72)
-    if report.empty:
-        print("No data available."); return
-    cols = [key,"signals","valid","resolved","wins","losses","ambiguous","open","win_rate","avg_R","total_R","profit_factor"]
-    print(report[cols].to_string(index=False))
-
-
-def detect_drawdown_events(market, thresholds=(-10.0, -20.0)):
-    """Return independent drawdown episodes for each threshold.
-
-    Entry into an episode is still defined exactly as before: the daily Close
-    reaches or falls below the threshold relative to the cumulative maximum
-    High.
-
-    IMPORTANT: recovery is defined by a *new intraday high* (current High >=
-    the prior cumulative reference High), not by requiring the Close itself to
-    equal the historical High. This distinction matters because a market can
-    establish a new all-time High intraday while closing below that High.
-    Requiring Close / cumulative-High - 1 >= 0 could therefore keep an episode
-    artificially open for a very long time and suppress later independent
-    episodes (such as the 2022 drawdown).
-    """
-    ref_high = market["High"].cummax()
-    dd = (market["Close"] / ref_high - 1.0) * 100.0
-
-    # A recovery/new-high day is one whose High reaches the cumulative High
-    # that existed before that day.  Shift prevents the current day's High
-    # from trivially qualifying because ref_high includes the current day.
-    prior_ref_high = ref_high.shift(1)
-    recovered = prior_ref_high.notna() & (market["High"] >= prior_ref_high)
-
-    events = []
-
-    for threshold in thresholds:
-        in_episode = False
-        episode_id = 0
-
-        for pos, idx in enumerate(market.index):
-            value = float(dd.iloc[pos])
-
-            # A new episode begins only after the previous episode has fully
-            # recovered to a new cumulative high.
-            if not in_episode and value <= threshold:
-                episode_id += 1
-                in_episode = True
-                events.append({
-                    "threshold": float(threshold),
-                    "episode_id": int(episode_id),
-                    "event_date": pd.Timestamp(idx),
-                    "event_index": int(pos),
-                    "event_drawdown_pct": value,
-                    "reference_high": float(ref_high.iloc[pos]),
-                })
-
-            # Do not let the event day itself immediately recover. Recovery
-            # must occur after the threshold event and must be a genuine new
-            # High relative to the pre-day reference High.
-            elif in_episode and bool(recovered.iloc[pos]):
-                in_episode = False
-
-    return pd.DataFrame(events).sort_values(
-        ["threshold", "event_date"]
-    ).reset_index(drop=True)
-
-
-def build_lead_event_study(market, fred, thresholds=(-10.0, -20.0), windows=(60, 20, 10, 5)):
-    """Evaluate macro state on trading days before independent episodes."""
-    events = detect_drawdown_events(market, thresholds=thresholds)
-    detail = []
-    for _, ev in events.iterrows():
-        event_index = int(ev["event_index"])
-        row = ev.to_dict()
-        for window in windows:
-            target_index = event_index - int(window)
-            prefix = f"tminus_{window}d"
-            if target_index < 0:
-                row[f"{prefix}_date"] = pd.NaT
-                row[f"{prefix}_available"] = False
-                continue
-            lead_date = pd.Timestamp(market.index[target_index])
-            macro = classify_macro_v21(fred, lead_date)
-            row[f"{prefix}_date"] = lead_date
-            row[f"{prefix}_available"] = True
-            row[f"{prefix}_leading_warning"] = macro["leading_warning"]
-            row[f"{prefix}_leading_warning_count"] = macro["leading_warning_count"]
-            row[f"{prefix}_macro_regime"] = macro["macro_regime"]
-            row[f"{prefix}_macro_stress"] = macro["macro_stress"]
-            row[f"{prefix}_macro_momentum"] = macro["macro_momentum"]
-            for dim in DIMENSIONS:
-                row[f"{prefix}_{dim}_stress"] = macro[f"{dim}_stress"]
-                row[f"{prefix}_{dim}_momentum"] = macro[f"{dim}_momentum"]
-                row[f"{prefix}_{dim}_momentum_score"] = macro[f"{dim}_momentum_score"]
-                row[f"{prefix}_{dim}_short_change"] = macro[f"{dim}_short_change"]
-                row[f"{prefix}_{dim}_medium_change"] = macro[f"{dim}_medium_change"]
-        detail.append(row)
-    return pd.DataFrame(detail)
-
-
-def build_lead_dimension_report(detail, windows=(60, 20, 10, 5)):
-    rows = []
-    for threshold in sorted(detail["threshold"].dropna().unique()):
-        subset = detail[detail["threshold"] == threshold]
-        for dim in DIMENSIONS:
-            for window in windows:
-                col = f"tminus_{window}d_{dim}_momentum"
-                score_col = f"tminus_{window}d_{dim}_stress"
-                if col not in subset.columns:
-                    continue
-                s = subset[col].dropna()
-                stress = pd.to_numeric(subset[score_col], errors="coerce").dropna()
-                n = len(s)
-                rows.append({
-                    "threshold": threshold,
-                    "dimension": dim,
-                    "window_trading_days": window,
-                    "events": n,
-                    "deteriorating_pct": 100 * s.isin(["DETERIORATING", "STRONGLY DETERIORATING"]).mean() if n else np.nan,
-                    "strongly_deteriorating_pct": 100 * (s == "STRONGLY DETERIORATING").mean() if n else np.nan,
-                    "improving_pct": 100 * (s == "IMPROVING").mean() if n else np.nan,
-                    "stable_pct": 100 * (s == "STABLE").mean() if n else np.nan,
-                    "mean_stress": float(stress.mean()) if len(stress) else np.nan,
-                    "median_stress": float(stress.median()) if len(stress) else np.nan,
-                })
     return pd.DataFrame(rows)
 
 
-def build_lead_transition_report(detail, windows=(60, 20, 10, 5)):
-    rows = []
-    for threshold in sorted(detail["threshold"].dropna().unique()):
-        subset = detail[detail["threshold"] == threshold]
-        for dim in DIMENSIONS:
-            base_col = f"tminus_{windows[0]}d_{dim}_stress"
-            for window in windows[1:]:
-                later_col = f"tminus_{window}d_{dim}_stress"
-                if base_col not in subset or later_col not in subset:
-                    continue
-                pair = subset[[base_col, later_col]].apply(pd.to_numeric, errors="coerce").dropna()
-                if pair.empty:
-                    continue
-                delta = pair[later_col] - pair[base_col]
-                rows.append({
-                    "threshold": threshold,
-                    "dimension": dim,
-                    "from_window": windows[0],
-                    "to_window": window,
-                    "events": len(pair),
-                    "mean_stress_change": float(delta.mean()),
-                    "median_stress_change": float(delta.median()),
-                    "pct_worsened_ge_5": 100 * (delta >= 5).mean(),
-                    "pct_worsened_ge_10": 100 * (delta >= 10).mean(),
-                    "pct_improved_le_minus_5": 100 * (delta <= -5).mean(),
-                })
-    return pd.DataFrame(rows)
+# ============================================================
+# 2 — C4 VS BASELINE
+# ============================================================
 
+def c4_vs_baseline(df):
 
-def build_lead_warning_report(detail, windows=(60, 20, 10, 5)):
-    rows = []
-    for threshold in sorted(detail["threshold"].dropna().unique()):
-        subset = detail[detail["threshold"] == threshold]
-        for window in windows:
-            col = f"tminus_{window}d_leading_warning"
-            if col not in subset:
-                continue
-            s = subset[col].dropna()
-            n = len(s)
-            for state in ["NONE", "WATCH", "ELEVATED", "STRONG"]:
-                rows.append({
-                    "threshold": threshold,
-                    "window_trading_days": window,
-                    "leading_warning": state,
-                    "events": n,
-                    "pct": 100 * (s == state).mean() if n else np.nan,
-                })
-    return pd.DataFrame(rows)
+    groups = {
+        "ALL_FROZEN_SIGNALS":
+            np.ones(len(df), dtype=bool),
 
+        "C4":
+            df["C4"],
 
-
-def build_episode_comparison(detail, windows=(60, 20, 10, 5)):
-    """One row per independent episode with compact macro trajectory fields."""
-    rows = []
-    if detail.empty:
-        return pd.DataFrame()
-
-    for _, r in detail.iterrows():
-        out = {
-            "threshold": r["threshold"],
-            "episode_id": r["episode_id"],
-            "event_date": r["event_date"],
-            "event_drawdown_pct": r["event_drawdown_pct"],
-        }
-        for window in windows:
-            prefix = f"tminus_{window}d"
-            out[f"{prefix}_date"] = r.get(f"{prefix}_date", pd.NaT)
-            out[f"{prefix}_leading_warning"] = r.get(f"{prefix}_leading_warning", np.nan)
-            out[f"{prefix}_macro_regime"] = r.get(f"{prefix}_macro_regime", np.nan)
-            out[f"{prefix}_macro_stress"] = r.get(f"{prefix}_macro_stress", np.nan)
-            out[f"{prefix}_macro_momentum"] = r.get(f"{prefix}_macro_momentum", np.nan)
-        rows.append(out)
-    return pd.DataFrame(rows)
-
-
-def build_episode_stress_transitions(detail, windows=(60, 20, 10, 5)):
-    """Calculate stress changes within each independent episode.
-
-    Positive delta = more stress according to the existing V2.1 score.
-    No thresholds or scoring rules are changed here.
-    """
-    rows = []
-    if detail.empty:
-        return pd.DataFrame()
-
-    pairs = list(zip(windows[:-1], windows[1:]))
-    for _, r in detail.iterrows():
-        for dim in DIMENSIONS:
-            for w0, w1 in pairs:
-                a = pd.to_numeric(r.get(f"tminus_{w0}d_{dim}_stress"), errors="coerce")
-                b = pd.to_numeric(r.get(f"tminus_{w1}d_{dim}_stress"), errors="coerce")
-                if not (np.isfinite(a) and np.isfinite(b)):
-                    continue
-                delta = float(b - a)
-                rows.append({
-                    "threshold": r["threshold"],
-                    "episode_id": r["episode_id"],
-                    "event_date": r["event_date"],
-                    "dimension": dim,
-                    "from_window": w0,
-                    "to_window": w1,
-                    "stress_from": float(a),
-                    "stress_to": float(b),
-                    "stress_change": delta,
-                    "direction": "WORSENED" if delta >= 5 else "IMPROVED" if delta <= -5 else "STABLE",
-                })
-
-            a = pd.to_numeric(r.get(f"tminus_{windows[0]}d_{dim}_stress"), errors="coerce")
-            b = pd.to_numeric(r.get(f"tminus_{windows[-1]}d_{dim}_stress"), errors="coerce")
-            if np.isfinite(a) and np.isfinite(b):
-                delta = float(b - a)
-                rows.append({
-                    "threshold": r["threshold"],
-                    "episode_id": r["episode_id"],
-                    "event_date": r["event_date"],
-                    "dimension": dim,
-                    "from_window": windows[0],
-                    "to_window": windows[-1],
-                    "stress_from": float(a),
-                    "stress_to": float(b),
-                    "stress_change": delta,
-                    "direction": "WORSENED" if delta >= 5 else "IMPROVED" if delta <= -5 else "STABLE",
-                })
-    return pd.DataFrame(rows)
-
-
-def build_episode_dimension_summary(detail, windows=(60, 20, 10, 5)):
-    """Summary across independent episodes, with mathematically valid percentages."""
-    rows = []
-    if detail.empty:
-        return pd.DataFrame()
-
-    for threshold in sorted(detail["threshold"].dropna().unique()):
-        subset = detail[detail["threshold"] == threshold]
-        for dim in DIMENSIONS:
-            for window in windows:
-                status_col = f"tminus_{window}d_{dim}_momentum"
-                stress_col = f"tminus_{window}d_{dim}_stress"
-                if status_col not in subset.columns:
-                    continue
-                s = subset[status_col]
-                stress = pd.to_numeric(subset[stress_col], errors="coerce")
-                valid = s.notna()
-                n = int(valid.sum())
-                if n == 0:
-                    continue
-                ss = s[valid]
-                vv = stress[stress.notna()]
-                rows.append({
-                    "threshold": threshold,
-                    "dimension": dim,
-                    "window_trading_days": window,
-                    "episodes": n,
-                    "deteriorating_pct": 100 * ss.isin(["DETERIORATING", "STRONGLY DETERIORATING"]).mean(),
-                    "strongly_deteriorating_pct": 100 * (ss == "STRONGLY DETERIORATING").mean(),
-                    "improving_pct": 100 * (ss == "IMPROVING").mean(),
-                    "stable_pct": 100 * (ss == "STABLE").mean(),
-                    "mean_stress": float(vv.mean()) if len(vv) else np.nan,
-                    "median_stress": float(vv.median()) if len(vv) else np.nan,
-                })
-    return pd.DataFrame(rows)
-
-
-def build_episode_warning_summary(detail, windows=(60, 20, 10, 5)):
-    rows = []
-    if detail.empty:
-        return pd.DataFrame()
-    for threshold in sorted(detail["threshold"].dropna().unique()):
-        subset = detail[detail["threshold"] == threshold]
-        for window in windows:
-            col = f"tminus_{window}d_leading_warning"
-            if col not in subset.columns:
-                continue
-            s = subset[col].dropna()
-            n = len(s)
-            for state in ["NONE", "WATCH", "ELEVATED", "STRONG"]:
-                rows.append({
-                    "threshold": threshold,
-                    "window_trading_days": window,
-                    "leading_warning": state,
-                    "episodes": n,
-                    "pct": 100 * (s == state).mean() if n else np.nan,
-                })
-    return pd.DataFrame(rows)
-
-
-
-def build_confluence_report(trades, columns, min_signals=1):
-    """Trade-level macro confluence study. No thresholds or baseline logic are changed."""
-    rows = []
-    work = trades.copy()
-    for c in columns:
-        if c not in work.columns:
-            raise KeyError(f"Missing confluence column: {c}")
-    for keys, g in work.groupby(columns, dropna=False, observed=False):
-        if not isinstance(keys, tuple):
-            keys = (keys,)
-        s = summarize(g)
-        if s["signals"] < min_signals:
-            continue
-        row = {c: k for c, k in zip(columns, keys)}
-        row.update(s)
-        row["confluence_group"] = " | ".join(str(k) for k in keys)
-        rows.append(row)
-    return pd.DataFrame(rows)
-
-
-def add_confluence_flags(trades):
-    """Descriptive confluence flags; these are research labels only."""
-    out = trades.copy()
-    out["leading_stress_count"] = out[["credit_momentum", "labor_momentum", "liquidity_momentum"]].isin(["DETERIORATING", "STRONGLY DETERIORATING"]).sum(axis=1)
-    out["macro_deterioration_count"] = out[[f"{d}_momentum" for d in DIMENSIONS]].isin(["DETERIORATING", "STRONGLY DETERIORATING"]).sum(axis=1)
-    out["macro_improvement_count"] = out[[f"{d}_momentum" for d in DIMENSIONS]].eq("IMPROVING").sum(axis=1)
-    out["technical_context"] = "NOT_INCLUDED"
-    return out
-
-
-def summarize_period(g):
-    """Summary with no changes to the frozen trade engine."""
-    if g.empty:
-        return summarize(g)
-    return summarize(g)
-
-
-def add_v24_period(trades, split_date="2025-01-01"):
-    out = trades.copy()
-    d = pd.to_datetime(out["signal_date"])
-    split = pd.Timestamp(split_date)
-    out["sample"] = np.where(d < split, "DISCOVERY", "HOLDOUT")
-    return out
-
-
-def v24_candidate_tests(trades):
-    """Pre-specified V2.3 hypotheses tested unchanged in discovery and holdout."""
-    tests = [
-        ("H1_REGIME_A_WATCH", lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH")),
-        ("H2_SHALLOW_DD_WATCH", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH")),
-        ("H3_DD_10_TO_5_REGIME_B", lambda x: (x["drawdown_bucket"] == "-10% to -5%") & (x["macro_regime"] == "B")),
-        ("H4_REGIME_A_LIQUIDITY_DETERIORATING", lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING")),
-        ("H5_SHALLOW_DD_LEADING_STRESS_COUNT_1", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1)),
-    ]
-    rows = []
-    for name, fn in tests:
-        mask = fn(trades)
-        for sample in ["DISCOVERY", "HOLDOUT"]:
-            g = trades.loc[mask & (trades["sample"] == sample)].copy()
-            st = summarize(g)
-            rows.append({"hypothesis": name, "sample": sample, **st})
-    return pd.DataFrame(rows)
-
-
-def v24_group_robustness(trades):
-    """Compare the same pre-specified group definitions across periods."""
-    specs = [
-        ("REGIME x WARNING", ["macro_regime", "leading_warning"]),
-        ("DRAWDOWN x WARNING", ["drawdown_bucket", "leading_warning"]),
-        ("DRAWDOWN x REGIME", ["drawdown_bucket", "macro_regime"]),
-        ("REGIME x LIQUIDITY", ["macro_regime", "liquidity_momentum"]),
-        ("LEADING STRESS COUNT", ["leading_stress_count"]),
-    ]
-    rows = []
-    for title, cols in specs:
-        for sample in ["DISCOVERY", "HOLDOUT"]:
-            part = trades[trades["sample"] == sample]
-            rep = build_confluence_report(part, cols, min_signals=1)
-            if rep.empty:
-                continue
-            rep.insert(0, "sample", sample)
-            rep.insert(0, "study", title)
-            rows.append(rep)
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-
-
-def make_drawdown_bucket(value, boundaries):
-    """Research-only drawdown bucketing for robustness sensitivity; baseline is untouched."""
-    b3, b5, b10, b20 = boundaries
-    if pd.isna(value):
-        return np.nan
-    v = float(value)
-    if v <= b20:
-        return f"<={b20:g}%"
-    if v <= b10:
-        return f"{b20:g}% to {b10:g}%"
-    if v <= b5:
-        return f"{b10:g}% to {b5:g}%"
-    if v <= b3:
-        return f"{b5:g}% to {b3:g}%"
-    return f"{b3:g}% to 0%"
-
-
-def v24_drawdown_sensitivity(trades):
-    """Sensitivity around drawdown boundaries, without changing any trade outcomes."""
-    schemes = {
-        "CANONICAL": (-3.0, -5.0, -10.0, -20.0),
-        "SHIFTED_0_5_PP": (-2.5, -4.5, -9.5, -19.5),
-        "SHIFTED_1_0_PP": (-2.0, -4.0, -9.0, -19.0),
+        "NOT_C4":
+            df["NOT_C4"],
     }
+
     rows = []
-    for name, bounds in schemes.items():
-        work = trades.copy()
-        work["sensitivity_drawdown_bucket"] = work["drawdown_pct"].apply(lambda v: make_drawdown_bucket(v, bounds))
-        mask = work["leading_warning"].eq("WATCH")
-        for sample in ["DISCOVERY", "HOLDOUT"]:
-            g = work.loc[mask & work["sample"].eq(sample)]
-            st = summarize(g)
-            rows.append({"scheme": name, "sample": sample, "boundaries": str(bounds), **st})
+
+    for name, mask in groups.items():
+
+        s = summary(
+            df.loc[mask]
+        )
+
+        s["group"] = name
+
+        rows.append(s)
+
     return pd.DataFrame(rows)
 
 
-def v24_yearly_holdout(trades):
-    """Year-by-year holdout stability for the pre-specified hypotheses."""
-    tests = {
-        "H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
-        "H2_SHALLOW_DD_WATCH": lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH"),
-        "H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
-        "H5_SHALLOW_DD_LEADING_STRESS_COUNT_1": lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1),
+# ============================================================
+# 3 — CONTEXT × DRAWDOWN
+# ============================================================
+
+def context_drawdown(df):
+
+    rows = []
+
+    for context in [
+        "NONE",
+        "H1",
+        "H1+H4",
+        "H1+H4+STRONG_TECH",
+    ]:
+
+        for bucket in DRAWDOWN_LABELS:
+
+            g = df.loc[
+                (df["research_context"] == context)
+                &
+                (
+                    df["drawdown_bucket"]
+                    .astype(str)
+                    == bucket
+                )
+            ]
+
+            if g.empty:
+                continue
+
+            s = summary(g)
+
+            s["context"] = context
+            s["drawdown_bucket"] = bucket
+
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# 4 — CONTEXT × DRAWDOWN × TECHNICAL
+# ============================================================
+
+def context_drawdown_technical(df):
+
+    rows = []
+
+    for context in [
+        "NONE",
+        "H1",
+        "H1+H4",
+        "H1+H4+STRONG_TECH",
+    ]:
+
+        for bucket in DRAWDOWN_LABELS:
+
+            for tech in [
+                "WEAK",
+                "PARTIAL",
+                "STRONG",
+            ]:
+
+                g = df.loc[
+                    (df["research_context"] == context)
+                    &
+                    (
+                        df["drawdown_bucket"]
+                        .astype(str)
+                        == bucket
+                    )
+                    &
+                    (
+                        df["technical_status"]
+                        .astype(str)
+                        .str.upper()
+                        == tech
+                    )
+                ]
+
+                if g.empty:
+                    continue
+
+                s = summary(g)
+
+                s["context"] = context
+                s["drawdown_bucket"] = bucket
+                s["technical_status"] = tech
+
+                rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# 5 — YEARLY
+# ============================================================
+
+def yearly_context(df):
+
+    rows = []
+
+    for context in [
+        "NONE",
+        "H1",
+        "H1+H4",
+        "H1+H4+STRONG_TECH",
+    ]:
+
+        g0 = df[
+            df["research_context"] == context
+        ]
+
+        for year, g in g0.groupby("year"):
+
+            s = summary(g)
+
+            s["context"] = context
+            s["year"] = int(year)
+
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# 6 — OOS
+# ============================================================
+
+def chronological_oos(df):
+
+    rows = []
+
+    candidates = {
+        "C3_H1_PLUS_H4":
+            df["C3"],
+
+        "C4_H1_PLUS_H4_STRONG_TECH":
+            df["C4"],
+
+        "C3_NOT_C4":
+            df["C3_NOT_C4"],
+
+        "NOT_C4":
+            df["NOT_C4"],
     }
-    hold = trades[trades["sample"] == "HOLDOUT"].copy()
-    rows = []
-    if hold.empty:
-        return pd.DataFrame()
-    hold["holdout_year"] = pd.to_datetime(hold["signal_date"]).dt.year
-    for name, fn in tests.items():
-        mask = fn(hold)
-        for year, g0 in hold.loc[mask].groupby("holdout_year"):
-            st = summarize(g0)
-            rows.append({"hypothesis": name, "year": int(year), **st})
-    return pd.DataFrame(rows)
 
+    discovery = df["year"] < 2025
+    holdout = df["year"] >= 2025
 
-# ============================================================
-# V2.5 WALK-FORWARD / ROLLING ROBUSTNESS
-# ============================================================
-def v25_hypotheses():
-    """Exactly the V2.3 pre-specified hypotheses; no re-optimization."""
-    return [
-        ("H1_REGIME_A_WATCH", lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH")),
-        ("H2_SHALLOW_DD_WATCH", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_warning"] == "WATCH")),
-        ("H3_DD_10_TO_5_REGIME_B", lambda x: (x["drawdown_bucket"] == "-10% to -5%") & (x["macro_regime"] == "B")),
-        ("H4_REGIME_A_LIQUIDITY_DETERIORATING", lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING")),
-        ("H5_SHALLOW_DD_LEADING_STRESS_COUNT_1", lambda x: (x["drawdown_bucket"] == "-3% to 0%") & (x["leading_stress_count"] == 1)),
-    ]
+    for name, candidate in candidates.items():
 
+        for sample, period in [
+            ("DISCOVERY", discovery),
+            ("HOLDOUT", holdout),
+        ]:
 
-def v25_walk_forward(trades, first_test_year=2023, last_test_year=None):
-    """
-    Expanding chronological walk-forward report.
+            s = summary(
+                df.loc[
+                    candidate & period
+                ]
+            )
 
-    For each test year Y:
-      TRAIN/AVAILABLE: all observations before Y
-      TEST: observations in calendar year Y
+            s["candidate"] = name
+            s["sample"] = sample
 
-    The hypotheses are fixed in advance and are never selected or optimized
-    from the training period. The prior-period column is descriptive only.
-    """
-    out = trades.copy()
-    out["signal_date"] = pd.to_datetime(out["signal_date"])
-    min_year = int(out["signal_date"].dt.year.min())
-    max_year = int(out["signal_date"].dt.year.max())
-    first_test_year = max(first_test_year, min_year + 1)
-    if last_test_year is None:
-        last_test_year = max_year
-
-    rows = []
-    for test_year in range(first_test_year, last_test_year + 1):
-        train = out[out["signal_date"].dt.year < test_year]
-        test = out[out["signal_date"].dt.year == test_year]
-        if test.empty:
-            continue
-
-        for name, fn in v25_hypotheses():
-            train_g = train.loc[fn(train)].copy()
-            test_g = test.loc[fn(test)].copy()
-            train_st = summarize(train_g)
-            test_st = summarize(test_g)
-
-            row = {
-                "hypothesis": name,
-                "test_year": test_year,
-                "train_start": train["signal_date"].min().date().isoformat() if not train.empty else "",
-                "train_end": train["signal_date"].max().date().isoformat() if not train.empty else "",
-                "train_signals": train_st["signals"],
-                "train_resolved": train_st["resolved"],
-                "train_wins": train_st["wins"],
-                "train_losses": train_st["losses"],
-                "train_win_rate": train_st["win_rate"],
-                "train_avg_R": train_st["avg_R"],
-                "train_total_R": train_st["total_R"],
-                "train_profit_factor": train_st["profit_factor"],
-                "test_signals": test_st["signals"],
-                "test_valid": test_st["valid"],
-                "test_invalid_sl": test_st["invalid_sl"],
-                "test_resolved": test_st["resolved"],
-                "test_wins": test_st["wins"],
-                "test_losses": test_st["losses"],
-                "test_ambiguous": test_st["ambiguous"],
-                "test_open": test_st["open"],
-                "test_win_rate": test_st["win_rate"],
-                "test_avg_R": test_st["avg_R"],
-                "test_total_R": test_st["total_R"],
-                "test_profit_factor": test_st["profit_factor"],
-            }
-            rows.append(row)
+            rows.append(s)
 
     return pd.DataFrame(rows)
 
 
-def v25_stability_summary(walk):
-    """Summarize OOS test-year consistency without ranking hypotheses."""
-    if walk.empty:
-        return pd.DataFrame()
-
-    rows = []
-    for name, g in walk.groupby("hypothesis"):
-        tested = g[g["test_resolved"] > 0].copy()
-        positive = int((tested["test_total_R"] > 0).sum())
-        nonnegative = int((tested["test_total_R"] >= 0).sum())
-        rows.append({
-            "hypothesis": name,
-            "test_years_with_resolved_trades": len(tested),
-            "positive_test_years": positive,
-            "nonnegative_test_years": nonnegative,
-            "test_years_total_R": float(tested["test_total_R"].sum()) if not tested.empty else 0.0,
-            "test_resolved_total": int(tested["test_resolved"].sum()) if not tested.empty else 0,
-            "test_wins_total": int(tested["test_wins"].sum()) if not tested.empty else 0,
-            "test_losses_total": int(tested["test_losses"].sum()) if not tested.empty else 0,
-            "test_win_rate_pooled": (
-                100.0 * tested["test_wins"].sum() / tested["test_resolved"].sum()
-                if not tested.empty and tested["test_resolved"].sum() else np.nan
-            ),
-            "test_avg_R_pooled": (
-                float(tested["test_total_R"].sum() / tested["test_resolved"].sum())
-                if not tested.empty and tested["test_resolved"].sum() else np.nan
-            ),
-        })
-    return pd.DataFrame(rows)
-
-
-def main():
-    market = load_market()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    # ------------------------------------------------------------
-    # FROZEN BASELINE — MUST REMAIN IDENTICAL TO V2.3
-    # ------------------------------------------------------------
-    baseline = build_baseline_trades(market)
-    baseline_ok = print_baseline_check(baseline)
-    if not baseline_ok:
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.4 is stopped; do not use these results.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-
-    # Fixed chronological split. No optimization on the holdout.
-    SPLIT_DATE = "2025-01-01"
-    trades = add_v24_period(trades, SPLIT_DATE)
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.4 — OUT-OF-SAMPLE + ROBUSTNESS TEST")
-    print("=" * 72)
-    print(f"Chronological split: DISCOVERY < {SPLIT_DATE} | HOLDOUT >= {SPLIT_DATE}")
-    print("Frozen EMA19 entries/exits/RR are unchanged. Research-only; no trade execution.")
-
-    print("\nSAMPLE SIZES")
-    print(trades.groupby("sample").size().rename("signals").to_string())
-
-    # 1) Pre-specified V2.3 hypotheses.
-    candidate = v24_candidate_tests(trades)
-    print("\n" + "-" * 72)
-    print("PRE-SPECIFIED V2.3 HYPOTHESES — DISCOVERY vs HOLDOUT")
-    print("-" * 72)
-    print(candidate.to_string(index=False))
-
-    # 2) Same group definitions in both samples.
-    groups = v24_group_robustness(trades)
-    print("\n" + "-" * 72)
-    print("GROUP ROBUSTNESS — SAME DEFINITIONS IN BOTH SAMPLES")
-    print("-" * 72)
-    if groups.empty:
-        print("No grouped results.")
-    else:
-        cols = ["study", "sample"] + [c for c in groups.columns if c not in {"study", "sample", "signals", "valid", "invalid_sl", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor", "confluence_group"}] + ["signals", "valid", "resolved", "wins", "losses", "ambiguous", "open", "win_rate", "avg_R", "total_R", "profit_factor"]
-        cols = [c for c in cols if c in groups.columns]
-        print(groups[cols].to_string(index=False))
-
-    # 3) Boundary sensitivity: only labels change, not trades/results.
-    sensitivity = v24_drawdown_sensitivity(trades)
-    print("\n" + "-" * 72)
-    print("DRAWDOWN BOUNDARY SENSITIVITY — WATCH GROUP")
-    print("-" * 72)
-    print(sensitivity.to_string(index=False))
-
-    # 4) Holdout year-by-year stability.
-    yearly = v24_yearly_holdout(trades)
-    print("\n" + "-" * 72)
-    print("HOLDOUT YEAR-BY-YEAR STABILITY")
-    print("-" * 72)
-    if yearly.empty:
-        print("No holdout observations for the pre-specified hypotheses.")
-    else:
-        print(yearly.to_string(index=False))
-
-    # ------------------------------------------------------------
-    # V2.5 WALK-FORWARD — SAME FIXED HYPOTHESES
-    # ------------------------------------------------------------
-    walk = v25_walk_forward(trades, first_test_year=2023)
-    stability = v25_stability_summary(walk)
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.5 — WALK-FORWARD / ROLLING ROBUSTNESS")
-    print("=" * 72)
-    print("Expanding chronology: all data before test year is TRAIN/AVAILABLE;")
-    print("the calendar test year is evaluated as unseen TEST data.")
-    print("Hypotheses are fixed from V2.3 and are NOT optimized during walk-forward.")
-    print("Research-only; no trade execution; no Decision Engine calibration.")
-
-    print("\nWALK-FORWARD TEST-YEAR RESULTS")
-    print("-" * 72)
-    if walk.empty:
-        print("No walk-forward observations.")
-    else:
-        print(walk.to_string(index=False))
-
-    print("\nWALK-FORWARD STABILITY SUMMARY")
-    print("-" * 72)
-    if stability.empty:
-        print("No resolved walk-forward observations.")
-    else:
-        print(stability.to_string(index=False))
-
-    # Export everything for auditability.
-    trades.to_csv("macro_backtest_v25_trades.csv", index=False)
-    candidate.to_csv("macro_backtest_v25_candidate_hypotheses_v24_reference.csv", index=False)
-    groups.to_csv("macro_backtest_v25_group_robustness_v24_reference.csv", index=False)
-    sensitivity.to_csv("macro_backtest_v25_drawdown_sensitivity_v24_reference.csv", index=False)
-    yearly.to_csv("macro_backtest_v25_holdout_yearly_v24_reference.csv", index=False)
-    walk.to_csv("macro_backtest_v25_walk_forward.csv", index=False)
-    stability.to_csv("macro_backtest_v25_stability_summary.csv", index=False)
-
-    print("\nFILES CREATED")
-    print("macro_backtest_v25_trades.csv")
-    print("macro_backtest_v25_candidate_hypotheses_v24_reference.csv")
-    print("macro_backtest_v25_group_robustness_v24_reference.csv")
-    print("macro_backtest_v25_drawdown_sensitivity_v24_reference.csv")
-    print("macro_backtest_v25_holdout_yearly_v24_reference.csv")
-    print("macro_backtest_v25_walk_forward.csv")
-    print("macro_backtest_v25_stability_summary.csv")
-    print("\nMACRO CALIBRATION V2.5 WALK-FORWARD / ROLLING ROBUSTNESS COMPLETE")
-
-
 # ============================================================
-# V2.6 STATISTICAL ROBUSTNESS / NULL TESTING
-# ============================================================
-# Research-only. The five hypotheses are frozen from V2.3/V2.5.
-# No threshold optimization, no entry/exit changes, no Decision Engine.
-
-V26_SEED = 2606
-V26_BOOTSTRAPS = 10000
-V26_PERMUTATIONS = 10000
-V26_BLOCK_LEN = 3
-
-
-def _resolved_r(g):
-    if g.empty or "R" not in g.columns:
-        return np.array([], dtype=float)
-    x = pd.to_numeric(g.loc[g["result"].isin(["WIN", "LOSS"]), "R"], errors="coerce").dropna()
-    return x.to_numpy(dtype=float)
-
-
-def _bootstrap_mean_ci(values, rng, n=V26_BOOTSTRAPS, alpha=0.05):
-    values = np.asarray(values, dtype=float)
-    if len(values) == 0:
-        return np.nan, np.nan
-    if len(values) == 1:
-        return float(values[0]), float(values[0])
-    samples = rng.choice(values, size=(n, len(values)), replace=True)
-    means = samples.mean(axis=1)
-    return float(np.quantile(means, alpha/2)), float(np.quantile(means, 1-alpha/2))
-
-
-def _bootstrap_total_ci(values, rng, n=V26_BOOTSTRAPS, alpha=0.05):
-    values = np.asarray(values, dtype=float)
-    if len(values) == 0:
-        return np.nan, np.nan
-    if len(values) == 1:
-        return float(values[0]), float(values[0])
-    samples = rng.choice(values, size=(n, len(values)), replace=True)
-    totals = samples.sum(axis=1)
-    return float(np.quantile(totals, alpha/2)), float(np.quantile(totals, 1-alpha/2))
-
-
-def _block_bootstrap_mean_ci(values, rng, block_len=V26_BLOCK_LEN, n=V26_BOOTSTRAPS, alpha=0.05):
-    values = np.asarray(values, dtype=float)
-    m = len(values)
-    if m == 0:
-        return np.nan, np.nan
-    if m < 2:
-        return float(values.mean()), float(values.mean())
-    L = max(1, min(int(block_len), m))
-    means = np.empty(n, dtype=float)
-    for b in range(n):
-        sample = []
-        while len(sample) < m:
-            start = int(rng.integers(0, m))
-            for k in range(L):
-                sample.append(values[(start + k) % m])
-                if len(sample) >= m:
-                    break
-        means[b] = np.mean(sample)
-    return float(np.quantile(means, alpha/2)), float(np.quantile(means, 1-alpha/2))
-
-
-def _permutation_p_value(all_r, mask, observed_mean, rng, n=V26_PERMUTATIONS):
-    all_r = np.asarray(all_r, dtype=float)
-    mask = np.asarray(mask, dtype=bool)
-    k = int(mask.sum())
-    if k == 0 or len(all_r) <= 1 or not np.isfinite(observed_mean):
-        return np.nan
-    extreme = 0
-    # Randomly reassign the same number of labels to resolved trades.
-    for _ in range(n):
-        idx = rng.choice(len(all_r), size=k, replace=False)
-        stat = float(all_r[idx].mean())
-        if stat >= observed_mean - 1e-12:
-            extreme += 1
-    return float((extreme + 1) / (n + 1))
-
-
-def _permutation_diff_p_value(all_r, mask, observed_diff, rng, n=V26_PERMUTATIONS):
-    all_r = np.asarray(all_r, dtype=float)
-    mask = np.asarray(mask, dtype=bool)
-    k = int(mask.sum())
-    if k == 0 or k == len(all_r) or len(all_r) <= 1 or not np.isfinite(observed_diff):
-        return np.nan
-    extreme = 0
-    for _ in range(n):
-        idx = rng.choice(len(all_r), size=k, replace=False)
-        sel = np.zeros(len(all_r), dtype=bool)
-        sel[idx] = True
-        diff = float(all_r[sel].mean() - all_r[~sel].mean())
-        if diff >= observed_diff - 1e-12:
-            extreme += 1
-    return float((extreme + 1) / (n + 1))
-
-
-def _placebo_shift_p_value(all_r, mask, observed_mean, rng, n=V26_PERMUTATIONS):
-    """Circularly shift the fixed hypothesis membership across chronological trades."""
-    all_r = np.asarray(all_r, dtype=float)
-    mask = np.asarray(mask, dtype=bool)
-    k = int(mask.sum())
-    N = len(all_r)
-    if k == 0 or N <= 1 or not np.isfinite(observed_mean):
-        return np.nan
-    extreme = 0
-    shifts = rng.integers(1, N, size=n)
-    for shift in shifts:
-        shifted = np.roll(mask, int(shift))
-        stat = float(all_r[shifted].mean())
-        if stat >= observed_mean - 1e-12:
-            extreme += 1
-    return float((extreme + 1) / (n + 1))
-
-
-def _bh_adjust(pvalues):
-    vals = np.asarray(pvalues, dtype=float)
-    out = np.full(vals.shape, np.nan, dtype=float)
-    good = np.isfinite(vals)
-    if not good.any():
-        return out
-    idx = np.where(good)[0]
-    order = idx[np.argsort(vals[good])]
-    m = len(order)
-    prev = 1.0
-    for rank in range(m, 0, -1):
-        i = order[rank-1]
-        q = vals[i] * m / rank
-        prev = min(prev, q)
-        out[i] = prev
-    return out
-
-
-def _winner_concentration(values):
-    values = np.sort(np.asarray(values, dtype=float))[::-1]
-    total = float(values.sum()) if len(values) else 0.0
-    out = {"total_R": total}
-    for n in [1, 2, 3]:
-        if len(values) > n:
-            out[f"total_R_excl_top_{n}"] = float(values[n:].sum())
-        else:
-            out[f"total_R_excl_top_{n}"] = np.nan
-    return out
-
-
-def v26_statistical_robustness(trades):
-    """Statistical tests for the five frozen hypotheses.
-
-    The null tests ask whether a hypothesis group's observed R distribution is
-    unusually positive relative to random reassignment of the same group size.
-    They do not change the trading strategy or select new thresholds.
-    """
-    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
-    all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
-    valid_all = np.isfinite(all_r)
-    resolved = resolved.loc[valid_all].reset_index(drop=True)
-    all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
-    baseline_mean = float(all_r.mean()) if len(all_r) else np.nan
-
-    rows = []
-    rng = np.random.default_rng(V26_SEED)
-    pvals = []
-    raw_rows = []
-
-    for name, fn in v25_hypotheses():
-        mask = np.asarray(fn(resolved), dtype=bool)
-        vals = all_r[mask]
-        k = len(vals)
-        if k == 0:
-            raw_rows.append({"hypothesis": name, "resolved": 0})
-            pvals.append(np.nan)
-            continue
-
-        mean_r = float(vals.mean())
-        total_r = float(vals.sum())
-        complement = all_r[~mask]
-        comp_mean = float(complement.mean()) if len(complement) else np.nan
-        diff = mean_r - comp_mean if np.isfinite(comp_mean) else np.nan
-        ci_lo, ci_hi = _bootstrap_mean_ci(vals, rng)
-        total_lo, total_hi = _bootstrap_total_ci(vals, rng)
-        block_lo, block_hi = _block_bootstrap_mean_ci(vals, rng)
-        perm_p = _permutation_p_value(all_r, mask, mean_r, rng)
-        diff_p = _permutation_diff_p_value(all_r, mask, diff, rng)
-        placebo_p = _placebo_shift_p_value(all_r, mask, mean_r, rng)
-        concentration = _winner_concentration(vals)
-        wins = int((resolved.loc[mask, "result"] == "WIN").sum())
-        losses = int((resolved.loc[mask, "result"] == "LOSS").sum())
-
-        row = {
-            "hypothesis": name,
-            "resolved": k,
-            "wins": wins,
-            "losses": losses,
-            "win_rate": 100.0 * wins / k if k else np.nan,
-            "mean_R": mean_r,
-            "mean_R_bootstrap_ci_low": ci_lo,
-            "mean_R_bootstrap_ci_high": ci_hi,
-            "mean_R_block_bootstrap_ci_low": block_lo,
-            "mean_R_block_bootstrap_ci_high": block_hi,
-            "total_R": total_r,
-            "total_R_bootstrap_ci_low": total_lo,
-            "total_R_bootstrap_ci_high": total_hi,
-            "baseline_mean_R": baseline_mean,
-            "vs_complement_mean_R": comp_mean,
-            "mean_R_difference_vs_complement": diff,
-            "permutation_p_mean": perm_p,
-            "permutation_p_vs_complement": diff_p,
-            "placebo_circular_shift_p": placebo_p,
-            **concentration,
-        }
-        raw_rows.append(row)
-        pvals.append(perm_p)
-
-    report = pd.DataFrame(raw_rows)
-    if not report.empty and "permutation_p_mean" in report.columns:
-        report["permutation_q_mean_bh"] = _bh_adjust(report["permutation_p_mean"].to_numpy(dtype=float))
-    return report
-
-
-def v26_crisis_exclusion(trades):
-    """Sensitivity after excluding major stress years 2020 and 2022."""
-    work = trades.copy()
-    work["signal_date"] = pd.to_datetime(work["signal_date"])
-    work = work[~work["signal_date"].dt.year.isin([2020, 2022])]
-    rows = []
-    for name, fn in v25_hypotheses():
-        g = work.loc[fn(work) & work["result"].isin(["WIN", "LOSS"])].copy()
-        r = _resolved_r(g)
-        wins = int((g["result"] == "WIN").sum())
-        losses = int((g["result"] == "LOSS").sum())
-        rows.append({
-            "hypothesis": name,
-            "resolved": len(r),
-            "wins": wins,
-            "losses": losses,
-            "win_rate": 100.0 * wins / len(r) if len(r) else np.nan,
-            "avg_R": float(r.mean()) if len(r) else np.nan,
-            "total_R": float(r.sum()) if len(r) else 0.0,
-        })
-    return pd.DataFrame(rows)
-
-
-def v26_walk_forward_nulls(trades):
-    """Null testing restricted to the chronological V2.5 test years."""
-    rows = []
-    walk = v25_walk_forward(trades, first_test_year=2023)
-    if walk.empty:
-        return pd.DataFrame()
-    for _, w in walk.iterrows():
-        year = int(w["test_year"])
-        test = trades[pd.to_datetime(trades["signal_date"]).dt.year == year].copy()
-        if test.empty:
-            continue
-        resolved = test[test["result"].isin(["WIN", "LOSS"])].copy().sort_values("signal_date").reset_index(drop=True)
-        all_r = pd.to_numeric(resolved["R"], errors="coerce").to_numpy(dtype=float)
-        if len(all_r) == 0:
-            continue
-        name = w["hypothesis"]
-        fn = dict(v25_hypotheses())[name]
-        mask = np.asarray(fn(resolved), dtype=bool)
-        if mask.sum() == 0:
-            continue
-        rng = np.random.default_rng(V26_SEED + year)
-        obs = float(all_r[mask].mean())
-        rows.append({
-            "hypothesis": name,
-            "test_year": year,
-            "resolved": int(mask.sum()),
-            "observed_mean_R": obs,
-            "permutation_p_mean": _permutation_p_value(all_r, mask, obs, rng, n=V26_PERMUTATIONS),
-        })
-    return pd.DataFrame(rows)
-
-
-def v26_main():
-    market = load_market()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    baseline = build_baseline_trades(market)
-    if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.6 is stopped; do not use these results.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-    trades = add_v24_period(trades, "2025-01-01")
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.6 — STATISTICAL ROBUSTNESS / NULL TESTING")
-    print("=" * 72)
-    print("Frozen hypotheses: H1/H2/H3/H4/H5 from V2.3/V2.5.")
-    print("Bootstrap, permutation, placebo, block-bootstrap, crisis-exclusion and winner-concentration tests.")
-    print("Research-only; no trade execution; no Decision Engine calibration.")
-
-    stats = v26_statistical_robustness(trades)
-    crisis = v26_crisis_exclusion(trades)
-    wf_nulls = v26_walk_forward_nulls(trades)
-
-    print("\nSTATISTICAL ROBUSTNESS — FROZEN HYPOTHESES")
-    print("-" * 72)
-    print(stats.to_string(index=False))
-
-    print("\nCRISIS-EXCLUSION SENSITIVITY — EXCLUDING 2020 AND 2022")
-    print("-" * 72)
-    print(crisis.to_string(index=False))
-
-    print("\nWALK-FORWARD TEST-YEAR NULL CHECK")
-    print("-" * 72)
-    if wf_nulls.empty:
-        print("No resolved walk-forward null observations.")
-    else:
-        print(wf_nulls.to_string(index=False))
-
-    trades.to_csv("macro_backtest_v26_trades.csv", index=False)
-    stats.to_csv("macro_backtest_v26_statistical_robustness.csv", index=False)
-    crisis.to_csv("macro_backtest_v26_crisis_exclusion.csv", index=False)
-    wf_nulls.to_csv("macro_backtest_v26_walk_forward_nulls.csv", index=False)
-
-    print("\nFILES CREATED")
-    print("macro_backtest_v26_trades.csv")
-    print("macro_backtest_v26_statistical_robustness.csv")
-    print("macro_backtest_v26_crisis_exclusion.csv")
-    print("macro_backtest_v26_walk_forward_nulls.csv")
-    print("\nMACRO CALIBRATION V2.6 STATISTICAL ROBUSTNESS / NULL TESTING COMPLETE")
-
-
-# V2.6 main guard disabled when running V2.7.
-
-
-# ============================================================
-# V2.7 TEMPORAL / DEPENDENCY ROBUSTNESS
+# 7 — EXPANDING WALK FORWARD
 # ============================================================
 
-V27_BOOTSTRAPS = 5000
-V27_SEED = 2707
+def walk_forward(df):
 
-def add_independent_drawdown_episodes(trades, threshold=-3.0):
-    """Assign independent drawdown episodes.
+    rows = []
 
-    An episode starts on the first observed trade-date at or below the
-    threshold after the prior episode has recovered to >= 0% drawdown.
-    Trades before the first threshold crossing are assigned NORMAL_0.
-    This is deliberately a coarse market-state cluster, not a new trading rule.
-    """
-    work = trades.copy()
-    work["signal_date"] = pd.to_datetime(work["signal_date"])
-    work = work.sort_values("signal_date").reset_index(drop=True)
+    candidates = {
+        "C3_H1_PLUS_H4":
+            df["C3"],
 
-    episode = 0
-    active = False
-    ids = []
-    for _, row in work.iterrows():
-        dd = row.get("drawdown_pct", np.nan)
-        if not active:
-            if np.isfinite(dd) and float(dd) <= threshold:
-                episode += 1
-                active = True
-        ids.append(episode)
-        if active and np.isfinite(dd) and float(dd) >= 0:
-            active = False
-    work["dd3_episode_id"] = ids
-    work["dd3_episode"] = work["dd3_episode_id"].apply(
-        lambda x: f"EP_{int(x)}" if int(x) > 0 else "NORMAL"
-    )
-    return work
+        "C4_H1_PLUS_H4_STRONG_TECH":
+            df["C4"],
+    }
 
-
-def _cluster_bootstrap_mean(values, clusters, rng, n=V27_BOOTSTRAPS, alpha=0.05):
-    """Bootstrap clusters, keeping all observations inside a cluster together."""
-    values = np.asarray(values, dtype=float)
-    clusters = np.asarray(clusters)
-    if len(values) == 0:
-        return np.nan, np.nan
-    unique = pd.unique(clusters)
-    if len(unique) == 1:
-        return float(values.mean()), float(values.mean())
-
-    cluster_values = {c: values[clusters == c] for c in unique}
-    means = np.empty(n, dtype=float)
-    for b in range(n):
-        sampled = rng.choice(unique, size=len(unique), replace=True)
-        vals = np.concatenate([cluster_values[c] for c in sampled])
-        means[b] = float(np.mean(vals))
-    return (
-        float(np.quantile(means, alpha / 2)),
-        float(np.quantile(means, 1 - alpha / 2)),
+    years = sorted(
+        df["year"]
+        .dropna()
+        .unique()
     )
 
+    for test_year in years:
 
-def _episode_leave_one_out(values, clusters):
-    """Return min/max mean after removing one independent episode/cluster."""
-    values = np.asarray(values, dtype=float)
-    clusters = np.asarray(clusters)
-    unique = pd.unique(clusters)
-    if len(unique) <= 1:
-        return np.nan, np.nan, len(unique)
+        if test_year <= 2022:
+            continue
 
-    means = []
-    for c in unique:
-        keep = clusters != c
-        if keep.sum():
-            means.append(float(values[keep].mean()))
-    return float(min(means)), float(max(means)), len(unique)
+        train_period = (
+            df["year"] < test_year
+        )
 
+        test_period = (
+            df["year"] == test_year
+        )
 
-def _cluster_concentration(values, clusters):
-    """Measure whether a result is dominated by one temporal cluster."""
-    values = np.asarray(values, dtype=float)
-    clusters = np.asarray(clusters)
-    unique = pd.unique(clusters)
-    totals = {c: float(values[clusters == c].sum()) for c in unique}
-    ranked = sorted(totals.values(), reverse=True)
-    total = float(values.sum())
-    return {
-        "cluster_count": len(unique),
-        "top_cluster_R": ranked[0] if ranked else np.nan,
-        "total_R_excl_top_cluster": (
-            total - ranked[0] if ranked else total
-        ),
-        "top_2_cluster_R": (
-            sum(ranked[:2]) if ranked else np.nan
-        ),
-        "total_R_excl_top_2_clusters": (
-            total - sum(ranked[:2]) if ranked else total
-        ),
-    }
+        for name, candidate in candidates.items():
 
+            train = df.loc[
+                candidate & train_period
+            ]
 
-def v27_temporal_robustness(trades):
-    """Evaluate frozen hypotheses using temporal clusters rather than
-    treating every trade as independent evidence."""
-    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
-    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
-    resolved["year_cluster"] = resolved["signal_date"].dt.year.astype(str)
+            test = df.loc[
+                candidate & test_period
+            ]
 
-    rows = []
-    rng = np.random.default_rng(V27_SEED)
+            tr = summary(train)
+            te = summary(test)
 
-    for name, fn in v25_hypotheses():
-        mask = np.asarray(fn(resolved), dtype=bool)
-        g = resolved.loc[mask].copy()
-        if g.empty:
             rows.append({
-                "hypothesis": name,
-                "resolved": 0,
-                "dd3_episode_clusters": 0,
-                "year_clusters": 0,
+                "candidate": name,
+                "test_year": int(test_year),
+
+                "train_signals":
+                    tr["signals"],
+
+                "train_wins":
+                    tr["wins"],
+
+                "train_losses":
+                    tr["losses"],
+
+                "train_avg_R":
+                    tr["avg_R"],
+
+                "train_total_R":
+                    tr["total_R"],
+
+                "test_signals":
+                    te["signals"],
+
+                "test_wins":
+                    te["wins"],
+
+                "test_losses":
+                    te["losses"],
+
+                "test_win_rate":
+                    te["win_rate"],
+
+                "test_avg_R":
+                    te["avg_R"],
+
+                "test_total_R":
+                    te["total_R"],
+
+                "test_profit_factor":
+                    te["profit_factor"],
             })
-            continue
-
-        r = pd.to_numeric(g["R"], errors="coerce").to_numpy(dtype=float)
-        ok = np.isfinite(r)
-        g = g.loc[ok].reset_index(drop=True)
-        r = pd.to_numeric(g["R"], errors="coerce").to_numpy(dtype=float)
-
-        dd_clusters = g["dd3_episode_id"].to_numpy()
-        year_clusters = g["year_cluster"].to_numpy()
-
-        dd_lo, dd_hi = _cluster_bootstrap_mean(r, dd_clusters, rng)
-        yr_lo, yr_hi = _cluster_bootstrap_mean(r, year_clusters, rng)
-
-        dd_loo_min, dd_loo_max, dd_n = _episode_leave_one_out(r, dd_clusters)
-        yr_loo_min, yr_loo_max, yr_n = _episode_leave_one_out(r, year_clusters)
-
-        row = {
-            "hypothesis": name,
-            "resolved": len(r),
-            "wins": int((g["result"] == "WIN").sum()),
-            "losses": int((g["result"] == "LOSS").sum()),
-            "mean_R": float(r.mean()),
-            "total_R": float(r.sum()),
-            "dd3_episode_clusters": dd_n,
-            "dd3_cluster_bootstrap_ci_low": dd_lo,
-            "dd3_cluster_bootstrap_ci_high": dd_hi,
-            "dd3_leave_one_episode_out_min_mean_R": dd_loo_min,
-            "dd3_leave_one_episode_out_max_mean_R": dd_loo_max,
-            "year_clusters": yr_n,
-            "year_cluster_bootstrap_ci_low": yr_lo,
-            "year_cluster_bootstrap_ci_high": yr_hi,
-            "year_leave_one_out_min_mean_R": yr_loo_min,
-            "year_leave_one_out_max_mean_R": yr_loo_max,
-            **_cluster_concentration(r, dd_clusters),
-        }
-        rows.append(row)
 
     return pd.DataFrame(rows)
 
 
-def v27_episode_permutation(trades, n=V27_BOOTSTRAPS):
-    """Episode-level placebo: preserve complete temporal clusters and compare
-    observed hypothesis-group mean with random episode assignment.
+# ============================================================
+# 8 — LEAVE ONE YEAR OUT
+# ============================================================
 
-    This is intentionally conservative. It does not pretend trades within
-    one market episode are independent observations.
-    """
-    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
-    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
+def leave_one_year_out(df):
 
     rows = []
-    rng = np.random.default_rng(V27_SEED + 100)
 
-    for name, fn in v25_hypotheses():
-        mask = np.asarray(fn(resolved), dtype=bool)
-        if not mask.any():
-            continue
+    candidates = {
+        "C3_H1_PLUS_H4":
+            df["C3"],
 
-        observed = float(pd.to_numeric(
-            resolved.loc[mask, "R"], errors="coerce"
-        ).dropna().mean())
+        "C4_H1_PLUS_H4_STRONG_TECH":
+            df["C4"],
 
-        # A hypothesis is considered represented by the set of episodes in
-        # which it appears. Randomly select the same number of episodes and
-        # pool all trades from those episodes.
-        episode_labels = resolved["dd3_episode_id"].to_numpy()
-        unique = pd.unique(episode_labels)
-        selected_obs = pd.unique(episode_labels[mask])
-        k = len(selected_obs)
-
-        if k == 0 or len(unique) <= 1:
-            p = np.nan
-        else:
-            episode_means = {
-                e: float(pd.to_numeric(
-                    resolved.loc[episode_labels == e, "R"],
-                    errors="coerce"
-                ).dropna().mean())
-                for e in unique
-            }
-            valid_eps = [e for e, v in episode_means.items() if np.isfinite(v)]
-            k = min(k, len(valid_eps))
-            extreme = 0
-            for _ in range(n):
-                chosen = rng.choice(valid_eps, size=k, replace=False)
-                vals = [episode_means[e] for e in chosen]
-                stat = float(np.mean(vals))
-                if stat >= observed - 1e-12:
-                    extreme += 1
-            p = float((extreme + 1) / (n + 1))
-
-        rows.append({
-            "hypothesis": name,
-            "resolved": int(mask.sum()),
-            "observed_mean_R": observed,
-            "observed_episode_count": int(len(selected_obs)),
-            "total_episode_count": int(len(unique)),
-            "episode_level_permutation_p": p,
-        })
-
-    return pd.DataFrame(rows)
-
-
-def v27_exclusion_sensitivity(trades):
-    """Leave-one-year and leave-one-major-episode sensitivity."""
-    work = add_independent_drawdown_episodes(trades, threshold=-3.0)
-    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-
-    rows = []
-    exclusion_sets = {
-        "NONE": set(),
-        "EXCLUDE_2020": {2020},
-        "EXCLUDE_2022": {2022},
-        "EXCLUDE_2020_2022": {2020, 2022},
-        "EXCLUDE_2025": {2025},
+        "C3_NOT_C4":
+            df["C3_NOT_C4"],
     }
 
-    for name, fn in v25_hypotheses():
-        base = resolved.loc[fn(resolved)].copy()
-        for label, years in exclusion_sets.items():
-            g = base[~base["signal_date"].dt.year.isin(years)]
-            r = pd.to_numeric(g["R"], errors="coerce").dropna()
-            rows.append({
-                "hypothesis": name,
-                "exclusion": label,
-                "resolved": len(r),
-                "wins": int((g["result"] == "WIN").sum()),
-                "losses": int((g["result"] == "LOSS").sum()),
-                "avg_R": float(r.mean()) if len(r) else np.nan,
-                "total_R": float(r.sum()) if len(r) else 0.0,
-            })
-    return pd.DataFrame(rows)
-
-
-def v27_main():
-    market = load_market()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    baseline = build_baseline_trades(market)
-    if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.7 is stopped; do not use these results.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-    trades = add_v24_period(trades, "2025-01-01")
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.7 — TEMPORAL / DEPENDENCY ROBUSTNESS")
-    print("=" * 72)
-    print("Frozen hypotheses: H1/H2/H4/H5 from V2.3/V2.5; H3 retained for audit.")
-    print("Trade-level results are re-tested with independent drawdown episodes and year clusters.")
-    print("No thresholds, entries, exits or hypotheses are optimized.")
-    print("Research-only; no trade execution; no Decision Engine calibration.")
-
-    temporal = v27_temporal_robustness(trades)
-    episode_perm = v27_episode_permutation(trades)
-    exclusions = v27_exclusion_sensitivity(trades)
-
-    print("\nTEMPORAL / CLUSTER ROBUSTNESS")
-    print("-" * 72)
-    print(temporal.to_string(index=False))
-
-    print("\nEPISODE-LEVEL PERMUTATION / PLACEBO")
-    print("-" * 72)
-    print(episode_perm.to_string(index=False))
-
-    print("\nYEAR / CRISIS EXCLUSION SENSITIVITY")
-    print("-" * 72)
-    print(exclusions.to_string(index=False))
-
-    trades.to_csv("macro_backtest_v27_trades.csv", index=False)
-    temporal.to_csv("macro_backtest_v27_temporal_robustness.csv", index=False)
-    episode_perm.to_csv("macro_backtest_v27_episode_permutation.csv", index=False)
-    exclusions.to_csv("macro_backtest_v27_exclusion_sensitivity.csv", index=False)
-
-    print("\nFILES CREATED")
-    print("macro_backtest_v27_trades.csv")
-    print("macro_backtest_v27_temporal_robustness.csv")
-    print("macro_backtest_v27_episode_permutation.csv")
-    print("macro_backtest_v27_exclusion_sensitivity.csv")
-    print("\nMACRO CALIBRATION V2.7 TEMPORAL / DEPENDENCY ROBUSTNESS COMPLETE")
-
-
-
-# ============================================================
-# V2.9 EPISODE INTEGRITY + STATISTICAL AUDIT
-# ============================================================
-# Research-only audit of V2.7. No frozen baseline, hypothesis,
-# entry, exit, sizing, or Decision Engine logic is changed.
-#
-# Purpose:
-# 1) Reconstruct independent episodes from the DAILY MARKET path,
-#    rather than from trade dates only.
-# 2) Recompute the V2.7 episode-level permutation exactly.
-# 3) Compare the exact finite permutation distribution with the
-#    Monte-Carlo p-value printed by V2.7.
-# 4) Audit episode/year concentration and leave-one-cluster-out.
-# ============================================================
-
-from itertools import combinations
-
-V28_THRESHOLD = -3.0
-
-def v28_market_episode_labels(market, threshold=V28_THRESHOLD):
-    """Assign each market date to an independent drawdown episode.
-
-    The episode starts when Close/previous cumulative High reaches the
-    threshold. Recovery requires a later genuine new intraday high
-    (High >= prior cumulative High), matching the independent-episode
-    logic used by the V2.2 episode study.
-    """
-    m = market.copy()
-    m.index = pd.to_datetime(m.index)
-    ref_high = m["High"].cummax()
-    dd = (m["Close"] / ref_high - 1.0) * 100.0
-    prior_ref_high = ref_high.shift(1)
-    recovered = prior_ref_high.notna() & (m["High"] >= prior_ref_high)
-
-    labels = []
-    episode_id = 0
-    active = False
-    for pos in range(len(m)):
-        value = float(dd.iloc[pos])
-        if not active and np.isfinite(value) and value <= threshold:
-            episode_id += 1
-            active = True
-        labels.append(episode_id if active else 0)
-        if active and bool(recovered.iloc[pos]):
-            active = False
-    return pd.Series(labels, index=m.index, name="market_episode_id")
-
-
-def v28_attach_market_episodes(trades, market, threshold=V28_THRESHOLD):
-    out = trades.copy()
-    out["signal_date"] = pd.to_datetime(out["signal_date"])
-    labels = v28_market_episode_labels(market, threshold)
-    mapping = labels.reindex(out["signal_date"]).ffill().fillna(0).astype(int)
-    out["market_episode_id"] = mapping.to_numpy()
-    out["market_episode"] = out["market_episode_id"].apply(
-        lambda x: f"EP_{int(x)}" if int(x) > 0 else "NORMAL"
+    years = sorted(
+        df["year"]
+        .dropna()
+        .unique()
     )
-    return out
 
+    for name, candidate in candidates.items():
 
-def bh_adjust(p_values):
-    p=np.asarray(p_values,dtype=float); m=len(p)
-    if m==0: return np.array([])
-    order=np.argsort(p); q=np.empty(m,float); running=1.0
-    for rank,idx in reversed(list(enumerate(order,start=1))):
-        running=min(running,p[idx]*m/rank); q[idx]=running
-    return q
+        means = []
 
+        for year in years:
 
-def v29_corrected_episode_permutation(trades, episode_col, n_mc=10000):
-    """Correct episode-level permutation with matched observed/null statistics."""
-    rows=[]; rng=np.random.default_rng(V27_SEED+2900)
-    resolved=trades[trades['result'].isin(['WIN','LOSS'])].copy()
-    for name,fn in v25_hypotheses():
-        g=resolved.loc[np.asarray(fn(resolved),dtype=bool)].copy()
-        g['R_num']=pd.to_numeric(g['R'],errors='coerce'); g=g[np.isfinite(g['R_num'])].copy()
-        if g.empty: continue
-        stats={}
-        for ep,eg in resolved.groupby(episode_col,dropna=False):
-            rr=pd.to_numeric(eg['R'],errors='coerce').dropna()
-            if len(rr): stats[ep]={'mean':float(rr.mean()),'n':len(rr),'sum':float(rr.sum())}
-        selected=[e for e in pd.unique(g[episode_col]) if e in stats]
-        all_eps=list(stats); k=len(selected); total=len(all_eps)
-        obs_ep=float(np.mean([stats[e]['mean'] for e in selected])) if k else np.nan
-        obs_tw=float(g['R_num'].mean())
-        if not k or k>total: continue
-        extreme_ep=extreme_tw=0; assignments=0
-        if total<=20:
-            for combo in combinations(all_eps,k):
-                assignments+=1
-                se=float(np.mean([stats[e]['mean'] for e in combo]))
-                n=sum(stats[e]['n'] for e in combo); st=sum(stats[e]['sum'] for e in combo)/n
-                extreme_ep += se >= obs_ep-1e-12
-                extreme_tw += st >= obs_tw-1e-12
-            p_ep=extreme_ep/assignments; p_tw=extreme_tw/assignments; method='exact'
-        else:
-            for _ in range(n_mc):
-                chosen=rng.choice(all_eps,size=k,replace=False)
-                se=float(np.mean([stats[e]['mean'] for e in chosen]))
-                n=sum(stats[e]['n'] for e in chosen); st=sum(stats[e]['sum'] for e in chosen)/n
-                extreme_ep += se >= obs_ep-1e-12; extreme_tw += st >= obs_tw-1e-12
-            assignments=n_mc; p_ep=(extreme_ep+1)/(n_mc+1); p_tw=(extreme_tw+1)/(n_mc+1); method='monte_carlo'
-        rows.append({'hypothesis':name,'episode_definition':episode_col,'resolved':len(g),
-                     'selected_episode_count':k,'total_resolved_episode_count':total,
-                     'observed_episode_mean_R':obs_ep,'observed_trade_mean_R':obs_tw,
-                     'episode_mean_p':p_ep,'trade_weighted_p':p_tw,'method':method,
-                     'extreme_episode_mean':extreme_ep,'extreme_trade_weighted':extreme_tw,
-                     'total_assignments':assignments,'selected_episodes':str([str(e) for e in selected])})
-    out=pd.DataFrame(rows)
-    if not out.empty:
-        out['episode_mean_q_bh']=bh_adjust(out['episode_mean_p'].to_numpy())
-        out['trade_weighted_q_bh']=bh_adjust(out['trade_weighted_p'].to_numpy())
-    return out
+            g = df.loc[
+                candidate
+                &
+                (df["year"] != year)
+                &
+                df["result"].isin([
+                    "WIN",
+                    "LOSS",
+                ])
+            ]
 
-
-def v29_episode_bootstrap(trades, episode_col, n=20000):
-    """Bootstrap independent episodes while preserving within-episode trade blocks."""
-    rows=[]; rng=np.random.default_rng(V27_SEED+2950)
-    resolved=trades[trades['result'].isin(['WIN','LOSS'])].copy()
-    for name,fn in v25_hypotheses():
-        g=resolved.loc[np.asarray(fn(resolved),dtype=bool)].copy(); g['R_num']=pd.to_numeric(g['R'],errors='coerce'); g=g[np.isfinite(g['R_num'])]
-        eps=[]
-        for ep,eg in g.groupby(episode_col,dropna=False): eps.append((float(eg['R_num'].mean()),len(eg),float(eg['R_num'].sum())))
-        if not eps: continue
-        k=len(eps); x=np.array([e[0] for e in eps]); bm=[]; tw=[]
-        for _ in range(n):
-            idx=rng.integers(0,k,size=k); bm.append(x[idx].mean())
-            nn=sum(eps[j][1] for j in idx); tw.append(sum(eps[j][2] for j in idx)/nn)
-        rows.append({'hypothesis':name,'episode_count':k,'observed_episode_mean_R':float(x.mean()),
-                     'episode_bootstrap_ci_low':float(np.quantile(bm,.025)), 'episode_bootstrap_ci_high':float(np.quantile(bm,.975)),
-                     'observed_trade_mean_R':float(g['R_num'].mean()), 'trade_weighted_episode_bootstrap_ci_low':float(np.quantile(tw,.025)),
-                     'trade_weighted_episode_bootstrap_ci_high':float(np.quantile(tw,.975))})
-    return pd.DataFrame(rows)
-
-
-def v29_leave_one_year_out(trades):
-    rows=[]; r=trades[trades['result'].isin(['WIN','LOSS'])].copy(); r['R_num']=pd.to_numeric(r['R'],errors='coerce'); r=r[np.isfinite(r['R_num'])].copy(); r['year']=pd.to_datetime(r['signal_date']).dt.year
-    for name,fn in v25_hypotheses():
-        g=r.loc[np.asarray(fn(r),dtype=bool)].copy()
-        if g.empty: continue
-        vals=[]
-        for y in sorted(g['year'].unique()):
-            keep=g['year']!=y
-            if keep.sum(): vals.append(float(g.loc[keep,'R_num'].mean()))
-        rows.append({'hypothesis':name,'year_count':g['year'].nunique(),'loo_year_min_mean_R':min(vals) if vals else np.nan,'loo_year_max_mean_R':max(vals) if vals else np.nan,'years':str(sorted(g['year'].unique()))})
-    return pd.DataFrame(rows)
-
-
-def v28_reproduce_v27_mc(trades, n=V27_BOOTSTRAPS):
-    """Reproduce the V2.7 episode permutation algorithm exactly.
-
-    This is an audit function only. It lets us compare what the code
-    actually computes with the p-values printed in the V2.7 run.
-    """
-    work = add_independent_drawdown_episodes(trades, threshold=V28_THRESHOLD)
-    resolved = work[work["result"].isin(["WIN", "LOSS"])].copy()
-    resolved["signal_date"] = pd.to_datetime(resolved["signal_date"])
-    resolved = resolved.sort_values("signal_date").reset_index(drop=True)
-
-    rows = []
-    rng = np.random.default_rng(V27_SEED + 100)
-
-    for name, fn in v25_hypotheses():
-        mask = np.asarray(fn(resolved), dtype=bool)
-        if not mask.any():
-            continue
-        observed = float(pd.to_numeric(
-            resolved.loc[mask, "R"], errors="coerce"
-        ).dropna().mean())
-
-        episode_labels = resolved["dd3_episode_id"].to_numpy()
-        unique = pd.unique(episode_labels)
-        selected_obs = pd.unique(episode_labels[mask])
-        k = len(selected_obs)
-
-        if k == 0 or len(unique) <= 1:
-            p = np.nan
-        else:
-            episode_means = {
-                e: float(pd.to_numeric(
-                    resolved.loc[episode_labels == e, "R"],
-                    errors="coerce"
-                ).dropna().mean())
-                for e in unique
-            }
-            valid_eps = [e for e, v in episode_means.items() if np.isfinite(v)]
-            k2 = min(k, len(valid_eps))
-            extreme = 0
-            for _ in range(n):
-                chosen = rng.choice(valid_eps, size=k2, replace=False)
-                stat = float(np.mean([episode_means[e] for e in chosen]))
-                if stat >= observed - 1e-12:
-                    extreme += 1
-            p = float((extreme + 1) / (n + 1))
+            if not g.empty:
+                means.append(
+                    float(g["R"].mean())
+                )
 
         rows.append({
-            "hypothesis": name,
-            "v27_episode_count_all": int(len(unique)),
-            "v27_episode_count_selected": int(k),
-            "v27_recomputed_mc_p": p,
-            "v27_observed_mean_R": observed,
+            "candidate": name,
+            "year_count": len(means),
+            "loo_year_min_mean_R":
+                min(means)
+                if means else np.nan,
+            "loo_year_max_mean_R":
+                max(means)
+                if means else np.nan,
         })
+
     return pd.DataFrame(rows)
 
 
-def v28_cluster_audit(trades, episode_col):
-    """Trade contribution and leave-one-cluster-out audit."""
-    resolved = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+# ============================================================
+# 9 — CRISIS EXCLUSION
+# ============================================================
+
+def crisis_exclusion(df):
+
     rows = []
-    for name, fn in v25_hypotheses():
-        g = resolved.loc[fn(resolved)].copy()
-        if g.empty:
-            continue
-        g["R_num"] = pd.to_numeric(g["R"], errors="coerce")
-        g = g[np.isfinite(g["R_num"])].copy()
-        if g.empty:
+
+    candidates = {
+        "C3_H1_PLUS_H4":
+            df["C3"],
+
+        "C4_H1_PLUS_H4_STRONG_TECH":
+            df["C4"],
+
+        "C3_NOT_C4":
+            df["C3_NOT_C4"],
+    }
+
+    exclusions = {
+        "NONE": [],
+        "EXCLUDE_2020": [2020],
+        "EXCLUDE_2022": [2022],
+        "EXCLUDE_2020_2022": [2020, 2022],
+        "EXCLUDE_2025": [2025],
+    }
+
+    for name, candidate in candidates.items():
+
+        for label, years in exclusions.items():
+
+            mask = candidate.copy()
+
+            for year in years:
+                mask &= (
+                    df["year"] != year
+                )
+
+            s = summary(
+                df.loc[mask]
+            )
+
+            s["candidate"] = name
+            s["exclusion"] = label
+
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+# ============================================================
+# 10 — MARKET EPISODE AUDIT
+# ============================================================
+
+def episode_audit(df):
+
+    path = Path(EPISODES_FILE)
+
+    if not path.exists():
+
+        raise RuntimeError(
+            f"Missing {EPISODES_FILE}. "
+            "V3.3 refuses to invent a new episode definition."
+        )
+
+    ep = pd.read_csv(path)
+
+    date_col = (
+        "signal_date"
+        if "signal_date" in ep.columns
+        else "date"
+    )
+
+    ep["signal_date"] = pd.to_datetime(
+        ep[date_col],
+        errors="coerce",
+    )
+
+    episode_col = None
+
+    for col in [
+        "market_episode_id",
+        "episode_id",
+        "market_episode",
+        "episode",
+    ]:
+
+        if col in ep.columns:
+            episode_col = col
+            break
+
+    if episode_col is None:
+
+        raise RuntimeError(
+            "No market episode ID found in "
+            f"{EPISODES_FILE}."
+        )
+
+    ep["episode_id"] = ep[
+        episode_col
+    ]
+
+    ep = ep[
+        [
+            "signal_date",
+            "episode_id",
+        ]
+    ].drop_duplicates(
+        "signal_date"
+    )
+
+    merged = df.merge(
+        ep,
+        on="signal_date",
+        how="left",
+    )
+
+    if merged["episode_id"].isna().any():
+
+        raise RuntimeError(
+            "Some V3.2 trades have no market episode ID."
+        )
+
+    rows = []
+
+    candidates = {
+        "C3_H1_PLUS_H4":
+            merged["C3"],
+
+        "C4_H1_PLUS_H4_STRONG_TECH":
+            merged["C4"],
+
+        "C3_NOT_C4":
+            merged["C3_NOT_C4"],
+    }
+
+    for name, candidate in candidates.items():
+
+        selected = merged.loc[
+            candidate
+            &
+            merged["result"].isin([
+                "WIN",
+                "LOSS",
+            ])
+        ]
+
+        if selected.empty:
             continue
 
-        ep_stats = []
-        for ep, eg in g.groupby(episode_col, dropna=False):
-            ep_stats.append({
-                "episode": ep,
-                "trades": len(eg),
-                "total_R": float(eg["R_num"].sum()),
-                "mean_R": float(eg["R_num"].mean()),
-            })
-        ep_stats = sorted(ep_stats, key=lambda x: x["total_R"], reverse=True)
+        ep_stats = (
+            selected
+            .groupby("episode_id")
+            .agg(
+                trades=("R", "count"),
+                total_R=("R", "sum"),
+            )
+            .reset_index()
+        )
+
+        top = ep_stats.sort_values(
+            "total_R",
+            ascending=False,
+        ).iloc[0]
+
+        total_R = float(
+            selected["R"].sum()
+        )
 
         loo_means = []
-        for ep in ep_stats:
-            keep = g[episode_col] != ep["episode"]
-            if keep.sum():
-                loo_means.append(float(g.loc[keep, "R_num"].mean()))
 
-        years = pd.to_datetime(g["signal_date"]).dt.year
-        year_means = []
-        for y in sorted(years.unique()):
-            keep = years != y
-            if keep.sum():
-                year_means.append(float(g.loc[keep, "R_num"].mean()))
+        for episode_id in ep_stats[
+            "episode_id"
+        ]:
+
+            remaining = selected[
+                selected["episode_id"]
+                != episode_id
+            ]
+
+            if not remaining.empty:
+                loo_means.append(
+                    float(
+                        remaining["R"].mean()
+                    )
+                )
 
         rows.append({
-            "hypothesis": name,
-            "episode_definition": episode_col,
-            "resolved": len(g),
-            "episode_count": g[episode_col].nunique(dropna=False),
-            "top_episode": str(ep_stats[0]["episode"]) if ep_stats else "",
-            "top_episode_trades": ep_stats[0]["trades"] if ep_stats else 0,
-            "top_episode_total_R": ep_stats[0]["total_R"] if ep_stats else np.nan,
-            "total_R": float(g["R_num"].sum()),
-            "total_R_excl_top_episode": (
-                float(g["R_num"].sum() - ep_stats[0]["total_R"])
-                if ep_stats else np.nan
-            ),
-            "loo_episode_min_mean_R": min(loo_means) if loo_means else np.nan,
-            "loo_episode_max_mean_R": max(loo_means) if loo_means else np.nan,
-            "year_count": years.nunique(),
-            "loo_year_min_mean_R": min(year_means) if year_means else np.nan,
-            "loo_year_max_mean_R": max(year_means) if year_means else np.nan,
-            "episode_details": str(ep_stats),
+            "candidate": name,
+            "resolved": len(selected),
+            "episode_count":
+                len(ep_stats),
+            "top_episode_trades":
+                int(top["trades"]),
+            "top_episode_total_R":
+                float(top["total_R"]),
+            "total_R":
+                total_R,
+            "total_R_excl_top":
+                total_R
+                - float(top["total_R"]),
+            "loo_min_mean_R":
+                min(loo_means)
+                if loo_means else np.nan,
+            "loo_max_mean_R":
+                max(loo_means)
+                if loo_means else np.nan,
         })
+
     return pd.DataFrame(rows)
 
 
-def v28_main():
-    market = load_market()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    baseline = build_baseline_trades(market)
-    if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V2.9 is stopped.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-    trades = add_v24_period(trades, "2025-01-01")
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V2.9 — EPISODE INTEGRITY + STATISTICAL AUDIT")
-    print("=" * 72)
-    print("V2.7 hypotheses remain frozen: H1/H2/H4/H5; H3 retained for audit.")
-    print("No thresholds, entries, exits, sizing, or Decision Engine logic are changed.")
-    print("Research-only. This stage audits V2.7; it is not a new optimization stage.")
-
-    v27_mc = v28_reproduce_v27_mc(trades)
-    market_ep = v28_attach_market_episodes(trades, market)
-    corrected = v29_corrected_episode_permutation(market_ep, "market_episode_id")
-    boot = v29_episode_bootstrap(market_ep, "market_episode_id")
-    loo_year = v29_leave_one_year_out(market_ep)
-    audit_market = v28_cluster_audit(market_ep, "market_episode_id")
-
-    print("\nV2.7 ALGORITHM REPRODUCTION CHECK — AUDIT REFERENCE")
-    print("-" * 72); print(v27_mc.to_string(index=False))
-    print("\nV2.9 CORRECTED EPISODE PERMUTATION — MARKET EPISODES")
-    print("-" * 72); print(corrected.to_string(index=False))
-    print("\nV2.9 EPISODE BOOTSTRAP")
-    print("-" * 72); print(boot.to_string(index=False))
-    print("\nV2.9 LEAVE-ONE-YEAR-OUT")
-    print("-" * 72); print(loo_year.to_string(index=False))
-    print("\nV2.9 CLUSTER / LEAVE-ONE-EPISODE AUDIT — MARKET EPISODES")
-    print("-" * 72); print(audit_market.to_string(index=False))
-
-    trades.to_csv("macro_backtest_v29_trades.csv", index=False)
-    market_ep.to_csv("macro_backtest_v29_market_episode_trades.csv", index=False)
-    v27_mc.to_csv("macro_backtest_v29_v27_algorithm_reproduction_reference.csv", index=False)
-    corrected.to_csv("macro_backtest_v29_corrected_episode_permutation.csv", index=False)
-    boot.to_csv("macro_backtest_v29_episode_bootstrap.csv", index=False)
-    loo_year.to_csv("macro_backtest_v29_leave_one_year_out.csv", index=False)
-    audit_market.to_csv("macro_backtest_v29_market_episode_cluster_audit.csv", index=False)
-    print("\nFILES CREATED")
-    for f in ["macro_backtest_v29_trades.csv","macro_backtest_v29_market_episode_trades.csv","macro_backtest_v29_v27_algorithm_reproduction_reference.csv","macro_backtest_v29_corrected_episode_permutation.csv","macro_backtest_v29_episode_bootstrap.csv","macro_backtest_v29_leave_one_year_out.csv","macro_backtest_v29_market_episode_cluster_audit.csv"]: print(f)
-    print("\nMACRO CALIBRATION V2.9 CORRECTED STATISTICAL VALIDATION COMPLETE")
-
-
 # ============================================================
-# V3.1 — FULL DECISION ENGINE CALIBRATION
-# Technical confirmation is research-only and never creates signals.
-# Higher Low definition frozen for V3.1:
-# current signal Low > lowest Low of previous 5 completed candles.
+# DECISION ENGINE IMPACT
 # ============================================================
 
-TECH_SCORE_COMPONENTS = [
-    "PRICE_ABOVE_SMA200",
-    "SMA50_ABOVE_SMA200",
-    "HIGHER_LOW",
-    "PRICE_ABOVE_SMA20",
-    "RSI14_ABOVE_50",
-]
+def decision_impact(df):
 
-def technical_confirmation_for_signal(market, signal_index):
-    r = market.iloc[signal_index]
-    vals = {}
+    # This is intentionally descriptive.
+    # It DOES NOT alter trades.
 
-    vals["PRICE_ABOVE_SMA200"] = bool(pd.notna(r.get("SMA200")) and r["Close"] > r["SMA200"])
-    vals["SMA50_ABOVE_SMA200"] = bool(pd.notna(r.get("SMA50")) and pd.notna(r.get("SMA200")) and r["SMA50"] > r["SMA200"])
+    if "early_warning_score" not in df.columns:
 
-    if signal_index < LOW_LOOKBACK:
-        vals["HIGHER_LOW"] = False
-    else:
-        prev_low = market.iloc[signal_index - LOW_LOOKBACK:signal_index]["Low"].min()
-        vals["HIGHER_LOW"] = bool(pd.notna(prev_low) and r["Low"] > prev_low)
+        return pd.DataFrame([{
+            "status": "NOT_AVAILABLE",
+            "reason":
+                "early_warning_score not present in V3.2 CSV",
+        }])
 
-    vals["PRICE_ABOVE_SMA20"] = bool(pd.notna(r.get("SMA20")) and r["Close"] > r["SMA20"])
-    vals["RSI14_ABOVE_50"] = bool(pd.notna(r.get("RSI14")) and r["RSI14"] > 50)
-
-    available = [v for v in vals.values() if isinstance(v, (bool, np.bool_))]
-    score = int(sum(bool(v) for v in available))
-    status = "STRONG" if score >= 4 else ("PARTIAL" if score == 3 else "WEAK")
-
-    # If any required component is unavailable, retain the numeric score but
-    # explicitly mark availability so missing data is not mistaken for failure.
-    required_cols = ["SMA200", "SMA50", "SMA20", "RSI14"]
-    unavailable = any(pd.isna(r.get(c)) for c in required_cols)
-    if unavailable:
-        status = "UNAVAILABLE"
-
-    return score, status, vals
-
-
-def add_v31_technical_confirmation(trades, market):
     rows = []
-    for _, row in trades.iterrows():
-        i = int(row["signal_index"])
-        score, status, vals = technical_confirmation_for_signal(market, i)
-        out = row.copy()
-        out["technical_score"] = score
-        out["technical_status"] = status
-        for k, v in vals.items():
-            out[k] = bool(v)
-        rows.append(out)
-    return pd.DataFrame(rows)
 
+    for context, g in df.groupby(
+        "research_context"
+    ):
 
-def v31_full_calibration_matrix(trades):
-    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
-    r = r[np.isfinite(r["R_num"])].copy()
-    r["macro_modifier"] = np.select(
-        [r["H1_FLAG"] & r["H4_FLAG"], r["H1_FLAG"], r["H4_FLAG"]],
-        ["H1+H4", "H1", "H4"], default="NONE"
-    )
-    rows = []
-    for (modifier, status, score), g in r.groupby(["macro_modifier", "technical_status", "technical_score"], sort=False):
-        wins = int((g["result"] == "WIN").sum())
-        losses = int((g["result"] == "LOSS").sum())
-        gross_profit = float(g.loc[g["R_num"] > 0, "R_num"].sum())
-        gross_loss = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
         rows.append({
-            "macro_modifier": modifier,
-            "technical_status": status,
-            "technical_score": int(score),
+            "context": context,
             "signals": len(g),
-            "wins": wins,
-            "losses": losses,
-            "win_rate": 100 * wins / len(g),
-            "avg_R": float(g["R_num"].mean()),
-            "total_R": float(g["R_num"].sum()),
-            "profit_factor": gross_profit / gross_loss if gross_loss else np.nan,
+            "wins": int(
+                (g["result"] == "WIN").sum()
+            ),
+            "losses": int(
+                (g["result"] == "LOSS").sum()
+            ),
+            "avg_R":
+                float(g["R"].mean())
+                if g["R"].notna().any()
+                else np.nan,
+            "total_R":
+                float(g["R"].sum()),
         })
-    return pd.DataFrame(rows).sort_values(["macro_modifier", "technical_score"], kind="stable")
 
-
-def v31_technical_score_matrix(trades):
-    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
-    r = r[np.isfinite(r["R_num"])].copy()
-    rows = []
-    for score, g in r.groupby("technical_score", sort=True):
-        wins = int((g["result"] == "WIN").sum())
-        losses = int((g["result"] == "LOSS").sum())
-        gp = float(g.loc[g["R_num"] > 0, "R_num"].sum())
-        gl = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
-        rows.append({
-            "technical_score": int(score), "signals": len(g), "wins": wins, "losses": losses,
-            "win_rate": 100 * wins / len(g), "avg_R": float(g["R_num"].mean()),
-            "total_R": float(g["R_num"].sum()), "profit_factor": gp / gl if gl else np.nan
-        })
-    return pd.DataFrame(rows)
-
-
-def v31_decision_distribution(trades):
-    rows = []
-    for _, row in trades.iterrows():
-        d, m = v30_decision_layer(row)
-        rows.append({
-            "signal_date": row["signal_date"], "result": row["result"], "R": row["R"],
-            "macro_decision": d, "macro_modifier": m,
-            "macro_regime": row.get("macro_regime"), "leading_warning": row.get("leading_warning"),
-            "liquidity_momentum": row.get("liquidity_momentum"),
-            "technical_score": row.get("technical_score"),
-            "technical_status": row.get("technical_status"),
-            "price_above_sma200": row.get("PRICE_ABOVE_SMA200"),
-            "sma50_above_sma200": row.get("SMA50_ABOVE_SMA200"),
-            "higher_low": row.get("HIGHER_LOW"),
-            "price_above_sma20": row.get("PRICE_ABOVE_SMA20"),
-            "rsi14_above_50": row.get("RSI14_ABOVE_50"),
-        })
     return pd.DataFrame(rows)
 
 
 # ============================================================
-# V3.0 — DECISION ENGINE CALIBRATION
-# Research-only calibration layer over the frozen EMA19 baseline.
-# H1/H4 are the only candidate macro modifiers carried forward.
-# H2/H5 remain research-only; H3 is suspended.
-# No entry, exit, sizing, RR, or macro threshold is changed.
+# MAIN
 # ============================================================
 
-V30_CANDIDATES = {
-    "H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
-    "H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
-}
+def main():
 
-
-def v30_decision_layer(row):
-    """Non-executing macro calibration label.
-
-    The frozen technical signal remains the sole entry generator.
-    Macro conditions only classify the context around an existing signal.
-    """
-    h1 = bool(V30_CANDIDATES["H1_REGIME_A_WATCH"](pd.DataFrame([row])).iloc[0])
-    h4 = bool(V30_CANDIDATES["H4_REGIME_A_LIQUIDITY_DETERIORATING"](pd.DataFrame([row])).iloc[0])
-    regime = str(row.get("macro_regime", ""))
-    warning = str(row.get("leading_warning", ""))
-    early = str(row.get("early_warning_level", ""))
-
-    # Defensive precedence mirrors the existing Decision Engine philosophy.
-    if early == "CRITICAL" or regime.startswith("E") or regime.startswith("F"):
-        decision = "DEFENSIVE"
-    elif h1 or h4:
-        decision = "SUPPORTIVE / CONFIRM"
-    elif regime.startswith("C") or regime.startswith("D"):
-        decision = "WAIT / CONFIRM"
-    elif warning in ("ELEVATED", "STRONG"):
-        decision = "CAUTION"
-    else:
-        decision = "BASELINE CONTEXT"
-
-    if h1 and h4:
-        modifier = "H1+H4"
-    elif h1:
-        modifier = "H1"
-    elif h4:
-        modifier = "H4"
-    else:
-        modifier = "NONE"
-    return decision, modifier
-
-
-def v30_group_stats(trades, flag_col=None):
-    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
-    r = r[np.isfinite(r["R_num"])].copy()
-    if flag_col is None:
-        groups = [("ALL_BASELINE_SIGNALS", r)]
-    else:
-        groups = [("FLAG_TRUE", r[r[flag_col]]), ("FLAG_FALSE", r[~r[flag_col]])]
-    rows=[]
-    for name,g in groups:
-        if g.empty:
-            rows.append({"group":name,"signals":0,"resolved":0,"wins":0,"losses":0,"win_rate":np.nan,"avg_R":np.nan,"total_R":0.0,"profit_factor":np.nan})
-            continue
-        wins=int((g.result=="WIN").sum()); losses=int((g.result=="LOSS").sum())
-        gp=float(g.loc[g.R_num>0,"R_num"].sum()); gl=abs(float(g.loc[g.R_num<0,"R_num"].sum()))
-        rows.append({"group":name,"signals":len(g),"resolved":len(g),"wins":wins,"losses":losses,
-                     "win_rate":100*wins/len(g),"avg_R":float(g.R_num.mean()),"total_R":float(g.R_num.sum()),
-                     "profit_factor":gp/gl if gl else np.nan})
-    return pd.DataFrame(rows)
-
-
-def v30_context_matrix(trades):
-    r=trades[trades["result"].isin(["WIN","LOSS"])].copy()
-    r["R_num"]=pd.to_numeric(r["R"],errors="coerce")
-    r=r[np.isfinite(r["R_num"])].copy()
-    r["h1"]=(r["macro_regime"]=="A") & (r["leading_warning"]=="WATCH")
-    r["h4"]=(r["macro_regime"]=="A") & (r["liquidity_momentum"]=="DETERIORATING")
-    r["macro_modifier"]=np.select([r.h1 & r.h4,r.h1,r.h4],["H1+H4","H1","H4"],default="NONE")
-    rows=[]
-    for key,g in r.groupby("macro_modifier",sort=False):
-        wins=int((g.result=="WIN").sum()); losses=int((g.result=="LOSS").sum())
-        gp=float(g.loc[g.R_num>0,"R_num"].sum()); gl=abs(float(g.loc[g.R_num<0,"R_num"].sum()))
-        rows.append({"macro_modifier":key,"signals":len(g),"wins":wins,"losses":losses,
-                     "win_rate":100*wins/len(g),"avg_R":float(g.R_num.mean()),"total_R":float(g.R_num.sum()),
-                     "profit_factor":gp/gl if gl else np.nan})
-    return pd.DataFrame(rows)
-
-
-def v30_decision_distribution(trades):
-    rows=[]
-    for _,row in trades.iterrows():
-        d,m=v30_decision_layer(row)
-        rows.append({"signal_date":row["signal_date"],"result":row["result"],"R":row["R"],"macro_decision":d,"macro_modifier":m,
-                     "macro_regime":row.get("macro_regime"),"leading_warning":row.get("leading_warning"),"liquidity_momentum":row.get("liquidity_momentum")})
-    return pd.DataFrame(rows)
-
-
-def v31_main():
-    market = load_market()
-    market["SMA200"] = market["Close"].rolling(200, min_periods=200).mean()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    baseline = build_baseline_trades(market)
-    if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V3.1 STOPPED.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V3.1 — FULL DECISION ENGINE CALIBRATION")
     print("=" * 72)
-    print("Frozen EMA19 baseline remains the sole technical signal generator.")
-    print("Candidate macro modifiers: H1 and H4 only.")
-    print("H2/H5 remain research-only; H3 is suspended.")
-    print("Technical confirmation is research-only; it does NOT create entries.")
-    print("Higher Low = signal Low > lowest Low of previous 5 completed candles.")
-    print("No thresholds, entries, exits, sizing, RR, or macro definitions changed.")
-    print("Research-only: this script does NOT execute trades or place orders.")
-
-    # V3.1 technical layer is attached only after the frozen baseline trades exist.
-    trades = add_v31_technical_confirmation(trades, market)
-    trades["H1_FLAG"] = (trades["macro_regime"] == "A") & (trades["leading_warning"] == "WATCH")
-    trades["H4_FLAG"] = (trades["macro_regime"] == "A") & (trades["liquidity_momentum"] == "DETERIORATING")
-
-    dist = v31_decision_distribution(trades)
-    matrix = v31_full_calibration_matrix(trades)
-    score_matrix = v31_technical_score_matrix(trades)
-
-    print("\nV3.1 TECHNICAL CONFIRMATION SCORE DISTRIBUTION")
-    print("-" * 72)
-    print(score_matrix.to_string(index=False))
-
-    print("\nV3.1 FULL CALIBRATION MATRIX — MACRO MODIFIER × TECHNICAL SCORE")
-    print("-" * 72)
-    print(matrix.to_string(index=False))
-
-    print("\nV3.1 DECISION DISTRIBUTION")
-    print("-" * 72)
-    print(dist["macro_decision"].value_counts(dropna=False).to_string())
-
-    print("\nV3.1 TECHNICAL STATUS DISTRIBUTION")
-    print("-" * 72)
-    print(dist["technical_status"].value_counts(dropna=False).to_string())
-
-    # Integrity guards.
-    baseline_dates = pd.to_datetime(baseline["signal_date"]).astype("int64")
-    v31_dates = pd.to_datetime(trades["signal_date"]).astype("int64")
-    if len(baseline) != len(trades) or not baseline_dates.equals(v31_dates):
-        raise RuntimeError("SIGNAL-GENERATION GUARD FAILED: V3.1 changed the frozen baseline signal set.")
-    print("\nV3.1 SIGNAL-GENERATION GUARD: PASS")
-    print("Technical confirmation and macro modifiers classify existing frozen signals only; they do not create entries.")
-
-    trades.to_csv("macro_backtest_v31_trades.csv", index=False)
-    dist.to_csv("macro_backtest_v31_decision_distribution.csv", index=False)
-    matrix.to_csv("macro_backtest_v31_full_calibration_matrix.csv", index=False)
-    score_matrix.to_csv("macro_backtest_v31_technical_score_matrix.csv", index=False)
-
-    print("\nFILES CREATED")
-    for f in [
-        "macro_backtest_v31_trades.csv",
-        "macro_backtest_v31_decision_distribution.csv",
-        "macro_backtest_v31_full_calibration_matrix.csv",
-        "macro_backtest_v31_technical_score_matrix.csv",
-    ]:
-        print(f)
-    print("\nMACRO CALIBRATION V3.1 FULL DECISION ENGINE CALIBRATION COMPLETE")
-
-
-
-# ============================================================
-# V3.2 — DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION
-# ============================================================
-# Research-only validation of pre-specified V3.0/V3.1 context candidates.
-# No new entries, exits, sizing, RR, thresholds, macro definitions, or
-# technical definitions are introduced here.
-#
-# Candidates carried forward:
-#   C1 H1 = Regime A + WATCH
-#   C2 H4 = Regime A + Liquidity Deteriorating
-#   C3 H1+H4
-#   C4 H1+H4 + Technical Score >= 4
-#   C5 H1 + Technical Score >= 4
-#   C6 H4 + Technical Score >= 4
-#
-# C4-C6 are pre-specified interaction checks motivated by V3.1.
-# They are NOT optimized thresholds; >=4 is exactly the existing STRONG
-# technical-status boundary from V3.1.
-# ============================================================
-
-V32_CANDIDATES = {
-    "C1_H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
-    "C2_H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
-    "C3_H1_PLUS_H4": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (x["liquidity_momentum"] == "DETERIORATING")),
-    "C4_H1_PLUS_H4_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (x["liquidity_momentum"] == "DETERIORATING") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
-    "C5_H1_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
-    "C6_H4_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
-}
-
-
-def v32_resolved(trades):
-    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
-    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
-    return r[np.isfinite(r["R_num"])].copy()
-
-
-def v32_stats(g):
-    if g.empty:
-        return {"signals": 0, "wins": 0, "losses": 0, "win_rate": np.nan, "avg_R": np.nan, "total_R": 0.0, "profit_factor": np.nan}
-    wins = int((g["result"] == "WIN").sum())
-    losses = int((g["result"] == "LOSS").sum())
-    gp = float(g.loc[g["R_num"] > 0, "R_num"].sum())
-    gl = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
-    return {"signals": len(g), "wins": wins, "losses": losses,
-            "win_rate": 100 * wins / len(g), "avg_R": float(g["R_num"].mean()),
-            "total_R": float(g["R_num"].sum()), "profit_factor": gp / gl if gl else np.nan}
-
-
-def v32_candidate_matrix(trades):
-    r = v32_resolved(trades)
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
-        rows.append({"candidate": name, **v32_stats(g)})
-    return pd.DataFrame(rows)
-
-
-def v32_oos(trades, split_date="2025-01-01"):
-    r = v32_resolved(trades)
-    d = pd.to_datetime(r["signal_date"])
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        mask = np.asarray(fn(r), dtype=bool)
-        for sample, smask in [("DISCOVERY", d < pd.Timestamp(split_date)), ("HOLDOUT", d >= pd.Timestamp(split_date))]:
-            g = r.loc[mask & smask].copy()
-            rows.append({"candidate": name, "sample": sample, **v32_stats(g)})
-    return pd.DataFrame(rows)
-
-
-def v32_walk_forward(trades):
-    r = v32_resolved(trades).copy()
-    r["signal_date"] = pd.to_datetime(r["signal_date"])
-    min_year = int(r["signal_date"].dt.year.min())
-    max_year = int(r["signal_date"].dt.year.max())
-    rows = []
-    for test_year in range(max(2023, min_year + 1), max_year + 1):
-        train = r[r["signal_date"].dt.year < test_year]
-        test = r[r["signal_date"].dt.year == test_year]
-        if test.empty:
-            continue
-        for name, fn in V32_CANDIDATES.items():
-            tg = train.loc[np.asarray(fn(train), dtype=bool)]
-            vg = test.loc[np.asarray(fn(test), dtype=bool)]
-            ts = v32_stats(tg); vs = v32_stats(vg)
-            rows.append({"candidate": name, "test_year": test_year,
-                         "train_signals": ts["signals"], "train_wins": ts["wins"], "train_losses": ts["losses"],
-                         "train_win_rate": ts["win_rate"], "train_avg_R": ts["avg_R"], "train_total_R": ts["total_R"],
-                         "train_profit_factor": ts["profit_factor"],
-                         "test_signals": vs["signals"], "test_wins": vs["wins"], "test_losses": vs["losses"],
-                         "test_win_rate": vs["win_rate"], "test_avg_R": vs["avg_R"], "test_total_R": vs["total_R"],
-                         "test_profit_factor": vs["profit_factor"]})
-    return pd.DataFrame(rows)
-
-
-def v32_loo_year(trades):
-    r = v32_resolved(trades).copy()
-    r["year"] = pd.to_datetime(r["signal_date"]).dt.year
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
-        vals = []
-        for y in sorted(g["year"].unique()):
-            keep = g["year"] != y
-            if keep.sum():
-                vals.append(float(g.loc[keep, "R_num"].mean()))
-        rows.append({"candidate": name, "year_count": int(g["year"].nunique()),
-                     "loo_year_min_mean_R": min(vals) if vals else np.nan,
-                     "loo_year_max_mean_R": max(vals) if vals else np.nan,
-                     "years": str(sorted(g["year"].unique().tolist()))})
-    return pd.DataFrame(rows)
-
-
-def v32_crisis_exclusion(trades):
-    r = v32_resolved(trades).copy()
-    r["year"] = pd.to_datetime(r["signal_date"]).dt.year
-    exclusions = {"NONE": set(), "EXCLUDE_2020": {2020}, "EXCLUDE_2022": {2022},
-                  "EXCLUDE_2020_2022": {2020, 2022}, "EXCLUDE_2025": {2025}}
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        mask = np.asarray(fn(r), dtype=bool)
-        for label, years in exclusions.items():
-            g = r.loc[mask & ~r["year"].isin(years)].copy()
-            rows.append({"candidate": name, "exclusion": label, **v32_stats(g)})
-    return pd.DataFrame(rows)
-
-
-def v32_cluster_audit(trades, market, threshold=-3.0):
-    work = v28_attach_market_episodes(trades, market, threshold=threshold)
-    r = v32_resolved(work)
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
-        if g.empty:
-            continue
-        ep_stats = []
-        for ep, eg in g.groupby("market_episode_id", dropna=False):
-            ep_stats.append((ep, len(eg), float(eg["R_num"].sum()), float(eg["R_num"].mean())))
-        ep_stats.sort(key=lambda x: x[2], reverse=True)
-        loo = []
-        for ep, _, _, _ in ep_stats:
-            keep = g["market_episode_id"] != ep
-            if keep.sum(): loo.append(float(g.loc[keep, "R_num"].mean()))
-        total = float(g["R_num"].sum())
-        top = ep_stats[0] if ep_stats else ("", 0, np.nan, np.nan)
-        rows.append({"candidate": name, "resolved": len(g), "episode_count": g["market_episode_id"].nunique(dropna=False),
-                     "top_episode": str(top[0]), "top_episode_trades": top[1], "top_episode_total_R": top[2],
-                     "total_R": total, "total_R_excl_top_episode": total - top[2] if ep_stats else np.nan,
-                     "loo_episode_min_mean_R": min(loo) if loo else np.nan,
-                     "loo_episode_max_mean_R": max(loo) if loo else np.nan})
-    return pd.DataFrame(rows), work
-
-
-def v32_episode_permutation(trades, market, threshold=-3.0, n_mc=10000):
-    """Matched episode-level and trade-weighted permutation tests for C1-C6.
-
-    The null chooses k independent market episodes uniformly without replacement,
-    matching the selected candidate's episode count. Observed and null statistics
-    use the same statistic, avoiding the V2.7 mismatch.
-    """
-    work = v28_attach_market_episodes(trades, market, threshold=threshold)
-    r = v32_resolved(work)
-    rng = np.random.default_rng(3200)
-    all_stats = {}
-    for ep, eg in r.groupby("market_episode_id", dropna=False):
-        rr = eg["R_num"].to_numpy(dtype=float)
-        if len(rr): all_stats[ep] = {"mean": float(rr.mean()), "n": len(rr), "sum": float(rr.sum())}
-    episodes = list(all_stats)
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
-        selected = [e for e in pd.unique(g["market_episode_id"]) if e in all_stats]
-        k = len(selected); total = len(episodes)
-        if not k or total < k:
-            continue
-        obs_ep = float(np.mean([all_stats[e]["mean"] for e in selected]))
-        obs_tw = float(g["R_num"].mean())
-        extreme_ep = extreme_tw = 0
-        # Exact finite enumeration when feasible, otherwise Monte Carlo.
-        if total <= 18:
-            from itertools import combinations
-            assignments = 0
-            for combo in combinations(episodes, k):
-                assignments += 1
-                ep_stat = float(np.mean([all_stats[e]["mean"] for e in combo]))
-                n = sum(all_stats[e]["n"] for e in combo)
-                tw_stat = float(sum(all_stats[e]["sum"] for e in combo) / n)
-                extreme_ep += ep_stat >= obs_ep - 1e-12
-                extreme_tw += tw_stat >= obs_tw - 1e-12
-            p_ep = extreme_ep / assignments
-            p_tw = extreme_tw / assignments
-            method = "exact"
-        else:
-            assignments = n_mc
-            for _ in range(n_mc):
-                chosen = rng.choice(episodes, size=k, replace=False)
-                ep_stat = float(np.mean([all_stats[e]["mean"] for e in chosen]))
-                n = sum(all_stats[e]["n"] for e in chosen)
-                tw_stat = float(sum(all_stats[e]["sum"] for e in chosen) / n)
-                extreme_ep += ep_stat >= obs_ep - 1e-12
-                extreme_tw += tw_stat >= obs_tw - 1e-12
-            p_ep = (extreme_ep + 1) / (n_mc + 1)
-            p_tw = (extreme_tw + 1) / (n_mc + 1)
-            method = "monte_carlo"
-        rows.append({"candidate": name, "resolved": len(g), "selected_episode_count": k,
-                     "total_resolved_episode_count": total, "observed_episode_mean_R": obs_ep,
-                     "observed_trade_mean_R": obs_tw, "episode_mean_p": p_ep,
-                     "trade_weighted_p": p_tw, "method": method,
-                     "extreme_episode_mean": extreme_ep, "extreme_trade_weighted": extreme_tw,
-                     "total_assignments": assignments})
-    out = pd.DataFrame(rows)
-    if not out.empty:
-        out["episode_mean_q_bh"] = bh_adjust(out["episode_mean_p"].to_numpy(dtype=float))
-        out["trade_weighted_q_bh"] = bh_adjust(out["trade_weighted_p"].to_numpy(dtype=float))
-    return out
-
-
-def v32_episode_bootstrap(trades, market, threshold=-3.0, n=20000):
-    work = v28_attach_market_episodes(trades, market, threshold=threshold)
-    r = v32_resolved(work)
-    rng = np.random.default_rng(3250)
-    rows = []
-    for name, fn in V32_CANDIDATES.items():
-        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
-        eps = []
-        for ep, eg in g.groupby("market_episode_id", dropna=False):
-            rr = eg["R_num"].to_numpy(dtype=float)
-            if len(rr): eps.append((float(rr.mean()), len(rr), float(rr.sum())))
-        if not eps: continue
-        k = len(eps)
-        means = np.array([e[0] for e in eps])
-        bm = np.empty(n); tw = np.empty(n)
-        for i in range(n):
-            idx = rng.integers(0, k, size=k)
-            bm[i] = means[idx].mean()
-            nn = sum(eps[j][1] for j in idx)
-            tw[i] = sum(eps[j][2] for j in idx) / nn
-        rows.append({"candidate": name, "episode_count": k,
-                     "observed_episode_mean_R": float(means.mean()),
-                     "episode_bootstrap_ci_low": float(np.quantile(bm, .025)),
-                     "episode_bootstrap_ci_high": float(np.quantile(bm, .975)),
-                     "observed_trade_mean_R": float(g["R_num"].mean()),
-                     "trade_weighted_episode_bootstrap_ci_low": float(np.quantile(tw, .025)),
-                     "trade_weighted_episode_bootstrap_ci_high": float(np.quantile(tw, .975))})
-    return pd.DataFrame(rows)
-
-
-def v32_print(title, df):
-    print("\n" + "=" * 72)
-    print(title)
-    print("-" * 72)
-    print(df.to_string(index=False) if not df.empty else "No data available.")
-
-
-def v32_main():
-    market = load_market()
-    market["SMA200"] = market["Close"].rolling(200, min_periods=200).mean()
-    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-
-    baseline = build_baseline_trades(market)
-    if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V3.2 STOPPED.")
-
-    fred = load_fred()
-    trades = attach_macro(baseline, fred)
-    trades = add_drawdown(trades, market)
-    trades = add_zones(trades)
-    trades = add_confluence_flags(trades)
-    trades = add_v31_technical_confirmation(trades, market)
-    trades["H1_FLAG"] = (trades["macro_regime"] == "A") & (trades["leading_warning"] == "WATCH")
-    trades["H4_FLAG"] = (trades["macro_regime"] == "A") & (trades["liquidity_momentum"] == "DETERIORATING")
-
-    print("\n" + "=" * 72)
-    print("MACRO CALIBRATION V3.2 — DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION")
+    print("US500 MACRO INTELLIGENCE — V3.3")
+    print("C3 vs C4 INCREMENTAL INFORMATION")
     print("=" * 72)
-    print("Frozen EMA19 baseline remains the sole technical signal generator.")
-    print("Candidates: C1-C6 are pre-specified V3.0/V3.1 context checks only.")
-    print("Technical confirmation remains research-only; it does NOT create entries.")
-    print("Higher Low = signal Low > lowest Low of previous 5 completed candles.")
-    print("No thresholds, entries, exits, sizing, RR, or macro definitions changed.")
-    print("Research-only: this script does NOT execute trades or place orders.")
 
-    matrix = v32_candidate_matrix(trades)
-    oos = v32_oos(trades)
-    wf = v32_walk_forward(trades)
-    loo = v32_loo_year(trades)
-    crisis = v32_crisis_exclusion(trades)
-    cluster, market_ep = v32_cluster_audit(trades, market)
-    perm = v32_episode_permutation(trades, market)
-    boot = v32_episode_bootstrap(trades, market)
+    df = load_trades()
 
-    v32_print("V3.2 CANDIDATE CALIBRATION", matrix)
-    v32_print("V3.2 CHRONOLOGICAL OOS — DISCOVERY / HOLDOUT", oos)
-    v32_print("V3.2 EXPANDING WALK-FORWARD", wf)
-    v32_print("V3.2 LEAVE-ONE-YEAR-OUT", loo)
-    v32_print("V3.2 CRISIS EXCLUSION SENSITIVITY", crisis)
-    v32_print("V3.2 MARKET-EPISODE CLUSTER / LEAVE-ONE-EPISODE-OUT", cluster)
-    v32_print("V3.2 CORRECTED MARKET-EPISODE PERMUTATION", perm)
-    v32_print("V3.2 MARKET-EPISODE BOOTSTRAP", boot)
+    print(
+        f"Loaded V3.2 trades: {len(df)}"
+    )
 
-    # Integrity guards: V3.2 must preserve the exact V3.1 baseline signal set.
-    baseline_dates = pd.to_datetime(baseline["signal_date"]).astype("int64").reset_index(drop=True)
-    v32_dates = pd.to_datetime(trades["signal_date"]).astype("int64").reset_index(drop=True)
-    if len(baseline) != len(trades) or not baseline_dates.equals(v32_dates):
-        raise RuntimeError("SIGNAL-GENERATION GUARD FAILED: V3.2 changed the frozen baseline signal set.")
+    # --------------------------------------------------------
+    # BASELINE
+    # --------------------------------------------------------
 
-    # Also verify the V3.1 technical values are reproducible for every signal.
-    reference_tech = add_v31_technical_confirmation(baseline, market)
-    if not reference_tech["technical_score"].reset_index(drop=True).equals(trades["technical_score"].reset_index(drop=True)):
-        raise RuntimeError("TECHNICAL INTEGRITY GUARD FAILED: V3.2 changed V3.1 technical scores.")
+    baseline_guard(df)
 
-    print("\nV3.2 SIGNAL-GENERATION GUARD: PASS")
-    print("V3.2 TECHNICAL-INTEGRITY GUARD: PASS")
-    print("Candidates classify existing frozen signals only; they do not create entries.")
+    # --------------------------------------------------------
+    # CANDIDATES
+    # --------------------------------------------------------
 
-    trades.to_csv("macro_backtest_v32_trades.csv", index=False)
-    matrix.to_csv("macro_backtest_v32_candidate_calibration.csv", index=False)
-    oos.to_csv("macro_backtest_v32_oos.csv", index=False)
-    wf.to_csv("macro_backtest_v32_walk_forward.csv", index=False)
-    loo.to_csv("macro_backtest_v32_leave_one_year_out.csv", index=False)
-    crisis.to_csv("macro_backtest_v32_crisis_exclusion.csv", index=False)
-    cluster.to_csv("macro_backtest_v32_market_episode_cluster_audit.csv", index=False)
-    perm.to_csv("macro_backtest_v32_market_episode_permutation.csv", index=False)
-    boot.to_csv("macro_backtest_v32_market_episode_bootstrap.csv", index=False)
-    market_ep.to_csv("macro_backtest_v32_market_episode_trades.csv", index=False)
+    df = build_candidates(df)
 
-    print("\nFILES CREATED")
-    for f in [
-        "macro_backtest_v32_trades.csv",
-        "macro_backtest_v32_candidate_calibration.csv",
-        "macro_backtest_v32_oos.csv",
-        "macro_backtest_v32_walk_forward.csv",
-        "macro_backtest_v32_leave_one_year_out.csv",
-        "macro_backtest_v32_crisis_exclusion.csv",
-        "macro_backtest_v32_market_episode_cluster_audit.csv",
-        "macro_backtest_v32_market_episode_permutation.csv",
-        "macro_backtest_v32_market_episode_bootstrap.csv",
-        "macro_backtest_v32_market_episode_trades.csv",
-    ]:
-        print(f)
-    print("\nMACRO CALIBRATION V3.2 DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION COMPLETE")
+    # --------------------------------------------------------
+    # INTEGRITY
+    # --------------------------------------------------------
+
+    strong_expected = (
+        df["technical_score"]
+        >= STRONG_TECH_MIN
+    )
+
+    if not df["STRONG_TECH"].equals(
+        strong_expected
+    ):
+
+        raise RuntimeError(
+            "TECHNICAL INTEGRITY FAILED."
+        )
+
+    print(
+        "\nSIGNAL-GENERATION GUARD: PASS"
+    )
+
+    print(
+        "TECHNICAL-INTEGRITY GUARD: PASS"
+    )
+
+    print(
+        "NO ENTRY CREATION: PASS"
+    )
+
+    print(
+        "NO BASELINE MODIFICATION: PASS"
+    )
+
+    # --------------------------------------------------------
+    # REPORTS
+    # --------------------------------------------------------
+
+    reports = {
+
+        "macro_backtest_v33_c3_c4_incremental.csv":
+            c3_c4_report(df),
+
+        "macro_backtest_v33_baseline_vs_c4.csv":
+            c4_vs_baseline(df),
+
+        "macro_backtest_v33_context_drawdown.csv":
+            context_drawdown(df),
+
+        "macro_backtest_v33_context_drawdown_technical.csv":
+            context_drawdown_technical(df),
+
+        "macro_backtest_v33_yearly.csv":
+            yearly_context(df),
+
+        "macro_backtest_v33_oos.csv":
+            chronological_oos(df),
+
+        "macro_backtest_v33_walk_forward.csv":
+            walk_forward(df),
+
+        "macro_backtest_v33_leave_one_year_out.csv":
+            leave_one_year_out(df),
+
+        "macro_backtest_v33_crisis_exclusion.csv":
+            crisis_exclusion(df),
+
+        "macro_backtest_v33_market_episode_audit.csv":
+            episode_audit(df),
+
+        "macro_backtest_v33_decision_impact.csv":
+            decision_impact(df),
+
+        "macro_backtest_v33_trades.csv":
+            df,
+    }
+
+    # --------------------------------------------------------
+    # SAVE
+    # --------------------------------------------------------
+
+    for filename, report in reports.items():
+
+        report.to_csv(
+            filename,
+            index=False,
+        )
+
+    # --------------------------------------------------------
+    # PRINT
+    # --------------------------------------------------------
+
+    print("\n" + "=" * 72)
+    print("V3.3 C3 vs C4 INCREMENTAL ANALYSIS")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_c3_c4_incremental.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 BASELINE vs C4")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_baseline_vs_c4.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 MARKET EPISODE AUDIT")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_market_episode_audit.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 OOS")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_oos.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 WALK-FORWARD")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_walk_forward.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 LEAVE-ONE-YEAR-OUT")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_leave_one_year_out.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 CRISIS EXCLUSION")
+    print("=" * 72)
+
+    print(
+        reports[
+            "macro_backtest_v33_crisis_exclusion.csv"
+        ].to_string(index=False)
+    )
+
+    print("\n" + "=" * 72)
+    print("V3.3 COMPLETE")
+    print("=" * 72)
+
+    for filename in reports:
+        print(filename)
 
 
 if __name__ == "__main__":
-    v32_main()
+
+    try:
+        main()
+
+    except Exception as exc:
+
+        print(
+            "\nV3.3 FAILED:"
+        )
+
+        print(exc)
+
+        sys.exit(1)
