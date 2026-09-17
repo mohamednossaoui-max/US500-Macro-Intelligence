@@ -1,6 +1,6 @@
 # ============================================================
-# US500 MACRO BACKTEST V2.9 - EPISODE INTEGRITY + STATISTICAL AUDIT
-# FROZEN EMA19 BASELINE + MACRO V2.1 + DRAWdown LEAD EVENT STUDY
+# US500 MACRO BACKTEST V3.1 - FULL DECISION ENGINE CALIBRATION
+# FROZEN EMA19 BASELINE + MACRO CONTEXT + TECHNICAL CONFIRMATION
 # ============================================================
 # Frozen baseline configuration validated by V3:
 # ATR_WILDER / TOUCH_CLOSE_ABOVE / ROW_GAP_1 / OVERLAP
@@ -62,6 +62,23 @@ def load_market():
     df = df.dropna()
     df["EMA19"] = df["Close"].ewm(span=EMA19, adjust=False, min_periods=EMA19).mean()
     df["EMA200"] = df["Close"].ewm(span=EMA200, adjust=False, min_periods=EMA200).mean()
+
+    # V3.1 technical confirmation layer. These fields do NOT alter the
+    # frozen EMA19 signal generator; they only classify existing signals.
+    df["SMA20"] = df["Close"].rolling(20, min_periods=20).mean()
+    df["SMA50"] = df["Close"].rolling(50, min_periods=50).mean()
+
+    # Wilder-style RSI(14), calculated without changing any baseline rule.
+    delta = df["Close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
+    avg_loss = loss.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    df["RSI14"] = 100 - (100 / (1 + rs))
+    df.loc[(avg_loss == 0) & (avg_gain > 0), "RSI14"] = 100.0
+    df.loc[(avg_loss == 0) & (avg_gain == 0), "RSI14"] = 50.0
+
     pc = df["Close"].shift(1)
     tr = pd.concat([
         df["High"] - df["Low"],
@@ -2080,6 +2097,132 @@ def v28_main():
 
 
 # ============================================================
+# V3.1 — FULL DECISION ENGINE CALIBRATION
+# Technical confirmation is research-only and never creates signals.
+# Higher Low definition frozen for V3.1:
+# current signal Low > lowest Low of previous 5 completed candles.
+# ============================================================
+
+TECH_SCORE_COMPONENTS = [
+    "PRICE_ABOVE_SMA200",
+    "SMA50_ABOVE_SMA200",
+    "HIGHER_LOW",
+    "PRICE_ABOVE_SMA20",
+    "RSI14_ABOVE_50",
+]
+
+def technical_confirmation_for_signal(market, signal_index):
+    r = market.iloc[signal_index]
+    vals = {}
+
+    vals["PRICE_ABOVE_SMA200"] = bool(pd.notna(r.get("SMA200")) and r["Close"] > r["SMA200"])
+    vals["SMA50_ABOVE_SMA200"] = bool(pd.notna(r.get("SMA50")) and pd.notna(r.get("SMA200")) and r["SMA50"] > r["SMA200"])
+
+    if signal_index < LOW_LOOKBACK:
+        vals["HIGHER_LOW"] = False
+    else:
+        prev_low = market.iloc[signal_index - LOW_LOOKBACK:signal_index]["Low"].min()
+        vals["HIGHER_LOW"] = bool(pd.notna(prev_low) and r["Low"] > prev_low)
+
+    vals["PRICE_ABOVE_SMA20"] = bool(pd.notna(r.get("SMA20")) and r["Close"] > r["SMA20"])
+    vals["RSI14_ABOVE_50"] = bool(pd.notna(r.get("RSI14")) and r["RSI14"] > 50)
+
+    available = [v for v in vals.values() if isinstance(v, (bool, np.bool_))]
+    score = int(sum(bool(v) for v in available))
+    status = "STRONG" if score >= 4 else ("PARTIAL" if score == 3 else "WEAK")
+
+    # If any required component is unavailable, retain the numeric score but
+    # explicitly mark availability so missing data is not mistaken for failure.
+    required_cols = ["SMA200", "SMA50", "SMA20", "RSI14"]
+    unavailable = any(pd.isna(r.get(c)) for c in required_cols)
+    if unavailable:
+        status = "UNAVAILABLE"
+
+    return score, status, vals
+
+
+def add_v31_technical_confirmation(trades, market):
+    rows = []
+    for _, row in trades.iterrows():
+        i = int(row["signal_index"])
+        score, status, vals = technical_confirmation_for_signal(market, i)
+        out = row.copy()
+        out["technical_score"] = score
+        out["technical_status"] = status
+        for k, v in vals.items():
+            out[k] = bool(v)
+        rows.append(out)
+    return pd.DataFrame(rows)
+
+
+def v31_full_calibration_matrix(trades):
+    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    r = r[np.isfinite(r["R_num"])].copy()
+    r["macro_modifier"] = np.select(
+        [r["H1_FLAG"] & r["H4_FLAG"], r["H1_FLAG"], r["H4_FLAG"]],
+        ["H1+H4", "H1", "H4"], default="NONE"
+    )
+    rows = []
+    for (modifier, status, score), g in r.groupby(["macro_modifier", "technical_status", "technical_score"], sort=False):
+        wins = int((g["result"] == "WIN").sum())
+        losses = int((g["result"] == "LOSS").sum())
+        gross_profit = float(g.loc[g["R_num"] > 0, "R_num"].sum())
+        gross_loss = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
+        rows.append({
+            "macro_modifier": modifier,
+            "technical_status": status,
+            "technical_score": int(score),
+            "signals": len(g),
+            "wins": wins,
+            "losses": losses,
+            "win_rate": 100 * wins / len(g),
+            "avg_R": float(g["R_num"].mean()),
+            "total_R": float(g["R_num"].sum()),
+            "profit_factor": gross_profit / gross_loss if gross_loss else np.nan,
+        })
+    return pd.DataFrame(rows).sort_values(["macro_modifier", "technical_score"], kind="stable")
+
+
+def v31_technical_score_matrix(trades):
+    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    r = r[np.isfinite(r["R_num"])].copy()
+    rows = []
+    for score, g in r.groupby("technical_score", sort=True):
+        wins = int((g["result"] == "WIN").sum())
+        losses = int((g["result"] == "LOSS").sum())
+        gp = float(g.loc[g["R_num"] > 0, "R_num"].sum())
+        gl = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
+        rows.append({
+            "technical_score": int(score), "signals": len(g), "wins": wins, "losses": losses,
+            "win_rate": 100 * wins / len(g), "avg_R": float(g["R_num"].mean()),
+            "total_R": float(g["R_num"].sum()), "profit_factor": gp / gl if gl else np.nan
+        })
+    return pd.DataFrame(rows)
+
+
+def v31_decision_distribution(trades):
+    rows = []
+    for _, row in trades.iterrows():
+        d, m = v30_decision_layer(row)
+        rows.append({
+            "signal_date": row["signal_date"], "result": row["result"], "R": row["R"],
+            "macro_decision": d, "macro_modifier": m,
+            "macro_regime": row.get("macro_regime"), "leading_warning": row.get("leading_warning"),
+            "liquidity_momentum": row.get("liquidity_momentum"),
+            "technical_score": row.get("technical_score"),
+            "technical_status": row.get("technical_status"),
+            "price_above_sma200": row.get("PRICE_ABOVE_SMA200"),
+            "sma50_above_sma200": row.get("SMA50_ABOVE_SMA200"),
+            "higher_low": row.get("HIGHER_LOW"),
+            "price_above_sma20": row.get("PRICE_ABOVE_SMA20"),
+            "rsi14_above_50": row.get("RSI14_ABOVE_50"),
+        })
+    return pd.DataFrame(rows)
+
+
+# ============================================================
 # V3.0 — DECISION ENGINE CALIBRATION
 # Research-only calibration layer over the frozen EMA19 baseline.
 # H1/H4 are the only candidate macro modifiers carried forward.
@@ -2175,61 +2318,80 @@ def v30_decision_distribution(trades):
     return pd.DataFrame(rows)
 
 
-def v30_main():
-    market=load_market()
+def v31_main():
+    market = load_market()
+    market["SMA200"] = market["Close"].rolling(200, min_periods=200).mean()
     print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
-    baseline=build_baseline_trades(market)
+
+    baseline = build_baseline_trades(market)
     if not print_baseline_check(baseline):
-        raise RuntimeError("FROZEN BASELINE FAILED. V3.0 STOPPED.")
+        raise RuntimeError("FROZEN BASELINE FAILED. V3.1 STOPPED.")
 
-    fred=load_fred()
-    trades=attach_macro(baseline,fred)
-    trades=add_drawdown(trades,market)
-    trades=add_zones(trades)
-    trades=add_confluence_flags(trades)
+    fred = load_fred()
+    trades = attach_macro(baseline, fred)
+    trades = add_drawdown(trades, market)
+    trades = add_zones(trades)
+    trades = add_confluence_flags(trades)
 
-    print("\n"+"="*72)
-    print("MACRO CALIBRATION V3.0 — DECISION ENGINE CALIBRATION")
-    print("="*72)
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V3.1 — FULL DECISION ENGINE CALIBRATION")
+    print("=" * 72)
     print("Frozen EMA19 baseline remains the sole technical signal generator.")
     print("Candidate macro modifiers: H1 and H4 only.")
     print("H2/H5 remain research-only; H3 is suspended.")
+    print("Technical confirmation is research-only; it does NOT create entries.")
+    print("Higher Low = signal Low > lowest Low of previous 5 completed candles.")
     print("No thresholds, entries, exits, sizing, RR, or macro definitions changed.")
     print("Research-only: this script does NOT execute trades or place orders.")
 
-    trades["H1_FLAG"]=(trades["macro_regime"]=="A") & (trades["leading_warning"]=="WATCH")
-    trades["H4_FLAG"]=(trades["macro_regime"]=="A") & (trades["liquidity_momentum"]=="DETERIORATING")
-    dist=v30_decision_distribution(trades)
-    matrix=v30_context_matrix(trades)
-    h1=v30_group_stats(trades,"H1_FLAG")
-    h4=v30_group_stats(trades,"H4_FLAG")
+    # V3.1 technical layer is attached only after the frozen baseline trades exist.
+    trades = add_v31_technical_confirmation(trades, market)
+    trades["H1_FLAG"] = (trades["macro_regime"] == "A") & (trades["leading_warning"] == "WATCH")
+    trades["H4_FLAG"] = (trades["macro_regime"] == "A") & (trades["liquidity_momentum"] == "DETERIORATING")
 
-    print("\nV3.0 H1 CALIBRATION — REGIME A + WATCH")
-    print("-"*72); print(h1.to_string(index=False))
-    print("\nV3.0 H4 CALIBRATION — REGIME A + LIQUIDITY DETERIORATING")
-    print("-"*72); print(h4.to_string(index=False))
-    print("\nV3.0 MACRO MODIFIER MATRIX")
-    print("-"*72); print(matrix.to_string(index=False))
+    dist = v31_decision_distribution(trades)
+    matrix = v31_full_calibration_matrix(trades)
+    score_matrix = v31_technical_score_matrix(trades)
 
-    resolved=dist[dist["result"].isin(["WIN","LOSS"])].copy()
-    print("\nV3.0 DECISION DISTRIBUTION")
-    print("-"*72)
+    print("\nV3.1 TECHNICAL CONFIRMATION SCORE DISTRIBUTION")
+    print("-" * 72)
+    print(score_matrix.to_string(index=False))
+
+    print("\nV3.1 FULL CALIBRATION MATRIX — MACRO MODIFIER × TECHNICAL SCORE")
+    print("-" * 72)
+    print(matrix.to_string(index=False))
+
+    print("\nV3.1 DECISION DISTRIBUTION")
+    print("-" * 72)
     print(dist["macro_decision"].value_counts(dropna=False).to_string())
 
-    # Sanity check: candidate modifiers must never create a signal that was not
-    # already present in the frozen baseline.
-    print("\nV3.0 SIGNAL-GENERATION GUARD: PASS")
-    print("Macro modifiers classify existing frozen signals only; they do not create entries.")
+    print("\nV3.1 TECHNICAL STATUS DISTRIBUTION")
+    print("-" * 72)
+    print(dist["technical_status"].value_counts(dropna=False).to_string())
 
-    trades.to_csv("macro_backtest_v30_trades.csv",index=False)
-    dist.to_csv("macro_backtest_v30_decision_distribution.csv",index=False)
-    matrix.to_csv("macro_backtest_v30_macro_modifier_matrix.csv",index=False)
-    h1.to_csv("macro_backtest_v30_h1_calibration.csv",index=False)
-    h4.to_csv("macro_backtest_v30_h4_calibration.csv",index=False)
+    # Integrity guards.
+    baseline_dates = pd.to_datetime(baseline["signal_date"]).astype("int64")
+    v31_dates = pd.to_datetime(trades["signal_date"]).astype("int64")
+    if len(baseline) != len(trades) or not baseline_dates.equals(v31_dates):
+        raise RuntimeError("SIGNAL-GENERATION GUARD FAILED: V3.1 changed the frozen baseline signal set.")
+    print("\nV3.1 SIGNAL-GENERATION GUARD: PASS")
+    print("Technical confirmation and macro modifiers classify existing frozen signals only; they do not create entries.")
+
+    trades.to_csv("macro_backtest_v31_trades.csv", index=False)
+    dist.to_csv("macro_backtest_v31_decision_distribution.csv", index=False)
+    matrix.to_csv("macro_backtest_v31_full_calibration_matrix.csv", index=False)
+    score_matrix.to_csv("macro_backtest_v31_technical_score_matrix.csv", index=False)
+
     print("\nFILES CREATED")
-    for f in ["macro_backtest_v30_trades.csv","macro_backtest_v30_decision_distribution.csv","macro_backtest_v30_macro_modifier_matrix.csv","macro_backtest_v30_h1_calibration.csv","macro_backtest_v30_h4_calibration.csv"]:
+    for f in [
+        "macro_backtest_v31_trades.csv",
+        "macro_backtest_v31_decision_distribution.csv",
+        "macro_backtest_v31_full_calibration_matrix.csv",
+        "macro_backtest_v31_technical_score_matrix.csv",
+    ]:
         print(f)
-    print("\nMACRO CALIBRATION V3.0 DECISION ENGINE CALIBRATION COMPLETE")
+    print("\nMACRO CALIBRATION V3.1 FULL DECISION ENGINE CALIBRATION COMPLETE")
+
 
 if __name__ == "__main__":
-    v30_main()
+    v31_main()
