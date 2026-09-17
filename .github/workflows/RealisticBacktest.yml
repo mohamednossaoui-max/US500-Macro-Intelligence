@@ -23,12 +23,12 @@ jobs:
 
       - name: Verify realistic backtest file
         run: |
-          test -f realistic_backtest_audit_v1.py
-          python -m py_compile realistic_backtest_audit_v1.py
+          test -f RealisticBacktest.py
+          python -m py_compile RealisticBacktest.py
 
       - name: Run realistic backtest audit
         run: |
-          python realistic_backtest_audit_v1.py
+          python RealisticBacktest.py
 
       - name: Show generated files
         run: |
