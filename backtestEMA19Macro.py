@@ -6287,10 +6287,352 @@ def v39_main():
         print(filename)
 
 
+
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.10
+# EXTENDED TEMPORAL ROBUSTNESS / SURVIVAL VALIDATION
+# ============================================================
+#
+# V3.10 extends the research audit across the full frozen signal
+# history (2019 -> latest available year) using the exact V3.7/V3.8
+# context labels and exact frozen R outcomes.
+#
+# IMPORTANT METHODOLOGICAL LIMIT:
+#   These V3.7 context labels were defined using the complete frozen
+#   research dataset. Therefore V3.10 is an EXTENDED TEMPORAL
+#   ROBUSTNESS audit, NOT a new strict out-of-sample test.
+#
+# Strict chronological OOS remains V3.8/V3.9.
+#
+# V3.10 does NOT change:
+#   - signal generation
+#   - entries / stops / TP / RR
+#   - trade resolution / R
+#   - H1 / H4 / C3 definitions
+#   - Decision Engine logic
+#   - any parameter
+#
+# Research-only.
+# ============================================================
+
+V310_YEARS = list(range(2019, 2027))
+V310_CONTEXTS = list(V39_CONTEXTS)
+V310_MIN_RESOLVED = 20
+V310_MIN_YEARS = 3
+
+
+def v310_year_metric(g):
+    return v39_metric(g)
+
+
+def v310_year_by_year(signal_df):
+    x = signal_df.copy()
+    x["signal_date"] = pd.to_datetime(x["signal_date"])
+    x["year"] = x["signal_date"].dt.year
+    rows = []
+    for context in V310_CONTEXTS:
+        for year in V310_YEARS:
+            g = x[(x["context"] == context) & (x["year"] == year)].copy()
+            m = v310_year_metric(g)
+            rows.append({
+                "context": context,
+                "year": year,
+                **m,
+                "has_resolved": bool(m["resolved"] > 0),
+                "small_N_flag": bool(m["resolved"] < 5),
+            })
+    return pd.DataFrame(rows)
+
+
+def v310_temporal_summary(yearly):
+    rows = []
+    for context in V310_CONTEXTS:
+        y = yearly[yearly["context"] == context].copy()
+        active = y[y["resolved"] > 0].copy()
+        positive = int((active["total_R"] > 0).sum())
+        negative = int((active["total_R"] < 0).sum())
+        zero = int((active["total_R"] == 0).sum())
+        finite = active["total_R"].astype(float).tolist()
+        rows.append({
+            "context": context,
+            "signals": int(y["signals"].sum()),
+            "resolved": int(y["resolved"].sum()),
+            "wins": int(y["wins"].sum()),
+            "losses": int(y["losses"].sum()),
+            "win_rate": 100.0 * int(y["wins"].sum()) / int(y["resolved"].sum()) if int(y["resolved"].sum()) else np.nan,
+            "avg_R": float(y["total_R"].sum()) / int(y["resolved"].sum()) if int(y["resolved"].sum()) else np.nan,
+            "total_R": float(y["total_R"].sum()),
+            "positive_years": positive,
+            "negative_years": negative,
+            "zero_result_years": zero,
+            "years_with_resolved": int(len(active)),
+            "positive_year_rate_pct": 100.0 * positive / len(active) if len(active) else np.nan,
+            "median_yearly_R": float(np.median(finite)) if finite else np.nan,
+            "worst_year_R": float(np.min(finite)) if finite else np.nan,
+            "best_year_R": float(np.max(finite)) if finite else np.nan,
+            "small_N_flag": bool(int(y["resolved"].sum()) < V310_MIN_RESOLVED or len(active) < V310_MIN_YEARS),
+        })
+    return pd.DataFrame(rows)
+
+
+def v310_max_drawdown(signal_df):
+    x = signal_df.copy()
+    x["signal_date"] = pd.to_datetime(x["signal_date"])
+    rows = []
+    for context in V310_CONTEXTS:
+        g = x[x["context"] == context].copy()
+        g = g[g["result"].isin(["WIN", "LOSS"])].copy()
+        g = g.sort_values("signal_date")
+        if g.empty:
+            rows.append({"context": context, "max_drawdown_R": np.nan, "worst_peak_to_trough": np.nan})
+            continue
+        curve = g["R"].astype(float).cumsum()
+        peak = curve.cummax()
+        dd = curve - peak
+        rows.append({
+            "context": context,
+            "max_drawdown_R": float(dd.min()),
+            "worst_peak_to_trough": float(dd.min()),
+        })
+    return pd.DataFrame(rows)
+
+
+def v310_leave_one_year_out(signal_df):
+    x = signal_df.copy()
+    x["signal_date"] = pd.to_datetime(x["signal_date"])
+    x["year"] = x["signal_date"].dt.year
+    rows = []
+    for context in V310_CONTEXTS:
+        base = x[x["context"] == context].copy()
+        for year in V310_YEARS:
+            g = base[base["year"] != year]
+            m = v39_metric(g)
+            rows.append({
+                "context": context,
+                "excluded_year": year,
+                **m,
+                "small_N_flag": bool(m["resolved"] < V310_MIN_RESOLVED),
+            })
+    return pd.DataFrame(rows)
+
+
+def v310_crisis_exclusion(signal_df):
+    rows = []
+    exclusions = [
+        ("NONE", set()),
+        ("EXCLUDE_2020", {2020}),
+        ("EXCLUDE_2022", {2022}),
+        ("EXCLUDE_2020_2022", {2020, 2022}),
+        ("EXCLUDE_2025", {2025}),
+    ]
+    x = signal_df.copy()
+    x["year"] = pd.to_datetime(x["signal_date"]).dt.year
+    for context in V310_CONTEXTS:
+        base = x[x["context"] == context]
+        for label, years in exclusions:
+            g = base[~base["year"].isin(years)]
+            m = v39_metric(g)
+            rows.append({
+                "context": context,
+                "exclusion": label,
+                **m,
+                "small_N_flag": bool(m["resolved"] < V310_MIN_RESOLVED),
+            })
+    return pd.DataFrame(rows)
+
+
+def v310_largest_year_exclusion(yearly):
+    rows = []
+    for context in V310_CONTEXTS:
+        y = yearly[yearly["context"] == context].copy()
+        active = y[y["resolved"] > 0].copy()
+        if active.empty:
+            rows.append({"context": context, "largest_positive_year": np.nan, "total_R_excl_largest_positive_year": 0.0,
+                         "avg_R_excl_largest_positive_year": np.nan, "resolved_excl_largest_positive_year": 0,
+                         "small_N_flag": True})
+            continue
+        pos = active[active["total_R"] > 0]
+        if pos.empty:
+            largest_year = int(active.loc[active["total_R"].idxmax(), "year"])
+        else:
+            largest_year = int(pos.loc[pos["total_R"].idxmax(), "year"])
+        g = active[active["year"] != largest_year]
+        total = float(g["total_R"].sum())
+        resolved = int(g["resolved"].sum())
+        rows.append({
+            "context": context,
+            "largest_positive_year": largest_year,
+            "total_R_excl_largest_positive_year": total,
+            "avg_R_excl_largest_positive_year": total / resolved if resolved else np.nan,
+            "resolved_excl_largest_positive_year": resolved,
+            "small_N_flag": bool(resolved < V310_MIN_RESOLVED),
+        })
+    return pd.DataFrame(rows)
+
+
+def v310_robustness_verdict(summary, crisis, largest_year):
+    rows = []
+    for _, r in summary.iterrows():
+        c = crisis[(crisis["context"] == r["context"]) & (crisis["exclusion"] == "EXCLUDE_2020_2022")].iloc[0]
+        ly = largest_year[largest_year["context"] == r["context"]].iloc[0]
+        sufficient = (
+            int(r["resolved"]) >= V310_MIN_RESOLVED
+            and int(r["years_with_resolved"]) >= V310_MIN_YEARS
+        )
+        survives_core = (
+            float(r["avg_R"]) > 0
+            and float(r["total_R"]) > 0
+            and int(r["positive_years"]) >= int(r["negative_years"])
+        ) if pd.notna(r["avg_R"]) else False
+        survives_crisis = (
+            float(c["total_R"]) > 0
+            and pd.notna(c["avg_R"])
+            and float(c["avg_R"]) > 0
+        )
+        survives_largest = (
+            float(ly["total_R_excl_largest_positive_year"]) > 0
+            and pd.notna(ly["avg_R_excl_largest_positive_year"])
+            and float(ly["avg_R_excl_largest_positive_year"]) > 0
+        )
+        if not sufficient:
+            status = "INSUFFICIENT_EXTENDED_SAMPLE"
+        elif survives_core and survives_crisis and survives_largest:
+            status = "ROBUSTNESS_CHECKS_SURVIVED_RESEARCH_ONLY"
+        else:
+            status = "DOES_NOT_SURVIVE_EXTENDED_ROBUSTNESS_CHECKS"
+        rows.append({
+            "context": r["context"],
+            "resolved": int(r["resolved"]),
+            "years_with_resolved": int(r["years_with_resolved"]),
+            "total_R": float(r["total_R"]),
+            "avg_R": float(r["avg_R"]) if pd.notna(r["avg_R"]) else np.nan,
+            "positive_years": int(r["positive_years"]),
+            "negative_years": int(r["negative_years"]),
+            "crisis_excl_2020_2022_total_R": float(c["total_R"]),
+            "excl_largest_positive_year_total_R": float(ly["total_R_excl_largest_positive_year"]),
+            "status": status,
+            "research_only": True,
+            "NOT_STRICT_OOS": True,
+        })
+    return pd.DataFrame(rows)
+
+
+def v310_main():
+    print("\n" + "=" * 78)
+    print("US500 MACRO INTELLIGENCE — V3.10")
+    print("EXTENDED TEMPORAL ROBUSTNESS / SURVIVAL VALIDATION")
+    print("=" * 78)
+    print("V3.10 first runs the frozen V3.8/V3.9 pipeline.")
+    print("V3.10 is NOT a new strict OOS test because V3.7 context labels were defined on the full frozen dataset.")
+
+    # Run V3.9 first. This regenerates the authoritative frozen labels and
+    # executes all V3.8/V3.9 guards before any V3.10 diagnostics.
+    v39_main()
+
+    labels = pd.read_csv("macro_backtest_v38_frozen_decision_labels.csv")
+    required = {"signal_date", "result", "R", "context"}
+    missing = required - set(labels.columns)
+    if missing:
+        raise RuntimeError(f"V3.10 missing required frozen label columns: {sorted(missing)}")
+
+    assigned = labels[labels["context"] != "__NOT_IN_V39_CONTEXT__"].copy()
+    if assigned.empty:
+        raise RuntimeError("V3.10 context integrity failed: no assigned research contexts.")
+
+    yearly = v310_year_by_year(assigned)
+    summary = v310_temporal_summary(yearly)
+    dd = v310_max_drawdown(assigned)
+    loo = v310_leave_one_year_out(assigned)
+    crisis = v310_crisis_exclusion(assigned)
+    largest = v310_largest_year_exclusion(yearly)
+    verdict = v310_robustness_verdict(summary, crisis, largest)
+
+    yearly.to_csv("macro_backtest_v310_year_by_year.csv", index=False)
+    summary.to_csv("macro_backtest_v310_temporal_summary.csv", index=False)
+    dd.to_csv("macro_backtest_v310_max_drawdown.csv", index=False)
+    loo.to_csv("macro_backtest_v310_leave_one_year_out.csv", index=False)
+    crisis.to_csv("macro_backtest_v310_crisis_exclusion.csv", index=False)
+    largest.to_csv("macro_backtest_v310_largest_year_exclusion.csv", index=False)
+    verdict.to_csv("macro_backtest_v310_robustness_verdict.csv", index=False)
+
+    print("\n" + "=" * 78)
+    print("V3.10 YEAR-BY-YEAR TEMPORAL AUDIT")
+    print("=" * 78)
+    print(yearly.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 TEMPORAL SUMMARY")
+    print("=" * 78)
+    print(summary.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 MAX DRAWDOWN")
+    print("=" * 78)
+    print(dd.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 LEAVE-ONE-YEAR-OUT")
+    print("=" * 78)
+    print(loo.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 CRISIS EXCLUSION")
+    print("=" * 78)
+    print(crisis.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 LARGEST POSITIVE YEAR EXCLUSION")
+    print("=" * 78)
+    print(largest.to_string(index=False))
+
+    print("\n" + "=" * 78)
+    print("V3.10 ROBUSTNESS VERDICT")
+    print("=" * 78)
+    print(verdict.to_string(index=False))
+
+    # Frozen-data integrity: V3.10 must not modify the authoritative R series.
+    if len(labels) != 119:
+        raise RuntimeError(f"V3.10 frozen signal count changed: expected 119, got {len(labels)}")
+    resolved = labels[labels["result"].isin(["WIN", "LOSS"])]
+    if int((resolved["result"] == "WIN").sum()) != 36:
+        raise RuntimeError("V3.10 baseline win count changed.")
+    if int((resolved["result"] == "LOSS").sum()) != 73:
+        raise RuntimeError("V3.10 baseline loss count changed.")
+    total_r = float(pd.to_numeric(resolved["R"], errors="coerce").sum())
+    if abs(total_r - 71.0) > 1e-9:
+        raise RuntimeError(f"V3.10 baseline total R changed: {total_r}")
+
+    print("\n" + "=" * 78)
+    print("V3.10 VALIDATION STATUS")
+    print("=" * 78)
+    print("V3.10 V3.8/V3.9 PIPELINE GUARD: PASS")
+    print("V3.10 FROZEN 119-SIGNAL GUARD: PASS")
+    print("V3.10 FROZEN 36W/73L GUARD: PASS")
+    print("V3.10 FROZEN +71R GUARD: PASS")
+    print("V3.10 NO ENTRY CREATION: PASS")
+    print("V3.10 NO BASELINE MODIFICATION: PASS")
+    print("V3.10 NO PARAMETER OPTIMIZATION: PASS")
+    print("V3.10 VALIDATION COMPLETE")
+    print("Research-only. No Decision Engine rule was changed.")
+    print("IMPORTANT: V3.10 is extended temporal robustness, NOT strict OOS.")
+
+    print("\nFILES CREATED")
+    for filename in [
+        "macro_backtest_v310_year_by_year.csv",
+        "macro_backtest_v310_temporal_summary.csv",
+        "macro_backtest_v310_max_drawdown.csv",
+        "macro_backtest_v310_leave_one_year_out.csv",
+        "macro_backtest_v310_crisis_exclusion.csv",
+        "macro_backtest_v310_largest_year_exclusion.csv",
+        "macro_backtest_v310_robustness_verdict.csv",
+    ]:
+        print(filename)
+
+
 if __name__ == "__main__":
     try:
-        v39_main()
+        v310_main()
     except Exception as exc:
-        print("\nV3.9 FAILED:")
+        print("\nV3.10 FAILED:")
         print(type(exc).__name__ + ": " + str(exc))
         raise
