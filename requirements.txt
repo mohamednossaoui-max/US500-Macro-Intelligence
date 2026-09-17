@@ -1,7 +1,9 @@
-numpy
+streamlit
 pandas
+numpy
 requests
-beautifulsoup4
-pypdf
-openpyxl
 yfinance
+plotly
+beautifulsoup4
+python-dateutil
+pypdf
