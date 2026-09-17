@@ -4872,6 +4872,364 @@ def v361_main(trades, market):
     for filename in reports:
         print(filename)
 
+
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.7
+# CONDITIONAL REGIME AUDIT
+#
+# Research-only continuation of V3.6.1.
+# V3.7 does NOT alter signals, entries, stops, RR, sizing,
+# results, R values, technical scores, or the Decision Engine.
+#
+# Purpose:
+#   1) Determine when H1/H4 counterfactual effects occur.
+#   2) Audit H1/H4 decision changes conditionally by:
+#      - Macro Regime A-F
+#      - Drawdown bucket
+#      - Leading Warning
+#      - Technical Status
+#      - Year
+#   3) Audit selected 2D contexts for regime-dependent effects.
+#   4) Correct V3.6.1 interaction labels so "H1-only context"
+#      is not confused with "H1-only ablation effect".
+#   5) Flag small-N groups rather than treating them as evidence.
+#   6) Preserve all frozen integrity guards.
+# ============================================================
+
+
+def v37_corrected_interaction_classification(df):
+    """Descriptive classification of the existing V3.6 ablation labels.
+
+    IMPORTANT: these are context classifications, not trading rules.
+    "H1_ONLY_CONTEXT" means H1 alone reproduces BASE while H4 alone does not.
+    "H4_ONLY_CONTEXT" is the symmetric case.
+    "C3_REDUNDANT_SUPPORT" means both H1 and H4 alone reproduce BASE.
+    "COMBINED_INTERACTION" means neither alone reproduces BASE.
+    "NO_ABLATION_EFFECT" means no counterfactual changes the BASE label.
+    """
+    b = df["V36_DECISION_BASE"]
+    n = df["V36_DECISION_NO_H1_H4"]
+    h1 = df["V36_DECISION_H1_ONLY"]
+    h4 = df["V36_DECISION_H4_ONLY"]
+
+    conditions = [
+        (b != n) & (b != h1) & (b != h4),
+        (b != n) & (b == h1) & (b != h4),
+        (b != n) & (b != h1) & (b == h4),
+        (b != n) & (b == h1) & (b == h4),
+        (b == n) & (b == h1) & (b == h4),
+    ]
+    labels = [
+        "COMBINED_INTERACTION",
+        "H1_ONLY_CONTEXT",
+        "H4_ONLY_CONTEXT",
+        "C3_REDUNDANT_SUPPORT",
+        "NO_ABLATION_EFFECT",
+    ]
+    out = df.copy()
+    out["V37_INTERACTION_CLASS"] = np.select(
+        conditions, labels, default="OTHER_COUNTERFACTUAL_PATTERN"
+    )
+    return out
+
+
+def v37_summary(g):
+    s = v36_summary(g)
+    return {
+        "signals": s["signals"],
+        "resolved": s["resolved"],
+        "wins": s["wins"],
+        "losses": s["losses"],
+        "win_rate": s["win_rate"],
+        "avg_R": s["avg_R"],
+        "total_R": s["total_R"],
+        "profit_factor": s["profit_factor"],
+    }
+
+
+def v37_conditional_audit(df, dimension, mode, changed_col):
+    """Aggregate ablation effects within one contextual dimension."""
+    rows = []
+    work = df.copy()
+    work[dimension] = work[dimension].astype(str).fillna("NA")
+    for context, g in work.groupby(dimension, sort=False, dropna=False):
+        changed = g[g[changed_col]]
+        s = v37_summary(changed)
+        total = len(g)
+        rows.append({
+            "dimension": dimension,
+            "context": context,
+            "mode": mode,
+            "signals": total,
+            "changed_signals": s["signals"],
+            "changed_pct": 100.0 * s["signals"] / total if total else np.nan,
+            "resolved": s["resolved"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": s["win_rate"],
+            "avg_R": s["avg_R"],
+            "total_R": s["total_R"],
+            "profit_factor": s["profit_factor"],
+            "N_FLAG": "N<5" if total < 5 else ("N<10" if total < 10 else "OK"),
+            "CHANGED_N_FLAG": "CHANGED_N<5" if s["signals"] < 5 else ("CHANGED_N<10" if s["signals"] < 10 else "OK"),
+        })
+    return pd.DataFrame(rows)
+
+
+def v37_pair_audit(df, dimensions, mode, changed_col):
+    """Selected 2D conditional audit; useful for context dependence."""
+    rows = []
+    for keys, g in df.groupby(dimensions, sort=False, dropna=False):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        changed = g[g[changed_col]]
+        s = v37_summary(changed)
+        row = {k: str(v) for k, v in zip(dimensions, keys)}
+        row.update({
+            "mode": mode,
+            "signals": len(g),
+            "changed_signals": s["signals"],
+            "changed_pct": 100.0 * s["signals"] / len(g) if len(g) else np.nan,
+            "resolved": s["resolved"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": s["win_rate"],
+            "avg_R": s["avg_R"],
+            "total_R": s["total_R"],
+            "profit_factor": s["profit_factor"],
+            "N_FLAG": "N<5" if len(g) < 5 else ("N<10" if len(g) < 10 else "OK"),
+            "CHANGED_N_FLAG": "CHANGED_N<5" if s["signals"] < 5 else ("CHANGED_N<10" if s["signals"] < 10 else "OK"),
+        })
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def v37_transition_context_audit(df, dimension, mode, decision_col):
+    """Decision transition audit inside each contextual group."""
+    rows = []
+    for context, g in df.groupby(dimension, sort=False, dropna=False):
+        for (base_decision, counter_decision), cg in g.groupby(
+            ["V36_DECISION_BASE", decision_col], sort=False, dropna=False
+        ):
+            s = v37_summary(cg)
+            rows.append({
+                "dimension": dimension,
+                "context": str(context),
+                "mode": mode,
+                "base_decision": base_decision,
+                "counterfactual_decision": counter_decision,
+                "changed": bool(base_decision != counter_decision),
+                "signals": s["signals"],
+                "resolved": s["resolved"],
+                "wins": s["wins"],
+                "losses": s["losses"],
+                "win_rate": s["win_rate"],
+                "avg_R": s["avg_R"],
+                "total_R": s["total_R"],
+                "profit_factor": s["profit_factor"],
+            })
+    return pd.DataFrame(rows)
+
+
+def v37_integrity_guard(original, df):
+    """V3.7 may only add research columns."""
+    frozen_cols = [
+        "signal_date", "year", "result", "R", "technical_score",
+        "entry", "stop", "target", "risk_points",
+    ]
+    for col in frozen_cols:
+        if col not in original.columns or col not in df.columns:
+            raise RuntimeError(f"V3.7 MISSING FROZEN COLUMN: {col}")
+        a = original[col].reset_index(drop=True)
+        b = df[col].reset_index(drop=True)
+        if col in ["R", "technical_score", "entry", "stop", "target", "risk_points"]:
+            a = pd.to_numeric(a, errors="coerce")
+            b = pd.to_numeric(b, errors="coerce")
+            if not np.allclose(a.to_numpy(dtype=float), b.to_numpy(dtype=float), equal_nan=True):
+                raise RuntimeError(f"V3.7 {col.upper()} INTEGRITY GUARD FAILED.")
+        else:
+            if not a.equals(b):
+                raise RuntimeError(f"V3.7 {col.upper()} INTEGRITY GUARD FAILED.")
+
+    expected_dates = pd.to_datetime(original["signal_date"]).reset_index(drop=True)
+    actual_dates = pd.to_datetime(df["signal_date"]).reset_index(drop=True)
+    if not expected_dates.equals(actual_dates):
+        raise RuntimeError("V3.7 SIGNAL DATE GUARD FAILED.")
+
+    required = [
+        "V36_DECISION_BASE", "V36_DECISION_NO_H1_H4",
+        "V36_DECISION_H1_ONLY", "V36_DECISION_H4_ONLY",
+        "V36_H1", "V36_H4", "V36_C3", "V36_C3_CONTEXT",
+    ]
+    for col in required:
+        if col not in df.columns:
+            raise RuntimeError(f"V3.7 MISSING V3.6 COLUMN: {col}")
+
+    print("V3.7 FROZEN SIGNAL/RESULT/R/TECHNICAL GUARD: PASS")
+    print("V3.7 NO ENTRY CREATION: PASS")
+    print("V3.7 NO BASELINE MODIFICATION: PASS")
+
+
+def v37_main(trades, market):
+    print("\n" + "=" * 72)
+    print("US500 MACRO INTELLIGENCE — V3.7")
+    print("CONDITIONAL REGIME AUDIT")
+    print("=" * 72)
+
+    df = v36_build_decision_comparison(trades)
+    df = v37_corrected_interaction_classification(df)
+    v37_integrity_guard(trades, df)
+
+    # Verify V3.6 labels are reproduced exactly before conditional analysis.
+    reference = pd.Series(
+        [v30_decision_layer(row)[0] for _, row in trades.iterrows()],
+        dtype=object,
+    )
+    if not df["V36_DECISION_BASE"].reset_index(drop=True).equals(reference):
+        raise RuntimeError("V3.7 BASE DECISION REPRODUCTION GUARD FAILED.")
+    print("V3.7 BASE DECISION REPRODUCTION GUARD: PASS")
+
+    dimensions = [
+        "macro_regime",
+        "drawdown_bucket",
+        "leading_warning",
+        "technical_status",
+        "year",
+    ]
+    comparisons = [
+        ("NO_H1_H4", "V36_DECISION_NO_H1_H4", "V36_NO_H1_H4_CHANGED"),
+        ("H1_ONLY", "V36_DECISION_H1_ONLY", "V36_H1_ONLY_CHANGED"),
+        ("H4_ONLY", "V36_DECISION_H4_ONLY", "V36_H4_ONLY_CHANGED"),
+    ]
+
+    conditional_parts = []
+    transition_parts = []
+    for dimension in dimensions:
+        for mode, decision_col, changed_col in comparisons:
+            conditional_parts.append(
+                v37_conditional_audit(df, dimension, mode, changed_col)
+            )
+            transition_parts.append(
+                v37_transition_context_audit(df, dimension, mode, decision_col)
+            )
+    conditional = pd.concat(conditional_parts, ignore_index=True)
+    transitions = pd.concat(transition_parts, ignore_index=True)
+
+    # Selected 2D contexts: the combinations most relevant to the research framework.
+    pair_specs = [
+        ("macro_regime", "leading_warning"),
+        ("drawdown_bucket", "leading_warning"),
+        ("drawdown_bucket", "macro_regime"),
+        ("technical_status", "macro_regime"),
+        ("technical_status", "leading_warning"),
+    ]
+    pair_parts = []
+    for dims in pair_specs:
+        for mode, _, changed_col in comparisons:
+            pair_parts.append(v37_pair_audit(df, list(dims), mode, changed_col))
+    pair_audit = pd.concat(pair_parts, ignore_index=True)
+
+    # Corrected interaction class summary.
+    interaction_rows = []
+    for cls, g in df.groupby("V37_INTERACTION_CLASS", sort=False):
+        s = v37_summary(g)
+        interaction_rows.append({
+            "interaction_class": cls,
+            "signals": s["signals"],
+            "resolved": s["resolved"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": s["win_rate"],
+            "avg_R": s["avg_R"],
+            "total_R": s["total_R"],
+            "profit_factor": s["profit_factor"],
+        })
+    interaction = pd.DataFrame(interaction_rows)
+
+    # High-N candidates: descriptive shortlist only. No ranking or trading verdict.
+    high_n = conditional[
+        (conditional["signals"] >= 10) &
+        (conditional["changed_signals"] >= 5)
+    ].copy()
+    high_n = high_n.sort_values(
+        ["dimension", "mode", "changed_pct"], ascending=[True, True, False]
+    )
+
+    # Signal-level rows where at least one counterfactual changes the decision.
+    any_change = (
+        df["V36_NO_H1_H4_CHANGED"] |
+        df["V36_H1_ONLY_CHANGED"] |
+        df["V36_H4_ONLY_CHANGED"]
+    )
+    changed = df.loc[any_change].copy()
+    changed["V37_INTERACTION_CLASS"] = changed["V37_INTERACTION_CLASS"].astype(str)
+
+    print("\n" + "=" * 72)
+    print("V3.7 CORRECTED INTERACTION CLASSIFICATION")
+    print("=" * 72)
+    print(interaction.to_string(index=False))
+
+    for dimension in dimensions:
+        print("\n" + "=" * 72)
+        print(f"V3.7 CONDITIONAL AUDIT — {dimension.upper()}")
+        print("=" * 72)
+        print(conditional[conditional["dimension"] == dimension].to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.7 SELECTED 2D CONTEXT AUDIT")
+    print("=" * 72)
+    print(pair_audit.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.7 DECISION TRANSITIONS BY CONTEXT")
+    print("=" * 72)
+    print(transitions.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.7 HIGH-N RESEARCH CANDIDATE GROUPS")
+    print("=" * 72)
+    if high_n.empty:
+        print("No groups satisfy signals >= 10 and changed_signals >= 5.")
+    else:
+        print(high_n.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.7 CHANGED SIGNALS — CORRECTED CLASS")
+    print("=" * 72)
+    cols = [
+        "signal_date", "year", "result", "R",
+        "macro_regime", "drawdown_bucket", "leading_warning",
+        "technical_status", "V36_H1", "V36_H4", "V36_C3_CONTEXT",
+        "V37_INTERACTION_CLASS",
+        "V36_DECISION_BASE", "V36_DECISION_NO_H1_H4",
+        "V36_DECISION_H1_ONLY", "V36_DECISION_H4_ONLY",
+        "V36_NO_H1_H4_CHANGED", "V36_H1_ONLY_CHANGED",
+        "V36_H4_ONLY_CHANGED",
+    ]
+    print(changed[cols].to_string(index=False))
+
+    reports = {
+        "macro_backtest_v37_conditional_context_audit.csv": conditional,
+        "macro_backtest_v37_context_transition_audit.csv": transitions,
+        "macro_backtest_v37_selected_2d_context_audit.csv": pair_audit,
+        "macro_backtest_v37_corrected_interaction_classification.csv": interaction,
+        "macro_backtest_v37_high_n_research_candidates.csv": high_n,
+        "macro_backtest_v37_changed_signals_corrected.csv": changed[cols],
+    }
+    for filename, report in reports.items():
+        report.to_csv(filename, index=False)
+
+    print("\n" + "=" * 72)
+    print("V3.7 COMPLETE")
+    print("=" * 72)
+    print("Research-only. No new entries were created.")
+    print("Frozen baseline, entries, stops, RR, sizing and R outcomes were not modified.")
+    print("Small-N groups are explicitly flagged and are not treated as evidence.")
+    print("V3.7 does not modify the Decision Engine.")
+    print("\nFILES CREATED")
+    for filename in reports:
+        print(filename)
+
 if __name__ == "__main__":
     try:
         # Complete frozen V3.2/V3.3 pipeline.
@@ -4992,6 +5350,11 @@ if __name__ == "__main__":
         print("V3.6 COMPLETE — STARTING V3.6.1 AGGREGATE ABLATION AUDIT")
         print("=" * 72)
         v361_main(trades, market)
+
+        print("\n" + "=" * 72)
+        print("V3.6.1 COMPLETE — STARTING V3.7 CONDITIONAL REGIME AUDIT")
+        print("=" * 72)
+        v37_main(trades, market)
 
     except Exception as exc:
         print("\nV3.2/V3.3/V3.4/V3.5 FAILED:")
