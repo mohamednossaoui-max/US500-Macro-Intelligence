@@ -2393,5 +2393,348 @@ def v31_main():
     print("\nMACRO CALIBRATION V3.1 FULL DECISION ENGINE CALIBRATION COMPLETE")
 
 
+
+# ============================================================
+# V3.2 — DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION
+# ============================================================
+# Research-only validation of pre-specified V3.0/V3.1 context candidates.
+# No new entries, exits, sizing, RR, thresholds, macro definitions, or
+# technical definitions are introduced here.
+#
+# Candidates carried forward:
+#   C1 H1 = Regime A + WATCH
+#   C2 H4 = Regime A + Liquidity Deteriorating
+#   C3 H1+H4
+#   C4 H1+H4 + Technical Score >= 4
+#   C5 H1 + Technical Score >= 4
+#   C6 H4 + Technical Score >= 4
+#
+# C4-C6 are pre-specified interaction checks motivated by V3.1.
+# They are NOT optimized thresholds; >=4 is exactly the existing STRONG
+# technical-status boundary from V3.1.
+# ============================================================
+
+V32_CANDIDATES = {
+    "C1_H1_REGIME_A_WATCH": lambda x: (x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH"),
+    "C2_H4_REGIME_A_LIQUIDITY_DETERIORATING": lambda x: (x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING"),
+    "C3_H1_PLUS_H4": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (x["liquidity_momentum"] == "DETERIORATING")),
+    "C4_H1_PLUS_H4_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (x["liquidity_momentum"] == "DETERIORATING") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
+    "C5_H1_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["leading_warning"] == "WATCH") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
+    "C6_H4_STRONG_TECH": lambda x: ((x["macro_regime"] == "A") & (x["liquidity_momentum"] == "DETERIORATING") & (pd.to_numeric(x["technical_score"], errors="coerce") >= 4)),
+}
+
+
+def v32_resolved(trades):
+    r = trades[trades["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    return r[np.isfinite(r["R_num"])].copy()
+
+
+def v32_stats(g):
+    if g.empty:
+        return {"signals": 0, "wins": 0, "losses": 0, "win_rate": np.nan, "avg_R": np.nan, "total_R": 0.0, "profit_factor": np.nan}
+    wins = int((g["result"] == "WIN").sum())
+    losses = int((g["result"] == "LOSS").sum())
+    gp = float(g.loc[g["R_num"] > 0, "R_num"].sum())
+    gl = abs(float(g.loc[g["R_num"] < 0, "R_num"].sum()))
+    return {"signals": len(g), "wins": wins, "losses": losses,
+            "win_rate": 100 * wins / len(g), "avg_R": float(g["R_num"].mean()),
+            "total_R": float(g["R_num"].sum()), "profit_factor": gp / gl if gl else np.nan}
+
+
+def v32_candidate_matrix(trades):
+    r = v32_resolved(trades)
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
+        rows.append({"candidate": name, **v32_stats(g)})
+    return pd.DataFrame(rows)
+
+
+def v32_oos(trades, split_date="2025-01-01"):
+    r = v32_resolved(trades)
+    d = pd.to_datetime(r["signal_date"])
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        mask = np.asarray(fn(r), dtype=bool)
+        for sample, smask in [("DISCOVERY", d < pd.Timestamp(split_date)), ("HOLDOUT", d >= pd.Timestamp(split_date))]:
+            g = r.loc[mask & smask].copy()
+            rows.append({"candidate": name, "sample": sample, **v32_stats(g)})
+    return pd.DataFrame(rows)
+
+
+def v32_walk_forward(trades):
+    r = v32_resolved(trades).copy()
+    r["signal_date"] = pd.to_datetime(r["signal_date"])
+    min_year = int(r["signal_date"].dt.year.min())
+    max_year = int(r["signal_date"].dt.year.max())
+    rows = []
+    for test_year in range(max(2023, min_year + 1), max_year + 1):
+        train = r[r["signal_date"].dt.year < test_year]
+        test = r[r["signal_date"].dt.year == test_year]
+        if test.empty:
+            continue
+        for name, fn in V32_CANDIDATES.items():
+            tg = train.loc[np.asarray(fn(train), dtype=bool)]
+            vg = test.loc[np.asarray(fn(test), dtype=bool)]
+            ts = v32_stats(tg); vs = v32_stats(vg)
+            rows.append({"candidate": name, "test_year": test_year,
+                         "train_signals": ts["signals"], "train_wins": ts["wins"], "train_losses": ts["losses"],
+                         "train_win_rate": ts["win_rate"], "train_avg_R": ts["avg_R"], "train_total_R": ts["total_R"],
+                         "train_profit_factor": ts["profit_factor"],
+                         "test_signals": vs["signals"], "test_wins": vs["wins"], "test_losses": vs["losses"],
+                         "test_win_rate": vs["win_rate"], "test_avg_R": vs["avg_R"], "test_total_R": vs["total_R"],
+                         "test_profit_factor": vs["profit_factor"]})
+    return pd.DataFrame(rows)
+
+
+def v32_loo_year(trades):
+    r = v32_resolved(trades).copy()
+    r["year"] = pd.to_datetime(r["signal_date"]).dt.year
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
+        vals = []
+        for y in sorted(g["year"].unique()):
+            keep = g["year"] != y
+            if keep.sum():
+                vals.append(float(g.loc[keep, "R_num"].mean()))
+        rows.append({"candidate": name, "year_count": int(g["year"].nunique()),
+                     "loo_year_min_mean_R": min(vals) if vals else np.nan,
+                     "loo_year_max_mean_R": max(vals) if vals else np.nan,
+                     "years": str(sorted(g["year"].unique().tolist()))})
+    return pd.DataFrame(rows)
+
+
+def v32_crisis_exclusion(trades):
+    r = v32_resolved(trades).copy()
+    r["year"] = pd.to_datetime(r["signal_date"]).dt.year
+    exclusions = {"NONE": set(), "EXCLUDE_2020": {2020}, "EXCLUDE_2022": {2022},
+                  "EXCLUDE_2020_2022": {2020, 2022}, "EXCLUDE_2025": {2025}}
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        mask = np.asarray(fn(r), dtype=bool)
+        for label, years in exclusions.items():
+            g = r.loc[mask & ~r["year"].isin(years)].copy()
+            rows.append({"candidate": name, "exclusion": label, **v32_stats(g)})
+    return pd.DataFrame(rows)
+
+
+def v32_cluster_audit(trades, market, threshold=-3.0):
+    work = v28_attach_market_episodes(trades, market, threshold=threshold)
+    r = v32_resolved(work)
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
+        if g.empty:
+            continue
+        ep_stats = []
+        for ep, eg in g.groupby("market_episode_id", dropna=False):
+            ep_stats.append((ep, len(eg), float(eg["R_num"].sum()), float(eg["R_num"].mean())))
+        ep_stats.sort(key=lambda x: x[2], reverse=True)
+        loo = []
+        for ep, _, _, _ in ep_stats:
+            keep = g["market_episode_id"] != ep
+            if keep.sum(): loo.append(float(g.loc[keep, "R_num"].mean()))
+        total = float(g["R_num"].sum())
+        top = ep_stats[0] if ep_stats else ("", 0, np.nan, np.nan)
+        rows.append({"candidate": name, "resolved": len(g), "episode_count": g["market_episode_id"].nunique(dropna=False),
+                     "top_episode": str(top[0]), "top_episode_trades": top[1], "top_episode_total_R": top[2],
+                     "total_R": total, "total_R_excl_top_episode": total - top[2] if ep_stats else np.nan,
+                     "loo_episode_min_mean_R": min(loo) if loo else np.nan,
+                     "loo_episode_max_mean_R": max(loo) if loo else np.nan})
+    return pd.DataFrame(rows), work
+
+
+def v32_episode_permutation(trades, market, threshold=-3.0, n_mc=10000):
+    """Matched episode-level and trade-weighted permutation tests for C1-C6.
+
+    The null chooses k independent market episodes uniformly without replacement,
+    matching the selected candidate's episode count. Observed and null statistics
+    use the same statistic, avoiding the V2.7 mismatch.
+    """
+    work = v28_attach_market_episodes(trades, market, threshold=threshold)
+    r = v32_resolved(work)
+    rng = np.random.default_rng(3200)
+    all_stats = {}
+    for ep, eg in r.groupby("market_episode_id", dropna=False):
+        rr = eg["R_num"].to_numpy(dtype=float)
+        if len(rr): all_stats[ep] = {"mean": float(rr.mean()), "n": len(rr), "sum": float(rr.sum())}
+    episodes = list(all_stats)
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
+        selected = [e for e in pd.unique(g["market_episode_id"]) if e in all_stats]
+        k = len(selected); total = len(episodes)
+        if not k or total < k:
+            continue
+        obs_ep = float(np.mean([all_stats[e]["mean"] for e in selected]))
+        obs_tw = float(g["R_num"].mean())
+        extreme_ep = extreme_tw = 0
+        # Exact finite enumeration when feasible, otherwise Monte Carlo.
+        if total <= 18:
+            from itertools import combinations
+            assignments = 0
+            for combo in combinations(episodes, k):
+                assignments += 1
+                ep_stat = float(np.mean([all_stats[e]["mean"] for e in combo]))
+                n = sum(all_stats[e]["n"] for e in combo)
+                tw_stat = float(sum(all_stats[e]["sum"] for e in combo) / n)
+                extreme_ep += ep_stat >= obs_ep - 1e-12
+                extreme_tw += tw_stat >= obs_tw - 1e-12
+            p_ep = extreme_ep / assignments
+            p_tw = extreme_tw / assignments
+            method = "exact"
+        else:
+            assignments = n_mc
+            for _ in range(n_mc):
+                chosen = rng.choice(episodes, size=k, replace=False)
+                ep_stat = float(np.mean([all_stats[e]["mean"] for e in chosen]))
+                n = sum(all_stats[e]["n"] for e in chosen)
+                tw_stat = float(sum(all_stats[e]["sum"] for e in chosen) / n)
+                extreme_ep += ep_stat >= obs_ep - 1e-12
+                extreme_tw += tw_stat >= obs_tw - 1e-12
+            p_ep = (extreme_ep + 1) / (n_mc + 1)
+            p_tw = (extreme_tw + 1) / (n_mc + 1)
+            method = "monte_carlo"
+        rows.append({"candidate": name, "resolved": len(g), "selected_episode_count": k,
+                     "total_resolved_episode_count": total, "observed_episode_mean_R": obs_ep,
+                     "observed_trade_mean_R": obs_tw, "episode_mean_p": p_ep,
+                     "trade_weighted_p": p_tw, "method": method,
+                     "extreme_episode_mean": extreme_ep, "extreme_trade_weighted": extreme_tw,
+                     "total_assignments": assignments})
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out["episode_mean_q_bh"] = bh_adjust(out["episode_mean_p"].to_numpy(dtype=float))
+        out["trade_weighted_q_bh"] = bh_adjust(out["trade_weighted_p"].to_numpy(dtype=float))
+    return out
+
+
+def v32_episode_bootstrap(trades, market, threshold=-3.0, n=20000):
+    work = v28_attach_market_episodes(trades, market, threshold=threshold)
+    r = v32_resolved(work)
+    rng = np.random.default_rng(3250)
+    rows = []
+    for name, fn in V32_CANDIDATES.items():
+        g = r.loc[np.asarray(fn(r), dtype=bool)].copy()
+        eps = []
+        for ep, eg in g.groupby("market_episode_id", dropna=False):
+            rr = eg["R_num"].to_numpy(dtype=float)
+            if len(rr): eps.append((float(rr.mean()), len(rr), float(rr.sum())))
+        if not eps: continue
+        k = len(eps)
+        means = np.array([e[0] for e in eps])
+        bm = np.empty(n); tw = np.empty(n)
+        for i in range(n):
+            idx = rng.integers(0, k, size=k)
+            bm[i] = means[idx].mean()
+            nn = sum(eps[j][1] for j in idx)
+            tw[i] = sum(eps[j][2] for j in idx) / nn
+        rows.append({"candidate": name, "episode_count": k,
+                     "observed_episode_mean_R": float(means.mean()),
+                     "episode_bootstrap_ci_low": float(np.quantile(bm, .025)),
+                     "episode_bootstrap_ci_high": float(np.quantile(bm, .975)),
+                     "observed_trade_mean_R": float(g["R_num"].mean()),
+                     "trade_weighted_episode_bootstrap_ci_low": float(np.quantile(tw, .025)),
+                     "trade_weighted_episode_bootstrap_ci_high": float(np.quantile(tw, .975))})
+    return pd.DataFrame(rows)
+
+
+def v32_print(title, df):
+    print("\n" + "=" * 72)
+    print(title)
+    print("-" * 72)
+    print(df.to_string(index=False) if not df.empty else "No data available.")
+
+
+def v32_main():
+    market = load_market()
+    market["SMA200"] = market["Close"].rolling(200, min_periods=200).mean()
+    print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+
+    baseline = build_baseline_trades(market)
+    if not print_baseline_check(baseline):
+        raise RuntimeError("FROZEN BASELINE FAILED. V3.2 STOPPED.")
+
+    fred = load_fred()
+    trades = attach_macro(baseline, fred)
+    trades = add_drawdown(trades, market)
+    trades = add_zones(trades)
+    trades = add_confluence_flags(trades)
+    trades = add_v31_technical_confirmation(trades, market)
+    trades["H1_FLAG"] = (trades["macro_regime"] == "A") & (trades["leading_warning"] == "WATCH")
+    trades["H4_FLAG"] = (trades["macro_regime"] == "A") & (trades["liquidity_momentum"] == "DETERIORATING")
+
+    print("\n" + "=" * 72)
+    print("MACRO CALIBRATION V3.2 — DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION")
+    print("=" * 72)
+    print("Frozen EMA19 baseline remains the sole technical signal generator.")
+    print("Candidates: C1-C6 are pre-specified V3.0/V3.1 context checks only.")
+    print("Technical confirmation remains research-only; it does NOT create entries.")
+    print("Higher Low = signal Low > lowest Low of previous 5 completed candles.")
+    print("No thresholds, entries, exits, sizing, RR, or macro definitions changed.")
+    print("Research-only: this script does NOT execute trades or place orders.")
+
+    matrix = v32_candidate_matrix(trades)
+    oos = v32_oos(trades)
+    wf = v32_walk_forward(trades)
+    loo = v32_loo_year(trades)
+    crisis = v32_crisis_exclusion(trades)
+    cluster, market_ep = v32_cluster_audit(trades, market)
+    perm = v32_episode_permutation(trades, market)
+    boot = v32_episode_bootstrap(trades, market)
+
+    v32_print("V3.2 CANDIDATE CALIBRATION", matrix)
+    v32_print("V3.2 CHRONOLOGICAL OOS — DISCOVERY / HOLDOUT", oos)
+    v32_print("V3.2 EXPANDING WALK-FORWARD", wf)
+    v32_print("V3.2 LEAVE-ONE-YEAR-OUT", loo)
+    v32_print("V3.2 CRISIS EXCLUSION SENSITIVITY", crisis)
+    v32_print("V3.2 MARKET-EPISODE CLUSTER / LEAVE-ONE-EPISODE-OUT", cluster)
+    v32_print("V3.2 CORRECTED MARKET-EPISODE PERMUTATION", perm)
+    v32_print("V3.2 MARKET-EPISODE BOOTSTRAP", boot)
+
+    # Integrity guards: V3.2 must preserve the exact V3.1 baseline signal set.
+    baseline_dates = pd.to_datetime(baseline["signal_date"]).astype("int64").reset_index(drop=True)
+    v32_dates = pd.to_datetime(trades["signal_date"]).astype("int64").reset_index(drop=True)
+    if len(baseline) != len(trades) or not baseline_dates.equals(v32_dates):
+        raise RuntimeError("SIGNAL-GENERATION GUARD FAILED: V3.2 changed the frozen baseline signal set.")
+
+    # Also verify the V3.1 technical values are reproducible for every signal.
+    reference_tech = add_v31_technical_confirmation(baseline, market)
+    if not reference_tech["technical_score"].reset_index(drop=True).equals(trades["technical_score"].reset_index(drop=True)):
+        raise RuntimeError("TECHNICAL INTEGRITY GUARD FAILED: V3.2 changed V3.1 technical scores.")
+
+    print("\nV3.2 SIGNAL-GENERATION GUARD: PASS")
+    print("V3.2 TECHNICAL-INTEGRITY GUARD: PASS")
+    print("Candidates classify existing frozen signals only; they do not create entries.")
+
+    trades.to_csv("macro_backtest_v32_trades.csv", index=False)
+    matrix.to_csv("macro_backtest_v32_candidate_calibration.csv", index=False)
+    oos.to_csv("macro_backtest_v32_oos.csv", index=False)
+    wf.to_csv("macro_backtest_v32_walk_forward.csv", index=False)
+    loo.to_csv("macro_backtest_v32_leave_one_year_out.csv", index=False)
+    crisis.to_csv("macro_backtest_v32_crisis_exclusion.csv", index=False)
+    cluster.to_csv("macro_backtest_v32_market_episode_cluster_audit.csv", index=False)
+    perm.to_csv("macro_backtest_v32_market_episode_permutation.csv", index=False)
+    boot.to_csv("macro_backtest_v32_market_episode_bootstrap.csv", index=False)
+    market_ep.to_csv("macro_backtest_v32_market_episode_trades.csv", index=False)
+
+    print("\nFILES CREATED")
+    for f in [
+        "macro_backtest_v32_trades.csv",
+        "macro_backtest_v32_candidate_calibration.csv",
+        "macro_backtest_v32_oos.csv",
+        "macro_backtest_v32_walk_forward.csv",
+        "macro_backtest_v32_leave_one_year_out.csv",
+        "macro_backtest_v32_crisis_exclusion.csv",
+        "macro_backtest_v32_market_episode_cluster_audit.csv",
+        "macro_backtest_v32_market_episode_permutation.csv",
+        "macro_backtest_v32_market_episode_bootstrap.csv",
+        "macro_backtest_v32_market_episode_trades.csv",
+    ]:
+        print(f)
+    print("\nMACRO CALIBRATION V3.2 DECISION ENGINE ROBUSTNESS & INTERACTION VALIDATION COMPLETE")
+
+
 if __name__ == "__main__":
-    v31_main()
+    v32_main()
