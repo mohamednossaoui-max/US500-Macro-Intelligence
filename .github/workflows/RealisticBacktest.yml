@@ -1,0 +1,45 @@
+name: Realistic Backtest Audit V1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  realistic-backtest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance
+
+      - name: Verify realistic backtest file
+        run: |
+          test -f realistic_backtest_audit_v1.py
+          python -m py_compile realistic_backtest_audit_v1.py
+
+      - name: Run realistic backtest audit
+        run: |
+          python realistic_backtest_audit_v1.py
+
+      - name: Show generated files
+        run: |
+          echo "Generated files:"
+          ls -lh realistic_backtest_trade_level_audit.csv || true
+          ls -lh realistic_backtest_scenario_summary.csv || true
+
+      - name: Upload backtest results
+        uses: actions/upload-artifact@v4
+        with:
+          name: realistic-backtest-results
+          path: |
+            realistic_backtest_trade_level_audit.csv
+            realistic_backtest_scenario_summary.csv
