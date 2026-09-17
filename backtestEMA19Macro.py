@@ -3580,6 +3580,470 @@ def v34_main(trades, market):
     for filename in reports:
         print(filename)
 
+
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.5
+# C3 CONTEXT × DRAWDOWN × EARLY WARNING × TECHNICAL
+#
+# Research-only incremental-information analysis.
+#
+# C3 remains EXACTLY:
+#   H1 = Regime A + WATCH
+#   H4 = Regime A + Liquidity DETERIORATING
+#   C3 = H1 + H4
+#
+# Frozen baseline, entry, stop, RR, sizing, signal set and
+# previous macro/technical definitions are NOT modified.
+# V3.5 does not create entries or optimize thresholds.
+# ============================================================
+
+V35_DRAWDOWN_LABELS = [
+    "<=-20%",
+    "-20% to -10%",
+    "-10% to -5%",
+    "-5% to -3%",
+    "-3% to 0%",
+    ">0%",
+]
+
+V35_EARLY_WARNING_LEVELS = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+V35_TECHNICAL_STATUSES = ["WEAK", "PARTIAL", "STRONG"]
+
+
+def v35_build_context(df):
+    out = v33_build_contexts(df).copy()
+
+    # Preserve the exact C3 definition from V3.3.
+    expected_c3 = (
+        (out["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (out["leading_warning"].astype(str).str.upper().str.strip() == "WATCH")
+        & (out["liquidity_momentum"].astype(str).str.upper().str.strip() == "DETERIORATING")
+    )
+
+    if not out["V33_C3"].reset_index(drop=True).equals(
+        expected_c3.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.5 C3 DEFINITION GUARD FAILED.")
+
+    out["V35_C3_CONTEXT"] = np.where(
+        out["V33_C3"], "C3_H1_PLUS_H4", "NOT_C3"
+    )
+
+    dd = pd.to_numeric(out["drawdown_pct"], errors="coerce")
+    out["V35_DRAWDOWN_BUCKET"] = pd.cut(
+        dd,
+        bins=[-np.inf, -20, -10, -5, -3, 0, np.inf],
+        labels=V35_DRAWDOWN_LABELS,
+        right=True,
+    )
+
+    out["V35_EARLY_WARNING"] = (
+        out["early_warning_level"].astype(str).str.upper().str.strip()
+    )
+    out["V35_TECHNICAL_STATUS"] = (
+        out["technical_status"].astype(str).str.upper().str.strip()
+    )
+    out["V35_YEAR"] = pd.to_datetime(out["signal_date"]).dt.year
+
+    return out
+
+
+def v35_summary(df):
+    if df.empty:
+        return {
+            "signals": 0, "valid": 0, "invalid_sl": 0,
+            "resolved": 0, "wins": 0, "losses": 0,
+            "ambiguous": 0, "open": 0,
+            "win_rate": np.nan, "avg_R": np.nan,
+            "total_R": 0.0, "profit_factor": np.nan,
+        }
+
+    wins = int((df["result"] == "WIN").sum())
+    losses = int((df["result"] == "LOSS").sum())
+    ambiguous = int((df["result"] == "AMBIGUOUS").sum())
+    open_trades = int((df["result"] == "OPEN").sum())
+    invalid = int((df["result"] == "INVALID_SL").sum())
+    resolved = wins + losses
+
+    r = pd.to_numeric(df["R"], errors="coerce")
+    rr = r[df["result"].isin(["WIN", "LOSS"]) & np.isfinite(r)]
+
+    gp = float(rr[rr > 0].sum())
+    gl = abs(float(rr[rr < 0].sum()))
+
+    return {
+        "signals": len(df),
+        "valid": len(df) - invalid,
+        "invalid_sl": invalid,
+        "resolved": len(rr),
+        "wins": wins,
+        "losses": losses,
+        "ambiguous": ambiguous,
+        "open": open_trades,
+        "win_rate": 100 * wins / len(rr) if len(rr) else np.nan,
+        "avg_R": float(rr.mean()) if len(rr) else np.nan,
+        "total_R": float(rr.sum()) if len(rr) else 0.0,
+        "profit_factor": gp / gl if gl else np.nan,
+    }
+
+
+def v35_group_report(df, group_cols):
+    rows = []
+
+    work = df.copy()
+    keys = group_cols if isinstance(group_cols, list) else [group_cols]
+
+    grouped = work.groupby(keys, dropna=False, sort=False, observed=False)
+
+    for key, g in grouped:
+        if not isinstance(key, tuple):
+            key = (key,)
+
+        s = v35_summary(g)
+        for col, value in zip(keys, key):
+            s[col] = str(value)
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_c3_vs_non_c3_by(df, dimension):
+    rows = []
+
+    values = [
+        v for v in df[dimension].dropna().astype(str).unique()
+    ]
+
+    # Preserve the published ordering where possible.
+    preferred = {
+        "V35_DRAWDOWN_BUCKET": V35_DRAWDOWN_LABELS,
+        "V35_EARLY_WARNING": V35_EARLY_WARNING_LEVELS,
+        "V35_TECHNICAL_STATUS": V35_TECHNICAL_STATUSES,
+    }
+    ordered = [v for v in preferred.get(dimension, []) if v in values]
+    ordered += [v for v in values if v not in ordered]
+
+    for value in ordered:
+        for context in ["C3_H1_PLUS_H4", "NOT_C3"]:
+            g = df[
+                (df[dimension].astype(str) == value)
+                & (df["V35_C3_CONTEXT"] == context)
+            ]
+            s = v35_summary(g)
+            s["dimension"] = dimension
+            s["bucket"] = value
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_incremental_difference(df, dimension):
+    """Difference C3 minus NOT_C3 inside each fixed dimension bucket.
+
+    This is descriptive only. It does not select or optimize a rule.
+    """
+    rows = []
+    table = v35_c3_vs_non_c3_by(df, dimension)
+
+    for bucket in table["bucket"].drop_duplicates():
+        a = table[
+            (table["bucket"] == bucket)
+            & (table["c3_context"] == "C3_H1_PLUS_H4")
+        ]
+        b = table[
+            (table["bucket"] == bucket)
+            & (table["c3_context"] == "NOT_C3")
+        ]
+
+        if a.empty or b.empty:
+            rows.append({
+                "dimension": dimension,
+                "bucket": bucket,
+                "c3_signals": int(a["signals"].iloc[0]) if not a.empty else 0,
+                "non_c3_signals": int(b["signals"].iloc[0]) if not b.empty else 0,
+                "c3_resolved": int(a["resolved"].iloc[0]) if not a.empty else 0,
+                "non_c3_resolved": int(b["resolved"].iloc[0]) if not b.empty else 0,
+                "c3_avg_R": float(a["avg_R"].iloc[0]) if not a.empty else np.nan,
+                "non_c3_avg_R": float(b["avg_R"].iloc[0]) if not b.empty else np.nan,
+                "delta_avg_R_C3_minus_non_C3": np.nan,
+                "c3_win_rate": float(a["win_rate"].iloc[0]) if not a.empty else np.nan,
+                "non_c3_win_rate": float(b["win_rate"].iloc[0]) if not b.empty else np.nan,
+                "delta_win_rate_pp_C3_minus_non_C3": np.nan,
+            })
+            continue
+
+        c3_avg = a["avg_R"].iloc[0]
+        n3_avg = b["avg_R"].iloc[0]
+        c3_wr = a["win_rate"].iloc[0]
+        n3_wr = b["win_rate"].iloc[0]
+
+        rows.append({
+            "dimension": dimension,
+            "bucket": bucket,
+            "c3_signals": int(a["signals"].iloc[0]),
+            "non_c3_signals": int(b["signals"].iloc[0]),
+            "c3_resolved": int(a["resolved"].iloc[0]),
+            "non_c3_resolved": int(b["resolved"].iloc[0]),
+            "c3_avg_R": c3_avg,
+            "non_c3_avg_R": n3_avg,
+            "delta_avg_R_C3_minus_non_C3": (
+                c3_avg - n3_avg
+                if pd.notna(c3_avg) and pd.notna(n3_avg)
+                else np.nan
+            ),
+            "c3_win_rate": c3_wr,
+            "non_c3_win_rate": n3_wr,
+            "delta_win_rate_pp_C3_minus_non_C3": (
+                c3_wr - n3_wr
+                if pd.notna(c3_wr) and pd.notna(n3_wr)
+                else np.nan
+            ),
+        })
+
+    return pd.DataFrame(rows)
+
+
+def v35_combined_matrix(df):
+    """C3 vs non-C3 inside Drawdown × Early Warning.
+
+    No optimization is performed. Empty cells are retained.
+    """
+    rows = []
+
+    for dd in V35_DRAWDOWN_LABELS:
+        for ew in V35_EARLY_WARNING_LEVELS:
+            for context in ["C3_H1_PLUS_H4", "NOT_C3"]:
+                g = df[
+                    (df["V35_DRAWDOWN_BUCKET"].astype(str) == dd)
+                    & (df["V35_EARLY_WARNING"] == ew)
+                    & (df["V35_C3_CONTEXT"] == context)
+                ]
+                s = v35_summary(g)
+                s["drawdown_bucket"] = dd
+                s["early_warning"] = ew
+                s["c3_context"] = context
+                rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_drawdown_early_technical(df):
+    """Full descriptive matrix: Drawdown × Early Warning × Technical × C3."""
+    rows = []
+
+    for dd in V35_DRAWDOWN_LABELS:
+        for ew in V35_EARLY_WARNING_LEVELS:
+            for tech in V35_TECHNICAL_STATUSES:
+                for context in ["C3_H1_PLUS_H4", "NOT_C3"]:
+                    g = df[
+                        (df["V35_DRAWDOWN_BUCKET"].astype(str) == dd)
+                        & (df["V35_EARLY_WARNING"] == ew)
+                        & (df["V35_TECHNICAL_STATUS"] == tech)
+                        & (df["V35_C3_CONTEXT"] == context)
+                    ]
+                    s = v35_summary(g)
+                    s["drawdown_bucket"] = dd
+                    s["early_warning"] = ew
+                    s["technical_status"] = tech
+                    s["c3_context"] = context
+                    rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_decision_x_c3(df):
+    rows = []
+
+    for decision in [
+        "CRITICAL — NO NEW TRADE",
+        "DEFENSIVE",
+        "WAIT / CONFIRM",
+        "CAUTION",
+        "SUPPORTIVE / CONFIRM",
+        "BASELINE CONTEXT",
+    ]:
+        for context in ["C3_H1_PLUS_H4", "NOT_C3"]:
+            g = df[
+                (df["V34_BASE_DECISION"] == decision)
+                & (df["V35_C3_CONTEXT"] == context)
+            ]
+            s = v35_summary(g)
+            s["decision"] = decision
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_yearly(df):
+    rows = []
+
+    for year in sorted(df["V35_YEAR"].dropna().unique()):
+        for context in ["C3_H1_PLUS_H4", "NOT_C3"]:
+            g = df[
+                (df["V35_YEAR"] == year)
+                & (df["V35_C3_CONTEXT"] == context)
+            ]
+            s = v35_summary(g)
+            s["year"] = int(year)
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v35_integrity_guards(original, df):
+    if len(original) != len(df):
+        raise RuntimeError("V3.5 SIGNAL-GENERATION GUARD FAILED.")
+
+    od = pd.to_datetime(original["signal_date"]).reset_index(drop=True)
+    nd = pd.to_datetime(df["signal_date"]).reset_index(drop=True)
+    if not od.equals(nd):
+        raise RuntimeError(
+            "V3.5 SIGNAL-GENERATION GUARD FAILED: signal dates changed."
+        )
+
+    ot = pd.to_numeric(
+        original["technical_score"], errors="coerce"
+    ).reset_index(drop=True)
+    nt = pd.to_numeric(
+        df["technical_score"], errors="coerce"
+    ).reset_index(drop=True)
+    if not ot.equals(nt):
+        raise RuntimeError("V3.5 TECHNICAL-INTEGRITY GUARD FAILED.")
+
+    expected_c3 = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (df["leading_warning"].astype(str).str.upper().str.strip() == "WATCH")
+        & (df["liquidity_momentum"].astype(str).str.upper().str.strip() == "DETERIORATING")
+    )
+    if not df["V33_C3"].reset_index(drop=True).equals(
+        expected_c3.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.5 C3-DEFINITION GUARD FAILED.")
+
+    # V3.5 must not alter the frozen result labels or R values.
+    if not original["result"].reset_index(drop=True).equals(
+        df["result"].reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.5 RESULT-INTEGRITY GUARD FAILED.")
+
+    orr = pd.to_numeric(original["R"], errors="coerce").reset_index(drop=True)
+    nrr = pd.to_numeric(df["R"], errors="coerce").reset_index(drop=True)
+    if not orr.equals(nrr):
+        raise RuntimeError("V3.5 R-INTEGRITY GUARD FAILED.")
+
+    print("\nV3.5 SIGNAL-GENERATION GUARD: PASS")
+    print("V3.5 TECHNICAL-INTEGRITY GUARD: PASS")
+    print("V3.5 C3-DEFINITION GUARD: PASS")
+    print("V3.5 RESULT/R-INTEGRITY GUARD: PASS")
+    print("V3.5 NO ENTRY CREATION: PASS")
+    print("V3.5 NO BASELINE MODIFICATION: PASS")
+
+
+def v35_main(trades, market):
+    print("\n" + "=" * 72)
+    print("US500 MACRO INTELLIGENCE — V3.5")
+    print("C3 CONTEXT × DRAWDOWN × EARLY WARNING × TECHNICAL")
+    print("=" * 72)
+
+    df = v34_build_decision_context(trades).copy()
+    df = v35_build_context(df)
+
+    v35_integrity_guards(trades, df)
+
+    dd = v35_c3_vs_non_c3_by(df, "V35_DRAWDOWN_BUCKET")
+    ew = v35_c3_vs_non_c3_by(df, "V35_EARLY_WARNING")
+    tech = v35_c3_vs_non_c3_by(df, "V35_TECHNICAL_STATUS")
+
+    dd_diff = v35_incremental_difference(df, "V35_DRAWDOWN_BUCKET")
+    ew_diff = v35_incremental_difference(df, "V35_EARLY_WARNING")
+    tech_diff = v35_incremental_difference(df, "V35_TECHNICAL_STATUS")
+
+    combined = v35_combined_matrix(df)
+    full = v35_drawdown_early_technical(df)
+    decision = v35_decision_x_c3(df)
+    yearly = v35_yearly(df)
+
+    print("\n" + "=" * 72)
+    print("V3.5 C3 vs NON-C3 — DRAWDOWN")
+    print("=" * 72)
+    print(dd.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 INCREMENTAL DIFFERENCE — DRAWDOWN")
+    print("=" * 72)
+    print(dd_diff.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 C3 vs NON-C3 — EARLY WARNING")
+    print("=" * 72)
+    print(ew.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 INCREMENTAL DIFFERENCE — EARLY WARNING")
+    print("=" * 72)
+    print(ew_diff.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 C3 vs NON-C3 — TECHNICAL STATUS")
+    print("=" * 72)
+    print(tech.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 INCREMENTAL DIFFERENCE — TECHNICAL STATUS")
+    print("=" * 72)
+    print(tech_diff.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 DRAWDOWN × EARLY WARNING × C3")
+    print("=" * 72)
+    print(combined.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 DRAWDOWN × EARLY WARNING × TECHNICAL × C3")
+    print("=" * 72)
+    print(full.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 DECISION × C3")
+    print("=" * 72)
+    print(decision.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.5 YEARLY C3 CONTEXT")
+    print("=" * 72)
+    print(yearly.to_string(index=False))
+
+    reports = {
+        "macro_backtest_v35_c3_vs_non_c3_drawdown.csv": dd,
+        "macro_backtest_v35_incremental_drawdown.csv": dd_diff,
+        "macro_backtest_v35_c3_vs_non_c3_early_warning.csv": ew,
+        "macro_backtest_v35_incremental_early_warning.csv": ew_diff,
+        "macro_backtest_v35_c3_vs_non_c3_technical.csv": tech,
+        "macro_backtest_v35_incremental_technical.csv": tech_diff,
+        "macro_backtest_v35_drawdown_early_warning_c3.csv": combined,
+        "macro_backtest_v35_drawdown_early_warning_technical_c3.csv": full,
+        "macro_backtest_v35_decision_x_c3.csv": decision,
+        "macro_backtest_v35_yearly.csv": yearly,
+        "macro_backtest_v35_trades.csv": df,
+    }
+
+    for filename, report in reports.items():
+        report.to_csv(filename, index=False)
+
+    print("\n" + "=" * 72)
+    print("V3.5 COMPLETE")
+    print("=" * 72)
+    print("Research-only. No new entries were created.")
+    print("Frozen baseline, V3.0 decision logic and V3.3 C3 definition were not modified.")
+    print("\nFILES CREATED")
+    for filename in reports:
+        print(filename)
+
+
+
 if __name__ == "__main__":
     try:
         # Complete frozen V3.2/V3.3 pipeline.
@@ -3683,6 +4147,13 @@ if __name__ == "__main__":
 
         # V3.4 uses the exact same in-memory trades.
         v34_main(trades, market)
+
+        print("\n" + "=" * 72)
+        print("V3.4 COMPLETE — STARTING INTEGRATED V3.5")
+        print("=" * 72)
+
+        # V3.5 uses the exact same in-memory trades.
+        v35_main(trades, market)
 
     except Exception as exc:
         print("\nV3.2/V3.3/V3.4 FAILED:")
