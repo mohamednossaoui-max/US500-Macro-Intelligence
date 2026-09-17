@@ -4047,6 +4047,476 @@ def v35_main(trades, market):
 
 
 
+# ============================================================
+# US500 MACRO INTELLIGENCE — V3.6
+# DECISION ENGINE COUNTERFACTUAL / ABLATION ANALYSIS
+#
+# Research-only.
+#
+# Purpose:
+#   Test whether the existing V3.4 Decision Engine's H1/H4
+#   supportive branch adds incremental information to the
+#   decision labels, WITHOUT changing any frozen trade.
+#
+# IMPORTANT METHODOLOGICAL POINT:
+#   The current V3.0/V3.4 engine does not contain a dedicated
+#   "C3" branch. It uses H1 OR H4:
+#       H1 = Regime A + WATCH
+#       H4 = Regime A + Liquidity DETERIORATING
+#
+#   Therefore a true C3-only ablation is not identifiable from
+#   the current engine. V3.6 explicitly tests the identifiable
+#   counterfactual:
+#       BASE        = existing V3.0/V3.4 logic
+#       NO_H1_H4    = same logic with the H1/H4 supportive branch removed
+#       H1_ONLY     = same logic with only H1 allowed to support
+#       H4_ONLY     = same logic with only H4 allowed to support
+#
+# The frozen signal generator, entries, stops, RR, sizing,
+# results and R values are never modified.
+# ============================================================
+
+
+def v36_decision_layer(row, mode="BASE"):
+    """Counterfactual copy of the existing V3.0 decision logic.
+
+    BASE reproduces the current V3.4 decision labels.
+    NO_H1_H4 removes only the H1/H4 supportive branch.
+    H1_ONLY retains H1 support but removes H4 support.
+    H4_ONLY retains H4 support but removes H1 support.
+
+    This function changes labels only; it never changes trades.
+    """
+    regime = str(row.get("macro_regime", ""))
+    warning = str(row.get("leading_warning", ""))
+    early = str(row.get("early_warning_level", ""))
+
+    h1 = (
+        regime.upper().strip() == "A"
+        and warning.upper().strip() == "WATCH"
+    )
+    h4 = (
+        regime.upper().strip() == "A"
+        and str(row.get("liquidity_momentum", "")).upper().strip()
+        == "DETERIORATING"
+    )
+
+    # Reproduce the existing V3.0 precedence.
+    if early == "CRITICAL" or regime.startswith("E") or regime.startswith("F"):
+        return "DEFENSIVE"
+
+    if mode == "BASE":
+        supportive = h1 or h4
+    elif mode == "NO_H1_H4":
+        supportive = False
+    elif mode == "H1_ONLY":
+        supportive = h1
+    elif mode == "H4_ONLY":
+        supportive = h4
+    else:
+        raise ValueError(f"Unknown V3.6 mode: {mode}")
+
+    if supportive:
+        return "SUPPORTIVE / CONFIRM"
+
+    if regime.startswith("C") or regime.startswith("D"):
+        return "WAIT / CONFIRM"
+
+    if warning.upper().strip() in ("ELEVATED", "STRONG"):
+        return "CAUTION"
+
+    return "BASELINE CONTEXT"
+
+
+def v36_build_decision_comparison(trades):
+    """Attach base and counterfactual decisions to the same 119 signals."""
+    df = trades.copy()
+
+    df["V36_C3"] = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (df["leading_warning"].astype(str).str.upper().str.strip() == "WATCH")
+        & (
+            df["liquidity_momentum"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            == "DETERIORATING"
+        )
+    )
+
+    df["V36_H1"] = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (df["leading_warning"].astype(str).str.upper().str.strip() == "WATCH")
+    )
+
+    df["V36_H4"] = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (
+            df["liquidity_momentum"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            == "DETERIORATING"
+        )
+    )
+
+    df["V36_C3_CONTEXT"] = np.where(
+        df["V36_C3"], "C3_H1_PLUS_H4", "NOT_C3"
+    )
+
+    for mode in ["BASE", "NO_H1_H4", "H1_ONLY", "H4_ONLY"]:
+        df[f"V36_DECISION_{mode}"] = [
+            v36_decision_layer(row, mode)
+            for _, row in df.iterrows()
+        ]
+
+    df["V36_BASE_DECISION"] = df["V36_DECISION_BASE"]
+    df["V36_NO_H1_H4_CHANGED"] = (
+        df["V36_DECISION_BASE"] != df["V36_DECISION_NO_H1_H4"]
+    )
+    df["V36_H1_ONLY_CHANGED"] = (
+        df["V36_DECISION_BASE"] != df["V36_DECISION_H1_ONLY"]
+    )
+    df["V36_H4_ONLY_CHANGED"] = (
+        df["V36_DECISION_BASE"] != df["V36_DECISION_H4_ONLY"]
+    )
+
+    return df
+
+
+def v36_summary(df):
+    if df.empty:
+        return {
+            "signals": 0,
+            "resolved": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": np.nan,
+            "avg_R": np.nan,
+            "total_R": 0.0,
+            "profit_factor": np.nan,
+        }
+
+    r = df[df["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    r = r[np.isfinite(r["R_num"])].copy()
+
+    wins = int((r["result"] == "WIN").sum())
+    losses = int((r["result"] == "LOSS").sum())
+    gp = float(r.loc[r["R_num"] > 0, "R_num"].sum())
+    gl = abs(float(r.loc[r["R_num"] < 0, "R_num"].sum()))
+
+    return {
+        "signals": len(df),
+        "resolved": len(r),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": 100.0 * wins / len(r) if len(r) else np.nan,
+        "avg_R": float(r["R_num"].mean()) if len(r) else np.nan,
+        "total_R": float(r["R_num"].sum()) if len(r) else 0.0,
+        "profit_factor": gp / gl if gl else np.nan,
+    }
+
+
+def v36_transition_report(df, from_col, to_col):
+    rows = []
+
+    for (old_decision, new_decision), g in df.groupby(
+        [from_col, to_col], sort=False, dropna=False
+    ):
+        s = v36_summary(g)
+        s["from_decision"] = old_decision
+        s["to_decision"] = new_decision
+        s["changed"] = old_decision != new_decision
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v36_change_by_context(df, changed_col):
+    rows = []
+
+    for context, g in df.groupby("V36_C3_CONTEXT", sort=False):
+        changed = g[g[changed_col]]
+        unchanged = g[~g[changed_col]]
+
+        cs = v36_summary(changed)
+        us = v36_summary(unchanged)
+
+        rows.append({
+            "c3_context": context,
+            "changed_signals": cs["signals"],
+            "changed_resolved": cs["resolved"],
+            "changed_wins": cs["wins"],
+            "changed_losses": cs["losses"],
+            "changed_avg_R": cs["avg_R"],
+            "changed_total_R": cs["total_R"],
+            "unchanged_signals": us["signals"],
+            "unchanged_resolved": us["resolved"],
+            "unchanged_wins": us["wins"],
+            "unchanged_losses": us["losses"],
+            "unchanged_avg_R": us["avg_R"],
+            "unchanged_total_R": us["total_R"],
+        })
+
+    return pd.DataFrame(rows)
+
+
+def v36_decision_performance(df, decision_col, mode):
+    rows = []
+
+    for decision, g in df.groupby(decision_col, sort=False, dropna=False):
+        s = v36_summary(g)
+        s["mode"] = mode
+        s["decision"] = decision
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v36_decision_change_matrix(df):
+    """Performance of signals whose decision changes under the ablation."""
+    rows = []
+
+    comparisons = [
+        ("NO_H1_H4", "V36_DECISION_NO_H1_H4", "V36_NO_H1_H4_CHANGED"),
+        ("H1_ONLY", "V36_DECISION_H1_ONLY", "V36_H1_ONLY_CHANGED"),
+        ("H4_ONLY", "V36_DECISION_H4_ONLY", "V36_H4_ONLY_CHANGED"),
+    ]
+
+    for mode, new_col, changed_col in comparisons:
+        changed = df[df[changed_col]].copy()
+
+        if changed.empty:
+            rows.append({
+                "mode": mode,
+                "signals_changed": 0,
+                "resolved": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": np.nan,
+                "avg_R": np.nan,
+                "total_R": 0.0,
+                "profit_factor": np.nan,
+            })
+            continue
+
+        s = v36_summary(changed)
+        s["mode"] = mode
+        s["signals_changed"] = s.pop("signals")
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v36_integrity_guards(original, df):
+    if len(original) != len(df):
+        raise RuntimeError("V3.6 SIGNAL COUNT GUARD FAILED.")
+
+    od = pd.to_datetime(original["signal_date"]).reset_index(drop=True)
+    nd = pd.to_datetime(df["signal_date"]).reset_index(drop=True)
+    if not od.equals(nd):
+        raise RuntimeError("V3.6 SIGNAL DATE GUARD FAILED.")
+
+    for col in ["result", "R", "technical_score"]:
+        a = original[col].reset_index(drop=True)
+        b = df[col].reset_index(drop=True)
+
+        if col in ["R", "technical_score"]:
+            a = pd.to_numeric(a, errors="coerce")
+            b = pd.to_numeric(b, errors="coerce")
+
+        if not a.equals(b):
+            raise RuntimeError(f"V3.6 {col.upper()} INTEGRITY GUARD FAILED.")
+
+    expected_h1 = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (df["leading_warning"].astype(str).str.upper().str.strip() == "WATCH")
+    )
+
+    expected_h4 = (
+        (df["macro_regime"].astype(str).str.upper().str.strip() == "A")
+        & (
+            df["liquidity_momentum"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            == "DETERIORATING"
+        )
+    )
+
+    expected_c3 = expected_h1 & expected_h4
+
+    if not df["V36_H1"].reset_index(drop=True).equals(
+        expected_h1.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.6 H1 DEFINITION GUARD FAILED.")
+
+    if not df["V36_H4"].reset_index(drop=True).equals(
+        expected_h4.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.6 H4 DEFINITION GUARD FAILED.")
+
+    if not df["V36_C3"].reset_index(drop=True).equals(
+        expected_c3.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.6 C3 DEFINITION GUARD FAILED.")
+
+    # Verify that BASE reproduces the current V3.4 decision labels.
+    reference = [
+        v30_decision_layer(row)
+        for _, row in original.iterrows()
+    ]
+    if not df["V36_DECISION_BASE"].reset_index(drop=True).equals(
+        pd.Series(reference).reset_index(drop=True)
+    ):
+        raise RuntimeError(
+            "V3.6 BASE DECISION REPRODUCTION GUARD FAILED."
+        )
+
+    print("\nV3.6 SIGNAL COUNT GUARD: PASS")
+    print("V3.6 SIGNAL DATE GUARD: PASS")
+    print("V3.6 RESULT/R/TECHNICAL INTEGRITY GUARD: PASS")
+    print("V3.6 H1/H4 DEFINITION GUARD: PASS")
+    print("V3.6 C3 DEFINITION GUARD: PASS")
+    print("V3.6 BASE DECISION REPRODUCTION GUARD: PASS")
+    print("V3.6 NO ENTRY CREATION: PASS")
+    print("V3.6 NO BASELINE MODIFICATION: PASS")
+
+
+def v36_main(trades, market):
+    print("\n" + "=" * 72)
+    print("US500 MACRO INTELLIGENCE — V3.6")
+    print("DECISION ENGINE COUNTERFACTUAL / ABLATION ANALYSIS")
+    print("=" * 72)
+
+    df = v36_build_decision_comparison(trades)
+    v36_integrity_guards(trades, df)
+
+    transitions_no = v36_transition_report(
+        df, "V36_DECISION_BASE", "V36_DECISION_NO_H1_H4"
+    )
+    transitions_h1 = v36_transition_report(
+        df, "V36_DECISION_BASE", "V36_DECISION_H1_ONLY"
+    )
+    transitions_h4 = v36_transition_report(
+        df, "V36_DECISION_BASE", "V36_DECISION_H4_ONLY"
+    )
+
+    changed_summary = v36_decision_change_matrix(df)
+
+    context_no = v36_change_by_context(
+        df, "V36_NO_H1_H4_CHANGED"
+    )
+    context_h1 = v36_change_by_context(
+        df, "V36_H1_ONLY_CHANGED"
+    )
+    context_h4 = v36_change_by_context(
+        df, "V36_H4_ONLY_CHANGED"
+    )
+
+    perf = pd.concat(
+        [
+            v36_decision_performance(
+                df, "V36_DECISION_BASE", "BASE"
+            ),
+            v36_decision_performance(
+                df, "V36_DECISION_NO_H1_H4", "NO_H1_H4"
+            ),
+            v36_decision_performance(
+                df, "V36_DECISION_H1_ONLY", "H1_ONLY"
+            ),
+            v36_decision_performance(
+                df, "V36_DECISION_H4_ONLY", "H4_ONLY"
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    # Full signal-level audit: every frozen signal gets all four labels.
+    audit = df[
+        [
+            "signal_date",
+            "year",
+            "result",
+            "R",
+            "V36_H1",
+            "V36_H4",
+            "V36_C3",
+            "V36_C3_CONTEXT",
+            "V36_DECISION_BASE",
+            "V36_DECISION_NO_H1_H4",
+            "V36_DECISION_H1_ONLY",
+            "V36_DECISION_H4_ONLY",
+            "V36_NO_H1_H4_CHANGED",
+            "V36_H1_ONLY_CHANGED",
+            "V36_H4_ONLY_CHANGED",
+        ]
+    ].copy()
+
+    print("\n" + "=" * 72)
+    print("V3.6 DECISION CHANGES — BASE vs NO H1/H4 SUPPORTIVE BRANCH")
+    print("=" * 72)
+    print(changed_summary.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 TRANSITIONS — BASE -> NO H1/H4")
+    print("=" * 72)
+    print(transitions_no.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 CHANGED vs UNCHANGED — BASE -> NO H1/H4")
+    print("=" * 72)
+    print(context_no.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 TRANSITIONS — BASE -> H1 ONLY")
+    print("=" * 72)
+    print(transitions_h1.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 TRANSITIONS — BASE -> H4 ONLY")
+    print("=" * 72)
+    print(transitions_h4.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 DECISION PERFORMANCE BY MODE")
+    print("=" * 72)
+    print(perf.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.6 SIGNAL-LEVEL AUDIT")
+    print("=" * 72)
+    print(audit.to_string(index=False))
+
+    reports = {
+        "macro_backtest_v36_decision_ablation_summary.csv": changed_summary,
+        "macro_backtest_v36_transitions_base_vs_no_h1_h4.csv": transitions_no,
+        "macro_backtest_v36_transitions_base_vs_h1_only.csv": transitions_h1,
+        "macro_backtest_v36_transitions_base_vs_h4_only.csv": transitions_h4,
+        "macro_backtest_v36_changed_by_c3_context_no_h1_h4.csv": context_no,
+        "macro_backtest_v36_changed_by_c3_context_h1_only.csv": context_h1,
+        "macro_backtest_v36_changed_by_c3_context_h4_only.csv": context_h4,
+        "macro_backtest_v36_decision_performance_by_mode.csv": perf,
+        "macro_backtest_v36_signal_level_audit.csv": audit,
+    }
+
+    for filename, report in reports.items():
+        report.to_csv(filename, index=False)
+
+    print("\n" + "=" * 72)
+    print("V3.6 COMPLETE")
+    print("=" * 72)
+    print("Research-only. No new entries were created.")
+    print("Frozen baseline, entries, stops, RR, sizing and R outcomes were not modified.")
+    print("V3.6 is an ablation of the existing H1/H4 decision branch, not a new trading rule.")
+    print("\nFILES CREATED")
+    for filename in reports:
+        print(filename)
+
+
+
+
 if __name__ == "__main__":
     try:
         # Complete frozen V3.2/V3.3 pipeline.
@@ -4157,6 +4627,11 @@ if __name__ == "__main__":
 
         # V3.5 uses the exact same in-memory trades.
         v35_main(trades, market)
+
+        print("\n" + "=" * 72)
+        print("V3.5 COMPLETE — STARTING INTEGRATED V3.6")
+        print("=" * 72)
+        v36_main(trades, market)
 
     except Exception as exc:
         print("\nV3.2/V3.3/V3.4/V3.5 FAILED:")
