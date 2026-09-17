@@ -6179,20 +6179,25 @@ def v39_main():
             f"V3.9 missing required V3.8 frozen label columns: {sorted(missing)}"
         )
 
-    labels["context"] = np.select(
+    # IMPORTANT: V3.8 contexts are overlapping research masks, not a
+    # mutually-exclusive classification. Do NOT use np.select here: it
+    # would assign A+WATCH rows to H1/C3/H4 first and erase the overlap.
+    # Build an independent long-form context table instead.
+    context_masks = {
+        "H1_ONLY_CONTEXT": labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
+        "C3_REDUNDANT_SUPPORT": labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
+        "H4_ONLY_CONTEXT": labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
+        "A_WATCH_CONTEXT": (
+            labels["macro_regime"].eq("A")
+            & labels["leading_warning"].eq("WATCH")
+        ),
+    }
+    context_labels = pd.concat(
         [
-            labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
-            labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
-            labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
-            labels["macro_regime"].eq("A") & labels["leading_warning"].eq("WATCH"),
+            labels.loc[mask].assign(context=context_name)
+            for context_name, mask in context_masks.items()
         ],
-        [
-            "H1_ONLY_CONTEXT",
-            "C3_REDUNDANT_SUPPORT",
-            "H4_ONLY_CONTEXT",
-            "A_WATCH_CONTEXT",
-        ],
-        default="__NOT_IN_V39_CONTEXT__",
+        ignore_index=True,
     )
 
     # V3.8 walk-forward is an aggregate audit table. It intentionally
@@ -6205,9 +6210,9 @@ def v39_main():
             f"V3.9 missing required V3.8 walk-forward columns: {sorted(missing)}"
         )
 
-    aggregate = v39_oos_aggregate(labels)
-    survival = v39_year_survival(labels)
-    crisis = v39_crisis_exclusion(labels)
+    aggregate = v39_oos_aggregate(context_labels)
+    survival = v39_year_survival(context_labels)
+    crisis = v39_crisis_exclusion(context_labels)
     verdict = v39_survival_verdict(aggregate, survival)
 
     aggregate.to_csv("macro_backtest_v39_oos_aggregate.csv", index=False)
@@ -6246,9 +6251,7 @@ def v39_main():
     # partition of all 119 signals. Signals outside the four V3.9
     # research contexts are intentionally labelled __NOT_IN_V39_CONTEXT__.
     # Integrity therefore checks only the rows assigned to a V3.9 context.
-    assigned_contexts = set(labels.loc[
-        labels["context"] != "__NOT_IN_V39_CONTEXT__", "context"
-    ].dropna().unique())
+    assigned_contexts = set(context_labels["context"].dropna().unique())
     if not assigned_contexts.issubset(set(V39_CONTEXTS)):
         raise RuntimeError(
             "V3.9 context integrity check failed: unexpected assigned contexts "
@@ -6548,31 +6551,30 @@ def v310_main():
             f"V3.10 missing required frozen label columns: {sorted(missing)}"
         )
 
-    labels["context"] = np.select(
-        [
-            labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
-            labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
-            labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
+    # IMPORTANT: V3.8 contexts are overlapping research masks, not a
+    # mutually-exclusive classification. Do NOT use np.select here: it
+    # would erase A+WATCH overlap whenever a row is also H1/C3/H4.
+    context_masks = {
+        "H1_ONLY_CONTEXT": labels["V37_INTERACTION_CLASS"].eq("H1_ONLY_CONTEXT"),
+        "C3_REDUNDANT_SUPPORT": labels["V37_INTERACTION_CLASS"].eq("C3_REDUNDANT_SUPPORT"),
+        "H4_ONLY_CONTEXT": labels["V37_INTERACTION_CLASS"].eq("H4_ONLY_CONTEXT"),
+        "A_WATCH_CONTEXT": (
             labels["macro_regime"].eq("A")
-            & labels["leading_warning"].eq("WATCH"),
-        ],
+            & labels["leading_warning"].eq("WATCH")
+        ),
+    }
+    context_labels = pd.concat(
         [
-            "H1_ONLY_CONTEXT",
-            "C3_REDUNDANT_SUPPORT",
-            "H4_ONLY_CONTEXT",
-            "A_WATCH_CONTEXT",
+            labels.loc[mask].assign(context=context_name)
+            for context_name, mask in context_masks.items()
         ],
-        default="__NOT_IN_V39_CONTEXT__",
+        ignore_index=True,
     )
 
     # Contexts are intentionally overlapping and are not an exhaustive
     # partition of the 119 frozen signals. Only assigned research contexts
     # enter V3.10 temporal diagnostics.
-    assigned_contexts = set(
-        labels.loc[
-            labels["context"] != "__NOT_IN_V39_CONTEXT__", "context"
-        ].dropna().unique()
-    )
+    assigned_contexts = set(context_labels["context"].dropna().unique())
     expected_contexts = {
         "H1_ONLY_CONTEXT",
         "C3_REDUNDANT_SUPPORT",
@@ -6589,7 +6591,7 @@ def v310_main():
             "V3.10 context integrity failed: no assigned research contexts."
         )
 
-    assigned = labels[labels["context"] != "__NOT_IN_V39_CONTEXT__"].copy()
+    assigned = context_labels.copy()
     if assigned.empty:
         raise RuntimeError("V3.10 context integrity failed: no assigned research contexts.")
 
