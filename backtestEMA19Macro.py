@@ -32,6 +32,24 @@
 
 import importlib.util
 from pathlib import Path
+
+# ============================================================
+# RUNTIME DEPENDENCY CHECK
+# ============================================================
+# V3.8 uses the authoritative V3.2/V3.7 producer, which requires
+# yfinance for Yahoo Finance market data.
+# Official installation: pip install yfinance
+# ============================================================
+try:
+    import yfinance as yf  # noqa: F401
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        "\nV3.8 STOPPED: missing dependency 'yfinance'.\n"
+        "Install it with:\n"
+        "    pip install yfinance\n"
+        "or add 'yfinance' to requirements.txt and rerun the workflow.\n"
+    ) from exc
+
 import numpy as np
 import pandas as pd
 
