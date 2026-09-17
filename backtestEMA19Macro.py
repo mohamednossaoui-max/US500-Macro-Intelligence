@@ -4374,12 +4374,17 @@ def v36_integrity_guards(original, df):
     actual = df["V36_DECISION_BASE"].reset_index(drop=True)
     expected = pd.Series(reference, index=actual.index, dtype=object)
 
-    if not actual.equals(expected):
-        mismatch = pd.DataFrame({
-            "actual": actual,
-            "expected": expected,
-        })
-        mismatch = mismatch[mismatch["actual"] != mismatch["expected"]]
+    # Series.equals() is stricter than value equality: it also checks
+    # dtype and Series metadata such as the name.  The guard is intended
+    # to verify the decision LABELS themselves.  Compare aligned values
+    # after resetting the index, while retaining an explicit mismatch
+    # report for genuine label differences.
+    mismatch = pd.DataFrame({
+        "actual": actual.astype(object),
+        "expected": expected.astype(object),
+    })
+    mismatch = mismatch[mismatch["actual"] != mismatch["expected"]]
+    if not mismatch.empty:
         raise RuntimeError(
             "V3.6 BASE DECISION REPRODUCTION GUARD FAILED. "
             f"Mismatches: {len(mismatch)}"
