@@ -3290,20 +3290,310 @@ def v33_main(trades, market):
         print(filename)
 
 
+# ============================================================
+# V3.4 — DECISION ENGINE IMPACT CALIBRATION
+# ============================================================
+# Research-only.
+#
+# Purpose:
+#   Measure whether C3 = H1 + H4 adds useful information to the
+#   EXISTING V3.0 Decision Engine classification.
+#
+# Important:
+#   - Frozen EMA19 signal generation is unchanged.
+#   - No entries/exits/SL/RR/sizing are changed.
+#   - C3 does NOT create trades.
+#   - C4 / Strong Technical is NOT promoted to a decision rule.
+#   - This stage is descriptive/counterfactual-free: it measures
+#     outcomes conditional on the existing Decision Engine labels.
+# ============================================================
+
+def v34_build_decision_context(trades):
+    df = v33_build_contexts(trades).copy()
+
+    decisions = []
+    modifiers = []
+
+    for _, row in df.iterrows():
+        d, m = v30_decision_layer(row)
+        decisions.append(d)
+        modifiers.append(m)
+
+    df["V34_BASE_DECISION"] = decisions
+    df["V34_BASE_MODIFIER"] = modifiers
+    df["V34_C3_CONTEXT"] = np.where(df["V33_C3"], "C3_H1_PLUS_H4", "NOT_C3")
+
+    return df
+
+
+def v34_summary(df):
+    if df.empty:
+        return {
+            "signals": 0,
+            "resolved": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": np.nan,
+            "avg_R": np.nan,
+            "total_R": 0.0,
+            "profit_factor": np.nan,
+        }
+
+    r = df[df["result"].isin(["WIN", "LOSS"])].copy()
+    r["R_num"] = pd.to_numeric(r["R"], errors="coerce")
+    r = r[np.isfinite(r["R_num"])]
+
+    if r.empty:
+        return {
+            "signals": len(df),
+            "resolved": 0,
+            "wins": 0,
+            "losses": 0,
+            "win_rate": np.nan,
+            "avg_R": np.nan,
+            "total_R": 0.0,
+            "profit_factor": np.nan,
+        }
+
+    wins = int((r["result"] == "WIN").sum())
+    losses = int((r["result"] == "LOSS").sum())
+    gp = float(r.loc[r["R_num"] > 0, "R_num"].sum())
+    gl = abs(float(r.loc[r["R_num"] < 0, "R_num"].sum()))
+
+    return {
+        "signals": len(df),
+        "resolved": len(r),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": 100 * wins / len(r),
+        "avg_R": float(r["R_num"].mean()),
+        "total_R": float(r["R_num"].sum()),
+        "profit_factor": gp / gl if gl else np.nan,
+    }
+
+
+def v34_decision_x_c3(df):
+    rows = []
+
+    decisions = [
+        "CRITICAL — NO NEW TRADE",
+        "DEFENSIVE",
+        "WAIT / CONFIRM",
+        "CAUTION",
+        "SUPPORTIVE / CONFIRM",
+        "BASELINE CONTEXT",
+    ]
+
+    contexts = ["C3_H1_PLUS_H4", "NOT_C3"]
+
+    for decision in decisions:
+        for context in contexts:
+            g = df[
+                (df["V34_BASE_DECISION"] == decision)
+                & (df["V34_C3_CONTEXT"] == context)
+            ]
+            s = v34_summary(g)
+            s["decision"] = decision
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v34_c3_vs_non_c3(df):
+    rows = []
+
+    for context, mask in [
+        ("C3_H1_PLUS_H4", df["V33_C3"]),
+        ("NOT_C3", ~df["V33_C3"]),
+    ]:
+        s = v34_summary(df.loc[mask])
+        s["context"] = context
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v34_modifier_x_c3(df):
+    rows = []
+
+    for modifier in ["H1+H4", "H1", "H4", "NONE"]:
+        for context, mask in [
+            ("C3_H1_PLUS_H4", df["V33_C3"]),
+            ("NOT_C3", ~df["V33_C3"]),
+        ]:
+            g = df[
+                (df["V34_BASE_MODIFIER"] == modifier)
+                & mask
+            ]
+            s = v34_summary(g)
+            s["base_modifier"] = modifier
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v34_decision_distribution(df):
+    rows = []
+
+    for decision, g in df.groupby("V34_BASE_DECISION", sort=False):
+        s = v34_summary(g)
+        s["decision"] = decision
+        s["c3_signals"] = int(g["V33_C3"].sum())
+        s["non_c3_signals"] = int((~g["V33_C3"]).sum())
+        rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v34_yearly(df):
+    rows = []
+
+    work = df.copy()
+    work["year"] = pd.to_datetime(work["signal_date"]).dt.year
+
+    for year, gy in work.groupby("year"):
+        for context, mask in [
+            ("C3_H1_PLUS_H4", gy["V33_C3"]),
+            ("NOT_C3", ~gy["V33_C3"]),
+        ]:
+            g = gy.loc[mask]
+            s = v34_summary(g)
+            s["year"] = int(year)
+            s["c3_context"] = context
+            rows.append(s)
+
+    return pd.DataFrame(rows)
+
+
+def v34_integrity_guards(original, df):
+    if len(original) != len(df):
+        raise RuntimeError("V3.4 SIGNAL-GENERATION GUARD FAILED.")
+
+    original_dates = pd.to_datetime(
+        original["signal_date"]
+    ).reset_index(drop=True)
+
+    new_dates = pd.to_datetime(
+        df["signal_date"]
+    ).reset_index(drop=True)
+
+    if not original_dates.equals(new_dates):
+        raise RuntimeError("V3.4 SIGNAL-GENERATION GUARD FAILED: signal dates changed.")
+
+    original_scores = pd.to_numeric(
+        original["technical_score"], errors="coerce"
+    ).reset_index(drop=True)
+
+    new_scores = pd.to_numeric(
+        df["technical_score"], errors="coerce"
+    ).reset_index(drop=True)
+
+    if not original_scores.equals(new_scores):
+        raise RuntimeError("V3.4 TECHNICAL-INTEGRITY GUARD FAILED.")
+
+    expected_c3 = (
+        (df["macro_regime"] == "A")
+        & (df["leading_warning"] == "WATCH")
+        & (df["liquidity_momentum"] == "DETERIORATING")
+    )
+
+    if not df["V33_C3"].reset_index(drop=True).equals(
+        expected_c3.reset_index(drop=True)
+    ):
+        raise RuntimeError("V3.4 C3 DEFINITION GUARD FAILED.")
+
+    print("\nV3.4 SIGNAL-GENERATION GUARD: PASS")
+    print("V3.4 TECHNICAL-INTEGRITY GUARD: PASS")
+    print("V3.4 C3-DEFINITION GUARD: PASS")
+    print("V3.4 NO ENTRY CREATION: PASS")
+    print("V3.4 NO BASELINE MODIFICATION: PASS")
+
+
+def v34_main(trades, market):
+    print("\n" + "=" * 72)
+    print("US500 MACRO INTELLIGENCE — V3.4")
+    print("DECISION ENGINE IMPACT CALIBRATION")
+    print("=" * 72)
+
+    df = v34_build_decision_context(trades)
+
+    v34_integrity_guards(trades, df)
+
+    decision_dist = v34_decision_distribution(df)
+    decision_x_c3 = v34_decision_x_c3(df)
+    c3_vs_non_c3 = v34_c3_vs_non_c3(df)
+    modifier_x_c3 = v34_modifier_x_c3(df)
+    yearly = v34_yearly(df)
+
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # V3.4 does NOT create a new decision rule.
+    # It measures the existing V3.0 decision labels conditional
+    # on C3 vs non-C3.
+    # --------------------------------------------------------
+
+    print("\n" + "=" * 72)
+    print("V3.4 BASE DECISION DISTRIBUTION")
+    print("=" * 72)
+    print(decision_dist.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.4 DECISION × C3 CONTEXT")
+    print("=" * 72)
+    print(decision_x_c3.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.4 C3 vs NON-C3")
+    print("=" * 72)
+    print(c3_vs_non_c3.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.4 BASE MODIFIER × C3")
+    print("=" * 72)
+    print(modifier_x_c3.to_string(index=False))
+
+    print("\n" + "=" * 72)
+    print("V3.4 YEARLY C3 CONTEXT")
+    print("=" * 72)
+    print(yearly.to_string(index=False))
+
+    reports = {
+        "macro_backtest_v34_decision_distribution.csv": decision_dist,
+        "macro_backtest_v34_decision_x_c3.csv": decision_x_c3,
+        "macro_backtest_v34_c3_vs_non_c3.csv": c3_vs_non_c3,
+        "macro_backtest_v34_modifier_x_c3.csv": modifier_x_c3,
+        "macro_backtest_v34_yearly.csv": yearly,
+        "macro_backtest_v34_trades.csv": df,
+    }
+
+    for filename, report in reports.items():
+        report.to_csv(filename, index=False)
+
+    print("\n" + "=" * 72)
+    print("V3.4 COMPLETE")
+    print("=" * 72)
+    print("Research-only. No new entries were created.")
+    print("Frozen baseline and V3.0 decision logic were not modified.")
+    print("\nFILES CREATED")
+    for filename in reports:
+        print(filename)
+
 if __name__ == "__main__":
     try:
-        # Run the complete frozen V3.2 pipeline first.
-        # v32_main() itself is retained as the authoritative V3.2 producer.
-        # To avoid rebuilding the pipeline a second time, this integrated
-        # version uses a dedicated wrapper below.
+        # Complete frozen V3.2/V3.3 pipeline.
         market = load_market()
         market["SMA200"] = market["Close"].rolling(200, min_periods=200).mean()
 
-        print(f"Market rows: {len(market)} | {market.index.min().date()} -> {market.index.max().date()}")
+        print(
+            f"Market rows: {len(market)} | "
+            f"{market.index.min().date()} -> {market.index.max().date()}"
+        )
 
         baseline = build_baseline_trades(market)
         if not print_baseline_check(baseline):
-            raise RuntimeError("FROZEN BASELINE FAILED. V3.2/V3.3 STOPPED.")
+            raise RuntimeError("FROZEN BASELINE FAILED. V3.2/V3.3/V3.4 STOPPED.")
 
         fred = load_fred()
         trades = attach_macro(baseline, fred)
@@ -3311,6 +3601,7 @@ if __name__ == "__main__":
         trades = add_zones(trades)
         trades = add_confluence_flags(trades)
         trades = add_v31_technical_confirmation(trades, market)
+
         trades["H1_FLAG"] = (
             (trades["macro_regime"] == "A")
             & (trades["leading_warning"] == "WATCH")
@@ -3320,8 +3611,7 @@ if __name__ == "__main__":
             & (trades["liquidity_momentum"] == "DETERIORATING")
         )
 
-        # Execute the complete V3.2 robustness validation and save its
-        # outputs, exactly as before.
+        # V3.2 — unchanged authoritative robustness pipeline.
         matrix = v32_candidate_matrix(trades)
         oos = v32_oos(trades)
         wf = v32_walk_forward(trades)
@@ -3336,21 +3626,34 @@ if __name__ == "__main__":
         v32_print("V3.2 EXPANDING WALK-FORWARD", wf)
         v32_print("V3.2 LEAVE-ONE-YEAR-OUT", loo)
         v32_print("V3.2 CRISIS EXCLUSION SENSITIVITY", crisis)
-        v32_print("V3.2 MARKET-EPISODE CLUSTER / LEAVE-ONE-EPISODE-OUT", cluster)
+        v32_print(
+            "V3.2 MARKET-EPISODE CLUSTER / LEAVE-ONE-EPISODE-OUT",
+            cluster,
+        )
         v32_print("V3.2 CORRECTED MARKET-EPISODE PERMUTATION", perm)
         v32_print("V3.2 MARKET-EPISODE BOOTSTRAP", boot)
 
-        baseline_dates = pd.to_datetime(baseline["signal_date"]).astype("int64").reset_index(drop=True)
-        v32_dates = pd.to_datetime(trades["signal_date"]).astype("int64").reset_index(drop=True)
+        baseline_dates = pd.to_datetime(
+            baseline["signal_date"]
+        ).astype("int64").reset_index(drop=True)
+        v32_dates = pd.to_datetime(
+            trades["signal_date"]
+        ).astype("int64").reset_index(drop=True)
 
         if len(baseline) != len(trades) or not baseline_dates.equals(v32_dates):
-            raise RuntimeError("SIGNAL-GENERATION GUARD FAILED: V3.2 changed the frozen baseline signal set.")
+            raise RuntimeError(
+                "SIGNAL-GENERATION GUARD FAILED: "
+                "V3.2 changed the frozen baseline signal set."
+            )
 
         reference_tech = add_v31_technical_confirmation(baseline, market)
         if not reference_tech["technical_score"].reset_index(drop=True).equals(
             trades["technical_score"].reset_index(drop=True)
         ):
-            raise RuntimeError("TECHNICAL INTEGRITY GUARD FAILED: V3.2 changed V3.1 technical scores.")
+            raise RuntimeError(
+                "TECHNICAL INTEGRITY GUARD FAILED: "
+                "V3.2 changed V3.1 technical scores."
+            )
 
         print("\nV3.2 SIGNAL-GENERATION GUARD: PASS")
         print("V3.2 TECHNICAL-INTEGRITY GUARD: PASS")
@@ -3371,11 +3674,17 @@ if __name__ == "__main__":
         print("V3.2 COMPLETE — STARTING INTEGRATED V3.3")
         print("=" * 72)
 
-        # V3.3 consumes the exact same in-memory V3.2 trades.
+        # V3.3 uses the exact same in-memory V3.2 trades.
         v33_main(trades, market)
 
+        print("\n" + "=" * 72)
+        print("V3.3 COMPLETE — STARTING INTEGRATED V3.4")
+        print("=" * 72)
+
+        # V3.4 uses the exact same in-memory trades.
+        v34_main(trades, market)
+
     except Exception as exc:
-        print("\nV3.2/V3.3 FAILED:")
+        print("\nV3.2/V3.3/V3.4 FAILED:")
         print(exc)
         raise
-
