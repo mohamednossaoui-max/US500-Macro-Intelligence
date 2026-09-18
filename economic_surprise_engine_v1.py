@@ -18,15 +18,14 @@ Outputs:
     economic_surprise_summary_v1.csv
 """
 
-from pathlib import Path
-import os
 from __future__ import annotations
+
 
 import numpy as np
 import pandas as pd
 
 
-INPUT_FILE = os.getenv("ECONOMIC_HISTORICAL_INPUT", "economic_historical_events_v1.csv")
+INPUT_FILE = "economic_historical_events_v1.csv"
 OUTPUT_EVENTS = "economic_surprise_engine_v1.csv"
 OUTPUT_SUMMARY = "economic_surprise_summary_v1.csv"
 
@@ -67,19 +66,7 @@ def main():
     print("ECONOMIC INTELLIGENCE — ECONOMIC SURPRISE ENGINE v1.0")
     print("=" * 72)
 
-    input_path = Path(INPUT_FILE)
-    if not input_path.is_absolute() and not input_path.exists():
-        script_relative = Path(__file__).resolve().parent / input_path
-        if script_relative.exists():
-            input_path = script_relative
-
-    if not input_path.exists():
-        raise FileNotFoundError(
-            f"Historical economic input not found: {input_path}. "
-            "Expected economic_historical_events_v1.csv in the repository."
-        )
-
-    df = pd.read_csv(input_path)
+    df = pd.read_csv(INPUT_FILE)
 
     required = [
         "indicator", "agency", "release_date", "release_time",
