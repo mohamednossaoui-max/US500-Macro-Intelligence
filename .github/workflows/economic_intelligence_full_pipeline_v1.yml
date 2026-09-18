@@ -17,138 +17,134 @@ jobs:
 
     steps:
 
-      # ============================================================
-      # 1. Checkout repository
-      # ============================================================
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # ============================================================
-      # 2. Setup Python
-      # ============================================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ============================================================
-      # 3. Install dependencies
-      # ============================================================
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy
 
-      # ============================================================
-      # 4. Historical Economic Data Collector
-      # ============================================================
-
       - name: Run Economic Historical Collector
         run: |
           python "./economic_historical_collector_v1_4.py"
-
-      # ============================================================
-      # 5. Validate Historical Collector outputs
-      # ============================================================
 
       - name: Validate Historical Data
         run: |
           test -f economic_historical_events_v1.csv
           test -f economic_historical_quality_v1.csv
 
-          echo "Historical data files found."
-
           python - <<'PY'
           import pandas as pd
 
-          events = pd.read_csv("economic_historical_events_v1.csv")
-          quality = pd.read_csv("economic_historical_quality_v1.csv")
+          events = pd.read_csv(
+              "economic_historical_events_v1.csv"
+          )
 
-          print("Historical events:", len(events))
-          print("Quality rows:", len(quality))
+          print(
+              "Historical events:",
+              len(events)
+          )
 
           if len(events) == 0:
-              raise SystemExit("ERROR: Historical events file is empty.")
+              raise SystemExit(
+                  "ERROR: Historical events file is empty."
+              )
 
-          if "pit_safe" in events.columns:
-              safe = events["pit_safe"].astype(str).str.upper().isin(
+          safe = (
+              events["pit_safe"]
+              .astype(str)
+              .str.upper()
+              .isin(
                   ["TRUE", "1", "YES"]
-              ).sum()
+              )
+              .sum()
+          )
 
-              print(f"PIT safe: {safe}/{len(events)}")
+          print(
+              f"PIT safe: {safe}/{len(events)}"
+          )
 
-              if safe != len(events):
-                  raise SystemExit(
-                      "ERROR: Historical data contains PIT-unsafe records."
-                  )
+          if safe != len(events):
+              raise SystemExit(
+                  "ERROR: Historical data "
+                  "contains PIT-unsafe records."
+              )
 
-          print("Historical data validation: PASS")
+          print(
+              "Historical data validation: PASS"
+          )
           PY
-
-      # ============================================================
-      # 6. Economic Surprise Engine
-      # ============================================================
 
       - name: Run Economic Surprise Engine
         run: |
           python "./economic_surprise_engine_v1.py"
-
-      # ============================================================
-      # 7. Validate Surprise Engine outputs
-      # ============================================================
 
       - name: Validate Surprise Engine
         run: |
           test -f economic_surprise_engine_v1.csv
           test -f economic_surprise_summary_v1.csv
 
-          echo "Surprise Engine files found."
-
           python - <<'PY'
           import pandas as pd
 
-          df = pd.read_csv("economic_surprise_engine_v1.csv")
+          df = pd.read_csv(
+              "economic_surprise_engine_v1.csv"
+          )
 
-          print("Surprise Engine rows:", len(df))
+          print(
+              "Surprise Engine rows:",
+              len(df)
+          )
 
           if len(df) == 0:
               raise SystemExit(
-                  "ERROR: Economic Surprise Engine output is empty."
+                  "ERROR: Economic Surprise Engine "
+                  "output is empty."
               )
 
-          if "pit_safe" in df.columns:
-              safe = df["pit_safe"].astype(str).str.upper().isin(
+          safe = (
+              df["pit_safe"]
+              .astype(str)
+              .str.upper()
+              .isin(
                   ["TRUE", "1", "YES"]
-              ).sum()
+              )
+              .sum()
+          )
 
-              print(f"PIT safe: {safe}/{len(df)}")
+          print(
+              f"PIT safe: {safe}/{len(df)}"
+          )
 
-              if safe != len(df):
-                  raise SystemExit(
-                      "ERROR: Surprise Engine contains PIT-unsafe records."
-                  )
+          if safe != len(df):
+              raise SystemExit(
+                  "ERROR: Surprise Engine contains "
+                  "PIT-unsafe records."
+              )
 
-          print("Surprise Engine validation: PASS")
+          if "directional_shock_z" not in df.columns:
+              raise SystemExit(
+                  "ERROR: Missing directional_shock_z."
+              )
+
+          print(
+              "Surprise Engine validation: PASS"
+          )
           PY
-
-      # ============================================================
-      # 8. Economic Regime Classifier
-      # ============================================================
 
       - name: Run Economic Regime Classifier
         run: |
           python "./economic_regime_classifier_v1.py"
 
-      # ============================================================
-      # 9. Validate Regime Classifier outputs
-      # ============================================================
-
       - name: Validate Economic Regime
         run: |
-          test -f economic_regime_classification_v1.csv
+          test -f economic_regime_events_v1.csv
           test -f economic_regime_summary_v1.csv
 
           echo "Regime Classifier files found."
@@ -156,26 +152,69 @@ jobs:
           python - <<'PY'
           import pandas as pd
 
-          df = pd.read_csv("economic_regime_classification_v1.csv")
+          df = pd.read_csv(
+              "economic_regime_events_v1.csv"
+          )
 
-          print("Regime observations:", len(df))
+          print(
+              "Regime observations:",
+              len(df)
+          )
 
           if len(df) == 0:
               raise SystemExit(
-                  "ERROR: Economic Regime Classifier output is empty."
+                  "ERROR: Economic Regime output "
+                  "is empty."
               )
 
-          print("\nRegime distribution:")
+          required = {
+              "release_date",
+              "inflation_score",
+              "labor_score",
+              "growth_score",
+              "economic_regime",
+              "pit_safe",
+          }
 
-          if "regime" in df.columns:
-              print(df["regime"].value_counts(dropna=False))
+          missing = required - set(df.columns)
 
-          print("\nEconomic Regime validation: PASS")
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing regime columns: "
+                  f"{sorted(missing)}"
+              )
+
+          safe = (
+              df["pit_safe"]
+              .astype(str)
+              .str.upper()
+              .isin(
+                  ["TRUE", "1", "YES"]
+              )
+              .all()
+          )
+
+          if not safe:
+              raise SystemExit(
+                  "ERROR: Regime output contains "
+                  "PIT-unsafe rows."
+              )
+
+          print()
+          print("Regime distribution:")
+
+          print(
+              df["economic_regime"]
+              .value_counts(
+                  dropna=False
+              )
+          )
+
+          print()
+          print(
+              "Economic Regime validation: PASS"
+          )
           PY
-
-      # ============================================================
-      # 10. Upload all Economic Intelligence outputs
-      # ============================================================
 
       - name: Upload Economic Intelligence Artifacts
         uses: actions/upload-artifact@v4
@@ -186,13 +225,9 @@ jobs:
             economic_historical_quality_v1.csv
             economic_surprise_engine_v1.csv
             economic_surprise_summary_v1.csv
-            economic_regime_classification_v1.csv
+            economic_regime_events_v1.csv
             economic_regime_summary_v1.csv
           if-no-files-found: error
-
-      # ============================================================
-      # 11. Final status
-      # ============================================================
 
       - name: Economic Intelligence Pipeline Complete
         run: |
@@ -201,8 +236,8 @@ jobs:
           echo "ECONOMIC INTELLIGENCE PIPELINE v1"
           echo "============================================================"
           echo ""
-          echo "Historical Collector:      PASS"
-          echo "Economic Surprise Engine:  PASS"
+          echo "Historical Collector:       PASS"
+          echo "Economic Surprise Engine:   PASS"
           echo "Economic Regime Classifier: PASS"
           echo "Artifacts:                  UPLOADED"
           echo ""
