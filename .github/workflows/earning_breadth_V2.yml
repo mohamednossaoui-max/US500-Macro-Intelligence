@@ -1,0 +1,52 @@
+name: Test Earnings Breadth V2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  earnings-breadth:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas
+
+      - name: Verify earnings breadth file
+        run: |
+          test -f earnings_breadth_v2.py
+          python -m py_compile earnings_breadth_v2.py
+
+      - name: Run Earnings Breadth V2
+        env:
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_REQUEST_DELAY: "1.5"
+        run: |
+          python earnings_breadth_v2.py
+
+      - name: Show generated files
+        run: |
+          echo "Generated files:"
+          ls -lh earnings_breadth_events_v2.csv || true
+          ls -lh earnings_latest_company_v2.csv || true
+          ls -lh earnings_breadth_summary_v2.csv || true
+          ls -lh earnings_sector_breadth_v2.csv || true
+
+      - name: Upload earnings breadth results
+        uses: actions/upload-artifact@v4
+        with:
+          name: earnings-breadth-v2-results
+          path: |
+            earnings_breadth_events_v2.csv
+            earnings_latest_company_v2.csv
+            earnings_breadth_summary_v2.csv
+            earnings_sector_breadth_v2.csv
