@@ -1,72 +1,80 @@
+"""
+Corporate Earnings Intelligence V2
+===================================
+
+Research-only corporate earnings intelligence.
+
+Purpose
+-------
+Collect historical and recent EPS earnings-event data from
+Alpha Vantage and build a point-in-time-safe earnings dataset.
+
+V2 principles
+-------------
+- Uses Alpha Vantage EARNINGS endpoint.
+- Does NOT use EARNINGS_ESTIMATES revisions.
+- Preserves event-time EPS actual / consensus / surprise.
+- Conservative classification.
+- Revenue data is intentionally UNKNOWN because the EARNINGS
+  endpoint does not provide reliable event-time revenue
+  actual/consensus fields for this module.
+- Historical analog eligibility is explicitly tracked.
+- No trading signal.
+- No Decision Engine integration.
+
+Rate-limit protection
+---------------------
+Alpha Vantage free API keys have request-rate limitations.
+
+This version therefore:
+- waits between requests
+- detects rate-limit responses
+- retries automatically
+- uses progressively longer waits
+- continues safely if a company ultimately fails
+"""
+
 import os
 import time
-import json
-import requests
+import warnings
+
+import numpy as np
 import pandas as pd
+import requests
 
 
 # ============================================================
-# US500 MACRO INTELLIGENCE
-# CORPORATE EARNINGS INTELLIGENCE V2
-# S&P 500 EARNINGS BREADTH
-# ============================================================
-#
-# Conservative research-only implementation.
-#
-# IMPORTANT:
-# - No trade execution
-# - No Decision Engine integration
-# - No Technical Engine modification
-# - No historical market forecast
-# - No look-ahead assumption
-#
-# V2 objective:
-#   Build a cross-company earnings breadth dataset.
-#
-# Alpha Vantage:
-#   EARNINGS is used for event-time EPS results.
-#
-# We intentionally do NOT treat EARNINGS_ESTIMATES
-# revisions as historical Point-in-Time data.
-#
+# CONFIGURATION
 # ============================================================
 
+API_URL = "https://www.alphavantage.co/query"
 
-BASE_URL = "https://www.alphavantage.co/query"
+API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
 
-API_KEY = os.getenv(
-    "ALPHAVANTAGE_API_KEY",
-    ""
-).strip()
+# ------------------------------------------------------------
+# Rate-limit protection
+# ------------------------------------------------------------
 
-REQUEST_DELAY = float(
-    os.getenv(
-        "ALPHAVANTAGE_REQUEST_DELAY",
-        "1.5"
-    )
-)
+# Normal delay between successful company requests.
+REQUEST_DELAY_SECONDS = 12.0
 
-REQUEST_TIMEOUT = int(
-    os.getenv(
-        "ALPHAVANTAGE_TIMEOUT",
-        "30"
-    )
-)
+# Delay before the first retry after a rate-limit response.
+RATE_LIMIT_RETRY_DELAY_SECONDS = 20.0
 
+# Maximum number of retries after rate-limit / temporary errors.
+MAX_RETRIES = 4
 
-# ============================================================
-# V2 TEST UNIVERSE
-# ============================================================
-#
-# This is NOT the complete S&P 500.
-#
-# It is a validation universe covering multiple sectors.
-#
-# Once the pipeline is validated, we can expand the universe.
-#
-# ============================================================
+# HTTP timeout.
+REQUEST_TIMEOUT_SECONDS = 30
 
-UNIVERSE = [
+# Alpha Vantage may occasionally return transient errors.
+TRANSIENT_RETRY_DELAY_SECONDS = 10.0
+
+# ------------------------------------------------------------
+# Test universe
+# ------------------------------------------------------------
+
+COMPANIES = [
     {
         "ticker": "MSFT",
         "sector": "Information Technology",
@@ -109,49 +117,137 @@ UNIVERSE = [
     },
 ]
 
+# ------------------------------------------------------------
+# EPS classification thresholds
+# ------------------------------------------------------------
+
+LARGE_BEAT_THRESHOLD = 10.0
+BEAT_THRESHOLD = 3.0
+IN_LINE_LOWER_THRESHOLD = -3.0
+MISS_THRESHOLD = -10.0
+
+# ------------------------------------------------------------
+# User-Agent
+# ------------------------------------------------------------
+
+USER_AGENT = (
+    "US500-Macro-Intelligence/2.0 "
+    "(Corporate-Earnings-Intelligence)"
+)
+
+# ------------------------------------------------------------
+# Output files
+# ------------------------------------------------------------
+
+EVENTS_OUTPUT = (
+    "earnings_breadth_events_v2.csv"
+)
+
+LATEST_COMPANY_OUTPUT = (
+    "earnings_latest_company_v2.csv"
+)
+
+BREADTH_SUMMARY_OUTPUT = (
+    "earnings_breadth_summary_v2.csv"
+)
+
+SECTOR_BREADTH_OUTPUT = (
+    "earnings_sector_breadth_v2.csv"
+)
+
+
+# ============================================================
+# API VALIDATION
+# ============================================================
+
+def validate_api_key():
+    """
+    Validate that the Alpha Vantage API key exists.
+    """
+
+    if not API_KEY:
+        raise RuntimeError(
+            "ALPHAVANTAGE_API_KEY environment variable "
+            "is not set."
+        )
+
+    print("Alpha Vantage API key detected.")
+
 
 # ============================================================
 # HELPERS
 # ============================================================
 
-def to_float(value):
+def safe_float(value):
+    """
+    Convert value to float safely.
+    """
+
+    if value is None:
+        return np.nan
+
+    try:
+        if pd.isna(value):
+            return np.nan
+    except Exception:
+        pass
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return np.nan
+
+
+def normalize_date(value):
+    """
+    Normalize a date string to YYYY-MM-DD.
+
+    Returns None if invalid.
+    """
+
     if value is None:
         return None
 
     try:
+        parsed = pd.to_datetime(
+            value,
+            errors="coerce"
+        )
 
-        if isinstance(value, str):
-            value = value.strip()
-
-        if value == "":
+        if pd.isna(parsed):
             return None
 
-        return float(value)
+        return parsed.strftime("%Y-%m-%d")
 
-    except (TypeError, ValueError):
-
+    except Exception:
         return None
 
 
-def calculate_surprise_pct(
+def calculate_surprise_percentage(
     actual,
-    estimate
+    consensus
 ):
-    actual = to_float(actual)
-    estimate = to_float(estimate)
+    """
+    Calculate EPS surprise percentage.
 
-    if actual is None:
-        return None
+    Formula:
 
-    if estimate is None:
-        return None
+        (actual - consensus)
+        / abs(consensus) * 100
+    """
 
-    if estimate == 0:
-        return None
+    actual = safe_float(actual)
+    consensus = safe_float(consensus)
+
+    if pd.isna(actual) or pd.isna(consensus):
+        return np.nan
+
+    if consensus == 0:
+        return np.nan
 
     return (
-        (actual - estimate)
-        / abs(estimate)
+        (actual - consensus)
+        / abs(consensus)
         * 100.0
     )
 
@@ -159,149 +255,460 @@ def calculate_surprise_pct(
 def classify_eps_result(
     surprise_pct
 ):
+    """
+    Classify EPS earnings surprise.
 
-    if surprise_pct is None:
+    Thresholds:
+
+        >= +10%   LARGE_BEAT
+        >= +3%    BEAT
+        >  -3%    IN_LINE
+        > -10%    MISS
+        <= -10%   LARGE_MISS
+    """
+
+    surprise_pct = safe_float(
+        surprise_pct
+    )
+
+    if pd.isna(surprise_pct):
         return "UNKNOWN"
 
-    if surprise_pct >= 10:
+    if surprise_pct >= LARGE_BEAT_THRESHOLD:
         return "LARGE_BEAT"
 
-    if surprise_pct >= 3:
+    if surprise_pct >= BEAT_THRESHOLD:
         return "BEAT"
 
-    if surprise_pct > -3:
+    if surprise_pct > IN_LINE_LOWER_THRESHOLD:
         return "IN_LINE"
 
-    if surprise_pct > -10:
+    if surprise_pct > MISS_THRESHOLD:
         return "MISS"
 
     return "LARGE_MISS"
 
 
+def is_rate_limit_response(data):
+    """
+    Detect Alpha Vantage rate-limit responses.
+    """
+
+    if not isinstance(data, dict):
+        return False
+
+    text_parts = []
+
+    for key in [
+        "Note",
+        "Information",
+        "Error Message",
+    ]:
+        value = data.get(key)
+
+        if value:
+            text_parts.append(
+                str(value).lower()
+            )
+
+    combined = " ".join(text_parts)
+
+    rate_limit_keywords = [
+        "rate limit",
+        "api call frequency",
+        "requests per second",
+        "requests per day",
+        "spreading out",
+        "premium plans",
+        "25 requests per day",
+        "1 request per second",
+    ]
+
+    return any(
+        keyword in combined
+        for keyword in rate_limit_keywords
+    )
+
+
+def extract_api_message(data):
+    """
+    Extract a useful Alpha Vantage API message.
+    """
+
+    if not isinstance(data, dict):
+        return None
+
+    for key in [
+        "Note",
+        "Information",
+        "Error Message",
+    ]:
+        value = data.get(key)
+
+        if value:
+            return str(value)
+
+    return None
+
+
 # ============================================================
-# API
+# RATE-LIMIT SAFE API REQUEST
 # ============================================================
 
-def request_api(
-    function,
+def request_earnings(
     ticker
 ):
+    """
+    Request Alpha Vantage EARNINGS data with retry logic.
 
-    if not API_KEY:
-
-        raise RuntimeError(
-            "ALPHAVANTAGE_API_KEY is not available."
-        )
+    Returns:
+        dict on success
+        None on final failure
+    """
 
     params = {
-        "function": function,
+        "function": "EARNINGS",
         "symbol": ticker,
         "apikey": API_KEY,
     }
 
-    response = requests.get(
-        BASE_URL,
-        params=params,
-        timeout=REQUEST_TIMEOUT,
-    )
+    headers = {
+        "User-Agent": USER_AGENT
+    }
 
-    response.raise_for_status()
+    for attempt in range(
+        MAX_RETRIES + 1
+    ):
 
-    data = response.json()
+        attempt_number = attempt + 1
 
-    if "Error Message" in data:
+        try:
 
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Error Message']}"
-        )
+            print(
+                f"Requesting EARNINGS / {ticker} "
+                f"(attempt {attempt_number}/"
+                f"{MAX_RETRIES + 1})"
+            )
 
-    if "Note" in data:
+            response = requests.get(
+                API_URL,
+                params=params,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
 
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Note']}"
-        )
+            response.raise_for_status()
 
-    if "Information" in data:
+            data = response.json()
 
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Information']}"
-        )
+            # ------------------------------------------------
+            # Rate limit detected
+            # ------------------------------------------------
 
-    return data
+            if is_rate_limit_response(data):
+
+                message = extract_api_message(
+                    data
+                )
+
+                print(
+                    f"RATE LIMIT for {ticker}: "
+                    f"{message}"
+                )
+
+                if attempt < MAX_RETRIES:
+
+                    # Progressive retry delay:
+                    #
+                    # retry 1 -> 20 sec
+                    # retry 2 -> 40 sec
+                    # retry 3 -> 60 sec
+                    # retry 4 -> 80 sec
+                    #
+                    # This is deliberately conservative.
+
+                    retry_delay = (
+                        RATE_LIMIT_RETRY_DELAY_SECONDS
+                        * (attempt + 1)
+                    )
+
+                    print(
+                        f"Rate-limit retry wait: "
+                        f"{retry_delay:.1f} seconds..."
+                    )
+
+                    time.sleep(
+                        retry_delay
+                    )
+
+                    continue
+
+                print(
+                    f"Maximum retries reached "
+                    f"for {ticker}."
+                )
+
+                return None
+
+            # ------------------------------------------------
+            # Other Alpha Vantage error
+            # ------------------------------------------------
+
+            api_message = extract_api_message(
+                data
+            )
+
+            if api_message:
+
+                print(
+                    f"Alpha Vantage message "
+                    f"for {ticker}: "
+                    f"{api_message}"
+                )
+
+                # If no earnings data exists but the response
+                # is not a rate limit, return safely.
+                return data
+
+            # ------------------------------------------------
+            # Validate response
+            # ------------------------------------------------
+
+            if (
+                "quarterlyEarnings"
+                not in data
+            ):
+
+                print(
+                    f"WARNING: No "
+                    f"quarterlyEarnings field "
+                    f"for {ticker}."
+                )
+
+                return data
+
+            return data
+
+        except requests.exceptions.Timeout:
+
+            print(
+                f"TIMEOUT for {ticker}"
+            )
+
+            if attempt < MAX_RETRIES:
+
+                retry_delay = (
+                    TRANSIENT_RETRY_DELAY_SECONDS
+                    * (attempt + 1)
+                )
+
+                print(
+                    f"Retrying in "
+                    f"{retry_delay:.1f} seconds..."
+                )
+
+                time.sleep(
+                    retry_delay
+                )
+
+                continue
+
+            print(
+                f"Maximum timeout retries "
+                f"reached for {ticker}."
+            )
+
+            return None
+
+        except requests.exceptions.RequestException as exc:
+
+            print(
+                f"REQUEST ERROR for "
+                f"{ticker}: {exc}"
+            )
+
+            if attempt < MAX_RETRIES:
+
+                retry_delay = (
+                    TRANSIENT_RETRY_DELAY_SECONDS
+                    * (attempt + 1)
+                )
+
+                print(
+                    f"Retrying in "
+                    f"{retry_delay:.1f} seconds..."
+                )
+
+                time.sleep(
+                    retry_delay
+                )
+
+                continue
+
+            return None
+
+        except ValueError as exc:
+
+            print(
+                f"JSON ERROR for "
+                f"{ticker}: {exc}"
+            )
+
+            return None
+
+        except Exception as exc:
+
+            print(
+                f"UNEXPECTED ERROR for "
+                f"{ticker}: {exc}"
+            )
+
+            return None
+
+    return None
 
 
 # ============================================================
-# FETCH COMPANY EARNINGS
+# COMPANY EARNINGS FETCH
 # ============================================================
 
 def fetch_company_earnings(
     ticker,
     sector
 ):
+    """
+    Fetch and normalize Alpha Vantage EARNINGS
+    data for one company.
+    """
 
-    print(
-        f"\nRequesting EARNINGS / {ticker}"
-    )
-
-    data = request_api(
-        "EARNINGS",
+    data = request_earnings(
         ticker
     )
+
+    if data is None:
+
+        print(
+            f"FAILED: {ticker} "
+            f"returned no usable response."
+        )
+
+        return []
 
     quarterly = data.get(
         "quarterlyEarnings",
         []
     )
 
-    records = []
+    if not isinstance(
+        quarterly,
+        list
+    ):
+
+        print(
+            f"WARNING: Invalid quarterly "
+            f"earnings structure for {ticker}."
+        )
+
+        return []
+
+    print(
+        f"Records received: {len(quarterly)}"
+    )
+
+    rows = []
 
     for item in quarterly:
 
-        actual = to_float(
-            item.get("reportedEPS")
+        if not isinstance(
+            item,
+            dict
+        ):
+            continue
+
+        fiscal_date_ending = normalize_date(
+            item.get(
+                "fiscalDateEnding"
+            )
         )
 
-        consensus = to_float(
-            item.get("estimatedEPS")
+        reported_date = normalize_date(
+            item.get(
+                "reportedDate"
+            )
         )
 
-        surprise = to_float(
-            item.get("surprise")
+        if reported_date is None:
+            continue
+
+        # ----------------------------------------------------
+        # EPS
+        # ----------------------------------------------------
+
+        actual = safe_float(
+            item.get(
+                "reportedEPS"
+            )
         )
 
-        surprise_pct = to_float(
+        consensus = safe_float(
+            item.get(
+                "estimatedEPS"
+            )
+        )
+
+        provider_surprise = safe_float(
+            item.get(
+                "surprise"
+            )
+        )
+
+        provider_surprise_pct = safe_float(
             item.get(
                 "surprisePercentage"
             )
         )
 
-        calculated_pct = (
-            calculate_surprise_pct(
+        calculated_surprise_pct = (
+            calculate_surprise_percentage(
                 actual,
                 consensus
             )
         )
 
-        # Prefer the provider's event-time
-        # surprise percentage when available.
-        effective_surprise_pct = (
-            surprise_pct
-            if surprise_pct is not None
-            else calculated_pct
-        )
+        # ----------------------------------------------------
+        # Prefer Alpha Vantage's event-time
+        # surprisePercentage when available.
+        #
+        # Otherwise calculate it ourselves.
+        # ----------------------------------------------------
 
-        result_class = (
+        if not pd.isna(
+            provider_surprise_pct
+        ):
+
+            effective_surprise_pct = (
+                provider_surprise_pct
+            )
+
+        else:
+
+            effective_surprise_pct = (
+                calculated_surprise_pct
+            )
+
+        # ----------------------------------------------------
+        # Classification
+        # ----------------------------------------------------
+
+        eps_result_class = (
             classify_eps_result(
                 effective_surprise_pct
             )
         )
 
         if (
-            actual is not None
-            and consensus is not None
+            not pd.isna(actual)
+            and not pd.isna(consensus)
         ):
 
             earnings_beat = (
@@ -310,110 +717,128 @@ def fetch_company_earnings(
 
         else:
 
-            earnings_beat = None
+            earnings_beat = np.nan
 
-        record = {
+        # ----------------------------------------------------
+        # Revenue
+        #
+        # Intentionally UNKNOWN in V2.
+        # Alpha Vantage EARNINGS endpoint does not provide
+        # reliable event-time revenue actual/consensus
+        # fields for this research module.
+        # ----------------------------------------------------
 
-            # ------------------------------------------------
-            # Identity
-            # ------------------------------------------------
+        revenue_actual = np.nan
+        revenue_consensus = np.nan
+        revenue_surprise = np.nan
+        revenue_surprise_pct = np.nan
 
-            "ticker":
-                ticker,
+        revenue_result_class = "UNKNOWN"
 
-            "sector":
-                sector,
+        # ----------------------------------------------------
+        # Point-in-time metadata
+        # ----------------------------------------------------
 
-            "event_type":
-                "CORPORATE_EARNINGS",
+        point_in_time = True
 
-            "fiscal_date_ending":
-                item.get(
-                    "fiscalDateEnding"
-                ),
+        point_in_time_safe = True
 
-            "reported_date":
-                item.get(
-                    "reportedDate"
-                ),
+        historical_analog_eligible = True
 
-            # ------------------------------------------------
-            # EPS
-            # ------------------------------------------------
+        # ----------------------------------------------------
+        # Build row
+        # ----------------------------------------------------
 
-            "eps_actual":
-                actual,
+        rows.append({
+            "ticker": ticker,
+            "sector": sector,
 
-            "eps_consensus":
-                consensus,
+            "fiscal_date_ending": (
+                fiscal_date_ending
+            ),
 
-            "eps_surprise":
-                surprise,
+            "reported_date": (
+                reported_date
+            ),
 
-            "eps_surprise_pct":
-                effective_surprise_pct,
+            "eps_actual": actual,
 
-            "eps_surprise_pct_calculated":
-                calculated_pct,
+            "eps_consensus": consensus,
 
-            # ------------------------------------------------
-            # Classification
-            # ------------------------------------------------
+            "eps_surprise": (
+                provider_surprise
+            ),
 
-            "earnings_beat":
-                earnings_beat,
+            "eps_surprise_pct": (
+                effective_surprise_pct
+            ),
 
-            "eps_result_class":
-                result_class,
+            "calculated_eps_surprise_pct": (
+                calculated_surprise_pct
+            ),
 
-            # ------------------------------------------------
-            # Revenue
-            #
-            # Not populated here because EARNINGS does not
-            # provide event-time revenue actual/consensus.
-            # ------------------------------------------------
+            "eps_result_class": (
+                eps_result_class
+            ),
 
-            "revenue_actual":
-                None,
+            "earnings_beat": (
+                earnings_beat
+            ),
 
-            "revenue_consensus":
-                None,
+            "revenue_actual": (
+                revenue_actual
+            ),
 
-            "revenue_surprise_pct":
-                None,
+            "revenue_consensus": (
+                revenue_consensus
+            ),
 
-            "revenue_result_class":
-                "UNKNOWN",
+            "revenue_surprise": (
+                revenue_surprise
+            ),
 
-            # ------------------------------------------------
-            # Historical safety
-            # ------------------------------------------------
+            "revenue_surprise_pct": (
+                revenue_surprise_pct
+            ),
 
-            "point_in_time":
-                True,
+            "revenue_result_class": (
+                revenue_result_class
+            ),
 
-            "point_in_time_safe":
-                True,
+            "point_in_time": (
+                point_in_time
+            ),
 
-            "historical_analog_eligible":
-                True,
+            "point_in_time_safe": (
+                point_in_time_safe
+            ),
 
-            "source":
-                "Alpha Vantage EARNINGS",
+            "historical_analog_eligible": (
+                historical_analog_eligible
+            ),
 
-            "source_type":
-                "primary_event_data",
+            "source": (
+                "Alpha Vantage EARNINGS"
+            ),
 
-            "data_quality":
-                "PRIMARY_EVENT_DATA",
+            "source_type": (
+                "primary_event_data"
+            ),
 
-        }
+            "data_quality": (
+                "PRIMARY_EVENT_DATA"
+            ),
 
-        records.append(
-            record
-        )
+            "revenue_data_available": False,
 
-    return records
+            "guidance_data_available": False,
+
+            "earnings_estimate_revisions_used": False,
+
+            "research_only": True,
+        })
+
+    return rows
 
 
 # ============================================================
@@ -421,142 +846,187 @@ def fetch_company_earnings(
 # ============================================================
 
 def build_company_dataset():
+    """
+    Fetch earnings data for the complete test universe.
 
-    all_records = []
+    Companies that fail after all retries are preserved in
+    a failure log and do not crash the entire pipeline.
+    """
 
-    total_companies = len(
-        UNIVERSE
-    )
-
-    print(
-        "\n" + "=" * 70
-    )
-
-    print(
-        "BUILDING CORPORATE EARNINGS DATASET"
-    )
-
+    print()
+    print("=" * 70)
+    print("BUILDING CORPORATE EARNINGS DATASET")
     print(
         f"Companies in test universe: "
-        f"{total_companies}"
+        f"{len(COMPANIES)}"
     )
+    print("=" * 70)
+    print()
 
-    print(
-        "=" * 70
-    )
+    all_rows = []
+
+    failed_companies = []
+
+    total = len(COMPANIES)
 
     for index, company in enumerate(
-        UNIVERSE,
+        COMPANIES,
         start=1
     ):
 
-        ticker = company[
-            "ticker"
-        ]
-
-        sector = company[
-            "sector"
-        ]
+        ticker = company["ticker"]
+        sector = company["sector"]
 
         print(
-            f"\n[{index}/{total_companies}] "
-            f"{ticker} "
-            f"({sector})"
+            f"[{index}/{total}] "
+            f"{ticker} ({sector})"
+        )
+        print()
+
+        rows = fetch_company_earnings(
+            ticker,
+            sector
         )
 
-        try:
+        if rows:
 
-            records = (
-                fetch_company_earnings(
-                    ticker,
-                    sector
-                )
+            all_rows.extend(
+                rows
             )
 
-            all_records.extend(
-                records
+        else:
+
+            failed_companies.append(
+                ticker
             )
 
             print(
-                f"Records received: "
-                f"{len(records)}"
+                f"WARNING: {ticker} "
+                f"produced no usable earnings "
+                f"records."
             )
 
-        except Exception as exc:
+        print()
 
-            print(
-                f"ERROR for {ticker}: "
-                f"{exc}"
-            )
+        # ----------------------------------------------------
+        # Conservative delay between companies.
+        #
+        # We do NOT need to sleep after the last company.
+        # ----------------------------------------------------
 
-        # Avoid bursting the free API.
-        if index < total_companies:
+        if index < total:
 
             print(
                 f"Waiting "
-                f"{REQUEST_DELAY} seconds..."
+                f"{REQUEST_DELAY_SECONDS:.1f} "
+                f"seconds..."
             )
 
             time.sleep(
-                REQUEST_DELAY
+                REQUEST_DELAY_SECONDS
             )
 
-    return pd.DataFrame(
-        all_records
+    df = pd.DataFrame(
+        all_rows
     )
+
+    print()
+    print("=" * 70)
+    print("DATASET BUILD COMPLETE")
+    print("=" * 70)
+
+    print(
+        f"Total event records: "
+        f"{len(df)}"
+    )
+
+    successful_tickers = (
+        sorted(
+            df["ticker"].unique().tolist()
+        )
+        if not df.empty
+        else []
+    )
+
+    print(
+        f"Successful companies: "
+        f"{len(successful_tickers)}/"
+        f"{total}"
+    )
+
+    if successful_tickers:
+
+        print(
+            "Successful tickers: "
+            + ", ".join(
+                successful_tickers
+            )
+        )
+
+    if failed_companies:
+
+        print(
+            "Failed companies: "
+            + ", ".join(
+                failed_companies
+            )
+        )
+
+    else:
+
+        print(
+            "Failed companies: NONE"
+        )
+
+    print()
+
+    return df, failed_companies
 
 
 # ============================================================
-# LATEST QUARTER
+# PREPARE LATEST QUARTER
 # ============================================================
 
 def prepare_latest_quarter(
     df
 ):
+    """
+    Select the latest reported earnings event for each
+    company.
+    """
 
     if df.empty:
+        return pd.DataFrame()
 
-        return df
+    working = df.copy()
 
-    df = df.copy()
-
-    df[
-        "reported_date"
-    ] = pd.to_datetime(
-        df[
-            "reported_date"
-        ],
+    working["reported_date"] = pd.to_datetime(
+        working["reported_date"],
         errors="coerce"
     )
 
-    df[
-        "fiscal_date_ending"
-    ] = pd.to_datetime(
-        df[
-            "fiscal_date_ending"
-        ],
-        errors="coerce"
+    working = working.dropna(
+        subset=["reported_date"]
     )
-
-    # For each company, select its latest
-    # available reported earnings event.
 
     latest = (
-        df.sort_values(
-            [
-                "ticker",
-                "reported_date"
-            ],
-            ascending=[
-                True,
-                False
-            ]
+        working.sort_values(
+            "reported_date"
         )
         .groupby(
             "ticker",
             as_index=False
         )
-        .first()
+        .tail(1)
+        .sort_values(
+            "ticker"
+        )
+        .reset_index(drop=True)
+    )
+
+    latest["reported_date"] = (
+        latest["reported_date"]
+        .dt.strftime("%Y-%m-%d")
     )
 
     return latest
@@ -569,148 +1039,262 @@ def prepare_latest_quarter(
 def calculate_breadth(
     latest_df
 ):
+    """
+    Calculate descriptive earnings breadth.
+
+    Breadth is based on the percentage of valid companies
+    classified as BEAT/LARGE_BEAT versus MISS/LARGE_MISS.
+
+    This is NOT a trading signal.
+    """
 
     if latest_df.empty:
 
-        return {}
+        return {
+            "companies_total": 0,
+            "companies_valid_eps": 0,
+            "companies_unknown": 0,
+            "eps_beats": 0,
+            "eps_misses": 0,
+            "eps_in_line": 0,
+            "eps_beat_pct": np.nan,
+            "eps_miss_pct": np.nan,
+            "eps_in_line_pct": np.nan,
+            "average_eps_surprise_pct": np.nan,
+            "median_eps_surprise_pct": np.nan,
+            "breadth_score": np.nan,
+            "breadth_label": "UNKNOWN",
+            "breadth_reason": (
+                "No valid earnings data."
+            ),
+        }
 
-    total = len(
+    classes = (
+        latest_df["eps_result_class"]
+        .fillna("UNKNOWN")
+        .astype(str)
+        .str.upper()
+    )
+
+    beats = classes.isin(
+        ["BEAT", "LARGE_BEAT"]
+    )
+
+    misses = classes.isin(
+        ["MISS", "LARGE_MISS"]
+    )
+
+    in_line = classes.eq(
+        "IN_LINE"
+    )
+
+    unknown = classes.eq(
+        "UNKNOWN"
+    )
+
+    valid = ~unknown
+
+    companies_total = len(
         latest_df
     )
 
-    beat_count = int(
-        (
-            latest_df[
-                "eps_result_class"
-            ].isin(
-                [
-                    "BEAT",
-                    "LARGE_BEAT"
-                ]
-            )
-        ).sum()
+    companies_valid_eps = int(
+        valid.sum()
     )
 
-    miss_count = int(
-        (
-            latest_df[
-                "eps_result_class"
-            ].isin(
-                [
-                    "MISS",
-                    "LARGE_MISS"
-                ]
-            )
-        ).sum()
+    companies_unknown = int(
+        unknown.sum()
     )
 
-    in_line_count = int(
-        (
-            latest_df[
-                "eps_result_class"
-            ] == "IN_LINE"
-        ).sum()
+    eps_beats = int(
+        beats.sum()
     )
 
-    unknown_count = int(
-        (
-            latest_df[
-                "eps_result_class"
-            ] == "UNKNOWN"
-        ).sum()
+    eps_misses = int(
+        misses.sum()
     )
 
-    valid_count = (
-        beat_count
-        + miss_count
-        + in_line_count
+    eps_in_line = int(
+        in_line.sum()
     )
 
-    if valid_count > 0:
+    if companies_valid_eps > 0:
 
-        beat_pct = (
-            beat_count
-            / valid_count
+        eps_beat_pct = (
+            eps_beats
+            / companies_valid_eps
             * 100.0
         )
 
-        miss_pct = (
-            miss_count
-            / valid_count
+        eps_miss_pct = (
+            eps_misses
+            / companies_valid_eps
             * 100.0
         )
 
-        in_line_pct = (
-            in_line_count
-            / valid_count
+        eps_in_line_pct = (
+            eps_in_line
+            / companies_valid_eps
             * 100.0
         )
 
     else:
 
-        beat_pct = None
-        miss_pct = None
-        in_line_pct = None
+        eps_beat_pct = np.nan
+        eps_miss_pct = np.nan
+        eps_in_line_pct = np.nan
 
-    valid_surprises = (
-        latest_df[
-            "eps_surprise_pct"
-        ]
-        .dropna()
-    )
+    surprise_series = pd.to_numeric(
+        latest_df["eps_surprise_pct"],
+        errors="coerce"
+    ).dropna()
 
-    if len(
-        valid_surprises
-    ) > 0:
+    if len(surprise_series) > 0:
 
         average_surprise = (
-            valid_surprises.mean()
+            surprise_series.mean()
         )
 
         median_surprise = (
-            valid_surprises.median()
+            surprise_series.median()
         )
 
     else:
 
-        average_surprise = None
-        median_surprise = None
+        average_surprise = np.nan
+        median_surprise = np.nan
+
+    # --------------------------------------------------------
+    # Descriptive breadth score
+    #
+    # 50 = balanced
+    #
+    # Difference between beat and miss percentage
+    # is scaled by 0.5.
+    #
+    # Example:
+    # 80% beat / 20% miss
+    # score = 50 + (80 - 20) / 2 = 80
+    #
+    # This is descriptive only.
+    # --------------------------------------------------------
+
+    if companies_valid_eps > 0:
+
+        breadth_score = (
+            50.0
+            + (
+                eps_beat_pct
+                - eps_miss_pct
+            )
+            / 2.0
+        )
+
+        breadth_score = max(
+            0.0,
+            min(
+                100.0,
+                breadth_score
+            )
+        )
+
+    else:
+
+        breadth_score = np.nan
+
+    if pd.isna(breadth_score):
+
+        breadth_label = "UNKNOWN"
+
+    elif breadth_score >= 70:
+
+        breadth_label = (
+            "POSITIVE_BREADTH"
+        )
+
+    elif breadth_score >= 55:
+
+        breadth_label = (
+            "MILDLY_POSITIVE"
+        )
+
+    elif breadth_score > 45:
+
+        breadth_label = "BALANCED"
+
+    elif breadth_score > 30:
+
+        breadth_label = (
+            "MILDLY_NEGATIVE"
+        )
+
+    else:
+
+        breadth_label = (
+            "NEGATIVE_BREADTH"
+        )
+
+    breadth_reason = (
+        "Descriptive EPS beat/miss breadth; "
+        "not a trading signal."
+    )
 
     return {
+        "companies_total": (
+            companies_total
+        ),
 
-        "companies_total":
-            total,
+        "companies_valid_eps": (
+            companies_valid_eps
+        ),
 
-        "companies_valid_eps":
-            valid_count,
+        "companies_unknown": (
+            companies_unknown
+        ),
 
-        "companies_unknown":
-            unknown_count,
+        "eps_beats": (
+            eps_beats
+        ),
 
-        "eps_beats":
-            beat_count,
+        "eps_misses": (
+            eps_misses
+        ),
 
-        "eps_misses":
-            miss_count,
+        "eps_in_line": (
+            eps_in_line
+        ),
 
-        "eps_in_line":
-            in_line_count,
+        "eps_beat_pct": (
+            eps_beat_pct
+        ),
 
-        "eps_beat_pct":
-            beat_pct,
+        "eps_miss_pct": (
+            eps_miss_pct
+        ),
 
-        "eps_miss_pct":
-            miss_pct,
+        "eps_in_line_pct": (
+            eps_in_line_pct
+        ),
 
-        "eps_in_line_pct":
-            in_line_pct,
+        "average_eps_surprise_pct": (
+            average_surprise
+        ),
 
-        "average_eps_surprise_pct":
-            average_surprise,
+        "median_eps_surprise_pct": (
+            median_surprise
+        ),
 
-        "median_eps_surprise_pct":
-            median_surprise,
+        "breadth_score": (
+            breadth_score
+        ),
 
+        "breadth_label": (
+            breadth_label
+        ),
+
+        "breadth_reason": (
+            breadth_reason
+        ),
     }
 
 
@@ -721,394 +1305,234 @@ def calculate_breadth(
 def calculate_sector_breadth(
     latest_df
 ):
+    """
+    Calculate descriptive earnings breadth by sector.
+    """
 
     if latest_df.empty:
-
         return pd.DataFrame()
 
     rows = []
 
-    for sector, group in (
-        latest_df.groupby(
-            "sector"
-        )
+    for sector, group in latest_df.groupby(
+        "sector",
+        dropna=False
     ):
 
-        result = calculate_breadth(
+        breadth = calculate_breadth(
             group
         )
 
-        result[
-            "sector"
-        ] = sector
+        rows.append({
+            "sector": sector,
 
-        rows.append(
-            result
-        )
+            "companies_total": breadth[
+                "companies_total"
+            ],
 
-    sector_df = pd.DataFrame(
-        rows
+            "companies_valid_eps": breadth[
+                "companies_valid_eps"
+            ],
+
+            "companies_unknown": breadth[
+                "companies_unknown"
+            ],
+
+            "eps_beats": breadth[
+                "eps_beats"
+            ],
+
+            "eps_misses": breadth[
+                "eps_misses"
+            ],
+
+            "eps_in_line": breadth[
+                "eps_in_line"
+            ],
+
+            "eps_beat_pct": breadth[
+                "eps_beat_pct"
+            ],
+
+            "eps_miss_pct": breadth[
+                "eps_miss_pct"
+            ],
+
+            "eps_in_line_pct": breadth[
+                "eps_in_line_pct"
+            ],
+
+            "average_eps_surprise_pct": (
+                breadth[
+                    "average_eps_surprise_pct"
+                ]
+            ),
+
+            "median_eps_surprise_pct": (
+                breadth[
+                    "median_eps_surprise_pct"
+                ]
+            ),
+
+            "breadth_score": breadth[
+                "breadth_score"
+            ],
+
+            "breadth_label": breadth[
+                "breadth_label"
+            ],
+
+            "breadth_reason": breadth[
+                "breadth_reason"
+            ],
+        })
+
+    return (
+        pd.DataFrame(rows)
+        .sort_values("sector")
+        .reset_index(drop=True)
     )
 
-    if not sector_df.empty:
-
-        sector_df = sector_df[
-            [
-                "sector",
-                "companies_total",
-                "companies_valid_eps",
-                "companies_unknown",
-                "eps_beats",
-                "eps_misses",
-                "eps_in_line",
-                "eps_beat_pct",
-                "eps_miss_pct",
-                "eps_in_line_pct",
-                "average_eps_surprise_pct",
-                "median_eps_surprise_pct",
-            ]
-        ]
-
-        sector_df = (
-            sector_df.sort_values(
-                "eps_beat_pct",
-                ascending=False
-            )
-        )
-
-    return sector_df
-
 
 # ============================================================
-# BREADTH THERMOMETER INPUT
+# SAVE OUTPUTS
 # ============================================================
 
-def calculate_breadth_context(
-    breadth
+def save_outputs(
+    events_df,
+    latest_df,
+    breadth_summary,
+    sector_breadth
 ):
+    """
+    Save all V2 CSV outputs.
+    """
 
-    if not breadth:
+    print()
+    print("=" * 70)
+    print("SAVING V2 OUTPUT FILES")
+    print("=" * 70)
 
-        return {
-            "breadth_status":
-                "UNAVAILABLE",
-            "breadth_score":
-                None,
-            "breadth_reason":
-                "No valid earnings breadth data."
-        }
-
-    valid = breadth[
-        "companies_valid_eps"
-    ]
-
-    if valid < 3:
-
-        return {
-            "breadth_status":
-                "INSUFFICIENT_DATA",
-            "breadth_score":
-                None,
-            "breadth_reason":
-                "Too few valid companies."
-        }
-
-    beat_pct = breadth[
-        "eps_beat_pct"
-    ]
-
-    miss_pct = breadth[
-        "eps_miss_pct"
-    ]
-
-    if (
-        beat_pct is None
-        or miss_pct is None
-    ):
-
-        return {
-            "breadth_status":
-                "UNAVAILABLE",
-            "breadth_score":
-                None,
-            "breadth_reason":
-                "Beat/miss percentages unavailable."
-        }
-
-    # --------------------------------------------------------
-    # This is NOT a trading score.
-    #
-    # It is a descriptive breadth context score:
-    #
-    # 50 = balanced
-    # >50 = more beats than misses
-    # <50 = more misses than beats
-    #
-    # It is deliberately NOT connected to Decision Engine.
-    # --------------------------------------------------------
-
-    score = (
-        50.0
-        + (
-            beat_pct
-            - miss_pct
-        ) / 2.0
+    events_df.to_csv(
+        EVENTS_OUTPUT,
+        index=False
     )
 
-    score = max(
-        0.0,
-        min(
-            100.0,
-            score
-        )
+    latest_df.to_csv(
+        LATEST_COMPANY_OUTPUT,
+        index=False
     )
 
-    if score >= 70:
+    pd.DataFrame(
+        [breadth_summary]
+    ).to_csv(
+        BREADTH_SUMMARY_OUTPUT,
+        index=False
+    )
 
-        status = "POSITIVE_BREADTH"
+    sector_breadth.to_csv(
+        SECTOR_BREADTH_OUTPUT,
+        index=False
+    )
 
-    elif score >= 55:
+    print(
+        f" - {EVENTS_OUTPUT}"
+    )
 
-        status = "MILDLY_POSITIVE"
+    print(
+        f" - {LATEST_COMPANY_OUTPUT}"
+    )
 
-    elif score > 45:
+    print(
+        f" - {BREADTH_SUMMARY_OUTPUT}"
+    )
 
-        status = "BALANCED"
-
-    elif score > 30:
-
-        status = "MILDLY_NEGATIVE"
-
-    else:
-
-        status = "NEGATIVE_BREADTH"
-
-    return {
-
-        "breadth_status":
-            status,
-
-        "breadth_score":
-            score,
-
-        "breadth_reason":
-            "Descriptive EPS beat/miss breadth; not a trading signal."
-
-    }
+    print(
+        f" - {SECTOR_BREADTH_OUTPUT}"
+    )
 
 
 # ============================================================
-# EXPORT
+# DISPLAY LATEST RESULTS
 # ============================================================
 
-def export_v2():
+def display_latest_results(
+    latest_df
+):
+    """
+    Print latest company results.
+    """
 
-    df = build_company_dataset()
+    print()
+    print("=" * 70)
+    print("LATEST COMPANY RESULTS")
+    print("=" * 70)
 
-    if df.empty:
+    if latest_df.empty:
 
         print(
-            "\nNo earnings data collected."
+            "No latest company results."
         )
 
         return
 
-    # --------------------------------------------------------
-    # Full event dataset
-    # --------------------------------------------------------
-
-    df.to_csv(
-        "earnings_breadth_events_v2.csv",
-        index=False
-    )
-
-    # --------------------------------------------------------
-    # Latest event per company
-    # --------------------------------------------------------
-
-    latest_df = (
-        prepare_latest_quarter(
-            df
-        )
-    )
-
-    latest_df.to_csv(
-        "earnings_latest_company_v2.csv",
-        index=False
-    )
-
-    # --------------------------------------------------------
-    # Overall breadth
-    # --------------------------------------------------------
-
-    breadth = calculate_breadth(
-        latest_df
-    )
-
-    breadth_context = (
-        calculate_breadth_context(
-            breadth
-        )
-    )
-
-    breadth_output = {
-        **breadth,
-        **breadth_context,
-    }
-
-    breadth_df = pd.DataFrame(
-        [breadth_output]
-    )
-
-    breadth_df.to_csv(
-        "earnings_breadth_summary_v2.csv",
-        index=False
-    )
-
-    # --------------------------------------------------------
-    # Sector breadth
-    # --------------------------------------------------------
-
-    sector_df = (
-        calculate_sector_breadth(
-            latest_df
-        )
-    )
-
-    sector_df.to_csv(
-        "earnings_sector_breadth_v2.csv",
-        index=False
-    )
-
-    # --------------------------------------------------------
-    # Display
-    # --------------------------------------------------------
-
-    print(
-        "\n" + "=" * 70
-    )
-
-    print(
-        "EARNINGS BREADTH V2 SUMMARY"
-    )
-
-    print(
-        "=" * 70
-    )
-
-    for key, value in (
-        breadth_output.items()
-    ):
-
-        if isinstance(
-            value,
-            float
-        ):
-
-            print(
-                f"{key}: "
-                f"{value:.4f}"
-            )
-
-        else:
-
-            print(
-                f"{key}: "
-                f"{value}"
-            )
-
-    print(
-        "\n" + "=" * 70
-    )
-
-    print(
-        "LATEST COMPANY RESULTS"
-    )
-
-    print(
-        "=" * 70
-    )
-
-    display_columns = [
-
+    columns = [
         "ticker",
-
         "sector",
-
         "reported_date",
-
         "eps_actual",
-
         "eps_consensus",
-
         "eps_surprise",
-
         "eps_surprise_pct",
-
         "eps_result_class",
-
         "point_in_time_safe",
-
         "historical_analog_eligible",
-
     ]
 
-    available_columns = [
-        col
-        for col in display_columns
+    available = [
+        col for col in columns
         if col in latest_df.columns
     ]
 
+    display_df = latest_df[
+        available
+    ].copy()
+
     print(
-        latest_df[
-            available_columns
-        ].to_string(
+        display_df.to_string(
             index=False
         )
     )
 
-    print(
-        "\n" + "=" * 70
-    )
 
-    print(
-        "SECTOR BREADTH"
-    )
+# ============================================================
+# DISPLAY SECTOR BREADTH
+# ============================================================
 
-    print(
-        "=" * 70
-    )
+def display_sector_breadth(
+    sector_breadth
+):
+    """
+    Print sector breadth.
+    """
 
-    if not sector_df.empty:
+    print()
+    print("=" * 70)
+    print("SECTOR BREADTH")
+    print("=" * 70)
+
+    if sector_breadth.empty:
 
         print(
-            sector_df.to_string(
-                index=False
-            )
+            "No sector breadth data."
         )
 
-    print(
-        "\nCreated files:"
-    )
+        return
 
     print(
-        " - earnings_breadth_events_v2.csv"
-    )
-
-    print(
-        " - earnings_latest_company_v2.csv"
-    )
-
-    print(
-        " - earnings_breadth_summary_v2.csv"
-    )
-
-    print(
-        " - earnings_sector_breadth_v2.csv"
-    )
-
-    print(
-        "\nCORPORATE EARNINGS INTELLIGENCE V2 COMPLETED"
+        sector_breadth.to_string(
+            index=False
+        )
     )
 
 
@@ -1116,6 +1540,176 @@ def export_v2():
 # MAIN
 # ============================================================
 
-if __name__ == "__main__":
+def main():
+    """
+    Main execution pipeline.
+    """
 
-    export_v2()
+    print()
+    print("=" * 70)
+    print("CORPORATE EARNINGS INTELLIGENCE V2")
+    print("=" * 70)
+    print()
+    print(
+        "Research-only corporate earnings analysis."
+    )
+    print(
+        "No trading signal."
+    )
+    print(
+        "No Decision Engine integration."
+    )
+    print()
+
+    # --------------------------------------------------------
+    # Validate API key
+    # --------------------------------------------------------
+
+    validate_api_key()
+
+    # --------------------------------------------------------
+    # Build event dataset
+    # --------------------------------------------------------
+
+    events_df, failed_companies = (
+        build_company_dataset()
+    )
+
+    # --------------------------------------------------------
+    # Safety check
+    # --------------------------------------------------------
+
+    if events_df.empty:
+
+        raise RuntimeError(
+            "No earnings data was collected "
+            "from Alpha Vantage."
+        )
+
+    # --------------------------------------------------------
+    # Prepare latest quarter
+    # --------------------------------------------------------
+
+    latest_df = prepare_latest_quarter(
+        events_df
+    )
+
+    # --------------------------------------------------------
+    # Calculate overall breadth
+    # --------------------------------------------------------
+
+    breadth_summary = calculate_breadth(
+        latest_df
+    )
+
+    # --------------------------------------------------------
+    # Calculate sector breadth
+    # --------------------------------------------------------
+
+    sector_breadth = (
+        calculate_sector_breadth(
+            latest_df
+        )
+    )
+
+    # --------------------------------------------------------
+    # Display results
+    # --------------------------------------------------------
+
+    display_latest_results(
+        latest_df
+    )
+
+    display_sector_breadth(
+        sector_breadth
+    )
+
+    # --------------------------------------------------------
+    # Save outputs
+    # --------------------------------------------------------
+
+    save_outputs(
+        events_df,
+        latest_df,
+        breadth_summary,
+        sector_breadth
+    )
+
+    # --------------------------------------------------------
+    # Final status
+    # --------------------------------------------------------
+
+    print()
+    print("=" * 70)
+    print("FINAL V2 STATUS")
+    print("=" * 70)
+
+    successful_companies = (
+        latest_df["ticker"].nunique()
+        if not latest_df.empty
+        else 0
+    )
+
+    total_companies = len(
+        COMPANIES
+    )
+
+    print(
+        f"Companies successfully loaded: "
+        f"{successful_companies}/"
+        f"{total_companies}"
+    )
+
+    if failed_companies:
+
+        print(
+            "Companies without usable data: "
+            + ", ".join(
+                failed_companies
+            )
+        )
+
+        print()
+        print(
+            "WARNING: The dataset is incomplete "
+            "for the current run."
+        )
+
+    else:
+
+        print(
+            "Companies without usable data: NONE"
+        )
+
+        print(
+            "All test-universe companies "
+            "loaded successfully."
+        )
+
+    print()
+    print(
+        f"Breadth score: "
+        f"{breadth_summary['breadth_score']}"
+    )
+
+    print(
+        f"Breadth label: "
+        f"{breadth_summary['breadth_label']}"
+    )
+
+    print(
+        f"Breadth reason: "
+        f"{breadth_summary['breadth_reason']}"
+    )
+
+    print()
+    print("=" * 70)
+    print(
+        "CORPORATE EARNINGS INTELLIGENCE V2 COMPLETED"
+    )
+    print("=" * 70)
+    print()
+
+
+if __name__ == "__main__":
+    main()
