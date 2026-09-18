@@ -1,13 +1,14 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Phase 1B.2
-Historical Collector v1.2 — OFFICIAL MANIFEST MODE
+Economic Intelligence — Phase 1B.3
+Historical Collector v1.3 — BLS + DOL + ISM OFFICIAL MANIFEST MODE
 
-Adds verified U.S. Department of Labor Initial Jobless Claims records
-to the validated BLS historical manifest.
+Adds verified ISM Manufacturing PMI releases to the existing
+historical economic manifest.
 
-No scraping is performed. No consensus is fabricated.
-All values are release-time observations from official DOL releases.
+Research-only. No Decision Engine integration.
+No consensus is fabricated.
+No web scraping is performed.
 """
 
 from __future__ import annotations
@@ -39,14 +40,10 @@ class Record:
 
 
 # ---------------------------------------------------------------------
-# VERIFIED OFFICIAL MANIFEST
-# BLS records are retained from v1.1.
-# DOL claims records below are verified against official DOL releases.
-# Consensus remains UNKNOWN by design.
+# Existing validated BLS + DOL records
 # ---------------------------------------------------------------------
-
-OFFICIAL_MANIFEST = [
-    # ------------------------- BLS CPI -------------------------
+BLS_DOL_RECORDS = [
+    # CPI / Core CPI
     Record("CPI","BLS","2022-08-10","08:30 ET","July 2022",0.0,1.3,None,None,None,"2022-08-10",
            "U.S. Bureau of Labor Statistics — CPI News Release",
            "https://www.bls.gov/news.release/archives/cpi_08102022.htm"),
@@ -72,7 +69,7 @@ OFFICIAL_MANIFEST = [
            "U.S. Bureau of Labor Statistics — CPI News Release",
            "https://www.bls.gov/news.release/archives/cpi_01122023.htm"),
 
-    # ---------------------- BLS EMPLOYMENT ---------------------
+    # NFP / Unemployment
     Record("NFP","BLS","2022-08-05","08:30 ET","July 2022",528000,None,None,None,None,"2022-08-05",
            "U.S. Bureau of Labor Statistics — Employment Situation",
            "https://www.bls.gov/news.release/archives/empsit_08052022.htm"),
@@ -92,85 +89,94 @@ OFFICIAL_MANIFEST = [
            "U.S. Bureau of Labor Statistics — Employment Situation",
            "https://www.bls.gov/news.release/archives/empsit_11042022.htm"),
 
-    # -------------------- DOL INITIAL CLAIMS -------------------
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-07","08:30 ET",
-           "Week ending July 2, 2022",235000,231000,None,None,None,"2022-07-07",
+    # Initial Jobless Claims
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-07","08:30 ET","Week ending July 2, 2022",235000,231000,None,None,None,"2022-07-07",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220707"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-14","08:30 ET",
-           "Week ending July 9, 2022",244000,235000,None,None,None,"2022-07-14",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-14","08:30 ET","Week ending July 9, 2022",244000,235000,None,None,None,"2022-07-14",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220714"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-21","08:30 ET",
-           "Week ending July 16, 2022",251000,244000,None,None,None,"2022-07-21",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-21","08:30 ET","Week ending July 16, 2022",251000,244000,None,None,None,"2022-07-21",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220721"),
-
-    # Important revision: July 28 release says previous week was revised
-    # from 251k to 261k. Preserve both the release's actual and revision.
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-28","08:30 ET",
-           "Week ending July 23, 2022",256000,261000,10000,None,None,"2022-07-28",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-28","08:30 ET","Week ending July 23, 2022",256000,261000,10000,None,None,"2022-07-28",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220728"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-11","08:30 ET",
-           "Week ending August 6, 2022",262000,248000,12000,None,None,"2022-08-11",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-11","08:30 ET","Week ending August 6, 2022",262000,248000,12000,None,None,"2022-08-11",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220811"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-18","08:30 ET",
-           "Week ending August 13, 2022",250000,252000,10000,None,None,"2022-08-18",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-18","08:30 ET","Week ending August 13, 2022",250000,252000,10000,None,None,"2022-08-18",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220818"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-25","08:30 ET",
-           "Week ending August 20, 2022",243000,245000,5000,None,None,"2022-08-25",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-25","08:30 ET","Week ending August 20, 2022",243000,245000,5000,None,None,"2022-08-25",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220825"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-01","08:30 ET",
-           "Week ending August 27, 2022",232000,237000,6000,None,None,"2022-09-01",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-01","08:30 ET","Week ending August 27, 2022",232000,237000,6000,None,None,"2022-09-01",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220901"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-08","08:30 ET",
-           "Week ending September 3, 2022",222000,228000,4000,None,None,"2022-09-08",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-08","08:30 ET","Week ending September 3, 2022",222000,228000,4000,None,None,"2022-09-08",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220908"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-15","08:30 ET",
-           "Week ending September 10, 2022",213000,218000,4000,None,None,"2022-09-15",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-15","08:30 ET","Week ending September 10, 2022",213000,218000,4000,None,None,"2022-09-15",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220915"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-22","08:30 ET",
-           "Week ending September 17, 2022",213000,208000,5000,None,None,"2022-09-22",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-22","08:30 ET","Week ending September 17, 2022",213000,208000,5000,None,None,"2022-09-22",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220922"),
-
-    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-29","08:30 ET",
-           "Week ending September 24, 2022",193000,209000,4000,None,None,"2022-09-29",
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-29","08:30 ET","Week ending September 24, 2022",193000,209000,4000,None,None,"2022-09-29",
            "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
            "https://www.dol.gov/newsroom/releases/eta/eta20220929"),
 ]
 
 
-def validate(df):
+# ---------------------------------------------------------------------
+# ISM MANUFACTURING PMI
+#
+# ISM reports are monthly releases published on the first business day
+# of the following month. These records use the headline PMI only.
+# ---------------------------------------------------------------------
+ISM_RECORDS = [
+    Record("ISM_MANUFACTURING_PMI","ISM","2022-08-01","10:00 ET","July 2022",52.8,53.0,None,None,None,"2022-08-01",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/august/"),
+    Record("ISM_MANUFACTURING_PMI","ISM","2022-09-01","10:00 ET","August 2022",52.8,52.8,None,None,None,"2022-09-01",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/september/"),
+    Record("ISM_MANUFACTURING_PMI","ISM","2022-10-03","10:00 ET","September 2022",50.9,52.8,None,None,None,"2022-10-03",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/october/"),
+    Record("ISM_MANUFACTURING_PMI","ISM","2022-11-01","10:00 ET","October 2022",50.2,50.9,None,None,None,"2022-11-01",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/november/"),
+    Record("ISM_MANUFACTURING_PMI","ISM","2022-12-01","10:00 ET","November 2022",49.0,50.2,None,None,None,"2022-12-01",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/december/"),
+    Record("ISM_MANUFACTURING_PMI","ISM","2023-01-04","10:00 ET","December 2022",48.4,49.0,None,None,None,"2023-01-04",
+           "Institute for Supply Management — Manufacturing ISM Report On Business",
+           "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/pmi/january/"),
+]
+
+
+def validate(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
+
     for _, r in df.iterrows():
         issues = []
-        for col in [
-            "indicator","agency","release_date","release_time",
-            "reference_period","actual","vintage_date","source","source_url"
-        ]:
+
+        required = [
+            "indicator", "agency", "release_date", "release_time",
+            "reference_period", "actual", "vintage_date", "source",
+            "source_url"
+        ]
+
+        for col in required:
             if pd.isna(r[col]) or str(r[col]).strip() == "":
                 issues.append(f"missing_{col}")
 
         try:
             release = pd.Timestamp(r["release_date"])
             vintage = pd.Timestamp(r["vintage_date"])
+
             if vintage > release:
                 issues.append("vintage_after_release")
         except Exception:
@@ -189,24 +195,26 @@ def validate(df):
                 and str(r["consensus_source"]).strip() != ""
             ),
         })
+
     return pd.DataFrame(rows)
 
 
 def main():
     print("=" * 72)
     print("US500 MACRO INTELLIGENCE")
-    print("ECONOMIC INTELLIGENCE — PHASE 1B.2")
-    print("HISTORICAL COLLECTOR v1.2 — BLS + DOL OFFICIAL MANIFEST")
+    print("ECONOMIC INTELLIGENCE — PHASE 1B.3")
+    print("HISTORICAL COLLECTOR v1.3 — BLS + DOL + ISM")
     print("=" * 72)
 
-    df = pd.DataFrame([asdict(r) for r in OFFICIAL_MANIFEST])
+    records = BLS_DOL_RECORDS + ISM_RECORDS
+    df = pd.DataFrame([asdict(r) for r in records])
 
     if df.empty:
-        raise RuntimeError("Official manifest is empty. No data will be fabricated.")
+        raise RuntimeError("Official manifest is empty.")
 
     df = df.drop_duplicates(
-        subset=["indicator","release_date","reference_period","source_url"]
-    ).sort_values(["release_date","indicator"]).reset_index(drop=True)
+        subset=["indicator", "release_date", "reference_period", "source_url"]
+    ).sort_values(["release_date", "indicator"]).reset_index(drop=True)
 
     quality = validate(df)
 
