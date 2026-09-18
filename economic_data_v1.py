@@ -262,6 +262,10 @@ def normalize_input(df: pd.DataFrame) -> pd.DataFrame:
     ]
     quality = pd.DataFrame(quality_records, index=output.index)
 
+    # QualityResult stores the issue string as "issues"; the dataset schema
+    # exposes it as "quality_issues".
+    quality = quality.rename(columns={"issues": "quality_issues"})
+
     # Replace any pre-existing quality columns with the freshly validated
     # values, while preserving the original input row alignment.
     output = output.drop(
