@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "economic_release_collector_v1.py"
+      - "economic_release_collector_v1_1.py"
       - "economic_data_v1.py"
       - "requirements.txt"
       - ".github/workflows/collect_economic_data_v1.yml"
@@ -24,20 +24,20 @@ jobs:
 
       - name: Verify scripts
         run: |
-          test -f "./economic_release_collector_v1.py"
+          test -f "./economic_release_collector_v1_1.py"
           test -f "./economic_data_v1.py"
-          python -m py_compile "./economic_release_collector_v1.py"
+          python -m py_compile "./economic_release_collector_v1_1.py"
           python -m py_compile "./economic_data_v1.py"
           echo "Economic scripts syntax OK."
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests beautifulsoup4 pypdf openpyxl
+          pip install pandas numpy
 
       - name: Run official release collector
         run: |
-          python "./economic_release_collector_v1.py"
+          python "./economic_release_collector_v1_1.py"
 
       - name: Verify collected input
         run: |
@@ -51,6 +51,7 @@ jobs:
           assert df["source"].notna().all()
           assert df["source_url"].notna().all()
           assert df["actual"].notna().all()
+          assert df["consensus"].isna().all()
           PY
 
       - name: Run Phase 1A quality gate
@@ -73,7 +74,7 @@ jobs:
           echo "=============================="
           echo "ECONOMIC EVENTS"
           echo "=============================="
-          head -n 40 "./economic_events_v1.csv"
+          cat "./economic_events_v1.csv"
 
       - name: Upload Phase 1A results
         uses: actions/upload-artifact@v4
