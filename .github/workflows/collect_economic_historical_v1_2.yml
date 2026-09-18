@@ -1,4 +1,4 @@
-name: Collect Economic Historical Data — Phase 1B.1
+name: Collect Economic Historical Data — Phase 1B.2
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
           pip install pandas
 
       - name: Run official manifest collector
-        run: python "./economic_historical_collector_v1_1.py"
+        run: python "./economic_historical_collector_v1_2.py"
 
       - name: Verify outputs
         run: |
