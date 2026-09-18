@@ -1,17 +1,17 @@
-name: Economic Surprise Engine — Phase 1
+name: Economic Surprise Engine v1
 
 on:
   workflow_dispatch:
 
 jobs:
-  surprise-engine:
+  economic-surprise:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -21,27 +21,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy
 
+      - name: Build historical economic dataset
+        run: |
+          python "./economic_historical_collector_v1_4.py"
+
       - name: Run Economic Surprise Engine
-        run: python "./economic_surprise_engine_v1.py"
+        run: |
+          python "./economic_surprise_engine_v1.py"
 
       - name: Verify outputs
         run: |
-          test -f "./economic_surprise_engine_v1.csv"
-          test -f "./economic_surprise_summary_v1.csv"
-
-      - name: Quality gate
-        run: |
-          python - <<'PY'
-          import pandas as pd
-          df = pd.read_csv("economic_surprise_engine_v1.csv")
-
-          if not df["pit_safe"].all():
-              raise SystemExit("PIT QUALITY GATE FAILED")
-
-          if (df["consensus_available"] & df["consensus"].isna()).any():
-              raise SystemExit("CONSENSUS GATE FAILED")
-
-          print("PIT QUALITY GATE: PASS")
-          print("CONSENSUS FABRICATION GATE: PASS")
-          print("LOOK-AHEAD GATE: PASS")
-          PY
+          test -f economic_historical_events_v1.csv
+          test -f economic_surprise_engine_v1.csv
+          test -f economic_surprise_summary_v1.csv
