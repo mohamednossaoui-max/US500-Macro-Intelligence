@@ -1,4 +1,4 @@
-name: Collect Economic Historical Data — Phase 1B
+name: Collect Economic Historical Data — Phase 1B.1
 
 on:
   workflow_dispatch:
@@ -19,24 +19,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests beautifulsoup4
+          pip install pandas
 
-      - name: Run historical collector
-        run: python "./economic_historical_collector_v1.py"
+      - name: Run official manifest collector
+        run: python "./economic_historical_collector_v1_1.py"
 
       - name: Verify outputs
         run: |
           test -f "./economic_historical_events_v1.csv"
           test -f "./economic_historical_quality_v1.csv"
 
-      - name: Show output summary
+      - name: Quality gate
         run: |
           python - <<'PY'
           import pandas as pd
-          e = pd.read_csv("economic_historical_events_v1.csv")
           q = pd.read_csv("economic_historical_quality_v1.csv")
-          print("EVENTS:", len(e))
-          print("PIT SAFE:", int(q["point_in_time_safe"].sum()), "/", len(q))
-          print("INDICATORS:")
-          print(e["indicator"].value_counts().sort_index())
+          total = len(q)
+          safe = int(q["point_in_time_safe"].sum())
+          print(f"PIT SAFE: {safe}/{total}")
+          if safe != total:
+              raise SystemExit("PIT QUALITY GATE FAILED")
           PY
