@@ -13,38 +13,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------------------------------------
-      # 1. Checkout repository
-      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------------
-      # 2. Setup Python
-      # ------------------------------------------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ------------------------------------------------------------
-      # 3. Install dependencies
-      # ------------------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas
 
-      # ------------------------------------------------------------
-      # 4. Run Historical Collector v1.5
-      # ------------------------------------------------------------
       - name: Run Economic Historical Collector v1.5
         run: |
           python "./economic_historical_collector_v1_5.py"
 
-      # ------------------------------------------------------------
-      # 5. Validate Historical Data
-      # ------------------------------------------------------------
       - name: Validate Historical Data
         run: |
           test -f economic_historical_events_v1.csv
@@ -53,29 +38,20 @@ jobs:
           python - <<'PY'
           import pandas as pd
 
-          events = pd.read_csv(
-              "economic_historical_events_v1.csv"
-          )
-
-          quality = pd.read_csv(
-              "economic_historical_quality_v1.csv"
-          )
+          events = pd.read_csv("economic_historical_events_v1.csv")
+          quality = pd.read_csv("economic_historical_quality_v1.csv")
 
           print("=" * 72)
           print("HISTORICAL DATA VALIDATION")
           print("=" * 72)
 
-          print(
-              f"Historical events: {len(events)}"
-          )
+          print(f"Historical events: {len(events)}")
+          print(f"Quality rows: {len(quality)}")
 
-          print(
-              f"Quality rows: {len(quality)}"
-          )
+          # ------------------------------------------------------------
+          # Basic file validation
+          # ------------------------------------------------------------
 
-          # --------------------------------------------------------
-          # Basic non-empty checks
-          # --------------------------------------------------------
           if len(events) == 0:
               raise SystemExit(
                   "ERROR: Historical events file is empty."
@@ -86,9 +62,10 @@ jobs:
                   "ERROR: Historical quality file is empty."
               )
 
-          # --------------------------------------------------------
-          # Expected Phase 1B.5 size
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Expected fixed batch size
+          # ------------------------------------------------------------
+
           if len(events) != 48:
               raise SystemExit(
                   f"ERROR: Expected 48 historical records, "
@@ -101,9 +78,10 @@ jobs:
                   f"found {len(quality)}."
               )
 
-          # --------------------------------------------------------
-          # Required columns
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Required event columns
+          # ------------------------------------------------------------
+
           required_events = {
               "indicator",
               "agency",
@@ -116,15 +94,17 @@ jobs:
               "source_url"
           }
 
-          missing_events = (
-              required_events - set(events.columns)
-          )
+          missing_events = required_events - set(events.columns)
 
           if missing_events:
               raise SystemExit(
                   "ERROR: Missing event columns: "
                   f"{sorted(missing_events)}"
               )
+
+          # ------------------------------------------------------------
+          # Required quality columns
+          # ------------------------------------------------------------
 
           required_quality = {
               "record_id",
@@ -137,9 +117,7 @@ jobs:
               "historical_consensus_available"
           }
 
-          missing_quality = (
-              required_quality - set(quality.columns)
-          )
+          missing_quality = required_quality - set(quality.columns)
 
           if missing_quality:
               raise SystemExit(
@@ -147,9 +125,10 @@ jobs:
                   f"{sorted(missing_quality)}"
               )
 
-          # --------------------------------------------------------
-          # PIT validation
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Point-in-time safety
+          # ------------------------------------------------------------
+
           safe = (
               quality["point_in_time_safe"]
               .astype(str)
@@ -160,12 +139,12 @@ jobs:
 
           safe_count = int(safe.sum())
 
-          print(
-              f"PIT safe: {safe_count}/{len(quality)}"
-          )
+          print(f"PIT safe: {safe_count}/{len(quality)}")
 
           if safe_count != len(quality):
+
               print("\nPIT UNSAFE RECORDS:")
+
               print(
                   quality.loc[
                       ~safe,
@@ -179,36 +158,65 @@ jobs:
               )
 
               raise SystemExit(
-                  "ERROR: Historical data contains "
-                  "PIT-unsafe records."
+                  "ERROR: Historical data contains PIT-unsafe records."
               )
 
-          # --------------------------------------------------------
-          # Record ID validation
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Duplicate observation check
+          # ------------------------------------------------------------
+
+          duplicate_subset = [
+              "indicator",
+              "agency",
+              "release_date",
+              "release_time",
+              "reference_period",
+              "source_url"
+          ]
+
           if events.duplicated(
-              subset=[
-                  "indicator",
-                  "agency",
-                  "release_date",
-                  "release_time",
-                  "reference_period",
-                  "source_url"
-              ]
+              subset=duplicate_subset
           ).any():
+
+              print("\nDUPLICATE RECORDS:")
+
+              print(
+                  events.loc[
+                      events.duplicated(
+                          subset=duplicate_subset,
+                          keep=False
+                      ),
+                      duplicate_subset
+                  ].to_string(index=False)
+              )
 
               raise SystemExit(
                   "ERROR: Duplicate historical observations detected."
               )
 
+          # ------------------------------------------------------------
+          # Duplicate record_id check
+          # ------------------------------------------------------------
+
           if quality["record_id"].duplicated().any():
+
+              print("\nDUPLICATE RECORD IDs:")
+
+              print(
+                  quality.loc[
+                      quality["record_id"].duplicated(keep=False),
+                      ["record_id", "indicator", "release_date"]
+                  ].to_string(index=False)
+              )
+
               raise SystemExit(
                   "ERROR: Duplicate record_id detected."
               )
 
-          # --------------------------------------------------------
-          # Consensus validation
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Historical consensus gate
+          # ------------------------------------------------------------
+
           consensus_count = int(
               quality[
                   "historical_consensus_available"
@@ -231,9 +239,10 @@ jobs:
                   "was introduced."
               )
 
-          # --------------------------------------------------------
-          # Indicator validation
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Indicator universe
+          # ------------------------------------------------------------
+
           indicators = sorted(
               events["indicator"]
               .dropna()
@@ -241,15 +250,16 @@ jobs:
               .tolist()
           )
 
-          print(
-              f"Indicators: {len(indicators)}"
-          )
+          print(f"Indicators: {len(indicators)}")
 
           print("\nIndicators:")
+
           for indicator in indicators:
+
               count = int(
                   (events["indicator"] == indicator).sum()
               )
+
               print(
                   f"  {indicator}: {count}"
               )
@@ -269,9 +279,15 @@ jobs:
                   "ERROR: Indicator universe mismatch."
               )
 
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
           # 2023 batch validation
-          # --------------------------------------------------------
+          #
+          # v1.5 contains:
+          # - 10 newly added 2023 records
+          # - 4 existing 2023 GDP records
+          # = 14 total 2023 records
+          # ------------------------------------------------------------
+
           batch_2023 = events[
               events["release_date"]
               .astype(str)
@@ -282,24 +298,22 @@ jobs:
               f"\n2023 records: {len(batch_2023)}"
           )
 
-          if len(batch_2023) != 10:
+          if len(batch_2023) != 14:
               raise SystemExit(
-                  f"ERROR: Expected 10 records in the "
+                  f"ERROR: Expected 14 records in the "
                   f"2023 batch, found {len(batch_2023)}."
               )
 
-          # --------------------------------------------------------
-          # Final result
-          # --------------------------------------------------------
+          # ------------------------------------------------------------
+          # Final validation
+          # ------------------------------------------------------------
+
           print("\n" + "=" * 72)
           print("HISTORICAL DATA VALIDATION: PASS")
           print("=" * 72)
 
           PY
 
-      # ------------------------------------------------------------
-      # 6. Upload artifacts
-      # ------------------------------------------------------------
       - name: Upload Historical Collector Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -309,9 +323,6 @@ jobs:
             economic_historical_quality_v1.csv
           if-no-files-found: error
 
-      # ------------------------------------------------------------
-      # 7. Final status
-      # ------------------------------------------------------------
       - name: Economic Historical Collector Complete
         run: |
           echo "============================================================"
@@ -323,7 +334,7 @@ jobs:
           echo "Historical Collector: PASS"
           echo "PIT Quality Gate:     PASS"
           echo "Integrity Checks:     PASS"
-          echo "Artifacts:             UPLOADED"
+          echo "Artifacts:            UPLOADED"
           echo ""
           echo "Research-only."
           echo "No Decision Engine integration."
