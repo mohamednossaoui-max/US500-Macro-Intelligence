@@ -6,35 +6,149 @@ import pandas as pd
 
 
 # ============================================================
-# CONFIGURATION
+# US500 MACRO INTELLIGENCE
+# CORPORATE EARNINGS INTELLIGENCE V1
+# ============================================================
+#
+# Conservative implementation.
+#
+# IMPORTANT:
+# - No trade execution
+# - No Decision Engine integration
+# - No modification of Technical Engine
+# - No look-ahead assumptions
+#
+# Alpha Vantage is used as the primary earnings source.
+#
+# EARNINGS:
+#   Safe for event-time:
+#       reported EPS
+#       estimated EPS used by earnings endpoint
+#       EPS surprise
+#       reported date
+#
+# EARNINGS_ESTIMATES:
+#   Useful for current/future intelligence and revision context.
+#   Historical point-in-time usage is NOT assumed safe in V1.
+#
 # ============================================================
 
-API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
-
-if not API_KEY:
-    raise RuntimeError(
-        "ALPHAVANTAGE_API_KEY is not available."
-    )
 
 BASE_URL = "https://www.alphavantage.co/query"
 
-# We continue with one ticker only
-# to minimize Alpha Vantage API usage.
-TICKER = "MSFT"
+API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "").strip()
 
-# Alpha Vantage free request pacing
-REQUEST_DELAY = 1.5
+REQUEST_DELAY = float(
+    os.getenv("ALPHAVANTAGE_REQUEST_DELAY", "1.5")
+)
+
+REQUEST_TIMEOUT = int(
+    os.getenv("ALPHAVANTAGE_TIMEOUT", "30")
+)
 
 
 # ============================================================
-# API REQUEST
+# HELPERS
+# ============================================================
+
+def to_float(value):
+    """
+    Safely convert a value to float.
+    """
+    if value is None:
+        return None
+
+    try:
+        if isinstance(value, str):
+            value = value.strip()
+
+        if value == "":
+            return None
+
+        return float(value)
+
+    except (TypeError, ValueError):
+        return None
+
+
+def safe_divide(a, b):
+    """
+    Safe division.
+    """
+    if a is None or b is None:
+        return None
+
+    if b == 0:
+        return None
+
+    try:
+        return a / b
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def calculate_surprise_pct(actual, estimate):
+    """
+    Calculate EPS surprise percentage.
+
+    Formula:
+        (Actual - Estimate) / abs(Estimate) * 100
+
+    Using abs(Estimate) avoids a misleading sign when
+    the consensus estimate is negative.
+    """
+    actual = to_float(actual)
+    estimate = to_float(estimate)
+
+    if actual is None or estimate is None:
+        return None
+
+    if estimate == 0:
+        return None
+
+    return (
+        (actual - estimate)
+        / abs(estimate)
+        * 100.0
+    )
+
+
+def calculate_revision_pct(current, previous):
+    """
+    Calculate estimate revision percentage.
+
+    IMPORTANT:
+    This is NOT automatically considered Point-in-Time safe.
+    """
+    current = to_float(current)
+    previous = to_float(previous)
+
+    if current is None or previous is None:
+        return None
+
+    if previous == 0:
+        return None
+
+    return (
+        (current - previous)
+        / abs(previous)
+        * 100.0
+    )
+
+
+# ============================================================
+# API
 # ============================================================
 
 def request_api(function, ticker):
+    """
+    Request Alpha Vantage data with conservative error handling.
+    """
 
-    print(
-        f"\nRequesting: {function} / {ticker}"
-    )
+    if not API_KEY:
+        raise RuntimeError(
+            "ALPHAVANTAGE_API_KEY is not available."
+        )
 
     params = {
         "function": function,
@@ -45,17 +159,12 @@ def request_api(function, ticker):
     response = requests.get(
         BASE_URL,
         params=params,
-        timeout=30,
+        timeout=REQUEST_TIMEOUT,
     )
 
     response.raise_for_status()
 
     data = response.json()
-
-    print(
-        "Response keys:",
-        list(data.keys())
-    )
 
     if "Error Message" in data:
         raise RuntimeError(
@@ -79,10 +188,13 @@ def request_api(function, ticker):
 
 
 # ============================================================
-# SAVE RAW JSON
+# RAW DATA
 # ============================================================
 
-def save_raw_json(filename, data):
+def save_json(filename, data):
+    """
+    Save raw API response.
+    """
 
     with open(
         filename,
@@ -94,48 +206,34 @@ def save_raw_json(filename, data):
             data,
             file,
             indent=2,
-            ensure_ascii=False
+            ensure_ascii=False,
         )
-
-    print(
-        f"Created raw response: {filename}"
-    )
-
-
-# ============================================================
-# LOAD / CONVERT NUMERIC VALUE
-# ============================================================
-
-def to_float(value):
-
-    if value is None:
-        return None
-
-    try:
-        return float(value)
-
-    except (TypeError, ValueError):
-        return None
 
 
 # ============================================================
 # EARNINGS
 # ============================================================
 
-def get_earnings(ticker):
+def fetch_earnings(ticker):
+    """
+    Fetch reported earnings.
 
-    print("\n" + "=" * 70)
-    print(f"{ticker} — EARNINGS")
-    print("=" * 70)
+    This is the primary Point-in-Time-safe source in V1.
+
+    We use:
+        reportedEPS
+        estimatedEPS
+        surprise
+        surprisePercentage
+        reportedDate
+        fiscalDateEnding
+    """
+
+    ticker = str(ticker).upper().strip()
 
     data = request_api(
         "EARNINGS",
         ticker
-    )
-
-    save_raw_json(
-        "msft_earnings_raw.json",
-        data
     )
 
     quarterly = data.get(
@@ -143,12 +241,7 @@ def get_earnings(ticker):
         []
     )
 
-    print(
-        f"\nQuarterly records returned: "
-        f"{len(quarterly)}"
-    )
-
-    rows = []
+    records = []
 
     for item in quarterly:
 
@@ -156,79 +249,232 @@ def get_earnings(ticker):
             "fiscalDateEnding"
         )
 
-        rows.append({
+        reported_date = item.get(
+            "reportedDate"
+        )
 
-            "ticker":
-                ticker,
+        reported_eps = to_float(
+            item.get("reportedEPS")
+        )
 
-            "fiscalDateEnding":
-                fiscal_date,
+        estimated_eps = to_float(
+            item.get("estimatedEPS")
+        )
 
-            "reportedDate":
-                item.get(
-                    "reportedDate"
-                ),
+        surprise = to_float(
+            item.get("surprise")
+        )
 
-            "reportedEPS":
-                to_float(
-                    item.get(
-                        "reportedEPS"
+        surprise_pct = to_float(
+            item.get("surprisePercentage")
+        )
+
+        calculated_surprise_pct = (
+            calculate_surprise_pct(
+                reported_eps,
+                estimated_eps
+            )
+        )
+
+        record = {
+
+            # ------------------------------------------------
+            # Identity
+            # ------------------------------------------------
+
+            "ticker": ticker,
+
+            "company": None,
+
+            "sector": None,
+
+            "industry": None,
+
+            "event_type": "CORPORATE_EARNINGS",
+
+            "fiscal_date_ending": fiscal_date,
+
+            "reported_date": reported_date,
+
+            # ------------------------------------------------
+            # EPS
+            # ------------------------------------------------
+
+            "eps_actual": reported_eps,
+
+            "eps_consensus": estimated_eps,
+
+            "eps_surprise": surprise,
+
+            "eps_surprise_pct": surprise_pct,
+
+            "eps_surprise_pct_calculated":
+                calculated_surprise_pct,
+
+            # ------------------------------------------------
+            # Revenue
+            #
+            # Not populated from EARNINGS.
+            # ------------------------------------------------
+
+            "revenue_actual": None,
+
+            "revenue_consensus": None,
+
+            "revenue_surprise": None,
+
+            "revenue_surprise_pct": None,
+
+            # ------------------------------------------------
+            # Growth / margins
+            #
+            # Not assumed available in V1.
+            # ------------------------------------------------
+
+            "eps_growth_yoy": None,
+
+            "revenue_growth_yoy": None,
+
+            "gross_margin": None,
+
+            "operating_margin": None,
+
+            "net_margin": None,
+
+            "margin_change_yoy": None,
+
+            # ------------------------------------------------
+            # Guidance
+            # ------------------------------------------------
+
+            "guidance_direction": None,
+
+            "guidance_eps": None,
+
+            "guidance_revenue": None,
+
+            # ------------------------------------------------
+            # Revisions
+            #
+            # These are populated later from
+            # EARNINGS_ESTIMATES.
+            # ------------------------------------------------
+
+            "forward_eps_revision_7d_pct": None,
+
+            "forward_eps_revision_30d_pct": None,
+
+            "forward_eps_revision_60d_pct": None,
+
+            "forward_eps_revision_90d_pct": None,
+
+            "eps_revision_up_7d": None,
+
+            "eps_revision_down_7d": None,
+
+            "eps_revision_up_30d": None,
+
+            "eps_revision_down_30d": None,
+
+            # ------------------------------------------------
+            # Event classification
+            # ------------------------------------------------
+
+            "earnings_beat": (
+                True
+                if (
+                    reported_eps is not None
+                    and estimated_eps is not None
+                    and reported_eps > estimated_eps
+                )
+                else (
+                    False
+                    if (
+                        reported_eps is not None
+                        and estimated_eps is not None
                     )
-                ),
+                    else None
+                )
+            ),
 
-            "estimatedEPS":
-                to_float(
-                    item.get(
-                        "estimatedEPS"
-                    )
-                ),
+            # Revenue beat cannot be determined.
+            "revenue_beat": None,
 
-            "surprise":
-                to_float(
-                    item.get(
-                        "surprise"
-                    )
-                ),
+            # ------------------------------------------------
+            # Market reaction
+            #
+            # Not populated in V1.
+            # Historical market reaction belongs to the
+            # future Historical Analog Engine.
+            # ------------------------------------------------
 
-            "surprisePercentage":
-                to_float(
-                    item.get(
-                        "surprisePercentage"
-                    )
-                ),
-        })
+            "sp500_reaction_1d": None,
 
-    return rows
+            "sp500_reaction_3d": None,
+
+            "sp500_reaction_5d": None,
+
+            "sp500_reaction_20d": None,
+
+            # ------------------------------------------------
+            # Point-in-Time protection
+            # ------------------------------------------------
+
+            "point_in_time": True,
+
+            "point_in_time_safe": True,
+
+            "point_in_time_reason":
+                "Reported EPS and consensus EPS are tied to the earnings event.",
+
+            "data_as_of": reported_date,
+
+            "source": "Alpha Vantage EARNINGS",
+
+            "source_type": "primary",
+
+            "historical_analog_eligible": True,
+
+            # ------------------------------------------------
+            # Data quality
+            # ------------------------------------------------
+
+            "data_quality": "PRIMARY_EVENT_DATA",
+
+        }
+
+        records.append(record)
+
+    return records
 
 
 # ============================================================
 # EARNINGS ESTIMATES
 # ============================================================
 
-def get_estimates(ticker):
+def fetch_estimates(ticker):
+    """
+    Fetch Alpha Vantage earnings estimates.
 
-    print("\n" + "=" * 70)
-    print(
-        f"{ticker} — EARNINGS ESTIMATES"
-    )
-    print("=" * 70)
+    IMPORTANT:
+    The revision snapshots returned by this endpoint are NOT
+    automatically treated as Point-in-Time historical data.
 
-    print(
-        f"\nWaiting {REQUEST_DELAY} seconds..."
-    )
+    Therefore:
+        point_in_time_safe = False
 
-    time.sleep(
-        REQUEST_DELAY
-    )
+    in the estimate records.
+
+    These values may be used for CURRENT earnings intelligence,
+    but V1 does not allow them to contaminate historical
+    analog calculations.
+    """
+
+    ticker = str(ticker).upper().strip()
 
     data = request_api(
         "EARNINGS_ESTIMATES",
         ticker
-    )
-
-    save_raw_json(
-        "msft_earnings_estimates_raw.json",
-        data
     )
 
     estimates = data.get(
@@ -236,95 +482,113 @@ def get_estimates(ticker):
         []
     )
 
-    print(
-        f"\nTotal estimate records returned: "
-        f"{len(estimates)}"
-    )
-
-    rows = []
+    records = []
 
     for item in estimates:
 
         horizon = str(
-            item.get(
-                "horizon",
-                ""
-            )
-        ).lower()
-
-        # ----------------------------------------------------
-        # We only want fiscal-quarter estimates.
-        # Fiscal-year estimates are kept out of this V1 test.
-        # ----------------------------------------------------
+            item.get("horizon", "")
+        ).strip().lower()
 
         if horizon != "fiscal quarter":
             continue
 
-        rows.append({
+        fiscal_date = item.get("date")
 
-            "ticker":
-                ticker,
+        eps_average = to_float(
+            item.get(
+                "eps_estimate_average"
+            )
+        )
 
-            "fiscalDateEnding":
-                item.get(
-                    "date"
-                ),
+        eps_7d = to_float(
+            item.get(
+                "eps_estimate_average_7_days_ago"
+            )
+        )
+
+        eps_30d = to_float(
+            item.get(
+                "eps_estimate_average_30_days_ago"
+            )
+        )
+
+        eps_60d = to_float(
+            item.get(
+                "eps_estimate_average_60_days_ago"
+            )
+        )
+
+        eps_90d = to_float(
+            item.get(
+                "eps_estimate_average_90_days_ago"
+            )
+        )
+
+        record = {
+
+            "ticker": ticker,
+
+            "fiscal_date_ending":
+                fiscal_date,
 
             "horizon":
-                item.get(
-                    "horizon"
-                ),
+                item.get("horizon"),
 
-            "epsEstimate":
-                to_float(
-                    item.get(
-                        "eps_estimate_average"
-                    )
-                ),
+            # ------------------------------------------------
+            # EPS estimates
+            # ------------------------------------------------
 
-            "epsEstimateHigh":
+            "eps_estimate":
+                eps_average,
+
+            "eps_estimate_high":
                 to_float(
                     item.get(
                         "eps_estimate_high"
                     )
                 ),
 
-            "epsEstimateLow":
+            "eps_estimate_low":
                 to_float(
                     item.get(
                         "eps_estimate_low"
                     )
                 ),
 
-            "epsAnalystCount":
+            "eps_analyst_count":
                 to_float(
                     item.get(
                         "eps_estimate_analyst_count"
                     )
                 ),
 
-            "revenueEstimate":
+            # ------------------------------------------------
+            # Revenue estimates
+            # ------------------------------------------------
+
+            "revenue_estimate":
                 to_float(
                     item.get(
                         "revenue_estimate_average"
                     )
                 ),
 
-            "revenueEstimateHigh":
+            "revenue_estimate_high":
                 to_float(
                     item.get(
                         "revenue_estimate_high"
                     )
                 ),
 
-            "revenueEstimateLow":
+            "revenue_estimate_low":
                 to_float(
                     item.get(
                         "revenue_estimate_low"
                     )
                 ),
 
-            "revenueAnalystCount":
+            "revenue_analyst_count":
                 to_float(
                     item.get(
                         "revenue_estimate_analyst_count"
@@ -332,284 +596,196 @@ def get_estimates(ticker):
                 ),
 
             # ------------------------------------------------
-            # Historical consensus snapshots
+            # Historical snapshots
             # ------------------------------------------------
 
-            "epsEstimate7DaysAgo":
-                to_float(
-                    item.get(
-                        "eps_estimate_average_7_days_ago"
-                    )
-                ),
+            "eps_estimate_7d_ago":
+                eps_7d,
 
-            "epsEstimate30DaysAgo":
-                to_float(
-                    item.get(
-                        "eps_estimate_average_30_days_ago"
-                    )
-                ),
+            "eps_estimate_30d_ago":
+                eps_30d,
 
-            "epsEstimate60DaysAgo":
-                to_float(
-                    item.get(
-                        "eps_estimate_average_60_days_ago"
-                    )
-                ),
+            "eps_estimate_60d_ago":
+                eps_60d,
 
-            "epsEstimate90DaysAgo":
-                to_float(
-                    item.get(
-                        "eps_estimate_average_90_days_ago"
-                    )
-                ),
+            "eps_estimate_90d_ago":
+                eps_90d,
 
             # ------------------------------------------------
             # Revision counts
             # ------------------------------------------------
 
-            "epsRevisionUp7Days":
+            "eps_revision_up_7d":
                 to_float(
                     item.get(
                         "eps_estimate_revision_up_trailing_7_days"
                     )
                 ),
 
-            "epsRevisionDown7Days":
+            "eps_revision_down_7d":
                 to_float(
                     item.get(
                         "eps_estimate_revision_down_trailing_7_days"
                     )
                 ),
 
-            "epsRevisionUp30Days":
+            "eps_revision_up_30d":
                 to_float(
                     item.get(
                         "eps_estimate_revision_up_trailing_30_days"
                     )
                 ),
 
-            "epsRevisionDown30Days":
+            "eps_revision_down_30d":
                 to_float(
                     item.get(
                         "eps_estimate_revision_down_trailing_30_days"
                     )
                 ),
-        })
 
-    print(
-        f"\nFiscal-quarter estimate records: "
-        f"{len(rows)}"
-    )
+            # ------------------------------------------------
+            # Calculated revision percentages
+            # ------------------------------------------------
 
-    return rows
+            "eps_revision_7d_pct":
+                calculate_revision_pct(
+                    eps_average,
+                    eps_7d
+                ),
+
+            "eps_revision_30d_pct":
+                calculate_revision_pct(
+                    eps_average,
+                    eps_30d
+                ),
+
+            "eps_revision_60d_pct":
+                calculate_revision_pct(
+                    eps_average,
+                    eps_60d
+                ),
+
+            "eps_revision_90d_pct":
+                calculate_revision_pct(
+                    eps_average,
+                    eps_90d
+                ),
+
+            # ------------------------------------------------
+            # Point-in-Time protection
+            # ------------------------------------------------
+
+            "point_in_time": False,
+
+            "point_in_time_safe": False,
+
+            "point_in_time_reason":
+                "Alpha Vantage estimate snapshots are not treated as historical Point-in-Time observations in V1.",
+
+            "historical_analog_eligible":
+                False,
+
+            "source":
+                "Alpha Vantage EARNINGS_ESTIMATES",
+
+            "source_type":
+                "secondary_estimate_context",
+
+            "data_quality":
+                "CURRENT_ESTIMATE_CONTEXT",
+
+        }
+
+        records.append(record)
+
+    return records
 
 
 # ============================================================
-# MERGE EARNINGS + ESTIMATES
+# MERGE
 # ============================================================
 
-def merge_earnings_and_estimates(
-    earnings_rows,
-    estimate_rows
+def merge_earnings_data(
+    earnings_records,
+    estimate_records
 ):
+    """
+    Merge event-time earnings with estimate context.
 
-    print("\n" + "=" * 70)
-    print(
-        "MERGING EARNINGS + ESTIMATES"
-    )
-    print("=" * 70)
+    IMPORTANT:
+    Estimate context remains marked as non-PIT-safe.
+
+    The resulting event remains historically eligible only
+    when its core event data comes from EARNINGS.
+    """
 
     earnings_df = pd.DataFrame(
-        earnings_rows
+        earnings_records
     )
 
     estimates_df = pd.DataFrame(
-        estimate_rows
+        estimate_records
     )
 
     if earnings_df.empty:
-        print(
-            "No earnings data available."
-        )
         return pd.DataFrame()
 
     if estimates_df.empty:
-        print(
-            "No estimates data available."
-        )
         return earnings_df
 
-    # --------------------------------------------------------
-    # Normalize dates
-    # --------------------------------------------------------
-
     earnings_df[
-        "fiscalDateEnding"
+        "fiscal_date_ending"
     ] = pd.to_datetime(
         earnings_df[
-            "fiscalDateEnding"
+            "fiscal_date_ending"
         ],
         errors="coerce"
     )
 
     estimates_df[
-        "fiscalDateEnding"
+        "fiscal_date_ending"
     ] = pd.to_datetime(
         estimates_df[
-            "fiscalDateEnding"
+            "fiscal_date_ending"
         ],
         errors="coerce"
     )
-
-    # --------------------------------------------------------
-    # Merge using ticker + fiscal period
-    # --------------------------------------------------------
 
     merged = pd.merge(
         earnings_df,
         estimates_df,
         on=[
             "ticker",
-            "fiscalDateEnding"
+            "fiscal_date_ending"
         ],
         how="left",
         suffixes=(
             "",
-            "_estimate"
+            "_estimate_context"
         )
     )
 
     # --------------------------------------------------------
-    # Calculate additional metrics
+    # IMPORTANT:
+    #
+    # The estimate context does NOT make the event
+    # non-PIT-safe because the core event data remains safe.
+    #
+    # However, these revision fields must NOT be used in
+    # historical analog calculations until independently
+    # validated.
     # --------------------------------------------------------
 
     merged[
-        "epsSurprisePctCalculated"
-    ] = None
-
-    valid_eps = (
-        merged["reportedEPS"].notna()
-        &
-        merged["epsEstimate"].notna()
-        &
-        (merged["epsEstimate"] != 0)
-    )
-
-    merged.loc[
-        valid_eps,
-        "epsSurprisePctCalculated"
-    ] = (
-        (
-            merged.loc[
-                valid_eps,
-                "reportedEPS"
-            ]
-            -
-            merged.loc[
-                valid_eps,
-                "epsEstimate"
-            ]
-        )
-        /
-        merged.loc[
-            valid_eps,
-            "epsEstimate"
-        ]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Estimate revision momentum
-    # --------------------------------------------------------
-
-    valid_7d = (
-        merged[
-            "epsEstimate7DaysAgo"
-        ].notna()
-        &
-        merged[
-            "epsEstimate7DaysAgo"
-        ].ne(0)
-        &
-        merged[
-            "epsEstimate"
-        ].notna()
-    )
+        "revision_context_historical_safe"
+    ] = False
 
     merged[
-        "epsRevisionPct7Days"
-    ] = None
-
-    merged.loc[
-        valid_7d,
-        "epsRevisionPct7Days"
-    ] = (
-        (
-            merged.loc[
-                valid_7d,
-                "epsEstimate"
-            ]
-            -
-            merged.loc[
-                valid_7d,
-                "epsEstimate7DaysAgo"
-            ]
-        )
-        /
-        merged.loc[
-            valid_7d,
-            "epsEstimate7DaysAgo"
-        ]
-        * 100
-    )
-
-    valid_30d = (
-        merged[
-            "epsEstimate30DaysAgo"
-        ].notna()
-        &
-        merged[
-            "epsEstimate30DaysAgo"
-        ].ne(0)
-        &
-        merged[
-            "epsEstimate"
-        ].notna()
-    )
-
-    merged[
-        "epsRevisionPct30Days"
-    ] = None
-
-    merged.loc[
-        valid_30d,
-        "epsRevisionPct30Days"
-    ] = (
-        (
-            merged.loc[
-                valid_30d,
-                "epsEstimate"
-            ]
-            -
-            merged.loc[
-                valid_30d,
-                "epsEstimate30DaysAgo"
-            ]
-        )
-        /
-        merged.loc[
-            valid_30d,
-            "epsEstimate30DaysAgo"
-        ]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Sort newest first
-    # --------------------------------------------------------
+        "historical_analog_revision_safe"
+    ] = False
 
     merged = merged.sort_values(
-        "fiscalDateEnding",
+        "fiscal_date_ending",
         ascending=False
     )
 
@@ -617,14 +793,330 @@ def merge_earnings_and_estimates(
 
 
 # ============================================================
-# MAIN
+# PUBLIC FUNCTION
 # ============================================================
 
-def main():
+def build_earnings_intelligence(
+    ticker,
+    include_estimates=True
+):
+    """
+    Main public function.
+
+    Returns a DataFrame containing Corporate Earnings
+    Intelligence for one ticker.
+
+    Example:
+
+        df = build_earnings_intelligence("MSFT")
+
+    """
+
+    ticker = str(
+        ticker
+    ).upper().strip()
+
+    earnings_records = fetch_earnings(
+        ticker
+    )
+
+    if not include_estimates:
+
+        return pd.DataFrame(
+            earnings_records
+        )
+
+    # Respect Alpha Vantage free-tier rate limits.
+    time.sleep(
+        REQUEST_DELAY
+    )
+
+    estimate_records = fetch_estimates(
+        ticker
+    )
+
+    return merge_earnings_data(
+        earnings_records,
+        estimate_records
+    )
+
+
+# ============================================================
+# EVENT FINGERPRINT
+# ============================================================
+
+def build_event_fingerprint(row):
+    """
+    Convert one earnings event into a conservative
+    Corporate Earnings Event Fingerprint.
+
+    V1 only uses information that is explicitly available.
+
+    Missing information remains None.
+
+    This function does NOT produce a market forecast.
+    """
+
+    eps_surprise_pct = row.get(
+        "eps_surprise_pct"
+    )
+
+    if eps_surprise_pct is None:
+        eps_surprise_pct = row.get(
+            "eps_surprise_pct_calculated"
+        )
+
+    # --------------------------------------------------------
+    # EPS surprise classification
+    # --------------------------------------------------------
+
+    if eps_surprise_pct is None:
+
+        eps_surprise_bucket = (
+            "UNKNOWN"
+        )
+
+    elif eps_surprise_pct >= 10:
+
+        eps_surprise_bucket = (
+            "LARGE_POSITIVE"
+        )
+
+    elif eps_surprise_pct >= 3:
+
+        eps_surprise_bucket = (
+            "POSITIVE"
+        )
+
+    elif eps_surprise_pct > -3:
+
+        eps_surprise_bucket = (
+            "NEUTRAL"
+        )
+
+    elif eps_surprise_pct > -10:
+
+        eps_surprise_bucket = (
+            "NEGATIVE"
+        )
+
+    else:
+
+        eps_surprise_bucket = (
+            "LARGE_NEGATIVE"
+        )
+
+    # --------------------------------------------------------
+    # Earnings beat
+    # --------------------------------------------------------
+
+    earnings_beat = row.get(
+        "earnings_beat"
+    )
+
+    # --------------------------------------------------------
+    # Revision context
+    #
+    # Explicitly marked as NOT historical-safe.
+    # --------------------------------------------------------
+
+    revision_7d = row.get(
+        "eps_revision_7d_pct"
+    )
+
+    revision_30d = row.get(
+        "eps_revision_30d_pct"
+    )
+
+    fingerprint = {
+
+        "event_type":
+            "CORPORATE_EARNINGS",
+
+        "ticker":
+            row.get("ticker"),
+
+        "fiscal_date_ending":
+            row.get("fiscal_date_ending"),
+
+        "reported_date":
+            row.get("reported_date"),
+
+        # ----------------------------------------------------
+        # EPS
+        # ----------------------------------------------------
+
+        "eps_actual":
+            row.get("eps_actual"),
+
+        "eps_consensus":
+            row.get("eps_consensus"),
+
+        "eps_surprise":
+            row.get("eps_surprise"),
+
+        "eps_surprise_pct":
+            eps_surprise_pct,
+
+        "eps_surprise_bucket":
+            eps_surprise_bucket,
+
+        "earnings_beat":
+            earnings_beat,
+
+        # ----------------------------------------------------
+        # Revenue
+        # ----------------------------------------------------
+
+        "revenue_actual":
+            row.get("revenue_actual"),
+
+        "revenue_consensus":
+            row.get("revenue_consensus"),
+
+        "revenue_surprise_pct":
+            row.get("revenue_surprise_pct"),
+
+        # ----------------------------------------------------
+        # Growth / margins
+        # ----------------------------------------------------
+
+        "eps_growth_yoy":
+            row.get("eps_growth_yoy"),
+
+        "revenue_growth_yoy":
+            row.get("revenue_growth_yoy"),
+
+        "margin_change_yoy":
+            row.get("margin_change_yoy"),
+
+        # ----------------------------------------------------
+        # Guidance
+        # ----------------------------------------------------
+
+        "guidance_direction":
+            row.get("guidance_direction"),
+
+        # ----------------------------------------------------
+        # Revision context
+        #
+        # IMPORTANT:
+        # Not historical analog eligible in V1.
+        # ----------------------------------------------------
+
+        "eps_revision_7d_pct":
+            revision_7d,
+
+        "eps_revision_30d_pct":
+            revision_30d,
+
+        "revision_context_historical_safe":
+            False,
+
+        # ----------------------------------------------------
+        # Point in time
+        # ----------------------------------------------------
+
+        "point_in_time":
+            True,
+
+        "historical_analog_eligible":
+            True,
+
+        "historical_analog_revision_safe":
+            False,
+
+        "data_as_of":
+            row.get("data_as_of"),
+
+        "source":
+            row.get("source"),
+
+        "data_quality":
+            row.get("data_quality"),
+
+    }
+
+    return fingerprint
+
+
+# ============================================================
+# BUILD FINGERPRINTS
+# ============================================================
+
+def build_earnings_fingerprints(
+    earnings_df
+):
+    """
+    Build one fingerprint per earnings event.
+    """
+
+    if earnings_df is None:
+        return []
+
+    if earnings_df.empty:
+        return []
+
+    fingerprints = []
+
+    for _, row in earnings_df.iterrows():
+
+        fingerprints.append(
+            build_event_fingerprint(
+                row
+            )
+        )
+
+    return fingerprints
+
+
+# ============================================================
+# EXPORT
+# ============================================================
+
+def export_earnings_intelligence(
+    ticker,
+    output_csv=None
+):
+    """
+    Build and export earnings intelligence.
+    """
+
+    ticker = str(
+        ticker
+    ).upper().strip()
+
+    df = build_earnings_intelligence(
+        ticker
+    )
+
+    if output_csv is None:
+
+        output_csv = (
+            f"{ticker.lower()}_earnings_intelligence_v1.csv"
+        )
+
+    df.to_csv(
+        output_csv,
+        index=False
+    )
+
+    return df
+
+
+# ============================================================
+# SELF TEST
+# ============================================================
+
+def run_self_test():
+    """
+    Simple source/integrity test.
+
+    This is intentionally conservative.
+    """
 
     print(
-        "\n"
-        + "#" * 70
+        "\n" + "=" * 70
     )
 
     print(
@@ -632,235 +1124,123 @@ def main():
     )
 
     print(
-        "CORPORATE EARNINGS SOURCE TEST V3"
+        "CORPORATE EARNINGS INTELLIGENCE V1"
     )
 
     print(
-        "#" * 70
+        "=" * 70
+    )
+
+    ticker = "MSFT"
+
+    print(
+        f"\nTicker: {ticker}"
+    )
+
+    df = build_earnings_intelligence(
+        ticker
+    )
+
+    if df.empty:
+
+        print(
+            "\nNo earnings records returned."
+        )
+
+        return
+
+    print(
+        "\nRecords:",
+        len(df)
     )
 
     print(
-        f"\nTicker: {TICKER}"
+        "Point-in-Time-safe:",
+        int(
+            df[
+                "point_in_time_safe"
+            ].sum()
+        )
     )
 
-    # --------------------------------------------------------
-    # STEP 1 — Earnings
-    # --------------------------------------------------------
-
-    earnings_rows = get_earnings(
-        TICKER
+    print(
+        "Historical Analog eligible:",
+        int(
+            df[
+                "historical_analog_eligible"
+            ].sum()
+        )
     )
 
-    # --------------------------------------------------------
-    # STEP 2 — Estimates
-    # --------------------------------------------------------
-
-    estimate_rows = get_estimates(
-        TICKER
+    print(
+        "\nLatest earnings events:"
     )
 
-    # --------------------------------------------------------
-    # STEP 3 — Save individual datasets
-    # --------------------------------------------------------
+    display_columns = [
 
-    earnings_df = pd.DataFrame(
-        earnings_rows
-    )
+        "ticker",
 
-    estimates_df = pd.DataFrame(
-        estimate_rows
-    )
+        "fiscal_date_ending",
 
-    earnings_df.to_csv(
-        "earnings_source_test.csv",
-        index=False
-    )
+        "reported_date",
 
-    estimates_df.to_csv(
-        "earnings_estimates_source_test.csv",
-        index=False
-    )
+        "eps_actual",
 
-    # --------------------------------------------------------
-    # STEP 4 — Merge
-    # --------------------------------------------------------
+        "eps_consensus",
 
-    merged_df = merge_earnings_and_estimates(
-        earnings_rows,
-        estimate_rows
-    )
+        "eps_surprise",
 
-    # --------------------------------------------------------
-    # STEP 5 — Save merged dataset
-    # --------------------------------------------------------
+        "eps_surprise_pct",
 
-    if not merged_df.empty:
+        "earnings_beat",
 
-        merged_df.to_csv(
-            "earnings_combined_test.csv",
+        "revenue_consensus",
+
+        "eps_revision_7d_pct",
+
+        "eps_revision_30d_pct",
+
+        "point_in_time_safe",
+
+        "historical_analog_eligible",
+
+    ]
+
+    available_columns = [
+        col
+        for col in display_columns
+        if col in df.columns
+    ]
+
+    print(
+        df[
+            available_columns
+        ].head(10).to_string(
             index=False
         )
+    )
 
-        print(
-            "\nCreated:"
-        )
+    output_file = (
+        "msft_earnings_intelligence_v1.csv"
+    )
 
-        print(
-            "earnings_combined_test.csv"
-        )
-
-    # --------------------------------------------------------
-    # STEP 6 — Display latest records
-    # --------------------------------------------------------
-
-    print(
-        "\n"
-        + "=" * 70
+    df.to_csv(
+        output_file,
+        index=False
     )
 
     print(
-        "LATEST COMBINED EARNINGS RECORDS"
+        f"\nCreated: {output_file}"
     )
 
     print(
-        "=" * 70
-    )
-
-    if not merged_df.empty:
-
-        display_columns = [
-
-            "ticker",
-
-            "fiscalDateEnding",
-
-            "reportedDate",
-
-            "reportedEPS",
-
-            "estimatedEPS",
-
-            "surprise",
-
-            "surprisePercentage",
-
-            "epsEstimate",
-
-            "revenueEstimate",
-
-            "epsAnalystCount",
-
-            "revenueAnalystCount",
-
-            "epsEstimate7DaysAgo",
-
-            "epsEstimate30DaysAgo",
-
-            "epsRevisionUp7Days",
-
-            "epsRevisionDown7Days",
-
-            "epsRevisionUp30Days",
-
-            "epsRevisionDown30Days",
-
-            "epsRevisionPct7Days",
-
-            "epsRevisionPct30Days",
-        ]
-
-        available_columns = [
-            col
-            for col in display_columns
-            if col in merged_df.columns
-        ]
-
-        print(
-            merged_df[
-                available_columns
-            ].head(10).to_string(
-                index=False
-            )
-        )
-
-    else:
-
-        print(
-            "No combined records available."
-        )
-
-    # --------------------------------------------------------
-    # FINAL SUMMARY
-    # --------------------------------------------------------
-
-    print(
-        "\n"
-        + "=" * 70
-    )
-
-    print(
-        "TEST SUMMARY"
-    )
-
-    print(
-        "=" * 70
-    )
-
-    print(
-        f"Earnings records: "
-        f"{len(earnings_rows)}"
-    )
-
-    print(
-        f"Quarterly estimate records: "
-        f"{len(estimate_rows)}"
-    )
-
-    if not merged_df.empty:
-
-        matched = (
-            merged_df[
-                "epsEstimate"
-            ].notna()
-        ).sum()
-
-        print(
-            f"Matched earnings + estimates: "
-            f"{matched}"
-        )
-
-    print(
-        "\nGenerated files:"
-    )
-
-    print(
-        " - earnings_source_test.csv"
-    )
-
-    print(
-        " - earnings_estimates_source_test.csv"
-    )
-
-    print(
-        " - earnings_combined_test.csv"
-    )
-
-    print(
-        " - msft_earnings_raw.json"
-    )
-
-    print(
-        " - msft_earnings_estimates_raw.json"
-    )
-
-    print(
-        "\nCORPORATE EARNINGS SOURCE TEST V3 COMPLETED"
+        "\nV1 SELF TEST COMPLETED"
     )
 
 
 # ============================================================
-# ENTRY POINT
+# MAIN
 # ============================================================
 
 if __name__ == "__main__":
-    main()
+    run_self_test()
