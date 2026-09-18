@@ -2,6 +2,7 @@ name: Test Earnings Market Reaction V4
 
 on:
   workflow_dispatch:
+
   push:
     paths:
       - "earnings_market_reaction_v4.py"
@@ -11,31 +12,104 @@ on:
 
 jobs:
   test-earnings-reaction-v4:
+
     runs-on: ubuntu-latest
 
     steps:
+
+      # --------------------------------------------------
+      # 1. Checkout the exact branch/commit
+      # --------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      # --------------------------------------------------
+      # 2. Python
+      # --------------------------------------------------
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # --------------------------------------------------
+      # 3. Verify repository structure
+      # --------------------------------------------------
+
+      - name: Verify V4 files
+        run: |
+          echo "=========================================="
+          echo "WORKSPACE"
+          echo "=========================================="
+          pwd
+
+          echo ""
+          echo "=========================================="
+          echo "GIT BRANCH"
+          echo "=========================================="
+          git branch --show-current || true
+
+          echo ""
+          echo "=========================================="
+          echo "GIT COMMIT"
+          echo "=========================================="
+          git log -1 --oneline
+
+          echo ""
+          echo "=========================================="
+          echo "EARNINGS FILES"
+          echo "=========================================="
+          find . -maxdepth 2 -type f | sort | grep -E "earnings|requirements"
+
+          echo ""
+          echo "=========================================="
+          echo "CHECK V4 SCRIPT"
+          echo "=========================================="
+
+          if [ -f "earnings_market_reaction_v4.py" ]; then
+            echo "V4 script FOUND."
+            ls -lh earnings_market_reaction_v4.py
+          else
+            echo "ERROR: V4 script NOT FOUND."
+            echo "Files in repository root:"
+            ls -la
+            exit 1
+          fi
+
+      # --------------------------------------------------
+      # 4. Install dependencies
+      # --------------------------------------------------
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # --------------------------------------------------
+      # 5. Run V4
+      # --------------------------------------------------
+
       - name: Run Corporate Earnings Intelligence V4
-        env:
-          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
         run: |
+          echo "=========================================="
+          echo "RUNNING CORPORATE EARNINGS INTELLIGENCE V4"
+          echo "=========================================="
+
           python earnings_market_reaction_v4.py
+
+      # --------------------------------------------------
+      # 6. Verify outputs
+      # --------------------------------------------------
 
       - name: Check generated files
         run: |
-          echo "Checking V4 output files..."
+          echo "=========================================="
+          echo "CHECKING V4 OUTPUT FILES"
+          echo "=========================================="
 
           test -f earnings_market_reaction_v4.csv
           test -f earnings_event_study_v4.csv
@@ -44,7 +118,22 @@ jobs:
           test -f earnings_reaction_by_eps_class_v4.csv
           test -f earnings_reaction_by_sector_v4.csv
 
+          echo ""
           echo "All V4 output files were created successfully."
+
+          echo ""
+          echo "Generated files:"
+          ls -lh \
+            earnings_market_reaction_v4.csv \
+            earnings_event_study_v4.csv \
+            earnings_abnormal_return_v4.csv \
+            earnings_market_reaction_summary_v4.csv \
+            earnings_reaction_by_eps_class_v4.csv \
+            earnings_reaction_by_sector_v4.csv
+
+      # --------------------------------------------------
+      # 7. Upload results
+      # --------------------------------------------------
 
       - name: Upload V4 results
         uses: actions/upload-artifact@v4
