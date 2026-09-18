@@ -11,193 +11,173 @@ on:
       - ".github/workflows/test_earning_reaction_v4.yml"
 
 jobs:
+
   earnings-market-reaction-v4:
 
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==================================================
-      # 1. Checkout repository
-      # ==================================================
+      # ==========================================================
+      # Checkout
+      # ==========================================================
 
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
 
-      # ==================================================
-      # 2. Setup Python
-      # ==================================================
+      # ==========================================================
+      # Python
+      # ==========================================================
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ==================================================
-      # 3. Verify files
-      # ==================================================
+      # ==========================================================
+      # Debug repository
+      # ==========================================================
 
-      - name: Verify repository files
+      - name: Repository Debug
         run: |
           echo "=========================================="
-          echo "REPOSITORY"
+          echo "WORKSPACE"
           echo "=========================================="
-
           pwd
 
           echo ""
-          echo "Branch:"
+          echo "=========================================="
+          echo "GIT BRANCH"
+          echo "=========================================="
           git branch --show-current
 
           echo ""
-          echo "Commit:"
+          echo "=========================================="
+          echo "GIT COMMIT"
+          echo "=========================================="
           git log -1 --oneline
 
           echo ""
-          echo "Earnings Python files:"
-          ls -lh *earning*.py
-
-          echo ""
-          echo "Checking V2..."
-          test -f earnings_breadth_v2.py
-          echo "V2 script FOUND."
-
-          echo ""
-          echo "Checking V4..."
-          test -f earnings_market_reaction_v4.py
-          echo "V4 script FOUND."
-
-          echo ""
           echo "=========================================="
-          echo "REPOSITORY CHECK PASSED"
+          echo "FILES"
+          echo "=========================================="
+          find . -maxdepth 1 -type f
+
+      # ==========================================================
+      # Check V2
+      # ==========================================================
+
+      - name: Check V2 Script
+        run: |
+          echo "=========================================="
+          echo "CHECK V2"
           echo "=========================================="
 
-      # ==================================================
-      # 4. Install dependencies
-      # ==================================================
+          if [ -f "earnings_breadth_v2.py" ]; then
+              echo "V2 FOUND"
+          else
+              echo "ERROR: earnings_breadth_v2.py NOT FOUND"
+              exit 1
+          fi
+
+      # ==========================================================
+      # Check V4
+      # ==========================================================
+
+      - name: Check V4 Script
+        run: |
+          echo "=========================================="
+          echo "CHECK V4"
+          echo "=========================================="
+
+          ls -lh
+
+          if [ -f "earnings_market_reaction_v4.py" ]; then
+              echo "V4 FOUND"
+          else
+              echo "ERROR: earnings_market_reaction_v4.py NOT FOUND"
+              exit 1
+          fi
+
+      # ==========================================================
+      # Install dependencies
+      # ==========================================================
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
 
-      # ==================================================
-      # 5. Run V2
-      # ==================================================
+          if [ -f "requirements.txt" ]; then
+              pip install -r requirements.txt
+          fi
+
+          pip install pandas
+          pip install requests
+          pip install yfinance
+          pip install numpy
+
+      # ==========================================================
+      # Run V2
+      # ==========================================================
 
       - name: Run Earnings Breadth V2
         env:
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
         run: |
           echo "=========================================="
-          echo "RUNNING EARNINGS BREADTH V2"
+          echo "RUNNING V2"
           echo "=========================================="
 
           python earnings_breadth_v2.py
 
-      # ==================================================
-      # 6. Verify V2 output
-      # ==================================================
+      # ==========================================================
+      # Check V2 Output
+      # ==========================================================
 
-      - name: Verify V2 output
+      - name: Verify V2 Output
         run: |
           echo "=========================================="
-          echo "CHECKING V2 OUTPUT"
+          echo "CHECK V2 OUTPUT"
           echo "=========================================="
 
-          test -f earnings_breadth_events_v2.csv
+          if [ -f "earnings_breadth_events_v2.csv" ]; then
+              echo "CSV FOUND"
+              ls -lh earnings_breadth_events_v2.csv
+          else
+              echo "ERROR: earnings_breadth_events_v2.csv NOT FOUND"
+              exit 1
+          fi
 
-          echo "V2 output FOUND:"
-          ls -lh earnings_breadth_events_v2.csv
+      # ==========================================================
+      # Run V4
+      # ==========================================================
 
-          echo ""
-          echo "V2 output preview:"
-          head -n 5 earnings_breadth_events_v2.csv
-
-      # ==================================================
-      # 7. Run V4
-      # ==================================================
-
-      - name: Run Corporate Earnings Intelligence V4
+      - name: Run Earnings Market Reaction V4
         run: |
           echo "=========================================="
-          echo "RUNNING CORPORATE EARNINGS INTELLIGENCE V4"
+          echo "RUNNING V4"
           echo "=========================================="
 
           python earnings_market_reaction_v4.py
 
-      # ==================================================
-      # 8. Verify V4 outputs
-      # ==================================================
+      # ==========================================================
+      # Check outputs
+      # ==========================================================
 
-      - name: Verify V4 outputs
+      - name: Verify V4 Outputs
         run: |
           echo "=========================================="
-          echo "CHECKING V4 OUTPUT FILES"
+          echo "CHECK OUTPUTS"
           echo "=========================================="
 
-          test -f earnings_market_reaction_v4.csv
-          test -f earnings_event_study_v4.csv
-          test -f earnings_abnormal_return_v4.csv
-          test -f earnings_market_reaction_summary_v4.csv
-          test -f earnings_reaction_by_eps_class_v4.csv
-          test -f earnings_reaction_by_sector_v4.csv
+          ls -lh *.csv || true
 
-          echo ""
-          echo "ALL V4 OUTPUT FILES CREATED SUCCESSFULLY."
+      # ==========================================================
+      # Upload results
+      # ==========================================================
 
-          echo ""
-          echo "Generated files:"
-          ls -lh \
-            earnings_market_reaction_v4.csv \
-            earnings_event_study_v4.csv \
-            earnings_abnormal_return_v4.csv \
-            earnings_market_reaction_summary_v4.csv \
-            earnings_reaction_by_eps_class_v4.csv \
-            earnings_reaction_by_sector_v4.csv
-
-      # ==================================================
-      # 9. Show important results
-      # ==================================================
-
-      - name: Display V4 summary
-        run: |
-          echo "=========================================="
-          echo "V4 SUMMARY"
-          echo "=========================================="
-
-          cat earnings_market_reaction_summary_v4.csv
-
-          echo ""
-          echo "=========================================="
-          echo "EPS CLASS SUMMARY"
-          echo "=========================================="
-
-          cat earnings_reaction_by_eps_class_v4.csv
-
-          echo ""
-          echo "=========================================="
-          echo "SECTOR SUMMARY"
-          echo "=========================================="
-
-          cat earnings_reaction_by_sector_v4.csv
-
-      # ==================================================
-      # 10. Upload results
-      # ==================================================
-
-      - name: Upload V4 results
+      - name: Upload CSV Files
         uses: actions/upload-artifact@v4
         with:
-          name: corporate-earnings-intelligence-v4-results
-          path: |
-            earnings_breadth_events_v2.csv
-            earnings_market_reaction_v4.csv
-            earnings_event_study_v4.csv
-            earnings_abnormal_return_v4.csv
-            earnings_market_reaction_summary_v4.csv
-            earnings_reaction_by_eps_class_v4.csv
-            earnings_reaction_by_sector_v4.csv
+          name: earnings-v4-results
+          path: "*.csv"
