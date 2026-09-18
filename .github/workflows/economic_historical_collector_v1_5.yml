@@ -1,0 +1,330 @@
+name: Economic Historical Collector v1.5
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths:
+      - "economic_historical_collector_v1_5.py"
+      - ".github/workflows/collect_economic_historical_v1_5.yml"
+
+jobs:
+  collect-economic-historical:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------
+      # 2. Setup Python
+      # ------------------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ------------------------------------------------------------
+      # 3. Install dependencies
+      # ------------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+
+      # ------------------------------------------------------------
+      # 4. Run Historical Collector v1.5
+      # ------------------------------------------------------------
+      - name: Run Economic Historical Collector v1.5
+        run: |
+          python "./economic_historical_collector_v1_5.py"
+
+      # ------------------------------------------------------------
+      # 5. Validate Historical Data
+      # ------------------------------------------------------------
+      - name: Validate Historical Data
+        run: |
+          test -f economic_historical_events_v1.csv
+          test -f economic_historical_quality_v1.csv
+
+          python - <<'PY'
+          import pandas as pd
+
+          events = pd.read_csv(
+              "economic_historical_events_v1.csv"
+          )
+
+          quality = pd.read_csv(
+              "economic_historical_quality_v1.csv"
+          )
+
+          print("=" * 72)
+          print("HISTORICAL DATA VALIDATION")
+          print("=" * 72)
+
+          print(
+              f"Historical events: {len(events)}"
+          )
+
+          print(
+              f"Quality rows: {len(quality)}"
+          )
+
+          # --------------------------------------------------------
+          # Basic non-empty checks
+          # --------------------------------------------------------
+          if len(events) == 0:
+              raise SystemExit(
+                  "ERROR: Historical events file is empty."
+              )
+
+          if len(quality) == 0:
+              raise SystemExit(
+                  "ERROR: Historical quality file is empty."
+              )
+
+          # --------------------------------------------------------
+          # Expected Phase 1B.5 size
+          # --------------------------------------------------------
+          if len(events) != 48:
+              raise SystemExit(
+                  f"ERROR: Expected 48 historical records, "
+                  f"found {len(events)}."
+              )
+
+          if len(quality) != 48:
+              raise SystemExit(
+                  f"ERROR: Expected 48 quality rows, "
+                  f"found {len(quality)}."
+              )
+
+          # --------------------------------------------------------
+          # Required columns
+          # --------------------------------------------------------
+          required_events = {
+              "indicator",
+              "agency",
+              "release_date",
+              "release_time",
+              "reference_period",
+              "actual",
+              "vintage_date",
+              "source",
+              "source_url"
+          }
+
+          missing_events = (
+              required_events - set(events.columns)
+          )
+
+          if missing_events:
+              raise SystemExit(
+                  "ERROR: Missing event columns: "
+                  f"{sorted(missing_events)}"
+              )
+
+          required_quality = {
+              "record_id",
+              "indicator",
+              "agency",
+              "release_date",
+              "reference_period",
+              "point_in_time_safe",
+              "quality_issues",
+              "historical_consensus_available"
+          }
+
+          missing_quality = (
+              required_quality - set(quality.columns)
+          )
+
+          if missing_quality:
+              raise SystemExit(
+                  "ERROR: Missing quality columns: "
+                  f"{sorted(missing_quality)}"
+              )
+
+          # --------------------------------------------------------
+          # PIT validation
+          # --------------------------------------------------------
+          safe = (
+              quality["point_in_time_safe"]
+              .astype(str)
+              .str.strip()
+              .str.upper()
+              .isin(["TRUE", "1", "YES"])
+          )
+
+          safe_count = int(safe.sum())
+
+          print(
+              f"PIT safe: {safe_count}/{len(quality)}"
+          )
+
+          if safe_count != len(quality):
+              print("\nPIT UNSAFE RECORDS:")
+              print(
+                  quality.loc[
+                      ~safe,
+                      [
+                          "record_id",
+                          "indicator",
+                          "release_date",
+                          "quality_issues"
+                      ]
+                  ].to_string(index=False)
+              )
+
+              raise SystemExit(
+                  "ERROR: Historical data contains "
+                  "PIT-unsafe records."
+              )
+
+          # --------------------------------------------------------
+          # Record ID validation
+          # --------------------------------------------------------
+          if events.duplicated(
+              subset=[
+                  "indicator",
+                  "agency",
+                  "release_date",
+                  "release_time",
+                  "reference_period",
+                  "source_url"
+              ]
+          ).any():
+
+              raise SystemExit(
+                  "ERROR: Duplicate historical observations detected."
+              )
+
+          if quality["record_id"].duplicated().any():
+              raise SystemExit(
+                  "ERROR: Duplicate record_id detected."
+              )
+
+          # --------------------------------------------------------
+          # Consensus validation
+          # --------------------------------------------------------
+          consensus_count = int(
+              quality[
+                  "historical_consensus_available"
+              ]
+              .astype(str)
+              .str.strip()
+              .str.upper()
+              .isin(["TRUE", "1", "YES"])
+              .sum()
+          )
+
+          print(
+              f"Historical consensus: "
+              f"{consensus_count}/{len(quality)}"
+          )
+
+          if consensus_count != 0:
+              raise SystemExit(
+                  "ERROR: Unexpected historical consensus "
+                  "was introduced."
+              )
+
+          # --------------------------------------------------------
+          # Indicator validation
+          # --------------------------------------------------------
+          indicators = sorted(
+              events["indicator"]
+              .dropna()
+              .unique()
+              .tolist()
+          )
+
+          print(
+              f"Indicators: {len(indicators)}"
+          )
+
+          print("\nIndicators:")
+          for indicator in indicators:
+              count = int(
+                  (events["indicator"] == indicator).sum()
+              )
+              print(
+                  f"  {indicator}: {count}"
+              )
+
+          expected_indicators = {
+              "CPI",
+              "CORE_CPI",
+              "NFP",
+              "UNEMPLOYMENT_RATE",
+              "INITIAL_JOBLESS_CLAIMS",
+              "ISM_MANUFACTURING_PMI",
+              "GDP"
+          }
+
+          if set(indicators) != expected_indicators:
+              raise SystemExit(
+                  "ERROR: Indicator universe mismatch."
+              )
+
+          # --------------------------------------------------------
+          # 2023 batch validation
+          # --------------------------------------------------------
+          batch_2023 = events[
+              events["release_date"]
+              .astype(str)
+              .str.startswith("2023-")
+          ]
+
+          print(
+              f"\n2023 records: {len(batch_2023)}"
+          )
+
+          if len(batch_2023) != 10:
+              raise SystemExit(
+                  f"ERROR: Expected 10 records in the "
+                  f"2023 batch, found {len(batch_2023)}."
+              )
+
+          # --------------------------------------------------------
+          # Final result
+          # --------------------------------------------------------
+          print("\n" + "=" * 72)
+          print("HISTORICAL DATA VALIDATION: PASS")
+          print("=" * 72)
+
+          PY
+
+      # ------------------------------------------------------------
+      # 6. Upload artifacts
+      # ------------------------------------------------------------
+      - name: Upload Historical Collector Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-historical-v1-5
+          path: |
+            economic_historical_events_v1.csv
+            economic_historical_quality_v1.csv
+          if-no-files-found: error
+
+      # ------------------------------------------------------------
+      # 7. Final status
+      # ------------------------------------------------------------
+      - name: Economic Historical Collector Complete
+        run: |
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "ECONOMIC INTELLIGENCE — PHASE 1B.5"
+          echo "HISTORICAL COLLECTOR v1.5"
+          echo "============================================================"
+          echo ""
+          echo "Historical Collector: PASS"
+          echo "PIT Quality Gate:     PASS"
+          echo "Integrity Checks:     PASS"
+          echo "Artifacts:             UPLOADED"
+          echo ""
+          echo "Research-only."
+          echo "No Decision Engine integration."
+          echo "No trading signal generated."
