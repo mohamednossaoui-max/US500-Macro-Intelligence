@@ -1,27 +1,13 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Phase 1B.1
-Historical Collector v1.1 — OFFICIAL MANIFEST MODE
+Economic Intelligence — Phase 1B.2
+Historical Collector v1.2 — OFFICIAL MANIFEST MODE
 
-IMPORTANT:
-This version does NOT scrape BLS archive index pages.
-GitHub Actions runners can receive HTTP 403 from BLS, even though the
-official archive and individual releases are publicly accessible.
+Adds verified U.S. Department of Labor Initial Jobless Claims records
+to the validated BLS historical manifest.
 
-Therefore the collector is manifest-driven:
-- official release URL
-- release date/time
-- reference period
-- actual value(s)
-- vintage date
-- source
-
-Only records explicitly present in the verified manifest are exported.
-No value is calculated from a current/revised API and no consensus is
-invented.
-
-Batch 1.1 = verified BLS releases used to validate the historical pipeline.
-After this passes, expand the manifest in controlled batches.
+No scraping is performed. No consensus is fabricated.
+All values are release-time observations from official DOL releases.
 """
 
 from __future__ import annotations
@@ -53,145 +39,132 @@ class Record:
 
 
 # ---------------------------------------------------------------------
-# VERIFIED OFFICIAL RELEASE MANIFEST
-# ---------------------------------------------------------------------
-# Values below are copied from the official BLS release pages.
-# They are intentionally small in this first manifest batch so that
-# every record can be audited before the manifest is expanded.
-#
-# Official archive pages warn that archived data can later be revised.
-# vintage_date therefore equals the information-release date.
-#
-# Sources:
-# CPI:
-#   https://www.bls.gov/news.release/archives/cpi_08102022.htm
-#   https://www.bls.gov/news.release/archives/cpi_10132022.htm
-#   https://www.bls.gov/news.release/archives/cpi_11102022.htm
-#   https://www.bls.gov/news.release/archives/cpi_01122023.htm
-#
-# Employment:
-#   https://www.bls.gov/news.release/archives/empsit_08052022.htm
-#   https://www.bls.gov/news.release/archives/empsit_09022022.htm
-#   https://www.bls.gov/news.release/archives/empsit_11042022.htm
-#
-# We do not populate consensus because these official releases do not
-# provide the market consensus that existed immediately before release.
+# VERIFIED OFFICIAL MANIFEST
+# BLS records are retained from v1.1.
+# DOL claims records below are verified against official DOL releases.
+# Consensus remains UNKNOWN by design.
 # ---------------------------------------------------------------------
 
 OFFICIAL_MANIFEST = [
-    # CPI — July 2022, released Aug 10, 2022
-    Record(
-        "CPI", "BLS", "2022-08-10", "08:30 ET", "July 2022",
-        0.0, 1.3, None, None, None, "2022-08-10",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_08102022.htm",
-    ),
-    # Core CPI July 2022: 0.3% monthly increase (official release table/text).
-    Record(
-        "CORE_CPI", "BLS", "2022-08-10", "08:30 ET", "July 2022",
-        0.3, None, None, None, None, "2022-08-10",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_08102022.htm",
-    ),
+    # ------------------------- BLS CPI -------------------------
+    Record("CPI","BLS","2022-08-10","08:30 ET","July 2022",0.0,1.3,None,None,None,"2022-08-10",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_08102022.htm"),
+    Record("CORE_CPI","BLS","2022-08-10","08:30 ET","July 2022",0.3,None,None,None,None,"2022-08-10",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_08102022.htm"),
+    Record("CPI","BLS","2022-10-13","08:30 ET","September 2022",0.4,0.1,None,None,None,"2022-10-13",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_10132022.htm"),
+    Record("CORE_CPI","BLS","2022-10-13","08:30 ET","September 2022",0.6,None,None,None,None,"2022-10-13",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_10132022.htm"),
+    Record("CPI","BLS","2022-11-10","08:30 ET","October 2022",0.4,0.4,None,None,None,"2022-11-10",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_11102022.htm"),
+    Record("CORE_CPI","BLS","2022-11-10","08:30 ET","October 2022",0.3,None,None,None,None,"2022-11-10",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_11102022.htm"),
+    Record("CPI","BLS","2023-01-12","08:30 ET","December 2022",-0.1,0.1,None,None,None,"2023-01-12",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_01122023.htm"),
+    Record("CORE_CPI","BLS","2023-01-12","08:30 ET","December 2022",0.3,None,None,None,None,"2023-01-12",
+           "U.S. Bureau of Labor Statistics — CPI News Release",
+           "https://www.bls.gov/news.release/archives/cpi_01122023.htm"),
 
-    # CPI — September 2022, released Oct 13, 2022
-    Record(
-        "CPI", "BLS", "2022-10-13", "08:30 ET", "September 2022",
-        0.4, 0.1, None, None, None, "2022-10-13",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_10132022.htm",
-    ),
-    Record(
-        "CORE_CPI", "BLS", "2022-10-13", "08:30 ET", "September 2022",
-        0.6, None, None, None, None, "2022-10-13",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_10132022.htm",
-    ),
+    # ---------------------- BLS EMPLOYMENT ---------------------
+    Record("NFP","BLS","2022-08-05","08:30 ET","July 2022",528000,None,None,None,None,"2022-08-05",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_08052022.htm"),
+    Record("UNEMPLOYMENT_RATE","BLS","2022-08-05","08:30 ET","July 2022",3.5,None,None,None,None,"2022-08-05",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_08052022.htm"),
+    Record("NFP","BLS","2022-09-02","08:30 ET","August 2022",315000,None,None,None,None,"2022-09-02",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_09022022.htm"),
+    Record("UNEMPLOYMENT_RATE","BLS","2022-09-02","08:30 ET","August 2022",3.7,None,None,None,None,"2022-09-02",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_09022022.htm"),
+    Record("NFP","BLS","2022-11-04","08:30 ET","October 2022",261000,None,None,None,None,"2022-11-04",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_11042022.htm"),
+    Record("UNEMPLOYMENT_RATE","BLS","2022-11-04","08:30 ET","October 2022",3.7,None,None,None,None,"2022-11-04",
+           "U.S. Bureau of Labor Statistics — Employment Situation",
+           "https://www.bls.gov/news.release/archives/empsit_11042022.htm"),
 
-    # CPI — October 2022, released Nov 10, 2022
-    Record(
-        "CPI", "BLS", "2022-11-10", "08:30 ET", "October 2022",
-        0.4, 0.4, None, None, None, "2022-11-10",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_11102022.htm",
-    ),
-    Record(
-        "CORE_CPI", "BLS", "2022-11-10", "08:30 ET", "October 2022",
-        0.3, None, None, None, None, "2022-11-10",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_11102022.htm",
-    ),
+    # -------------------- DOL INITIAL CLAIMS -------------------
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-07","08:30 ET",
+           "Week ending July 2, 2022",235000,231000,None,None,None,"2022-07-07",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220707"),
 
-    # CPI — December 2022, released Jan 12, 2023
-    Record(
-        "CPI", "BLS", "2023-01-12", "08:30 ET", "December 2022",
-        -0.1, 0.1, None, None, None, "2023-01-12",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_01122023.htm",
-    ),
-    Record(
-        "CORE_CPI", "BLS", "2023-01-12", "08:30 ET", "December 2022",
-        0.3, None, None, None, None, "2023-01-12",
-        "U.S. Bureau of Labor Statistics — CPI News Release",
-        "https://www.bls.gov/news.release/archives/cpi_01122023.htm",
-    ),
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-14","08:30 ET",
+           "Week ending July 9, 2022",244000,235000,None,None,None,"2022-07-14",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220714"),
 
-    # Employment Situation — July 2022, released Aug 5, 2022
-    Record(
-        "NFP", "BLS", "2022-08-05", "08:30 ET", "July 2022",
-        528000, None, None, None, None, "2022-08-05",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_08052022.htm",
-    ),
-    Record(
-        "UNEMPLOYMENT_RATE", "BLS", "2022-08-05", "08:30 ET", "July 2022",
-        3.5, None, None, None, None, "2022-08-05",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_08052022.htm",
-    ),
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-21","08:30 ET",
+           "Week ending July 16, 2022",251000,244000,None,None,None,"2022-07-21",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220721"),
 
-    # Employment Situation — August 2022, released Sep 2, 2022
-    Record(
-        "NFP", "BLS", "2022-09-02", "08:30 ET", "August 2022",
-        315000, None, None, None, None, "2022-09-02",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_09022022.htm",
-    ),
-    Record(
-        "UNEMPLOYMENT_RATE", "BLS", "2022-09-02", "08:30 ET", "August 2022",
-        3.7, None, None, None, None, "2022-09-02",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_09022022.htm",
-    ),
+    # Important revision: July 28 release says previous week was revised
+    # from 251k to 261k. Preserve both the release's actual and revision.
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-07-28","08:30 ET",
+           "Week ending July 23, 2022",256000,261000,10000,None,None,"2022-07-28",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220728"),
 
-    # Employment Situation — October 2022, released Nov 4, 2022
-    Record(
-        "NFP", "BLS", "2022-11-04", "08:30 ET", "October 2022",
-        261000, None, None, None, None, "2022-11-04",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_11042022.htm",
-    ),
-    Record(
-        "UNEMPLOYMENT_RATE", "BLS", "2022-11-04", "08:30 ET", "October 2022",
-        3.7, None, None, None, None, "2022-11-04",
-        "U.S. Bureau of Labor Statistics — Employment Situation",
-        "https://www.bls.gov/news.release/archives/empsit_11042022.htm",
-    ),
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-11","08:30 ET",
+           "Week ending August 6, 2022",262000,248000,12000,None,None,"2022-08-11",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220811"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-18","08:30 ET",
+           "Week ending August 13, 2022",250000,252000,10000,None,None,"2022-08-18",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220818"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-08-25","08:30 ET",
+           "Week ending August 20, 2022",243000,245000,5000,None,None,"2022-08-25",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220825"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-01","08:30 ET",
+           "Week ending August 27, 2022",232000,237000,6000,None,None,"2022-09-01",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220901"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-08","08:30 ET",
+           "Week ending September 3, 2022",222000,228000,4000,None,None,"2022-09-08",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220908"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-15","08:30 ET",
+           "Week ending September 10, 2022",213000,218000,4000,None,None,"2022-09-15",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220915"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-22","08:30 ET",
+           "Week ending September 17, 2022",213000,208000,5000,None,None,"2022-09-22",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220922"),
+
+    Record("INITIAL_JOBLESS_CLAIMS","DOL","2022-09-29","08:30 ET",
+           "Week ending September 24, 2022",193000,209000,4000,None,None,"2022-09-29",
+           "U.S. Department of Labor — Unemployment Insurance Weekly Claims Report",
+           "https://www.dol.gov/newsroom/releases/eta/eta20220929"),
 ]
 
 
-def validate(df: pd.DataFrame) -> pd.DataFrame:
-    out = []
-
+def validate(df):
+    rows = []
     for _, r in df.iterrows():
         issues = []
-
-        required = [
-            "indicator", "agency", "release_date", "release_time",
-            "reference_period", "actual", "vintage_date",
-            "source", "source_url",
-        ]
-        for col in required:
+        for col in [
+            "indicator","agency","release_date","release_time",
+            "reference_period","actual","vintage_date","source","source_url"
+        ]:
             if pd.isna(r[col]) or str(r[col]).strip() == "":
                 issues.append(f"missing_{col}")
 
@@ -203,7 +176,7 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             issues.append("invalid_release_or_vintage_date")
 
-        out.append({
+        rows.append({
             "indicator": r["indicator"],
             "agency": r["agency"],
             "release_date": r["release_date"],
@@ -216,15 +189,14 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
                 and str(r["consensus_source"]).strip() != ""
             ),
         })
+    return pd.DataFrame(rows)
 
-    return pd.DataFrame(out)
 
-
-def main() -> None:
+def main():
     print("=" * 72)
     print("US500 MACRO INTELLIGENCE")
-    print("ECONOMIC INTELLIGENCE — PHASE 1B.1")
-    print("HISTORICAL COLLECTOR v1.1 — OFFICIAL MANIFEST MODE")
+    print("ECONOMIC INTELLIGENCE — PHASE 1B.2")
+    print("HISTORICAL COLLECTOR v1.2 — BLS + DOL OFFICIAL MANIFEST")
     print("=" * 72)
 
     df = pd.DataFrame([asdict(r) for r in OFFICIAL_MANIFEST])
@@ -233,8 +205,8 @@ def main() -> None:
         raise RuntimeError("Official manifest is empty. No data will be fabricated.")
 
     df = df.drop_duplicates(
-        subset=["indicator", "release_date", "reference_period", "source_url"]
-    ).sort_values(["release_date", "indicator"]).reset_index(drop=True)
+        subset=["indicator","release_date","reference_period","source_url"]
+    ).sort_values(["release_date","indicator"]).reset_index(drop=True)
 
     quality = validate(df)
 
@@ -255,21 +227,15 @@ def main() -> None:
     print("\nBY INDICATOR")
     print(df["indicator"].value_counts().sort_index().to_string())
 
-    print("\nRECORDS")
-    print(
-        df[
-            ["indicator", "release_date", "reference_period", "actual", "source_url"]
-        ].to_string(index=False)
-    )
+    print("\nOUTPUTS")
+    print(f"- {OUTPUT_EVENTS}")
+    print(f"- {OUTPUT_QUALITY}")
 
     if pit != total:
         print("\nPIT QUALITY GATE: FAIL")
         print(quality.loc[~quality["point_in_time_safe"]].to_string(index=False))
         raise RuntimeError("Historical data quality gate failed.")
 
-    print("\nOUTPUTS")
-    print(f"- {OUTPUT_EVENTS}")
-    print(f"- {OUTPUT_QUALITY}")
     print("\nPIT QUALITY GATE: PASS")
     print("Research-only. No Decision Engine integration.")
 
