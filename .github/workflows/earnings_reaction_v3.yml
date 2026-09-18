@@ -21,11 +21,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy requests yfinance
 
-      - name: Verify required files
+      - name: Verify required Python files
         run: |
+          test -f earnings_breadth_v2.py
           test -f earnings_reaction_v3.py
-          test -f earnings_breadth_events_v2.csv
+          python -m py_compile earnings_breadth_v2.py
           python -m py_compile earnings_reaction_v3.py
+
+      - name: Build Earnings Breadth V2 dataset
+        env:
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+          ALPHAVANTAGE_REQUEST_DELAY: "1.5"
+        run: |
+          python earnings_breadth_v2.py
+
+      - name: Verify generated V2 input
+        run: |
+          test -f earnings_breadth_events_v2.csv
+          ls -lh earnings_breadth_events_v2.csv
 
       - name: Run Earnings Market Reaction V3
         run: |
