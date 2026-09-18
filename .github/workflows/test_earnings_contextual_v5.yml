@@ -1,0 +1,118 @@
+name: Test Earnings Contextual Event Study V5
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "earnings_breadth_v2.py"
+      - "earnings_market_reaction_v4.py"
+      - "earnings_contextual_event_study_v5.py"
+      - "requirements.txt"
+      - ".github/workflows/test_earnings_contextual_v5.yml"
+
+jobs:
+  earnings-v5:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show repository files
+        run: |
+          echo "Repository root:"
+          pwd
+          echo ""
+          echo "Python files:"
+          find . -maxdepth 2 -type f -name "*.py" -print
+          echo ""
+          echo "Workflow files:"
+          find .github/workflows -maxdepth 1 -type f -print
+
+      - name: Verify V5 script
+        run: |
+          test -f "./earnings_contextual_event_study_v5.py"
+          echo "V5 script found successfully."
+          python -m py_compile "./earnings_contextual_event_study_v5.py"
+          echo "V5 Python syntax OK."
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pandas numpy requests yfinance scipy
+
+      - name: Run Earnings Breadth V2
+        env:
+          ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
+        run: |
+          python "./earnings_breadth_v2.py"
+
+      - name: Verify V2 input
+        run: |
+          test -f "./earnings_breadth_events_v2.csv"
+          echo "V2 input file found."
+
+      - name: Run Corporate Earnings V5
+        run: |
+          python "./earnings_contextual_event_study_v5.py"
+
+      - name: Verify V5 outputs
+        run: |
+          test -f "./earnings_contextual_event_study_v5.csv"
+          test -f "./earnings_context_by_market_regime_v5.csv"
+          test -f "./earnings_context_by_surprise_size_v5.csv"
+          test -f "./earnings_context_by_volatility_v5.csv"
+          test -f "./earnings_context_by_breadth_v5.csv"
+          test -f "./earnings_context_summary_v5.csv"
+
+          echo ""
+          echo "All V5 output files exist."
+
+      - name: Display V5 summary
+        run: |
+          echo "=============================="
+          echo "V5 SUMMARY"
+          echo "=============================="
+          cat "./earnings_context_summary_v5.csv"
+
+          echo ""
+          echo "=============================="
+          echo "MARKET REGIME"
+          echo "=============================="
+          cat "./earnings_context_by_market_regime_v5.csv"
+
+          echo ""
+          echo "=============================="
+          echo "SURPRISE SIZE"
+          echo "=============================="
+          cat "./earnings_context_by_surprise_size_v5.csv"
+
+          echo ""
+          echo "=============================="
+          echo "VOLATILITY"
+          echo "=============================="
+          cat "./earnings_context_by_volatility_v5.csv"
+
+          echo ""
+          echo "=============================="
+          echo "BREADTH"
+          echo "=============================="
+          cat "./earnings_context_by_breadth_v5.csv"
+
+      - name: Upload V5 results
+        uses: actions/upload-artifact@v4
+        with:
+          name: corporate-earnings-intelligence-v5
+          path: |
+            earnings_contextual_event_study_v5.csv
+            earnings_context_by_market_regime_v5.csv
+            earnings_context_by_surprise_size_v5.csv
+            earnings_context_by_volatility_v5.csv
+            earnings_context_by_breadth_v5.csv
+            earnings_context_summary_v5.csv
