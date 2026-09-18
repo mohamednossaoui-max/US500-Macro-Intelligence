@@ -1,10 +1,12 @@
 import os
+import time
+import json
 import requests
 import pandas as pd
 
 
 # ============================================================
-# ALPHA VANTAGE CONFIGURATION
+# CONFIGURATION
 # ============================================================
 
 API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
@@ -16,10 +18,11 @@ if not API_KEY:
 
 BASE_URL = "https://www.alphavantage.co/query"
 
-# Temporary test:
-# AAPL already worked, so we test only MSFT and NVDA
-# to avoid unnecessary API requests.
-TICKERS = ["MSFT", "NVDA"]
+# We test ONE company only to minimize API usage.
+TICKER = "MSFT"
+
+# Alpha Vantage asks free users to spread requests.
+REQUEST_DELAY = 1.5
 
 
 # ============================================================
@@ -28,8 +31,14 @@ TICKERS = ["MSFT", "NVDA"]
 
 def request_api(function, ticker):
     """
-    Send a request to Alpha Vantage and return the JSON response.
+    Request one Alpha Vantage endpoint.
+
+    A delay is applied before every request except the first one.
     """
+
+    print(
+        f"\nRequesting: {function} / {ticker}"
+    )
 
     params = {
         "function": function,
@@ -48,43 +57,61 @@ def request_api(function, ticker):
     data = response.json()
 
     print(
-        f"\n{ticker} {function} response keys:",
+        "Response keys:",
         list(data.keys())
     )
 
     # --------------------------------------------------------
-    # Alpha Vantage error messages
+    # Error / rate-limit responses
     # --------------------------------------------------------
 
     if "Error Message" in data:
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Error Message']}"
-        )
+        print("\nAlpha Vantage Error Message:")
+        print(data["Error Message"])
 
     if "Note" in data:
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Note']}"
-        )
+        print("\nAlpha Vantage Note:")
+        print(data["Note"])
 
     if "Information" in data:
-        raise RuntimeError(
-            f"{ticker} {function}: "
-            f"{data['Information']}"
-        )
+        print("\nAlpha Vantage Information:")
+        print(data["Information"])
 
     return data
 
 
 # ============================================================
-# TEST EARNINGS ENDPOINT
+# SAVE RAW JSON
+# ============================================================
+
+def save_raw_json(filename, data):
+    """
+    Save the complete API response.
+    """
+
+    with open(
+        filename,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+            data,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
+
+    print(
+        f"\nCreated raw response: {filename}"
+    )
+
+
+# ============================================================
+# TEST EARNINGS
 # ============================================================
 
 def test_earnings(ticker):
-    """
-    Test Alpha Vantage EARNINGS endpoint.
-    """
 
     print("\n" + "=" * 70)
     print(f"{ticker} — EARNINGS")
@@ -95,24 +122,20 @@ def test_earnings(ticker):
         ticker
     )
 
+    save_raw_json(
+        "msft_earnings_raw.json",
+        data
+    )
+
     quarterly = data.get(
         "quarterlyEarnings",
         []
     )
 
-    # --------------------------------------------------------
-    # No quarterly data
-    # --------------------------------------------------------
-
     if not quarterly:
 
         print(
-            f"No quarterly earnings data for {ticker}."
-        )
-
-        print(
-            "Full response keys:",
-            list(data.keys())
+            "\nNo quarterly earnings data returned."
         )
 
         print(
@@ -123,65 +146,103 @@ def test_earnings(ticker):
 
         return []
 
-    # --------------------------------------------------------
-    # Extract data
-    # --------------------------------------------------------
+    print(
+        f"\nQuarterly records returned: "
+        f"{len(quarterly)}"
+    )
 
     rows = []
 
     for item in quarterly[:10]:
 
         rows.append({
-            "ticker": ticker,
+
+            "ticker":
+                ticker,
 
             "fiscalDateEnding":
-                item.get("fiscalDateEnding"),
+                item.get(
+                    "fiscalDateEnding"
+                ),
 
             "reportedDate":
-                item.get("reportedDate"),
+                item.get(
+                    "reportedDate"
+                ),
 
             "reportedEPS":
-                item.get("reportedEPS"),
+                item.get(
+                    "reportedEPS"
+                ),
 
             "estimatedEPS":
-                item.get("estimatedEPS"),
+                item.get(
+                    "estimatedEPS"
+                ),
 
             "surprise":
-                item.get("surprise"),
+                item.get(
+                    "surprise"
+                ),
 
             "surprisePercentage":
-                item.get("surprisePercentage"),
+                item.get(
+                    "surprisePercentage"
+                ),
         })
-
-    # --------------------------------------------------------
-    # Display dataframe
-    # --------------------------------------------------------
 
     df = pd.DataFrame(rows)
 
+    print("\nParsed earnings data:")
+
     print(
-        df.to_string(index=False)
+        df.to_string(
+            index=False
+        )
+    )
+
+    df.to_csv(
+        "earnings_source_test.csv",
+        index=False
+    )
+
+    print(
+        "\nCreated: earnings_source_test.csv"
     )
 
     return rows
 
 
 # ============================================================
-# TEST EARNINGS ESTIMATES ENDPOINT
+# TEST EARNINGS ESTIMATES
 # ============================================================
 
 def test_estimates(ticker):
-    """
-    Test Alpha Vantage EARNINGS_ESTIMATES endpoint.
-    """
 
     print("\n" + "=" * 70)
-    print(f"{ticker} — EARNINGS ESTIMATES")
+    print(
+        f"{ticker} — EARNINGS ESTIMATES"
+    )
     print("=" * 70)
+
+    # Wait before the second API request.
+    print(
+        f"\nWaiting {REQUEST_DELAY} seconds "
+        "before next API request..."
+    )
+
+    time.sleep(
+        REQUEST_DELAY
+    )
 
     data = request_api(
         "EARNINGS_ESTIMATES",
         ticker
+    )
+
+    save_raw_json(
+        "msft_earnings_estimates_raw.json",
+        data
     )
 
     quarterly = data.get(
@@ -189,64 +250,80 @@ def test_estimates(ticker):
         []
     )
 
-    # --------------------------------------------------------
-    # No quarterly estimates
-    # --------------------------------------------------------
-
     if not quarterly:
 
         print(
-            f"No quarterly estimates data for {ticker}."
+            "\nNo quarterly estimates data returned."
         )
 
         print(
-            "Full response keys:",
-            list(data.keys())
-        )
-
-        print(
-            "Full response:"
+            "\nFull response:"
         )
 
         print(data)
 
         return []
 
-    # --------------------------------------------------------
-    # Extract estimates
-    # --------------------------------------------------------
+    print(
+        f"\nQuarterly estimate records returned: "
+        f"{len(quarterly)}"
+    )
 
     rows = []
 
     for item in quarterly[:10]:
 
         rows.append({
-            "ticker": ticker,
+
+            "ticker":
+                ticker,
 
             "fiscalDateEnding":
-                item.get("fiscalDateEnding"),
+                item.get(
+                    "fiscalDateEnding"
+                ),
 
             "epsEstimate":
-                item.get("epsEstimate"),
+                item.get(
+                    "epsEstimate"
+                ),
 
             "epsEstimateAnalystCount":
-                item.get("epsEstimateAnalystCount"),
+                item.get(
+                    "epsEstimateAnalystCount"
+                ),
 
             "revenueEstimate":
-                item.get("revenueEstimate"),
+                item.get(
+                    "revenueEstimate"
+                ),
 
             "revenueEstimateAnalystCount":
-                item.get("revenueEstimateAnalystCount"),
+                item.get(
+                    "revenueEstimateAnalystCount"
+                ),
         })
-
-    # --------------------------------------------------------
-    # Display dataframe
-    # --------------------------------------------------------
 
     df = pd.DataFrame(rows)
 
     print(
-        df.to_string(index=False)
+        "\nParsed estimates:"
+    )
+
+    print(
+        df.to_string(
+            index=False
+        )
+    )
+
+    df.to_csv(
+        "earnings_estimates_source_test.csv",
+        index=False
+    )
+
+    print(
+        "\nCreated: "
+        "earnings_estimates_source_test.csv"
     )
 
     return rows
@@ -258,10 +335,6 @@ def test_estimates(ticker):
 
 def main():
 
-    earnings_rows = []
-
-    estimate_rows = []
-
     print(
         "\n"
         + "#" * 70
@@ -272,115 +345,41 @@ def main():
     )
 
     print(
-        "CORPORATE EARNINGS SOURCE TEST"
+        "CORPORATE EARNINGS SOURCE TEST V2"
     )
 
     print(
         "#" * 70
     )
 
+    print(
+        f"\nTicker: {TICKER}"
+    )
+
+    print(
+        f"Request delay: "
+        f"{REQUEST_DELAY} seconds"
+    )
+
     # --------------------------------------------------------
-    # Test every ticker
+    # REQUEST 1
     # --------------------------------------------------------
 
-    for ticker in TICKERS:
+    earnings_rows = test_earnings(
+        TICKER
+    )
 
-        # EARNINGS
-        try:
+    # --------------------------------------------------------
+    # REQUEST 2
+    # --------------------------------------------------------
 
-            earnings_rows.extend(
-                test_earnings(ticker)
-            )
+    estimate_rows = test_estimates(
+        TICKER
+    )
 
-        except Exception as e:
-
-            print(
-                f"\nERROR testing "
-                f"{ticker} EARNINGS:"
-            )
-
-            print(e)
-
-        # ----------------------------------------------------
-        # EARNINGS ESTIMATES
-        # ----------------------------------------------------
-
-        try:
-
-            estimate_rows.extend(
-                test_estimates(ticker)
-            )
-
-        except Exception as e:
-
-            print(
-                f"\nERROR testing "
-                f"{ticker} EARNINGS_ESTIMATES:"
-            )
-
-            print(e)
-
-    # ========================================================
-    # SAVE EARNINGS RESULTS
-    # ========================================================
-
-    if earnings_rows:
-
-        earnings_df = pd.DataFrame(
-            earnings_rows
-        )
-
-        earnings_df.to_csv(
-            "earnings_source_test.csv",
-            index=False
-        )
-
-        print(
-            "\nCreated:"
-        )
-
-        print(
-            "earnings_source_test.csv"
-        )
-
-    else:
-
-        print(
-            "\nNo earnings rows were created."
-        )
-
-    # ========================================================
-    # SAVE ESTIMATE RESULTS
-    # ========================================================
-
-    if estimate_rows:
-
-        estimates_df = pd.DataFrame(
-            estimate_rows
-        )
-
-        estimates_df.to_csv(
-            "earnings_estimates_source_test.csv",
-            index=False
-        )
-
-        print(
-            "\nCreated:"
-        )
-
-        print(
-            "earnings_estimates_source_test.csv"
-        )
-
-    else:
-
-        print(
-            "\nNo earnings estimate rows were created."
-        )
-
-    # ========================================================
-    # FINAL STATUS
-    # ========================================================
+    # --------------------------------------------------------
+    # FINAL SUMMARY
+    # --------------------------------------------------------
 
     print(
         "\n"
@@ -388,11 +387,45 @@ def main():
     )
 
     print(
-        "EARNINGS SOURCE TEST COMPLETED"
+        "TEST SUMMARY"
     )
 
     print(
         "=" * 70
+    )
+
+    print(
+        f"Earnings rows: "
+        f"{len(earnings_rows)}"
+    )
+
+    print(
+        f"Estimate rows: "
+        f"{len(estimate_rows)}"
+    )
+
+    print(
+        "\nGenerated files:"
+    )
+
+    print(
+        " - earnings_source_test.csv"
+    )
+
+    print(
+        " - earnings_estimates_source_test.csv"
+    )
+
+    print(
+        " - msft_earnings_raw.json"
+    )
+
+    print(
+        " - msft_earnings_estimates_raw.json"
+    )
+
+    print(
+        "\nEARNINGS SOURCE TEST V2 COMPLETED"
     )
 
 
