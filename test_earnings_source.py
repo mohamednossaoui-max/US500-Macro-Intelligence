@@ -18,10 +18,11 @@ if not API_KEY:
 
 BASE_URL = "https://www.alphavantage.co/query"
 
-# We test ONE company only to minimize API usage.
+# We continue with one ticker only
+# to minimize Alpha Vantage API usage.
 TICKER = "MSFT"
 
-# Alpha Vantage asks free users to spread requests.
+# Alpha Vantage free request pacing
 REQUEST_DELAY = 1.5
 
 
@@ -30,11 +31,6 @@ REQUEST_DELAY = 1.5
 # ============================================================
 
 def request_api(function, ticker):
-    """
-    Request one Alpha Vantage endpoint.
-
-    A delay is applied before every request except the first one.
-    """
 
     print(
         f"\nRequesting: {function} / {ticker}"
@@ -61,21 +57,23 @@ def request_api(function, ticker):
         list(data.keys())
     )
 
-    # --------------------------------------------------------
-    # Error / rate-limit responses
-    # --------------------------------------------------------
-
     if "Error Message" in data:
-        print("\nAlpha Vantage Error Message:")
-        print(data["Error Message"])
+        raise RuntimeError(
+            f"{ticker} {function}: "
+            f"{data['Error Message']}"
+        )
 
     if "Note" in data:
-        print("\nAlpha Vantage Note:")
-        print(data["Note"])
+        raise RuntimeError(
+            f"{ticker} {function}: "
+            f"{data['Note']}"
+        )
 
     if "Information" in data:
-        print("\nAlpha Vantage Information:")
-        print(data["Information"])
+        raise RuntimeError(
+            f"{ticker} {function}: "
+            f"{data['Information']}"
+        )
 
     return data
 
@@ -85,9 +83,6 @@ def request_api(function, ticker):
 # ============================================================
 
 def save_raw_json(filename, data):
-    """
-    Save the complete API response.
-    """
 
     with open(
         filename,
@@ -103,15 +98,31 @@ def save_raw_json(filename, data):
         )
 
     print(
-        f"\nCreated raw response: {filename}"
+        f"Created raw response: {filename}"
     )
 
 
 # ============================================================
-# TEST EARNINGS
+# LOAD / CONVERT NUMERIC VALUE
 # ============================================================
 
-def test_earnings(ticker):
+def to_float(value):
+
+    if value is None:
+        return None
+
+    try:
+        return float(value)
+
+    except (TypeError, ValueError):
+        return None
+
+
+# ============================================================
+# EARNINGS
+# ============================================================
+
+def get_earnings(ticker):
 
     print("\n" + "=" * 70)
     print(f"{ticker} — EARNINGS")
@@ -132,20 +143,6 @@ def test_earnings(ticker):
         []
     )
 
-    if not quarterly:
-
-        print(
-            "\nNo quarterly earnings data returned."
-        )
-
-        print(
-            "Full response:"
-        )
-
-        print(data)
-
-        return []
-
     print(
         f"\nQuarterly records returned: "
         f"{len(quarterly)}"
@@ -153,7 +150,11 @@ def test_earnings(ticker):
 
     rows = []
 
-    for item in quarterly[:10]:
+    for item in quarterly:
+
+        fiscal_date = item.get(
+            "fiscalDateEnding"
+        )
 
         rows.append({
 
@@ -161,9 +162,7 @@ def test_earnings(ticker):
                 ticker,
 
             "fiscalDateEnding":
-                item.get(
-                    "fiscalDateEnding"
-                ),
+                fiscal_date,
 
             "reportedDate":
                 item.get(
@@ -171,53 +170,42 @@ def test_earnings(ticker):
                 ),
 
             "reportedEPS":
-                item.get(
-                    "reportedEPS"
+                to_float(
+                    item.get(
+                        "reportedEPS"
+                    )
                 ),
 
             "estimatedEPS":
-                item.get(
-                    "estimatedEPS"
+                to_float(
+                    item.get(
+                        "estimatedEPS"
+                    )
                 ),
 
             "surprise":
-                item.get(
-                    "surprise"
+                to_float(
+                    item.get(
+                        "surprise"
+                    )
                 ),
 
             "surprisePercentage":
-                item.get(
-                    "surprisePercentage"
+                to_float(
+                    item.get(
+                        "surprisePercentage"
+                    )
                 ),
         })
-
-    df = pd.DataFrame(rows)
-
-    print("\nParsed earnings data:")
-
-    print(
-        df.to_string(
-            index=False
-        )
-    )
-
-    df.to_csv(
-        "earnings_source_test.csv",
-        index=False
-    )
-
-    print(
-        "\nCreated: earnings_source_test.csv"
-    )
 
     return rows
 
 
 # ============================================================
-# TEST EARNINGS ESTIMATES
+# EARNINGS ESTIMATES
 # ============================================================
 
-def test_estimates(ticker):
+def get_estimates(ticker):
 
     print("\n" + "=" * 70)
     print(
@@ -225,10 +213,8 @@ def test_estimates(ticker):
     )
     print("=" * 70)
 
-    # Wait before the second API request.
     print(
-        f"\nWaiting {REQUEST_DELAY} seconds "
-        "before next API request..."
+        f"\nWaiting {REQUEST_DELAY} seconds..."
     )
 
     time.sleep(
@@ -245,33 +231,34 @@ def test_estimates(ticker):
         data
     )
 
-    quarterly = data.get(
-        "quarterly",
+    estimates = data.get(
+        "estimates",
         []
     )
 
-    if not quarterly:
-
-        print(
-            "\nNo quarterly estimates data returned."
-        )
-
-        print(
-            "\nFull response:"
-        )
-
-        print(data)
-
-        return []
-
     print(
-        f"\nQuarterly estimate records returned: "
-        f"{len(quarterly)}"
+        f"\nTotal estimate records returned: "
+        f"{len(estimates)}"
     )
 
     rows = []
 
-    for item in quarterly[:10]:
+    for item in estimates:
+
+        horizon = str(
+            item.get(
+                "horizon",
+                ""
+            )
+        ).lower()
+
+        # ----------------------------------------------------
+        # We only want fiscal-quarter estimates.
+        # Fiscal-year estimates are kept out of this V1 test.
+        # ----------------------------------------------------
+
+        if horizon != "fiscal quarter":
+            continue
 
         rows.append({
 
@@ -280,53 +267,353 @@ def test_estimates(ticker):
 
             "fiscalDateEnding":
                 item.get(
-                    "fiscalDateEnding"
+                    "date"
+                ),
+
+            "horizon":
+                item.get(
+                    "horizon"
                 ),
 
             "epsEstimate":
-                item.get(
-                    "epsEstimate"
+                to_float(
+                    item.get(
+                        "eps_estimate_average"
+                    )
                 ),
 
-            "epsEstimateAnalystCount":
-                item.get(
-                    "epsEstimateAnalystCount"
+            "epsEstimateHigh":
+                to_float(
+                    item.get(
+                        "eps_estimate_high"
+                    )
+                ),
+
+            "epsEstimateLow":
+                to_float(
+                    item.get(
+                        "eps_estimate_low"
+                    )
+                ),
+
+            "epsAnalystCount":
+                to_float(
+                    item.get(
+                        "eps_estimate_analyst_count"
+                    )
                 ),
 
             "revenueEstimate":
-                item.get(
-                    "revenueEstimate"
+                to_float(
+                    item.get(
+                        "revenue_estimate_average"
+                    )
                 ),
 
-            "revenueEstimateAnalystCount":
-                item.get(
-                    "revenueEstimateAnalystCount"
+            "revenueEstimateHigh":
+                to_float(
+                    item.get(
+                        "revenue_estimate_high"
+                    )
+                ),
+
+            "revenueEstimateLow":
+                to_float(
+                    item.get(
+                        "revenue_estimate_low"
+                    )
+                ),
+
+            "revenueAnalystCount":
+                to_float(
+                    item.get(
+                        "revenue_estimate_analyst_count"
+                    )
+                ),
+
+            # ------------------------------------------------
+            # Historical consensus snapshots
+            # ------------------------------------------------
+
+            "epsEstimate7DaysAgo":
+                to_float(
+                    item.get(
+                        "eps_estimate_average_7_days_ago"
+                    )
+                ),
+
+            "epsEstimate30DaysAgo":
+                to_float(
+                    item.get(
+                        "eps_estimate_average_30_days_ago"
+                    )
+                ),
+
+            "epsEstimate60DaysAgo":
+                to_float(
+                    item.get(
+                        "eps_estimate_average_60_days_ago"
+                    )
+                ),
+
+            "epsEstimate90DaysAgo":
+                to_float(
+                    item.get(
+                        "eps_estimate_average_90_days_ago"
+                    )
+                ),
+
+            # ------------------------------------------------
+            # Revision counts
+            # ------------------------------------------------
+
+            "epsRevisionUp7Days":
+                to_float(
+                    item.get(
+                        "eps_estimate_revision_up_trailing_7_days"
+                    )
+                ),
+
+            "epsRevisionDown7Days":
+                to_float(
+                    item.get(
+                        "eps_estimate_revision_down_trailing_7_days"
+                    )
+                ),
+
+            "epsRevisionUp30Days":
+                to_float(
+                    item.get(
+                        "eps_estimate_revision_up_trailing_30_days"
+                    )
+                ),
+
+            "epsRevisionDown30Days":
+                to_float(
+                    item.get(
+                        "eps_estimate_revision_down_trailing_30_days"
+                    )
                 ),
         })
 
-    df = pd.DataFrame(rows)
-
     print(
-        "\nParsed estimates:"
-    )
-
-    print(
-        df.to_string(
-            index=False
-        )
-    )
-
-    df.to_csv(
-        "earnings_estimates_source_test.csv",
-        index=False
-    )
-
-    print(
-        "\nCreated: "
-        "earnings_estimates_source_test.csv"
+        f"\nFiscal-quarter estimate records: "
+        f"{len(rows)}"
     )
 
     return rows
+
+
+# ============================================================
+# MERGE EARNINGS + ESTIMATES
+# ============================================================
+
+def merge_earnings_and_estimates(
+    earnings_rows,
+    estimate_rows
+):
+
+    print("\n" + "=" * 70)
+    print(
+        "MERGING EARNINGS + ESTIMATES"
+    )
+    print("=" * 70)
+
+    earnings_df = pd.DataFrame(
+        earnings_rows
+    )
+
+    estimates_df = pd.DataFrame(
+        estimate_rows
+    )
+
+    if earnings_df.empty:
+        print(
+            "No earnings data available."
+        )
+        return pd.DataFrame()
+
+    if estimates_df.empty:
+        print(
+            "No estimates data available."
+        )
+        return earnings_df
+
+    # --------------------------------------------------------
+    # Normalize dates
+    # --------------------------------------------------------
+
+    earnings_df[
+        "fiscalDateEnding"
+    ] = pd.to_datetime(
+        earnings_df[
+            "fiscalDateEnding"
+        ],
+        errors="coerce"
+    )
+
+    estimates_df[
+        "fiscalDateEnding"
+    ] = pd.to_datetime(
+        estimates_df[
+            "fiscalDateEnding"
+        ],
+        errors="coerce"
+    )
+
+    # --------------------------------------------------------
+    # Merge using ticker + fiscal period
+    # --------------------------------------------------------
+
+    merged = pd.merge(
+        earnings_df,
+        estimates_df,
+        on=[
+            "ticker",
+            "fiscalDateEnding"
+        ],
+        how="left",
+        suffixes=(
+            "",
+            "_estimate"
+        )
+    )
+
+    # --------------------------------------------------------
+    # Calculate additional metrics
+    # --------------------------------------------------------
+
+    merged[
+        "epsSurprisePctCalculated"
+    ] = None
+
+    valid_eps = (
+        merged["reportedEPS"].notna()
+        &
+        merged["epsEstimate"].notna()
+        &
+        (merged["epsEstimate"] != 0)
+    )
+
+    merged.loc[
+        valid_eps,
+        "epsSurprisePctCalculated"
+    ] = (
+        (
+            merged.loc[
+                valid_eps,
+                "reportedEPS"
+            ]
+            -
+            merged.loc[
+                valid_eps,
+                "epsEstimate"
+            ]
+        )
+        /
+        merged.loc[
+            valid_eps,
+            "epsEstimate"
+        ]
+        * 100
+    )
+
+    # --------------------------------------------------------
+    # Estimate revision momentum
+    # --------------------------------------------------------
+
+    valid_7d = (
+        merged[
+            "epsEstimate7DaysAgo"
+        ].notna()
+        &
+        merged[
+            "epsEstimate7DaysAgo"
+        ].ne(0)
+        &
+        merged[
+            "epsEstimate"
+        ].notna()
+    )
+
+    merged[
+        "epsRevisionPct7Days"
+    ] = None
+
+    merged.loc[
+        valid_7d,
+        "epsRevisionPct7Days"
+    ] = (
+        (
+            merged.loc[
+                valid_7d,
+                "epsEstimate"
+            ]
+            -
+            merged.loc[
+                valid_7d,
+                "epsEstimate7DaysAgo"
+            ]
+        )
+        /
+        merged.loc[
+            valid_7d,
+            "epsEstimate7DaysAgo"
+        ]
+        * 100
+    )
+
+    valid_30d = (
+        merged[
+            "epsEstimate30DaysAgo"
+        ].notna()
+        &
+        merged[
+            "epsEstimate30DaysAgo"
+        ].ne(0)
+        &
+        merged[
+            "epsEstimate"
+        ].notna()
+    )
+
+    merged[
+        "epsRevisionPct30Days"
+    ] = None
+
+    merged.loc[
+        valid_30d,
+        "epsRevisionPct30Days"
+    ] = (
+        (
+            merged.loc[
+                valid_30d,
+                "epsEstimate"
+            ]
+            -
+            merged.loc[
+                valid_30d,
+                "epsEstimate30DaysAgo"
+            ]
+        )
+        /
+        merged.loc[
+            valid_30d,
+            "epsEstimate30DaysAgo"
+        ]
+        * 100
+    )
+
+    # --------------------------------------------------------
+    # Sort newest first
+    # --------------------------------------------------------
+
+    merged = merged.sort_values(
+        "fiscalDateEnding",
+        ascending=False
+    )
+
+    return merged
 
 
 # ============================================================
@@ -345,7 +632,7 @@ def main():
     )
 
     print(
-        "CORPORATE EARNINGS SOURCE TEST V2"
+        "CORPORATE EARNINGS SOURCE TEST V3"
     )
 
     print(
@@ -356,26 +643,151 @@ def main():
         f"\nTicker: {TICKER}"
     )
 
+    # --------------------------------------------------------
+    # STEP 1 — Earnings
+    # --------------------------------------------------------
+
+    earnings_rows = get_earnings(
+        TICKER
+    )
+
+    # --------------------------------------------------------
+    # STEP 2 — Estimates
+    # --------------------------------------------------------
+
+    estimate_rows = get_estimates(
+        TICKER
+    )
+
+    # --------------------------------------------------------
+    # STEP 3 — Save individual datasets
+    # --------------------------------------------------------
+
+    earnings_df = pd.DataFrame(
+        earnings_rows
+    )
+
+    estimates_df = pd.DataFrame(
+        estimate_rows
+    )
+
+    earnings_df.to_csv(
+        "earnings_source_test.csv",
+        index=False
+    )
+
+    estimates_df.to_csv(
+        "earnings_estimates_source_test.csv",
+        index=False
+    )
+
+    # --------------------------------------------------------
+    # STEP 4 — Merge
+    # --------------------------------------------------------
+
+    merged_df = merge_earnings_and_estimates(
+        earnings_rows,
+        estimate_rows
+    )
+
+    # --------------------------------------------------------
+    # STEP 5 — Save merged dataset
+    # --------------------------------------------------------
+
+    if not merged_df.empty:
+
+        merged_df.to_csv(
+            "earnings_combined_test.csv",
+            index=False
+        )
+
+        print(
+            "\nCreated:"
+        )
+
+        print(
+            "earnings_combined_test.csv"
+        )
+
+    # --------------------------------------------------------
+    # STEP 6 — Display latest records
+    # --------------------------------------------------------
+
     print(
-        f"Request delay: "
-        f"{REQUEST_DELAY} seconds"
+        "\n"
+        + "=" * 70
     )
 
-    # --------------------------------------------------------
-    # REQUEST 1
-    # --------------------------------------------------------
-
-    earnings_rows = test_earnings(
-        TICKER
+    print(
+        "LATEST COMBINED EARNINGS RECORDS"
     )
 
-    # --------------------------------------------------------
-    # REQUEST 2
-    # --------------------------------------------------------
-
-    estimate_rows = test_estimates(
-        TICKER
+    print(
+        "=" * 70
     )
+
+    if not merged_df.empty:
+
+        display_columns = [
+
+            "ticker",
+
+            "fiscalDateEnding",
+
+            "reportedDate",
+
+            "reportedEPS",
+
+            "estimatedEPS",
+
+            "surprise",
+
+            "surprisePercentage",
+
+            "epsEstimate",
+
+            "revenueEstimate",
+
+            "epsAnalystCount",
+
+            "revenueAnalystCount",
+
+            "epsEstimate7DaysAgo",
+
+            "epsEstimate30DaysAgo",
+
+            "epsRevisionUp7Days",
+
+            "epsRevisionDown7Days",
+
+            "epsRevisionUp30Days",
+
+            "epsRevisionDown30Days",
+
+            "epsRevisionPct7Days",
+
+            "epsRevisionPct30Days",
+        ]
+
+        available_columns = [
+            col
+            for col in display_columns
+            if col in merged_df.columns
+        ]
+
+        print(
+            merged_df[
+                available_columns
+            ].head(10).to_string(
+                index=False
+            )
+        )
+
+    else:
+
+        print(
+            "No combined records available."
+        )
 
     # --------------------------------------------------------
     # FINAL SUMMARY
@@ -395,14 +807,27 @@ def main():
     )
 
     print(
-        f"Earnings rows: "
+        f"Earnings records: "
         f"{len(earnings_rows)}"
     )
 
     print(
-        f"Estimate rows: "
+        f"Quarterly estimate records: "
         f"{len(estimate_rows)}"
     )
+
+    if not merged_df.empty:
+
+        matched = (
+            merged_df[
+                "epsEstimate"
+            ].notna()
+        ).sum()
+
+        print(
+            f"Matched earnings + estimates: "
+            f"{matched}"
+        )
 
     print(
         "\nGenerated files:"
@@ -417,6 +842,10 @@ def main():
     )
 
     print(
+        " - earnings_combined_test.csv"
+    )
+
+    print(
         " - msft_earnings_raw.json"
     )
 
@@ -425,7 +854,7 @@ def main():
     )
 
     print(
-        "\nEARNINGS SOURCE TEST V2 COMPLETED"
+        "\nCORPORATE EARNINGS SOURCE TEST V3 COMPLETED"
     )
 
 
