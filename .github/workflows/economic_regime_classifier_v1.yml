@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "economic_historical_events_v1.csv"
+      - "economic_historical_events_v1_4.csv"
       - "economic_surprise_engine_v1.py"
       - "economic_regime_classifier_v1.py"
       - ".github/workflows/economic_regime_classifier_v1.yml"
