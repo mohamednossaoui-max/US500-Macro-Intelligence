@@ -1,0 +1,36 @@
+name: Economic Regime Classifier v1
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "economic_surprise_engine_v1.csv"
+      - "economic_regime_classifier_v1.py"
+      - ".github/workflows/economic_regime_classifier_v1.yml"
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Run Economic Regime Classifier
+        run: |
+          python "./economic_regime_classifier_v1.py"
+
+      - name: Validate outputs
+        run: |
+          test -f economic_regime_events_v1.csv
+          test -f economic_regime_summary_v1.csv
