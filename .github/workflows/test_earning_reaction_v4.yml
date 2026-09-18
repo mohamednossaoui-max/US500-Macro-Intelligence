@@ -5,20 +5,20 @@ on:
 
   push:
     paths:
-      - "earnings_market_reaction_v4.py"
-      - "earnings_breadth_events_v2.csv"
+      - "earning_market_reaction_v4.py"
+      - "earnings_breadth_v2.py"
       - "requirements.txt"
-      - ".github/workflows/test-earnings-reaction-v4.yml"
+      - ".github/workflows/test_earning_reaction_v4.yml"
 
 jobs:
-  test-earnings-reaction-v4:
+  test-earnings-market-reaction-v4:
 
     runs-on: ubuntu-latest
 
     steps:
 
       # --------------------------------------------------
-      # 1. Checkout the exact branch/commit
+      # 1. Checkout
       # --------------------------------------------------
 
       - name: Checkout repository
@@ -37,7 +37,7 @@ jobs:
           python-version: "3.11"
 
       # --------------------------------------------------
-      # 3. Verify repository structure
+      # 3. Verify repository
       # --------------------------------------------------
 
       - name: Verify V4 files
@@ -63,20 +63,35 @@ jobs:
           echo "=========================================="
           echo "EARNINGS FILES"
           echo "=========================================="
-          find . -maxdepth 2 -type f | sort | grep -E "earnings|requirements"
+          find . -maxdepth 2 -type f | sort | grep -E "earning|earnings|requirements"
 
           echo ""
           echo "=========================================="
           echo "CHECK V4 SCRIPT"
           echo "=========================================="
 
-          if [ -f "earnings_market_reaction_v4.py" ]; then
+          if [ -f "earning_market_reaction_v4.py" ]; then
             echo "V4 script FOUND."
-            ls -lh earnings_market_reaction_v4.py
+            ls -lh earning_market_reaction_v4.py
           else
             echo "ERROR: V4 script NOT FOUND."
-            echo "Files in repository root:"
-            ls -la
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "CHECK V2 INPUT DATA"
+          echo "=========================================="
+
+          if [ -f "earnings_breadth_events_v2.csv" ]; then
+            echo "V2 input CSV FOUND."
+            ls -lh earnings_breadth_events_v2.csv
+          else
+            echo "ERROR: earnings_breadth_events_v2.csv NOT FOUND."
+            echo ""
+            echo "The V4 script requires this file."
+            echo "It must either be committed to the repository"
+            echo "or generated before V4 runs."
             exit 1
           fi
 
@@ -99,7 +114,7 @@ jobs:
           echo "RUNNING CORPORATE EARNINGS INTELLIGENCE V4"
           echo "=========================================="
 
-          python earnings_market_reaction_v4.py
+          python earning_market_reaction_v4.py
 
       # --------------------------------------------------
       # 6. Verify outputs
