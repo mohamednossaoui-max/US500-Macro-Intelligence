@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "economic_surprise_engine_v1.csv"
+      - "economic_historical_events_v1.csv"
+      - "economic_surprise_engine_v1.py"
       - "economic_regime_classifier_v1.py"
       - ".github/workflows/economic_regime_classifier_v1.yml"
 
@@ -26,11 +27,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy
 
+      - name: Build Economic Surprise Engine output
+        run: |
+          python "./economic_surprise_engine_v1.py"
+
       - name: Run Economic Regime Classifier
         run: |
           python "./economic_regime_classifier_v1.py"
 
       - name: Validate outputs
         run: |
+          test -f economic_surprise_engine_v1.csv
+          test -f economic_surprise_summary_v1.csv
           test -f economic_regime_events_v1.csv
           test -f economic_regime_summary_v1.csv
