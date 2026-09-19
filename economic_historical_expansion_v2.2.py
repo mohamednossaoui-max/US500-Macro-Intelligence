@@ -5,6 +5,8 @@ Economic Intelligence — Historical Expansion v2.2 STANDALONE
 Self-contained historical expansion:
 - embeds the verified v1.9.1 261-record baseline
 - adds 24 official ISM Manufacturing PMI observations for 2020-2021
+- adds 48 BLS CPI/Core CPI observations for 2020-2021
+- adds 48 BLS NFP/Unemployment observations for 2020-2021
 - discovers and extracts original DOL Weekly Claims releases for 2020-2021
 - enforces PIT and research-only gates
 - does NOT use the current revised claims series as an original vintage
@@ -42,6 +44,73 @@ ISM = [
     ("2021-07-01","July 2021",59.5),("2021-08-02","August 2021",59.9),
     ("2021-09-01","September 2021",61.1),("2021-10-01","October 2021",60.8),
     ("2021-11-01","November 2021",61.1),("2021-12-01","December 2021",58.7),
+]
+
+
+# ---------------------------------------------------------------------
+# Historical Inflation + Labor expansion — 2020-2021
+#
+# Purpose: repair the main historical coverage gap identified by the
+# v2.2 validation. Values are the figures reported in the contemporaneous
+# BLS archived release pages. `previous` is intentionally left blank so
+# the Surprise Engine v1.2 derives prior observations without inventing
+# a vintage value.
+# ---------------------------------------------------------------------
+
+BLS_CPI_2020_2021 = [
+    # release_date, reference_period, CPI m/m SA, Core CPI m/m SA
+    ("2020-02-13", "January 2020", 0.1, 0.2),
+    ("2020-03-11", "February 2020", 0.1, 0.2),
+    ("2020-04-10", "March 2020", -0.4, 0.1),
+    ("2020-05-12", "April 2020", -0.8, -0.4),
+    ("2020-06-10", "May 2020", -0.1, -0.1),
+    ("2020-07-14", "June 2020", 0.6, 0.2),
+    ("2020-08-12", "July 2020", 0.6, 0.6),
+    ("2020-09-11", "August 2020", 0.4, 0.4),
+    ("2020-10-13", "September 2020", 0.2, 0.2),
+    ("2020-11-12", "October 2020", 0.0, 0.0),
+    ("2020-12-10", "November 2020", 0.2, 0.2),
+    ("2021-01-13", "December 2020", 0.4, 0.1),
+    ("2021-02-10", "January 2021", 0.3, 0.0),
+    ("2021-03-10", "February 2021", 0.4, 0.1),
+    ("2021-04-13", "March 2021", 0.6, 0.3),
+    ("2021-05-12", "April 2021", 0.8, 0.9),
+    ("2021-06-10", "May 2021", 0.6, 0.7),
+    ("2021-07-13", "June 2021", 0.9, 0.9),
+    ("2021-08-11", "July 2021", 0.5, 0.3),
+    ("2021-09-14", "August 2021", 0.3, 0.1),
+    ("2021-10-13", "September 2021", 0.2, 0.2),
+    ("2021-11-10", "October 2021", 0.9, 0.6),
+    ("2021-12-10", "November 2021", 0.8, 0.5),
+    ("2022-01-12", "December 2021", 0.5, 0.6),
+]
+
+BLS_NFP_2020_2021 = [
+    # release_date, reference_period, NFP change (persons), unemployment %
+    ("2020-02-07", "January 2020", 225000, 3.6),
+    ("2020-03-06", "February 2020", 273000, 3.5),
+    ("2020-04-03", "March 2020", -701000, 4.4),
+    ("2020-05-08", "April 2020", -20500000, 14.7),
+    ("2020-06-05", "May 2020", 2509000, 13.3),
+    ("2020-07-02", "June 2020", 4800000, 11.1),
+    ("2020-08-07", "July 2020", 1763000, 10.2),
+    ("2020-09-04", "August 2020", 1371000, 8.4),
+    ("2020-10-02", "September 2020", 661000, 7.9),
+    ("2020-11-06", "October 2020", 638000, 6.9),
+    ("2020-12-04", "November 2020", 245000, 6.7),
+    ("2021-01-08", "December 2020", -140000, 6.7),
+    ("2021-02-05", "January 2021", 49000, 6.3),
+    ("2021-03-05", "February 2021", 379000, 6.2),
+    ("2021-04-02", "March 2021", 916000, 6.0),
+    ("2021-05-07", "April 2021", 266000, 6.1),
+    ("2021-06-04", "May 2021", 559000, 5.8),
+    ("2021-07-02", "June 2021", 850000, 5.9),
+    ("2021-08-06", "July 2021", 943000, 5.4),
+    ("2021-09-03", "August 2021", 235000, 5.2),
+    ("2021-10-08", "September 2021", 194000, 4.8),
+    ("2021-11-05", "October 2021", 531000, 4.6),
+    ("2021-12-03", "November 2021", 210000, 4.2),
+    ("2022-01-07", "December 2021", 199000, 3.9),
 ]
 
 
@@ -469,6 +538,54 @@ def main():
                 ),
             }
         )
+
+    # -------------------------------------------------------------
+    # BLS CPI/Core CPI 2020-2021
+    # -------------------------------------------------------------
+    for release, ref, cpi, core in BLS_CPI_2020_2021:
+        url = f"https://www.bls.gov/news.release/archives/cpi_{release.replace('-', '')}.htm"
+        for indicator, actual in (("CPI", cpi), ("CORE_CPI", core)):
+            rows.append(
+                {
+                    "indicator": indicator,
+                    "agency": "BLS",
+                    "release_date": release,
+                    "release_time": "08:30 ET",
+                    "reference_period": ref,
+                    "actual": actual,
+                    "previous": None,
+                    "revision": None,
+                    "consensus": None,
+                    "consensus_source": None,
+                    "vintage_date": release,
+                    "source": "U.S. Bureau of Labor Statistics — Consumer Price Index",
+                    "source_url": url,
+                }
+            )
+
+    # -------------------------------------------------------------
+    # BLS NFP + Unemployment 2020-2021
+    # -------------------------------------------------------------
+    for release, ref, nfp, unemployment in BLS_NFP_2020_2021:
+        url = f"https://www.bls.gov/news.release/archives/empsit_{release.replace('-', '')}.htm"
+        for indicator, actual in (("NFP", nfp), ("UNEMPLOYMENT_RATE", unemployment)):
+            rows.append(
+                {
+                    "indicator": indicator,
+                    "agency": "BLS",
+                    "release_date": release,
+                    "release_time": "08:30 ET",
+                    "reference_period": ref,
+                    "actual": actual,
+                    "previous": None,
+                    "revision": None,
+                    "consensus": None,
+                    "consensus_source": None,
+                    "vintage_date": release,
+                    "source": "U.S. Bureau of Labor Statistics — Employment Situation",
+                    "source_url": url,
+                }
+            )
 
     # -------------------------------------------------------------
     # Initial Jobless Claims
