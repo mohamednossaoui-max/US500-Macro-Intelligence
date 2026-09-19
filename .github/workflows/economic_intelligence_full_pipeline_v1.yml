@@ -5,7 +5,7 @@ on:
 
   push:
     paths:
-      - "economic_historical_collector_v1_4.py"
+      - "economic_historical_collector_v1_5.py"
       - "economic_surprise_engine_v1.py"
       - "economic_regime_classifier_v1.py"
       - ".github/workflows/economic_intelligence_full_pipeline_v1.yml"
@@ -17,14 +17,15 @@ jobs:
     steps:
 
       # ============================================================
-      # 1. Checkout repository
+      # 1. CHECKOUT
       # ============================================================
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       # ============================================================
-      # 2. Setup Python
+      # 2. PYTHON
       # ============================================================
 
       - name: Setup Python
@@ -32,8 +33,9 @@ jobs:
         with:
           python-version: "3.11"
 
+
       # ============================================================
-      # 3. Install dependencies
+      # 3. DEPENDENCIES
       # ============================================================
 
       - name: Install dependencies
@@ -41,16 +43,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy
 
+
       # ============================================================
-      # 4. Historical Economic Data Collector
+      # 4. ECONOMIC HISTORICAL COLLECTOR v1.5
       # ============================================================
 
-      - name: Run Economic Historical Collector
+      - name: Run Economic Historical Collector v1.5
         run: |
-          python "./economic_historical_collector_v1_4.py"
+          python "./economic_historical_collector_v1_5.py"
+
 
       # ============================================================
-      # 5. Validate Historical Data
+      # 5. VALIDATE HISTORICAL DATA
       # ============================================================
 
       - name: Validate Historical Data
@@ -69,8 +73,21 @@ jobs:
               "economic_historical_quality_v1.csv"
           )
 
-          print("Historical events:", len(events))
-          print("Quality rows:", len(quality))
+          print("=" * 72)
+          print("HISTORICAL DATA VALIDATION")
+          print("=" * 72)
+
+          print(
+              f"Historical events: {len(events)}"
+          )
+
+          print(
+              f"Quality rows: {len(quality)}"
+          )
+
+          # --------------------------------------------------------
+          # BASIC VALIDATION
+          # --------------------------------------------------------
 
           if len(events) == 0:
               raise SystemExit(
@@ -82,16 +99,179 @@ jobs:
                   "ERROR: Historical quality file is empty."
               )
 
-          # IMPORTANT:
-          # PIT status belongs to the QUALITY file.
-          if "point_in_time_safe" not in quality.columns:
+          # --------------------------------------------------------
+          # EXPECTED TOTAL
+          # --------------------------------------------------------
+
+          if len(events) != 48:
               raise SystemExit(
-                  "ERROR: Missing 'point_in_time_safe' "
-                  "in economic_historical_quality_v1.csv"
+                  f"ERROR: Expected 48 historical records, "
+                  f"found {len(events)}."
               )
+
+          if len(quality) != 48:
+              raise SystemExit(
+                  f"ERROR: Expected 48 quality rows, "
+                  f"found {len(quality)}."
+              )
+
+          # --------------------------------------------------------
+          # REQUIRED EVENT COLUMNS
+          # --------------------------------------------------------
+
+          required_events = {
+              "indicator",
+              "agency",
+              "release_date",
+              "release_time",
+              "reference_period",
+              "actual",
+              "vintage_date",
+              "source",
+              "source_url"
+          }
+
+          missing_events = (
+              required_events - set(events.columns)
+          )
+
+          if missing_events:
+              raise SystemExit(
+                  "ERROR: Missing event columns: "
+                  f"{sorted(missing_events)}"
+              )
+
+          # --------------------------------------------------------
+          # REQUIRED QUALITY COLUMNS
+          # --------------------------------------------------------
+
+          required_quality = {
+              "record_id",
+              "indicator",
+              "agency",
+              "release_date",
+              "reference_period",
+              "point_in_time_safe",
+              "quality_issues",
+              "historical_consensus_available"
+          }
+
+          missing_quality = (
+              required_quality - set(quality.columns)
+          )
+
+          if missing_quality:
+              raise SystemExit(
+                  "ERROR: Missing quality columns: "
+                  f"{sorted(missing_quality)}"
+              )
+
+          # --------------------------------------------------------
+          # PIT SAFETY
+          # --------------------------------------------------------
 
           safe = (
               quality["point_in_time_safe"]
+              .astype(str)
+              .str.strip()
+              .str.upper()
+              .isin(["TRUE", "1", "YES"])
+          )
+
+          safe_count = int(safe.sum())
+
+          print(
+              f"PIT safe: {safe_count}/{len(quality)}"
+          )
+
+          if safe_count != len(quality):
+
+              print("\nPIT UNSAFE RECORDS:")
+
+              print(
+                  quality.loc[
+                      ~safe,
+                      [
+                          "record_id",
+                          "indicator",
+                          "release_date",
+                          "quality_issues"
+                      ]
+                  ].to_string(index=False)
+              )
+
+              raise SystemExit(
+                  "ERROR: Historical data contains "
+                  "PIT-unsafe records."
+              )
+
+          # --------------------------------------------------------
+          # DUPLICATE OBSERVATIONS
+          # --------------------------------------------------------
+
+          duplicate_subset = [
+              "indicator",
+              "agency",
+              "release_date",
+              "release_time",
+              "reference_period",
+              "source_url"
+          ]
+
+          if events.duplicated(
+              subset=duplicate_subset
+          ).any():
+
+              print("\nDUPLICATE RECORDS:")
+
+              print(
+                  events.loc[
+                      events.duplicated(
+                          subset=duplicate_subset,
+                          keep=False
+                      ),
+                      duplicate_subset
+                  ].to_string(index=False)
+              )
+
+              raise SystemExit(
+                  "ERROR: Duplicate historical "
+                  "observations detected."
+              )
+
+          # --------------------------------------------------------
+          # DUPLICATE RECORD IDs
+          # --------------------------------------------------------
+
+          if quality["record_id"].duplicated().any():
+
+              print("\nDUPLICATE RECORD IDs:")
+
+              print(
+                  quality.loc[
+                      quality["record_id"].duplicated(
+                          keep=False
+                      ),
+                      [
+                          "record_id",
+                          "indicator",
+                          "release_date"
+                      ]
+                  ].to_string(index=False)
+              )
+
+              raise SystemExit(
+                  "ERROR: Duplicate record_id detected."
+              )
+
+          # --------------------------------------------------------
+          # HISTORICAL CONSENSUS GATE
+          # --------------------------------------------------------
+
+          consensus_count = int(
+              quality[
+                  "historical_consensus_available"
+              ]
               .astype(str)
               .str.strip()
               .str.upper()
@@ -100,30 +280,112 @@ jobs:
           )
 
           print(
-              f"PIT safe: {safe}/{len(quality)}"
+              f"Historical consensus: "
+              f"{consensus_count}/{len(quality)}"
           )
 
-          if safe != len(quality):
+          if consensus_count != 0:
               raise SystemExit(
-                  "ERROR: Historical data contains "
-                  "PIT-unsafe records."
+                  "ERROR: Unexpected historical consensus "
+                  "was introduced."
+              )
+
+          # --------------------------------------------------------
+          # INDICATOR UNIVERSE
+          # --------------------------------------------------------
+
+          indicators = sorted(
+              events["indicator"]
+              .dropna()
+              .unique()
+              .tolist()
+          )
+
+          print(
+              f"Indicators: {len(indicators)}"
+          )
+
+          print("\nIndicators:")
+
+          for indicator in indicators:
+
+              count = int(
+                  (
+                      events["indicator"] == indicator
+                  ).sum()
+              )
+
+              print(
+                  f"  {indicator}: {count}"
+              )
+
+          expected_indicators = {
+              "CPI",
+              "CORE_CPI",
+              "NFP",
+              "UNEMPLOYMENT_RATE",
+              "INITIAL_JOBLESS_CLAIMS",
+              "ISM_MANUFACTURING_PMI",
+              "GDP"
+          }
+
+          if set(indicators) != expected_indicators:
+              raise SystemExit(
+                  "ERROR: Indicator universe mismatch."
+              )
+
+          # --------------------------------------------------------
+          # 2023 BATCH
+          #
+          # v1.5 total:
+          # 10 newly added 2023 records
+          # + 4 existing 2023 records
+          # = 14
+          # --------------------------------------------------------
+
+          batch_2023 = events[
+              events["release_date"]
+              .astype(str)
+              .str.startswith("2023-")
+          ]
+
+          print(
+              f"\n2023 records: {len(batch_2023)}"
+          )
+
+          if len(batch_2023) != 14:
+              raise SystemExit(
+                  f"ERROR: Expected 14 records in "
+                  f"the 2023 batch, found "
+                  f"{len(batch_2023)}."
               )
 
           print(
-              "Historical data validation: PASS"
+              "\n" + "=" * 72
           )
+
+          print(
+              "HISTORICAL DATA VALIDATION: PASS"
+          )
+
+          print(
+              "=" * 72
+          )
+
           PY
 
+
       # ============================================================
-      # 6. Economic Surprise Engine
+      # 6. ECONOMIC SURPRISE ENGINE
       # ============================================================
 
       - name: Run Economic Surprise Engine
         run: |
           python "./economic_surprise_engine_v1.py"
 
+
       # ============================================================
-      # 7. Validate Surprise Engine
+      # 7. VALIDATE SURPRISE ENGINE
       # ============================================================
 
       - name: Validate Surprise Engine
@@ -138,9 +400,12 @@ jobs:
               "economic_surprise_engine_v1.csv"
           )
 
+          print("=" * 72)
+          print("ECONOMIC SURPRISE ENGINE VALIDATION")
+          print("=" * 72)
+
           print(
-              "Surprise Engine rows:",
-              len(df)
+              f"Surprise Engine rows: {len(df)}"
           )
 
           if len(df) == 0:
@@ -148,6 +413,10 @@ jobs:
                   "ERROR: Economic Surprise Engine "
                   "output is empty."
               )
+
+          # --------------------------------------------------------
+          # REQUIRED COLUMNS
+          # --------------------------------------------------------
 
           required = {
               "pit_safe",
@@ -158,9 +427,13 @@ jobs:
 
           if missing:
               raise SystemExit(
-                  f"ERROR: Surprise Engine is missing: "
+                  "ERROR: Surprise Engine is missing: "
                   f"{sorted(missing)}"
               )
+
+          # --------------------------------------------------------
+          # PIT SAFETY
+          # --------------------------------------------------------
 
           safe = (
               df["pit_safe"]
@@ -168,42 +441,81 @@ jobs:
               .str.strip()
               .str.upper()
               .isin(["TRUE", "1", "YES"])
-              .sum()
           )
+
+          safe_count = int(safe.sum())
 
           print(
-              f"PIT safe: {safe}/{len(df)}"
+              f"PIT safe: {safe_count}/{len(df)}"
           )
 
-          if safe != len(df):
+          if safe_count != len(df):
               raise SystemExit(
                   "ERROR: Surprise Engine contains "
                   "PIT-unsafe records."
               )
 
-          print(
-              "Surprise Engine validation: PASS"
+          # --------------------------------------------------------
+          # CONSENSUS INFORMATION
+          # --------------------------------------------------------
+
+          if "surprise_method" in df.columns:
+
+              print("\nSurprise methods:")
+
+              print(
+                  df["surprise_method"]
+                  .value_counts(dropna=False)
+                  .to_string()
+              )
+
+          # --------------------------------------------------------
+          # Z-SCORE COVERAGE
+          # --------------------------------------------------------
+
+          z_count = int(
+              df["directional_shock_z"]
+              .notna()
+              .sum()
           )
+
+          print(
+              f"\nPIT-safe z-scores: "
+              f"{z_count}/{len(df)}"
+          )
+
+          print(
+              "\n" + "=" * 72
+          )
+
+          print(
+              "SURPRISE ENGINE VALIDATION: PASS"
+          )
+
+          print(
+              "=" * 72
+          )
+
           PY
 
+
       # ============================================================
-      # 8. Economic Regime Classifier
+      # 8. ECONOMIC REGIME CLASSIFIER
       # ============================================================
 
       - name: Run Economic Regime Classifier
         run: |
           python "./economic_regime_classifier_v1.py"
 
+
       # ============================================================
-      # 9. Validate Economic Regime
+      # 9. VALIDATE ECONOMIC REGIME
       # ============================================================
 
       - name: Validate Economic Regime
         run: |
           test -f economic_regime_events_v1.csv
           test -f economic_regime_summary_v1.csv
-
-          echo "Regime Classifier files found."
 
           python - <<'PY'
           import pandas as pd
@@ -212,9 +524,12 @@ jobs:
               "economic_regime_events_v1.csv"
           )
 
+          print("=" * 72)
+          print("ECONOMIC REGIME VALIDATION")
+          print("=" * 72)
+
           print(
-              "Regime observations:",
-              len(df)
+              f"Regime observations: {len(df)}"
           )
 
           if len(df) == 0:
@@ -222,6 +537,10 @@ jobs:
                   "ERROR: Economic Regime output "
                   "is empty."
               )
+
+          # --------------------------------------------------------
+          # REQUIRED COLUMNS
+          # --------------------------------------------------------
 
           required = {
               "release_date",
@@ -236,9 +555,13 @@ jobs:
 
           if missing:
               raise SystemExit(
-                  f"ERROR: Missing regime columns: "
+                  "ERROR: Missing regime columns: "
                   f"{sorted(missing)}"
               )
+
+          # --------------------------------------------------------
+          # PIT SAFETY
+          # --------------------------------------------------------
 
           safe = (
               df["pit_safe"]
@@ -246,30 +569,64 @@ jobs:
               .str.strip()
               .str.upper()
               .isin(["TRUE", "1", "YES"])
-              .all()
           )
 
-          if not safe:
+          if not safe.all():
               raise SystemExit(
                   "ERROR: Regime output contains "
                   "PIT-unsafe rows."
               )
 
-          print()
-          print("Regime distribution:")
+          # --------------------------------------------------------
+          # REGIME DISTRIBUTION
+          # --------------------------------------------------------
+
+          print("\nRegime distribution:")
+
           print(
               df["economic_regime"]
               .value_counts(dropna=False)
+              .to_string()
           )
 
-          print()
+          # --------------------------------------------------------
+          # SCORE COVERAGE
+          # --------------------------------------------------------
+
+          print("\nScore coverage:")
+
+          for column in [
+              "inflation_score",
+              "labor_score",
+              "growth_score"
+          ]:
+
+              count = int(
+                  df[column].notna().sum()
+              )
+
+              print(
+                  f"  {column}: "
+                  f"{count}/{len(df)}"
+              )
+
           print(
-              "Economic Regime validation: PASS"
+              "\n" + "=" * 72
           )
+
+          print(
+              "ECONOMIC REGIME VALIDATION: PASS"
+          )
+
+          print(
+              "=" * 72
+          )
+
           PY
 
+
       # ============================================================
-      # 10. Upload Economic Intelligence Artifacts
+      # 10. UPLOAD ALL ECONOMIC INTELLIGENCE ARTIFACTS
       # ============================================================
 
       - name: Upload Economic Intelligence Artifacts
@@ -285,8 +642,9 @@ jobs:
             economic_regime_summary_v1.csv
           if-no-files-found: error
 
+
       # ============================================================
-      # 11. Final status
+      # 11. FINAL PIPELINE STATUS
       # ============================================================
 
       - name: Economic Intelligence Pipeline Complete
@@ -296,7 +654,9 @@ jobs:
           echo "ECONOMIC INTELLIGENCE PIPELINE v1"
           echo "============================================================"
           echo ""
-          echo "Historical Collector:       PASS"
+          echo "Historical Collector v1.5:  PASS"
+          echo "Historical PIT Gate:        PASS"
+          echo "Historical Integrity:       PASS"
           echo "Economic Surprise Engine:   PASS"
           echo "Economic Regime Classifier: PASS"
           echo "Artifacts:                  UPLOADED"
