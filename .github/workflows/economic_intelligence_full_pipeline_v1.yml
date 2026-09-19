@@ -565,4 +565,54 @@ jobs:
 
           print("")
           print("==========================================")
-          print("FINAL QUALITY GATE:
+          print("FINAL QUALITY GATE: PASS")
+          print("==========================================")
+          print("")
+          print("Economic Intelligence remains:")
+          print("  Research-only: YES")
+          print("  Decision Engine integration: NO")
+          print("  PIT-safe: YES")
+          print("  Raw/Z mixing: NO")
+          print("  Labor composite stabilization: YES")
+          PY
+
+      # ============================================================
+      # 13. UPLOAD ARTIFACTS
+      # ============================================================
+      - name: Upload Economic Intelligence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-intelligence-v1
+          path: |
+            economic_historical_events_v1.csv
+            economic_historical_quality_v1.csv
+            economic_surprise_engine_v1.csv
+            economic_surprise_summary_v1.csv
+            economic_regime_events_v1.csv
+            economic_regime_summary_v1.csv
+          if-no-files-found: error
+          retention-days: 30
+
+      # ============================================================
+      # 14. FINAL SUMMARY
+      # ============================================================
+      - name: Final Pipeline Summary
+        shell: bash
+        run: |
+          echo ""
+          echo "======================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "ECONOMIC INTELLIGENCE PIPELINE"
+          echo "======================================================"
+          echo ""
+          echo "Historical Collector: v1.7"
+          echo "Surprise Engine:      v1.1"
+          echo "Regime Classifier:    v1.5"
+          echo ""
+          echo "Research-only:        YES"
+          echo "Decision Engine:      DISABLED"
+          echo "PIT validation:       PASS"
+          echo "Labor stabilization:  PASS"
+          echo ""
+          echo "Pipeline completed successfully."
+          echo "======================================================"
