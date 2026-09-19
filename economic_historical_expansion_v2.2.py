@@ -44,206 +44,602 @@ ISM = [
     ("2021-11-01","November 2021",61.1),("2021-12-01","December 2021",58.7),
 ]
 
-HEADERS = {"User-Agent": "US500-Macro-Intelligence/2.2 research-only"}
 
-def discover_archive_links(session, year):
-    # DOL's public archive is the authoritative discovery layer.
-    url = "https://oui.doleta.gov/unemploy/claims_arch.asp"
-    r = session.get(url, timeout=30)
-    r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
-    links = []
-    for a in soup.find_all("a", href=True):
-        txt = " ".join(a.stripped_strings)
-        href = a["href"]
-        if str(year) in txt and ("pdf" in href.lower() or "press" in href.lower()):
-            if href.startswith("/"):
-                href = "https://oui.doleta.gov" + href
-            links.append(href)
-    return sorted(set(links))
+HEADERS = {
+    "User-Agent": "US500-Macro-Intelligence/2.2 research-only"
+}
 
-def candidate_direct_pdfs(year):
-    # Secondary fallback only after archive discovery. We do not accept
-    # guessed URLs unless they actually return a PDF containing the official
-    # Weekly Claims report.
-    # The official DOL press archive uses date-coded PDFs.
-    from datetime import date, timedelta
-    d = date(year,1,1)
-    end = date(year,12,31)
-    while d <= end:
-        # Weekly releases generally Thursday; include adjacent Wed/Fri.
-        if d.weekday() in (2,3,4):
-            yield f"https://oui.doleta.gov/press/{year}/{d:%m%d%y}.pdf"
-        d += timedelta(days=1)
+# ---------------------------------------------------------------------
+# DOL / ALFRED Claims reconstruction
+#
+# GitHub Actions runners can receive HTTP 403 from the DOL PDF endpoint.
+# We therefore keep the DOL PDF parser as the first path, but use an
+# explicit ALFRED vintage of the DOL/FRED ICSA series as the deterministic
+# fallback.  The fallback uses vintage_date == release_date and never uses
+# the current revised series.
+#
+# This preserves point-in-time availability for the research dataset.
+# ---------------------------------------------------------------------
 
 def parse_claims_pdf(content, url):
     reader = PdfReader(BytesIO(content))
     text = "\n".join((p.extract_text() or "") for p in reader.pages)
     flat = re.sub(r"\s+", " ", text)
+
     if "UNEMPLOYMENT INSURANCE WEEKLY CLAIMS" not in flat.upper():
         return None
 
     md = re.search(
-        r"(\b(?:January|February|March|April|May|June|July|August|September|October|November|December)"
-        r"\s+\d{1,2},\s+20(?:20|21))", flat, re.I)
+        r"(\b(?:January|February|March|April|May|June|July|August|September|"
+        r"October|November|December)\s+\d{1,2},\s+20(?:20|21))",
+        flat,
+        re.I,
+    )
+
     mw = re.search(
         r"week ending\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,\s+20(?:20|21))",
-        flat, re.I)
+        flat,
+        re.I,
+    )
+
     ma = re.search(
         r"advance figure for seasonally adjusted initial claims was\s+([\d,]+)",
-        flat, re.I)
+        flat,
+        re.I,
+    )
+
     if not (md and mw and ma):
         return None
 
     release = pd.to_datetime(md.group(1)).strftime("%Y-%m-%d")
+
     week = re.sub(r"(st|nd|rd|th)", "", mw.group(1))
     week = pd.to_datetime(week).strftime("%Y-%m-%d")
+
     actual = int(ma.group(1).replace(",", ""))
 
     previous = None
     revision = None
+
     mr = re.search(
         r"previous week's level was revised\s+(up|down)\s+by\s+([\d,]+)\s+"
-        r"from\s+([\d,]+)\s+to\s+([\d,]+)", flat, re.I)
+        r"from\s+([\d,]+)\s+to\s+([\d,]+)",
+        flat,
+        re.I,
+    )
+
     if mr:
         revision = int(mr.group(2).replace(",", ""))
         previous = int(mr.group(4).replace(",", ""))
     else:
-        mp = re.search(r"previous week's level was\s+([\d,]+)", flat, re.I)
+        mp = re.search(
+            r"previous week's level was\s+([\d,]+)",
+            flat,
+            re.I,
+        )
         if mp:
             previous = int(mp.group(1).replace(",", ""))
 
     return {
-        "indicator":"INITIAL_JOBLESS_CLAIMS",
-        "agency":"DOL",
-        "release_date":release,
-        "release_time":"08:30 ET",
-        "reference_period":f"Week ending {week}",
-        "actual":actual,
-        "previous":previous,
-        "revision":revision,
-        "consensus":None,
-        "consensus_source":None,
-        "vintage_date":release,
-        "source":"DOL Unemployment Insurance Weekly Claims Report",
-        "source_url":url,
+        "indicator": "INITIAL_JOBLESS_CLAIMS",
+        "agency": "DOL",
+        "release_date": release,
+        "release_time": "08:30 ET",
+        "reference_period": f"Week ending {week}",
+        "actual": actual,
+        "previous": previous,
+        "revision": revision,
+        "consensus": None,
+        "consensus_source": None,
+        "vintage_date": release,
+        "source": "DOL Unemployment Insurance Weekly Claims Report",
+        "source_url": url,
     }
 
+
+def candidate_release_dates(year):
+    """
+    Build the official weekly release calendar for 2020/2021.
+
+    Normal schedule: Thursday.
+    Thanksgiving exception:
+      2020-11-25 (Wednesday)
+      2021-11-24 (Wednesday)
+
+    The DOL archive documents Thursday publication with federal-holiday
+    exceptions.
+    """
+    dates = []
+
+    start = pd.Timestamp(f"{year}-01-01")
+    end = pd.Timestamp(f"{year}-12-31")
+
+    d = start
+
+    while d <= end:
+        if d.weekday() == 3:  # Thursday
+            dates.append(d)
+        d += pd.Timedelta(days=1)
+
+    # Thanksgiving Wednesday replaces the Thursday release.
+    if year == 2020:
+        dates = [d for d in dates if d != pd.Timestamp("2020-11-26")]
+        dates.append(pd.Timestamp("2020-11-25"))
+
+    if year == 2021:
+        dates = [d for d in dates if d != pd.Timestamp("2021-11-25")]
+        dates.append(pd.Timestamp("2021-11-24"))
+
+    return sorted(dates)
+
+
+def week_ending_for_release(release_date):
+    """
+    Initial claims are reported for the Saturday immediately preceding
+    the release date.
+    """
+    d = pd.Timestamp(release_date).normalize()
+    previous_saturday = d - pd.Timedelta(days=(d.weekday() - 5) % 7)
+
+    # If release itself is Saturday, use the prior Saturday.
+    if previous_saturday >= d:
+        previous_saturday -= pd.Timedelta(days=7)
+
+    return previous_saturday.strftime("%Y-%m-%d")
+
+
+def direct_dol_pdf_url(release_date):
+    d = pd.Timestamp(release_date)
+    return f"https://oui.doleta.gov/press/{d:%Y}/{d:%m%d%y}.pdf"
+
+
+def try_dol_pdf(session, release_date):
+    """
+    Try the actual DOL release PDF first.
+
+    GitHub Actions may receive 403 from oui.doleta.gov. That is treated
+    as an acquisition failure, not as a data value.
+    """
+    url = direct_dol_pdf_url(release_date)
+
+    try:
+        r = session.get(
+            url,
+            timeout=20,
+            headers=HEADERS,
+        )
+
+        if r.status_code != 200:
+            return None
+
+        if not r.content.startswith(b"%PDF"):
+            return None
+
+        return parse_claims_pdf(r.content, url)
+
+    except Exception:
+        return None
+
+
+def fetch_alfred_vintage(session, release_date):
+    """
+    Deterministic PIT fallback.
+
+    ICSA is the seasonally adjusted Initial Claims series underlying
+    the DOL weekly release.  ALFRED permits retrieval using a historical
+    vintage date.  We use vintage_date == DOL release_date and select
+    the Saturday observation immediately preceding the release.
+
+    This is NOT the current revised series.
+    """
+    release = pd.Timestamp(release_date)
+    week_ending = week_ending_for_release(release)
+
+    url = (
+        "https://alfred.stlouisfed.org/graph/alfredgraph.csv"
+        f"?id=ICSA"
+        f"&cosd={week_ending}"
+        f"&coed={week_ending}"
+        f"&vintage_date={release:%Y-%m-%d}"
+    )
+
+    try:
+        r = session.get(
+            url,
+            timeout=30,
+            headers=HEADERS,
+        )
+        r.raise_for_status()
+
+        if not r.text.strip():
+            return None
+
+        from io import StringIO
+
+        df = pd.read_csv(StringIO(r.text))
+
+        if df.empty:
+            return None
+
+        # ALFRED normally returns observation_date + ICSA.
+        value_col = None
+        for col in df.columns:
+            if str(col).upper() == "ICSA":
+                value_col = col
+                break
+
+        if value_col is None:
+            return None
+
+        value = pd.to_numeric(
+            df.iloc[0][value_col],
+            errors="coerce",
+        )
+
+        if pd.isna(value):
+            return None
+
+        actual = int(round(float(value)))
+
+        return {
+            "indicator": "INITIAL_JOBLESS_CLAIMS",
+            "agency": "DOL",
+            "release_date": release.strftime("%Y-%m-%d"),
+            "release_time": "08:30 ET",
+            "reference_period": f"Week ending {week_ending}",
+            "actual": actual,
+            "previous": None,
+            "revision": None,
+            "consensus": None,
+            "consensus_source": None,
+            "vintage_date": release.strftime("%Y-%m-%d"),
+            "source": (
+                "DOL Initial Claims — ALFRED PIT vintage "
+                "of ICSA"
+            ),
+            "source_url": url,
+        }
+
+    except Exception as exc:
+        print(
+            f"  ALFRED unavailable for {release:%Y-%m-%d}: "
+            f"{type(exc).__name__}"
+        )
+        return None
+
+
 def collect_claims():
+    """
+    Collect all 2020-2021 weekly observations.
+
+    Priority:
+      1. DOL original release PDF.
+      2. ALFRED PIT vintage reconstruction.
+
+    We never fall back to the current revised DOL series.
+    """
     session = requests.Session()
     session.headers.update(HEADERS)
+
     found = []
     seen = set()
 
-    # Direct archive PDFs are validated by their actual PDF contents.
-    # We do not trust the filename alone.
-    for year in (2020, 2021):
-        for url in candidate_direct_pdfs(year):
-            try:
-                r = session.get(url, timeout=20)
-                if r.status_code != 200 or not r.content.startswith(b"%PDF"):
-                    continue
-                rec = parse_claims_pdf(r.content, url)
-                if rec is None:
-                    continue
-                if rec["reference_period"] in seen:
-                    continue
-                seen.add(rec["reference_period"])
-                found.append(rec)
-            except Exception:
-                continue
+    release_dates = (
+        candidate_release_dates(2020)
+        + candidate_release_dates(2021)
+    )
+
+    print(f"Claims release dates expected: {len(release_dates)}")
+
+    for release_date in release_dates:
+
+        release_key = release_date.strftime("%Y-%m-%d")
+
+        rec = try_dol_pdf(session, release_date)
+
+        if rec is not None:
+            print(
+                f"  DOL PDF OK: "
+                f"{release_key} -> {rec['actual']:,}"
+            )
+        else:
+            rec = fetch_alfred_vintage(
+                session,
+                release_date,
+            )
+
+            if rec is not None:
+                print(
+                    f"  ALFRED PIT OK: "
+                    f"{release_key} -> {rec['actual']:,}"
+                )
+
+        if rec is None:
+            print(
+                f"  ERROR: no PIT source for "
+                f"{release_key}"
+            )
+            continue
+
+        key = (
+            rec["release_date"],
+            rec["reference_period"],
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        found.append(rec)
+
+        # Small delay to avoid hammering either endpoint.
+        time.sleep(0.15)
+
     return found
 
+
 def rid(row):
-    raw = "|".join(str(row.get(k,"")) for k in [
-        "indicator","agency","release_date","release_time",
-        "reference_period","source_url"
-    ])
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+    raw = "|".join(
+        str(row.get(k, ""))
+        for k in [
+            "indicator",
+            "agency",
+            "release_date",
+            "release_time",
+            "reference_period",
+            "source_url",
+        ]
+    )
+
+    return hashlib.sha256(
+        raw.encode()
+    ).hexdigest()[:16]
+
 
 def main():
+
     rows = list(BASELINE)
 
+    # -------------------------------------------------------------
+    # ISM 2020-2021
+    # -------------------------------------------------------------
     for release, ref, actual in ISM:
-        rows.append({
-            "indicator":"ISM_MANUFACTURING_PMI",
-            "agency":"ISM",
-            "release_date":release,
-            "release_time":"10:00 ET",
-            "reference_period":ref,
-            "actual":actual,
-            "previous":None,
-            "revision":None,
-            "consensus":None,
-            "consensus_source":None,
-            "vintage_date":release,
-            "source":"Institute for Supply Management — Manufacturing PMI",
-            "source_url":"https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/",
-        })
+        rows.append(
+            {
+                "indicator": "ISM_MANUFACTURING_PMI",
+                "agency": "ISM",
+                "release_date": release,
+                "release_time": "10:00 ET",
+                "reference_period": ref,
+                "actual": actual,
+                "previous": None,
+                "revision": None,
+                "consensus": None,
+                "consensus_source": None,
+                "vintage_date": release,
+                "source": (
+                    "Institute for Supply Management — "
+                    "Manufacturing PMI"
+                ),
+                "source_url": (
+                    "https://www.ismworld.org/"
+                    "supply-management-news-and-reports/"
+                    "reports/ism-pmi-reports/"
+                ),
+            }
+        )
 
+    # -------------------------------------------------------------
+    # Initial Jobless Claims
+    # -------------------------------------------------------------
     print("Collecting DOL original release PDFs...")
-    rows.extend(collect_claims())
+    claims = collect_claims()
 
+    rows.extend(claims)
+
+    # -------------------------------------------------------------
+    # De-duplicate
+    # -------------------------------------------------------------
     out = pd.DataFrame(rows)
-    key = ["indicator","agency","release_date","release_time",
-           "reference_period","source_url"]
-    out = out.drop_duplicates(subset=key, keep="first")
-    out = out.sort_values(["release_date","indicator"]).reset_index(drop=True)
 
-    quality=[]
+    key = [
+        "indicator",
+        "agency",
+        "release_date",
+        "release_time",
+        "reference_period",
+        "source_url",
+    ]
+
+    out = (
+        out
+        .drop_duplicates(
+            subset=key,
+            keep="first",
+        )
+        .sort_values(
+            ["release_date", "indicator"]
+        )
+        .reset_index(drop=True)
+    )
+
+    # -------------------------------------------------------------
+    # Quality validation
+    # -------------------------------------------------------------
+    quality = []
+
     for _, row in out.iterrows():
-        issues=[]
-        safe=True
-        if pd.isna(row.get("release_date")) or pd.isna(row.get("vintage_date")):
-            safe=False; issues.append("missing_release_or_vintage_date")
-        elif pd.to_datetime(row["vintage_date"]) > pd.to_datetime(row["release_date"]):
-            safe=False; issues.append("vintage_after_release")
-        if pd.isna(row.get("actual")):
-            safe=False; issues.append("missing_actual")
-        if not str(row.get("source_url","")).strip():
-            safe=False; issues.append("missing_source_url")
-        quality.append({
-            "record_id":rid(row),
-            "indicator":row["indicator"],
-            "agency":row["agency"],
-            "release_date":row["release_date"],
-            "reference_period":row["reference_period"],
-            "point_in_time_safe":safe,
-            "quality_issues":"; ".join(issues),
-            "historical_consensus_available":(
-                pd.notna(row.get("consensus")) and
-                str(row.get("consensus_source","")).strip() not in ("","nan","None")
+
+        issues = []
+        safe = True
+
+        if (
+            pd.isna(row.get("release_date"))
+            or pd.isna(row.get("vintage_date"))
+        ):
+            safe = False
+            issues.append(
+                "missing_release_or_vintage_date"
             )
-        })
 
-    q=pd.DataFrame(quality)
-    out.to_csv(OUTPUT,index=False)
-    q.to_csv(QUALITY,index=False)
+        else:
 
-    claims=((out["indicator"]=="INITIAL_JOBLESS_CLAIMS") &
-            out["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
-    ism=((out["indicator"]=="ISM_MANUFACTURING_PMI") &
-         out["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
+            release_date = pd.to_datetime(
+                row["release_date"]
+            )
 
-    print(f"Baseline records: {len(BASELINE)}")
-    print(f"ISM 2020-2021: {ism}")
-    print(f"Claims 2020-2021: {claims}")
-    print(f"Final records: {len(out)}")
-    print(f"PIT safe: {int(q.point_in_time_safe.sum())}/{len(q)}")
-    print(f"Historical consensus: {int(q.historical_consensus_available.sum())}")
+            vintage_date = pd.to_datetime(
+                row["vintage_date"]
+            )
 
-    if ism != 24:
-        raise RuntimeError(f"ISM incomplete: {ism}/24")
-    if claims < 90:
-        raise RuntimeError(f"DOL Claims archive incomplete: {claims}")
+            if vintage_date > release_date:
+                safe = False
+                issues.append(
+                    "vintage_after_release"
+                )
+
+        if pd.isna(row.get("actual")):
+            safe = False
+            issues.append(
+                "missing_actual"
+            )
+
+        if not str(
+            row.get("source_url", "")
+        ).strip():
+            safe = False
+            issues.append(
+                "missing_source_url"
+            )
+
+        quality.append(
+            {
+                "record_id": rid(row),
+                "indicator": row["indicator"],
+                "agency": row["agency"],
+                "release_date": row["release_date"],
+                "reference_period": row[
+                    "reference_period"
+                ],
+                "point_in_time_safe": safe,
+                "quality_issues": "; ".join(issues),
+                "historical_consensus_available": (
+                    pd.notna(
+                        row.get("consensus")
+                    )
+                    and str(
+                        row.get(
+                            "consensus_source",
+                            "",
+                        )
+                    ).strip()
+                    not in ("", "nan", "None")
+                ),
+            }
+        )
+
+    q = pd.DataFrame(quality)
+
+    out.to_csv(
+        OUTPUT,
+        index=False,
+    )
+
+    q.to_csv(
+        QUALITY,
+        index=False,
+    )
+
+    # -------------------------------------------------------------
+    # Coverage statistics
+    # -------------------------------------------------------------
+    claims_count = (
+        (
+            out["indicator"]
+            == "INITIAL_JOBLESS_CLAIMS"
+        )
+        & out["release_date"]
+        .astype(str)
+        .str[:4]
+        .isin(["2020", "2021"])
+    ).sum()
+
+    ism_count = (
+        (
+            out["indicator"]
+            == "ISM_MANUFACTURING_PMI"
+        )
+        & out["release_date"]
+        .astype(str)
+        .str[:4]
+        .isin(["2020", "2021"])
+    ).sum()
+
+    print("")
+    print("==========================================")
+    print("HISTORICAL EXPANSION v2.2")
+    print("==========================================")
+    print(
+        f"Baseline records: {len(BASELINE)}"
+    )
+    print(
+        f"ISM 2020-2021: {ism_count}"
+    )
+    print(
+        f"Claims 2020-2021: {claims_count}"
+    )
+    print(
+        f"Final records: {len(out)}"
+    )
+    print(
+        "PIT safe: "
+        f"{int(q.point_in_time_safe.sum())}"
+        f"/{len(q)}"
+    )
+    print(
+        "Historical consensus: "
+        f"{int(q.historical_consensus_available.sum())}"
+    )
+
+    # -------------------------------------------------------------
+    # Mandatory gates
+    # -------------------------------------------------------------
+
+    if ism_count != 24:
+        raise RuntimeError(
+            f"ISM incomplete: "
+            f"{ism_count}/24"
+        )
+
+    if claims_count < 90:
+        raise RuntimeError(
+            "DOL Claims archive incomplete: "
+            f"{claims_count}"
+        )
+
     if not q.point_in_time_safe.all():
-        raise RuntimeError("PIT QUALITY GATE FAILED")
+        raise RuntimeError(
+            "PIT QUALITY GATE FAILED"
+        )
+
     if q.historical_consensus_available.any():
-        raise RuntimeError("Historical consensus must remain unknown")
+        raise RuntimeError(
+            "Historical consensus must remain unknown"
+        )
 
+    print("")
     print("PIT QUALITY GATE: PASS")
+    print(
+        "HISTORICAL CONSENSUS GATE: PASS"
+    )
     print("RESEARCH-ONLY GATE: PASS")
-    print("DECISION ENGINE DISABLED: PASS")
+    print(
+        "DECISION ENGINE DISABLED: PASS"
+    )
+    print(
+        "HISTORICAL EXPANSION v2.2: PASS"
+    )
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
