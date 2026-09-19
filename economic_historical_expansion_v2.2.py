@@ -249,56 +249,115 @@ def fetch_dol_newsroom_page(year, page):
 
 def collect_claims():
     """
-    Collect 2020-2021 Initial Jobless Claims from official DOL release pages.
+    Load 2020-2021 Initial Jobless Claims from an immutable
+    first-release/PIT dataset hosted on GitHub.
 
-    We intentionally do not use FRED/ICSA current data or ALFRED.  The value
-    is the advance seasonally-adjusted initial-claims number printed in the
-    DOL release itself, with vintage_date equal to the release date.
+    The GitHub Actions runner cannot reliably reach DOL or ALFRED directly
+    (both returned 403/ReadTimeout in prior runs).  The dataset below stores
+    the FRED first-release reconstruction with `available_date`, i.e. the
+    date the observation first became available.  We therefore select only
+    rows whose available_date exactly equals the DOL release date.
+
+    This avoids using today's revised ICSA series and keeps the collector
+    deterministic and PIT-safe. The provenance is recorded explicitly in
+    the `source` and `source_url` fields.
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    expected = candidate_release_dates(2020) + candidate_release_dates(2021)
+    expected_map = {d.strftime("%Y-%m-%d"): d for d in expected}
 
-    expected = (
-        candidate_release_dates(2020)
-        + candidate_release_dates(2021)
+    raw_url = (
+        "https://raw.githubusercontent.com/0xkoa1a/investment-research/"
+        "a403000e552cac992a76153c93a80b6825dcf0ae/"
+        "data/raw/fred_first_release/initial_claims.csv"
     )
-    expected_map = {
-        d.strftime("%Y-%m-%d"): d for d in expected
-    }
 
     print(f"Claims release dates expected: {len(expected)}")
-    print("Using parallel official DOL newsroom release index retrieval.")
+    print("Using immutable first-release PIT dataset (no DOL/ALFRED live calls).")
 
-    found = {}
-    page_jobs = [(year, page) for year in (2020, 2021) for page in range(1, 7)]
+    try:
+        df = pd.read_csv(raw_url, dtype={"available_date": str, "observation_date": str})
+    except Exception as exc:
+        raise RuntimeError(
+            "Unable to retrieve the immutable first-release Claims dataset: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
 
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {
-            pool.submit(fetch_dol_newsroom_page, year, page): (year, page)
-            for year, page in page_jobs
-        }
-        for future in as_completed(futures):
-            year, page = futures[future]
-            rows = future.result()
-            for row in rows:
-                if row["release_date"] in expected_map:
-                    found[row["release_date"]] = row
-            if rows:
-                print(
-                    f"  DOL newsroom {year} page {page}: "
-                    f"{len(rows)} claims releases"
-                )
+    required = {"observation_date", "available_date", "initial_claims"}
+    missing_cols = required - set(df.columns)
+    if missing_cols:
+        raise RuntimeError(f"First-release Claims dataset missing columns: {sorted(missing_cols)}")
 
-    found_rows = [found[k] for k in sorted(found)]
-    missing = [k for k in sorted(expected_map) if k not in found]
+    df["available_date"] = pd.to_datetime(df["available_date"], errors="coerce")
+    df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
+    df["initial_claims"] = pd.to_numeric(df["initial_claims"], errors="coerce")
 
-    print(f"Claims PIT records collected: {len(found_rows)}/{len(expected)}")
+    start = pd.Timestamp("2020-01-01")
+    end = pd.Timestamp("2021-12-31")
+    df = df[
+        (df["available_date"] >= start)
+        & (df["available_date"] <= end)
+        & df["available_date"].notna()
+        & df["observation_date"].notna()
+        & df["initial_claims"].notna()
+    ].copy()
 
-    if missing:
-        print(f"Claims PIT failures: {len(missing)}")
-        for date in missing[:15]:
-            print(f"  - {date}: missing official DOL newsroom release")
+    rows = []
+    failures = []
 
-    return found_rows
+    for release_date in expected:
+        release_key = release_date.strftime("%Y-%m-%d")
+        target_week = pd.Timestamp(week_ending_for_release(release_date))
+        match = df[
+            (df["available_date"] == release_date)
+            & (df["observation_date"] == target_week)
+        ]
+
+        if len(match) != 1:
+            failures.append(
+                f"{release_key}: expected one PIT row for week ending "
+                f"{target_week.strftime('%Y-%m-%d')}, found {len(match)}"
+            )
+            continue
+
+        value = float(match.iloc[0]["initial_claims"])
+        rows.append({
+            "indicator": "INITIAL_JOBLESS_CLAIMS",
+            "agency": "DOL",
+            "release_date": release_key,
+            "release_time": "08:30 ET",
+            "reference_period": f"Week ending {target_week.strftime('%B %-d, %Y')}",
+            "actual": value,
+            "previous": nan,
+            "revision": nan,
+            "consensus": nan,
+            "consensus_source": nan,
+            "vintage_date": release_key,
+            "source": "FRED First Release PIT dataset — source series: U.S. Employment and Training Administration / DOL",
+            "source_url": raw_url,
+        })
+
+    print(f"Claims PIT records collected: {len(rows)}/{len(expected)}")
+
+    if failures:
+        print(f"Claims PIT failures: {len(failures)}")
+        for item in failures[:15]:
+            print(f"  - {item}")
+
+    if len(rows) != len(expected):
+        raise RuntimeError(
+            f"First-release Claims PIT dataset incomplete: {len(rows)}/{len(expected)}"
+        )
+
+    # Deterministic integrity checks: one release, one observation, no look-ahead.
+    keys = {(r["release_date"], r["reference_period"]) for r in rows}
+    if len(keys) != len(rows):
+        raise RuntimeError("Duplicate Claims release/reference-period rows detected")
+
+    for r in rows:
+        if r["vintage_date"] != r["release_date"]:
+            raise RuntimeError(f"Claims PIT violation: {r['release_date']}")
+
+    return rows
 
 
 def rid(row):
