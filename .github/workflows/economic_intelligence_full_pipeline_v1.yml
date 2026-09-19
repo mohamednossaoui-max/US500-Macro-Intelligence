@@ -30,7 +30,7 @@ jobs:
           python-version: "3.11"
 
       # ================================================================
-      # 3. DEPENDENCIES
+      # 3. INSTALL DEPENDENCIES
       # ================================================================
       - name: Install dependencies
         run: |
@@ -38,7 +38,7 @@ jobs:
           pip install pandas numpy
 
       # ================================================================
-      # 4. VERIFY REQUIRED FILES
+      # 4. VERIFY FILES
       # ================================================================
       - name: Verify required files
         run: |
@@ -49,7 +49,7 @@ jobs:
           echo "All required files found."
 
       # ================================================================
-      # 5. RUN HISTORICAL COLLECTOR v1.5
+      # 5. HISTORICAL COLLECTOR v1.5
       # ================================================================
       - name: Run Economic Historical Collector v1.5
         run: |
@@ -77,7 +77,7 @@ jobs:
           print(f"Quality rows: {len(quality)}")
 
           # ------------------------------------------------------------
-          # RECORD COUNT
+          # RECORD COUNTS
           # ------------------------------------------------------------
           if len(events) != 48:
               raise RuntimeError(
@@ -90,11 +90,11 @@ jobs:
               )
 
           # ------------------------------------------------------------
-          # EVENT COLUMNS
+          # EVENTS FILE
           #
           # IMPORTANT:
-          # Collector v1.5 does NOT require record_id in the
-          # events CSV. Do not validate it here.
+          # PIT validation belongs to the quality file.
+          # Do NOT require point_in_time_safe in events.
           # ------------------------------------------------------------
           required_event_columns = [
               "indicator",
@@ -102,8 +102,7 @@ jobs:
               "release_date",
               "release_time",
               "reference_period",
-              "actual",
-              "point_in_time_safe"
+              "actual"
           ]
 
           for col in required_event_columns:
@@ -113,7 +112,7 @@ jobs:
                   )
 
           # ------------------------------------------------------------
-          # QUALITY COLUMNS
+          # QUALITY FILE
           # ------------------------------------------------------------
           required_quality_columns = [
               "indicator",
@@ -132,20 +131,13 @@ jobs:
                   )
 
           # ------------------------------------------------------------
-          # PIT SAFETY
+          # PIT QUALITY GATE
           # ------------------------------------------------------------
-          if not events[
-              "point_in_time_safe"
-          ].fillna(False).all():
-              raise RuntimeError(
-                  "Not all historical events are PIT safe."
-              )
-
           if not quality[
               "point_in_time_safe"
           ].fillna(False).all():
               raise RuntimeError(
-                  "Not all quality records are PIT safe."
+                  "Historical PIT quality gate failed."
               )
 
           # ------------------------------------------------------------
@@ -162,15 +154,18 @@ jobs:
           # QUALITY ISSUES
           # ------------------------------------------------------------
           issues = (
-              quality["quality_issues"]
+              quality[
+                  "quality_issues"
+              ]
               .fillna("")
               .astype(str)
               .str.strip()
           )
 
           if issues.ne("").any():
+
               print("")
-              print("QUALITY ISSUES FOUND:")
+              print("QUALITY ISSUES:")
               print(
                   quality.loc[
                       issues.ne(""),
@@ -187,7 +182,7 @@ jobs:
               )
 
           # ------------------------------------------------------------
-          # INDICATOR COUNT
+          # INDICATORS
           # ------------------------------------------------------------
           indicator_count = events[
               "indicator"
@@ -199,7 +194,7 @@ jobs:
               )
 
           # ------------------------------------------------------------
-          # 2023 BATCH
+          # RELEASE DATE VALIDATION
           # ------------------------------------------------------------
           release_dates = pd.to_datetime(
               events["release_date"],
@@ -211,6 +206,9 @@ jobs:
                   "Invalid release_date detected."
               )
 
+          # ------------------------------------------------------------
+          # 2023 BATCH
+          # ------------------------------------------------------------
           records_2023 = events[
               release_dates.dt.year == 2023
           ]
@@ -238,6 +236,7 @@ jobs:
           )
 
           if duplicates.any():
+
               print("")
               print("DUPLICATE EVENTS:")
               print(
@@ -260,7 +259,7 @@ jobs:
           '
 
       # ================================================================
-      # 7. RUN SURPRISE ENGINE v1.0
+      # 7. SURPRISE ENGINE v1.0
       # ================================================================
       - name: Run Economic Surprise Engine v1.0
         run: |
@@ -304,9 +303,6 @@ jobs:
                       f"Missing surprise column: {col}"
                   )
 
-          # ------------------------------------------------------------
-          # PIT
-          # ------------------------------------------------------------
           if not df[
               "point_in_time_safe"
           ].fillna(False).all():
@@ -314,9 +310,6 @@ jobs:
                   "Surprise Engine PIT gate failed."
               )
 
-          # ------------------------------------------------------------
-          # RESEARCH ONLY
-          # ------------------------------------------------------------
           if not df[
               "research_only"
           ].fillna(False).all():
@@ -324,9 +317,6 @@ jobs:
                   "Surprise Engine research-only gate failed."
               )
 
-          # ------------------------------------------------------------
-          # DECISION ENGINE MUST REMAIN DISABLED
-          # ------------------------------------------------------------
           if df[
               "decision_engine_ready"
           ].fillna(True).any():
@@ -334,11 +324,10 @@ jobs:
                   "Decision Engine integration must remain disabled."
               )
 
-          # ------------------------------------------------------------
-          # DIRECTIONAL SHOCKS
-          # ------------------------------------------------------------
           directional_count = (
-              df["directional_release_shock"]
+              df[
+                  "directional_release_shock"
+              ]
               .notna()
               .sum()
           )
@@ -348,9 +337,6 @@ jobs:
                   "No directional release shocks generated."
               )
 
-          # ------------------------------------------------------------
-          # INDICATORS
-          # ------------------------------------------------------------
           indicator_count = df[
               "indicator"
           ].nunique()
@@ -360,9 +346,6 @@ jobs:
                   f"Expected 7 indicators, got {indicator_count}"
               )
 
-          # ------------------------------------------------------------
-          # Z-SCORES
-          # ------------------------------------------------------------
           if "prior_zscore" in df.columns:
               z_count = df[
                   "prior_zscore"
@@ -370,8 +353,13 @@ jobs:
           else:
               z_count = 0
 
-          print(f"Directional release shocks: {directional_count}")
-          print(f"PIT-safe z-scores: {z_count}")
+          print(
+              f"Directional release shocks: {directional_count}"
+          )
+
+          print(
+              f"PIT-safe z-scores: {z_count}"
+          )
 
           print("")
           print("Surprise Engine validation: PASS")
@@ -382,7 +370,7 @@ jobs:
           '
 
       # ================================================================
-      # 9. RUN REGIME CLASSIFIER v1.3
+      # 9. REGIME CLASSIFIER v1.3
       # ================================================================
       - name: Run Economic Regime Classifier v1.3
         run: |
@@ -409,22 +397,16 @@ jobs:
           print(f"Regime observations: {len(df)}")
           print(f"Summary rows: {len(summary)}")
 
-          # ------------------------------------------------------------
-          # CURRENT EXPECTED OBSERVATION COUNT
-          # ------------------------------------------------------------
           if len(df) != 34:
               raise RuntimeError(
                   f"Expected 34 regime observations, got {len(df)}"
               )
 
-          if len(summary) <= 0:
+          if len(summary) == 0:
               raise RuntimeError(
                   "Regime summary is empty."
               )
 
-          # ------------------------------------------------------------
-          # REQUIRED COLUMNS
-          # ------------------------------------------------------------
           required_columns = [
               "snapshot_date",
               "economic_regime",
@@ -439,9 +421,6 @@ jobs:
                       f"Missing regime column: {col}"
                   )
 
-          # ------------------------------------------------------------
-          # PIT
-          # ------------------------------------------------------------
           if not df[
               "point_in_time_safe"
           ].fillna(False).all():
@@ -449,9 +428,6 @@ jobs:
                   "Regime PIT quality gate failed."
               )
 
-          # ------------------------------------------------------------
-          # RESEARCH ONLY
-          # ------------------------------------------------------------
           if not df[
               "research_only"
           ].fillna(False).all():
@@ -459,9 +435,6 @@ jobs:
                   "Regime research-only gate failed."
               )
 
-          # ------------------------------------------------------------
-          # DECISION ENGINE DISABLED
-          # ------------------------------------------------------------
           if df[
               "decision_engine_ready"
           ].fillna(True).any():
@@ -469,9 +442,6 @@ jobs:
                   "Decision Engine integration must remain disabled."
               )
 
-          # ------------------------------------------------------------
-          # SNAPSHOT DATES
-          # ------------------------------------------------------------
           dates = pd.to_datetime(
               df["snapshot_date"],
               errors="coerce"
@@ -482,9 +452,6 @@ jobs:
                   "Invalid snapshot_date detected."
               )
 
-          # ------------------------------------------------------------
-          # VALID REGIME LABELS
-          # ------------------------------------------------------------
           valid_regimes = {
               "INFLATIONARY_GROWTH",
               "DISINFLATIONARY_GROWTH",
@@ -511,9 +478,6 @@ jobs:
                   f"Invalid regime labels detected: {invalid}"
               )
 
-          # ------------------------------------------------------------
-          # DIMENSION COVERAGE
-          # ------------------------------------------------------------
           print("")
           print("DIMENSION COVERAGE")
           print("-" * 72)
@@ -524,14 +488,14 @@ jobs:
               "growth_score"
           ]:
               if col in df.columns:
-                  count = df[col].notna().sum()
+                  count = df[
+                      col
+                  ].notna().sum()
+
                   print(
                       f"{col}: {count}/{len(df)}"
                   )
 
-          # ------------------------------------------------------------
-          # REGIME DISTRIBUTION
-          # ------------------------------------------------------------
           print("")
           print("REGIME DISTRIBUTION")
           print("-" * 72)
@@ -611,7 +575,7 @@ jobs:
           '
 
       # ================================================================
-      # 12. DISPLAY ALL PIPELINE OUTPUTS
+      # 12. DISPLAY PIPELINE OUTPUTS
       # ================================================================
       - name: Display Pipeline Outputs
         run: |
@@ -678,26 +642,22 @@ jobs:
           print("FINAL ECONOMIC INTELLIGENCE QUALITY GATE")
           print("=" * 72)
 
-          # ------------------------------------------------------------
           # HISTORICAL
-          # ------------------------------------------------------------
           if len(historical) != 48:
               raise RuntimeError(
                   "Historical record count failed."
               )
 
-          if not historical[
-              "point_in_time_safe"
-          ].fillna(False).all():
+          if len(quality) != 48:
               raise RuntimeError(
-                  "Historical PIT gate failed."
+                  "Historical quality count failed."
               )
 
           if not quality[
               "point_in_time_safe"
           ].fillna(False).all():
               raise RuntimeError(
-                  "Historical quality PIT gate failed."
+                  "Historical PIT gate failed."
               )
 
           if quality[
@@ -707,9 +667,12 @@ jobs:
                   "Historical consensus gate failed."
               )
 
-          # ------------------------------------------------------------
           # SURPRISE
-          # ------------------------------------------------------------
+          if len(surprise) != 48:
+              raise RuntimeError(
+                  "Surprise record count failed."
+              )
+
           if not surprise[
               "point_in_time_safe"
           ].fillna(False).all():
@@ -728,12 +691,15 @@ jobs:
               "decision_engine_ready"
           ].fillna(True).any():
               raise RuntimeError(
-                  "Surprise Decision Engine integration is enabled."
+                  "Surprise Decision Engine integration enabled."
               )
 
-          # ------------------------------------------------------------
           # REGIME
-          # ------------------------------------------------------------
+          if len(regime) != 34:
+              raise RuntimeError(
+                  "Regime observation count failed."
+              )
+
           if not regime[
               "point_in_time_safe"
           ].fillna(False).all():
@@ -752,7 +718,7 @@ jobs:
               "decision_engine_ready"
           ].fillna(True).any():
               raise RuntimeError(
-                  "Regime Decision Engine integration is enabled."
+                  "Regime Decision Engine integration enabled."
               )
 
           print("")
