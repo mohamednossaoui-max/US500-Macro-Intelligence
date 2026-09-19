@@ -99,9 +99,6 @@ jobs:
           print(f"Historical events: {len(events)}")
           print(f"Quality rows: {len(quality)}")
 
-          # --------------------------------------------------------
-          # RECORD COUNT
-          # --------------------------------------------------------
           if len(events) != 48:
               raise RuntimeError(
                   f"Expected 48 historical records, got {len(events)}"
@@ -112,9 +109,6 @@ jobs:
                   f"Expected 48 quality records, got {len(quality)}"
               )
 
-          # --------------------------------------------------------
-          # EVENTS COLUMNS
-          # --------------------------------------------------------
           required_events = [
               "indicator",
               "agency",
@@ -130,9 +124,6 @@ jobs:
                       f"Missing historical event column: {col}"
                   )
 
-          # --------------------------------------------------------
-          # QUALITY COLUMNS
-          # --------------------------------------------------------
           required_quality = [
               "indicator",
               "agency",
@@ -149,9 +140,6 @@ jobs:
                       f"Missing historical quality column: {col}"
                   )
 
-          # --------------------------------------------------------
-          # PIT
-          # --------------------------------------------------------
           pit = quality[
               "point_in_time_safe"
           ].fillna(False)
@@ -161,9 +149,6 @@ jobs:
                   "Historical PIT quality gate failed."
               )
 
-          # --------------------------------------------------------
-          # QUALITY ISSUES
-          # --------------------------------------------------------
           issues = (
               quality["quality_issues"]
               .fillna("")
@@ -187,9 +172,6 @@ jobs:
                   "Historical data contains quality issues."
               )
 
-          # --------------------------------------------------------
-          # CONSENSUS
-          # --------------------------------------------------------
           consensus = quality[
               "historical_consensus_available"
           ].fillna(False)
@@ -199,9 +181,6 @@ jobs:
                   "Historical consensus detected unexpectedly."
               )
 
-          # --------------------------------------------------------
-          # INDICATORS
-          # --------------------------------------------------------
           indicators = events[
               "indicator"
           ].dropna().unique()
@@ -211,9 +190,6 @@ jobs:
                   f"Expected 7 indicators, got {len(indicators)}"
               )
 
-          # --------------------------------------------------------
-          # 2023 BATCH
-          # --------------------------------------------------------
           release_dates = pd.to_datetime(
               events["release_date"],
               errors="coerce"
@@ -228,9 +204,6 @@ jobs:
                   f"Expected 14 records from 2023 batch, got {records_2023}"
               )
 
-          # --------------------------------------------------------
-          # DUPLICATES
-          # --------------------------------------------------------
           duplicate_subset = [
               "indicator",
               "agency",
@@ -304,9 +277,6 @@ jobs:
           print(f"Records: {len(df)}")
           print(f"Summary rows: {len(summary)}")
 
-          # --------------------------------------------------------
-          # RECORD COUNT
-          # --------------------------------------------------------
           if len(df) != 48:
               raise RuntimeError(
                   f"Expected 48 surprise records, got {len(df)}"
@@ -317,9 +287,6 @@ jobs:
                   "Surprise summary is empty."
               )
 
-          # --------------------------------------------------------
-          # REQUIRED COLUMNS
-          # --------------------------------------------------------
           required_columns = [
               "indicator",
               "release_date",
@@ -334,9 +301,6 @@ jobs:
                       f"Missing surprise column: {col}"
                   )
 
-          # --------------------------------------------------------
-          # INDICATORS
-          # --------------------------------------------------------
           indicators = df[
               "indicator"
           ].dropna().unique()
@@ -346,9 +310,6 @@ jobs:
                   f"Expected 7 indicators, got {len(indicators)}"
               )
 
-          # --------------------------------------------------------
-          # DIRECTIONAL SHOCKS
-          # --------------------------------------------------------
           shocks = df[
               "directional_release_shock"
           ]
@@ -360,9 +321,6 @@ jobs:
                   "No directional release shocks were generated."
               )
 
-          # --------------------------------------------------------
-          # RESEARCH ONLY
-          # --------------------------------------------------------
           research_only = df[
               "research_only"
           ].fillna(False)
@@ -372,9 +330,6 @@ jobs:
                   "Surprise Engine research-only gate failed."
               )
 
-          # --------------------------------------------------------
-          # DECISION ENGINE DISABLED
-          # --------------------------------------------------------
           decision_ready = df[
               "decision_engine_ready"
           ].fillna(True)
@@ -385,9 +340,6 @@ jobs:
                   "must remain disabled."
               )
 
-          # --------------------------------------------------------
-          # RELEASE DATES
-          # --------------------------------------------------------
           dates = pd.to_datetime(
               df["release_date"],
               errors="coerce"
@@ -439,19 +391,7 @@ jobs:
 
 
       # ============================================================
-      # 10. VALIDATE REGIME OUTPUT
-      #
-      # Uses the ACTUAL v1.3 schema:
-      #
-      # release_date
-      # inflation_score
-      # labor_score
-      # growth_score
-      # dimensions_available
-      # economic_regime
-      # research_only
-      # decision_engine_ready
-      # pit_safe
+      # 10. VALIDATE REGIME CLASSIFIER
       # ============================================================
       - name: Validate Economic Regime Classifier
         run: |
@@ -474,7 +414,7 @@ jobs:
           print(f"Summary rows: {len(summary)}")
 
           # --------------------------------------------------------
-          # RECORD COUNT
+          # COUNT
           # --------------------------------------------------------
           if len(df) != 34:
               raise RuntimeError(
@@ -491,6 +431,7 @@ jobs:
           # --------------------------------------------------------
           required_columns = [
               "release_date",
+
               "inflation_score",
               "inflation_method",
               "inflation_observation_date",
@@ -569,7 +510,7 @@ jobs:
               )
 
           # --------------------------------------------------------
-          # DECISION ENGINE DISABLED
+          # DECISION ENGINE
           # --------------------------------------------------------
           decision_ready = df[
               "decision_engine_ready"
@@ -614,7 +555,7 @@ jobs:
               )
 
           # --------------------------------------------------------
-          # DIMENSION COVERAGE
+          # COVERAGE
           # --------------------------------------------------------
           print("")
           print("DIMENSION COVERAGE")
@@ -631,24 +572,22 @@ jobs:
               ].notna().sum()
 
               print(
-                  f"{col}: "
-                  f"{count}/{len(df)}"
+                  f"{col}: {count}/{len(df)}"
               )
 
           # --------------------------------------------------------
-          # REGIME DISTRIBUTION
+          # DISTRIBUTION
           # --------------------------------------------------------
           print("")
           print("REGIME DISTRIBUTION")
           print("-" * 72)
 
-          distribution = (
-              df["economic_regime"]
-              .value_counts()
-          )
-
           print(
-              distribution.to_string()
+              df[
+                  "economic_regime"
+              ]
+              .value_counts()
+              .to_string()
           )
 
           print("")
@@ -657,7 +596,12 @@ jobs:
 
 
       # ============================================================
-      # 11. PRINT ORGANIZED 34 REGIME OBSERVATIONS
+      # 11. PRINT ORGANIZED 34 OBSERVATIONS
+      #
+      # IMPORTANT:
+      # No nested f-string expressions.
+      # Values are prepared first, then formatted.
+      # This avoids the previous SyntaxError.
       # ============================================================
       - name: Print Organized Economic Regime Observations
         run: |
@@ -671,12 +615,12 @@ jobs:
 
           pd.set_option(
               "display.width",
-              220
+              240
           )
 
           pd.set_option(
               "display.max_colwidth",
-              35
+              40
           )
 
           df = pd.read_csv(
@@ -692,9 +636,9 @@ jobs:
               "release_date"
           ).reset_index(drop=True)
 
-          # --------------------------------------------------------
+          # ========================================================
           # MAIN TABLE
-          # --------------------------------------------------------
+          # ========================================================
           print("")
           print("=" * 120)
           print("ECONOMIC REGIME OBSERVATIONS — v1.3")
@@ -702,59 +646,87 @@ jobs:
 
           print("")
           print(
-              "Date | Inflation | Labor | Growth | "
-              "Dimensions | Regime"
+              "No. | Date       | Inflation | Labor    | Growth   | "
+              "Dims | Regime"
           )
 
           print("-" * 120)
 
-          for _, row in df.iterrows():
+          for index, row in df.iterrows():
 
-              date = (
-                  row["release_date"]
-                  .strftime("%Y-%m-%d")
-                  if pd.notna(row["release_date"])
-                  else "N/A"
-              )
+              date_value = row["release_date"]
 
-              inflation = (
-                  f"{row[\"inflation_score\"]:.3f}"
-                  if pd.notna(row["inflation_score"])
-                  else "N/A"
-              )
+              if pd.notna(date_value):
+                  date_text = date_value.strftime(
+                      "%Y-%m-%d"
+                  )
+              else:
+                  date_text = "N/A"
 
-              labor = (
-                  f"{row[\"labor_score\"]:.3f}"
-                  if pd.notna(row["labor_score"])
-                  else "N/A"
-              )
+              inflation_value = row[
+                  "inflation_score"
+              ]
 
-              growth = (
-                  f"{row[\"growth_score\"]:.3f}"
-                  if pd.notna(row["growth_score"])
-                  else "N/A"
-              )
+              if pd.notna(inflation_value):
+                  inflation_text = "{:.3f}".format(
+                      inflation_value
+                  )
+              else:
+                  inflation_text = "N/A"
 
-              dimensions = str(
+              labor_value = row[
+                  "labor_score"
+              ]
+
+              if pd.notna(labor_value):
+                  labor_text = "{:.3f}".format(
+                      labor_value
+                  )
+              else:
+                  labor_text = "N/A"
+
+              growth_value = row[
+                  "growth_score"
+              ]
+
+              if pd.notna(growth_value):
+                  growth_text = "{:.3f}".format(
+                      growth_value
+                  )
+              else:
+                  growth_text = "N/A"
+
+              dimensions_text = str(
                   row["dimensions_available"]
               )
 
-              regime = str(
+              regime_text = str(
                   row["economic_regime"]
               )
 
+              number_text = str(
+                  index + 1
+              ).rjust(2)
+
               print(
-                  f"{date} | "
-                  f"{inflation:>8} | "
-                  f"{labor:>8} | "
-                  f"{growth:>8} | "
-                  f"{dimensions:<10} | "
-                  f"{regime}"
+                  number_text
+                  + " | "
+                  + date_text
+                  + " | "
+                  + inflation_text.rjust(9)
+                  + " | "
+                  + labor_text.rjust(8)
+                  + " | "
+                  + growth_text.rjust(8)
+                  + " | "
+                  + dimensions_text.ljust(4)
+                  + " | "
+                  + regime_text
               )
 
-          # --------------------------------------------------------
+          # ========================================================
           # DETAILED TABLE
-          # --------------------------------------------------------
+          # ========================================================
           print("")
           print("=" * 120)
           print("DETAILED DIMENSION OBSERVATIONS")
@@ -809,19 +781,23 @@ jobs:
               )
           )
 
-          # --------------------------------------------------------
+          # ========================================================
           # REGIME DISTRIBUTION
-          # --------------------------------------------------------
+          # ========================================================
           print("")
           print("=" * 120)
           print("REGIME DISTRIBUTION")
           print("=" * 120)
 
           distribution = (
-              df["economic_regime"]
+              df[
+                  "economic_regime"
+              ]
               .value_counts()
               .rename_axis("economic_regime")
-              .reset_index(name="observations")
+              .reset_index(
+                  name="observations"
+              )
           )
 
           print(
@@ -830,28 +806,74 @@ jobs:
               )
           )
 
-          # --------------------------------------------------------
+          # ========================================================
           # DIMENSION AVAILABILITY
-          # --------------------------------------------------------
+          # ========================================================
           print("")
           print("=" * 120)
           print("DIMENSION AVAILABILITY")
           print("=" * 120)
 
-          for col, label in [
+          dimension_info = [
               ("inflation_score", "Inflation"),
               ("labor_score", "Labor"),
               ("growth_score", "Growth")
-          ]:
+          ]
+
+          for column, label in dimension_info:
 
               available = df[
-                  col
+                  column
               ].notna().sum()
 
               print(
-                  f"{label:<12}: "
-                  f"{available}/{len(df)}"
+                  "{:<12}: {}/{}".format(
+                      label,
+                      available,
+                      len(df)
+                  )
               )
+
+          # ========================================================
+          # PIT / RESEARCH / DECISION STATUS
+          # ========================================================
+          print("")
+          print("=" * 120)
+          print("PIPELINE STATUS")
+          print("=" * 120)
+
+          pit_count = df[
+              "pit_safe"
+          ].fillna(False).sum()
+
+          research_count = df[
+              "research_only"
+          ].fillna(False).sum()
+
+          decision_count = df[
+              "decision_engine_ready"
+          ].fillna(True).sum()
+
+          print(
+              "PIT safe              : {}/{}".format(
+                  pit_count,
+                  len(df)
+              )
+          )
+
+          print(
+              "Research only         : {}/{}".format(
+                  research_count,
+                  len(df)
+              )
+          )
+
+          print(
+              "Decision Engine ready : {}/{}".format(
+                  decision_count,
+                  len(df)
+              )
+          )
 
           print("")
           print("=" * 120)
@@ -934,11 +956,11 @@ jobs:
                   "Historical record count gate failed."
               )
 
-          pit = historical_quality[
+          historical_pit = historical_quality[
               "point_in_time_safe"
           ].fillna(False)
 
-          if not pit.all():
+          if not historical_pit.all():
               raise RuntimeError(
                   "Historical PIT gate failed."
               )
@@ -951,25 +973,21 @@ jobs:
                   "Surprise record count gate failed."
               )
 
-          if "research_only" in surprise.columns:
+          if not surprise[
+              "research_only"
+          ].fillna(False).all():
 
-              if not surprise[
-                  "research_only"
-              ].fillna(False).all():
+              raise RuntimeError(
+                  "Surprise Engine research-only gate failed."
+              )
 
-                  raise RuntimeError(
-                      "Surprise Engine research-only gate failed."
-                  )
+          if surprise[
+              "decision_engine_ready"
+          ].fillna(True).any():
 
-          if "decision_engine_ready" in surprise.columns:
-
-              if surprise[
-                  "decision_engine_ready"
-              ].fillna(True).any():
-
-                  raise RuntimeError(
-                      "Surprise Engine Decision Engine gate failed."
-                  )
+              raise RuntimeError(
+                  "Surprise Engine Decision Engine gate failed."
+              )
 
           # --------------------------------------------------------
           # REGIME
@@ -979,60 +997,65 @@ jobs:
                   "Regime observation count gate failed."
               )
 
-          # Exact v1.3 PIT field
-          if not regime[
+          regime_pit = regime[
               "pit_safe"
-          ].fillna(False).all():
+          ].fillna(False)
 
+          if not regime_pit.all():
               raise RuntimeError(
                   "Regime PIT gate failed."
               )
 
-          if "research_only" in regime.columns:
+          if not regime[
+              "research_only"
+          ].fillna(False).all():
 
-              if not regime[
-                  "research_only"
-              ].fillna(False).all():
+              raise RuntimeError(
+                  "Regime research-only gate failed."
+              )
 
-                  raise RuntimeError(
-                      "Regime research-only gate failed."
-                  )
+          if regime[
+              "decision_engine_ready"
+          ].fillna(True).any():
 
-          if "decision_engine_ready" in regime.columns:
-
-              if regime[
-                  "decision_engine_ready"
-              ].fillna(True).any():
-
-                  raise RuntimeError(
-                      "Regime Decision Engine gate failed."
-                  )
+              raise RuntimeError(
+                  "Regime Decision Engine gate failed."
+              )
 
           # --------------------------------------------------------
-          # FINAL STATUS
+          # FINAL
           # --------------------------------------------------------
           print("")
           print(
-              f"Historical records: {len(historical_quality)}"
+              "Historical records: {}".format(
+                  len(historical_quality)
+              )
           )
 
           print(
-              f"Historical PIT safe: "
-              f"{int(pit.sum())}/{len(pit)}"
+              "Historical PIT safe: {}/{}".format(
+                  historical_pit.sum(),
+                  len(historical_pit)
+              )
           )
 
           print(
-              f"Surprise records: {len(surprise)}"
+              "Surprise records: {}".format(
+                  len(surprise)
+              )
           )
 
           print(
-              f"Regime observations: {len(regime)}"
+              "Regime observations: {}".format(
+                  len(regime)
+              )
           )
 
           print(
-              f"Regime PIT safe: "
-              f"{int(regime[\"pit_safe\"].fillna(False).sum())}"
-              f"/{len(regime)}"
+              "Regime PIT safe: {}/{}".format(
+                  regime_pit.sum(),
+                  len(regime_pit)
+              )
           )
 
           print("")
