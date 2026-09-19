@@ -1,6 +1,6 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Economic Surprise Engine v1.2
+Economic Intelligence — Economic Surprise Engine v1.3
 FILE NAME: economic_surprise_engine_v1.1.py
 
 Purpose
@@ -8,7 +8,7 @@ Purpose
 Research-only transformation of point-in-time economic release data into
 directional release shocks and point-in-time expanding z-scores.
 
-v1.2 methodology:
+v1.3 methodology:
 1. Use official "previous" when it is explicitly present.
 2. If official previous is unavailable, use the immediately prior published
    observation for the same indicator, provided its release_date is strictly
@@ -85,6 +85,59 @@ def validate_required_columns(df: pd.DataFrame) -> None:
     missing = sorted(required - set(df.columns))
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
+
+
+def classify_release_type(row: pd.Series) -> str:
+    """Classify whether a release is a new GDP period or a same-period revision.
+
+    For non-GDP indicators this is NEW_PERIOD_RELEASE. For GDP, repeated
+    reference periods such as Q1 2025 Advance/Second/Third are revisions to
+    the same underlying period and must not be treated as new growth states by
+    the regime classifier.
+    """
+    if str(row.get("indicator", "")) != "GDP":
+        return "NEW_PERIOD_RELEASE"
+
+    ref = str(row.get("reference_period", ""))
+    if "Estimate" in ref or "Initial" in ref or "Updated" in ref:
+        # The first release for a reference quarter is a new period. A repeated
+        # reference period is detected later from prior published references.
+        return "GDP_RELEASE_CANDIDATE"
+    return "GDP_RELEASE_CANDIDATE"
+
+
+def finalize_gdp_release_types(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["release_type"] = "NEW_PERIOD_RELEASE"
+    df["regime_eligible"] = True
+    if "reference_period" not in df.columns:
+        return df
+
+    if "indicator" not in df.columns:
+        return df
+
+    g = df[df["indicator"] == "GDP"].copy()
+    if g.empty:
+        return df
+
+    g = g.sort_values(["release_date", "_row_order"], kind="mergesort")
+    seen = set()
+    for idx, row in g.iterrows():
+        ref = str(row.get("reference_period", "")).strip()
+        # Normalize GDP vintages to the underlying reference quarter.
+        # Examples: "Q1 2025 — Advance Estimate" and
+        # "Q1 2025 — Third Estimate" belong to the same economic period.
+        import re
+        m = re.match(r"^(Q[1-4]\s+\d{4})", ref)
+        period_key = m.group(1) if m else ref
+        if period_key in seen:
+            df.loc[idx, "release_type"] = "SAME_PERIOD_REVISION"
+            df.loc[idx, "regime_eligible"] = False
+        else:
+            df.loc[idx, "release_type"] = "NEW_PERIOD_RELEASE"
+            df.loc[idx, "regime_eligible"] = True
+            seen.add(period_key)
+    return df
 
 
 def point_in_time_safe(row: pd.Series) -> bool:
@@ -305,6 +358,8 @@ def main() -> None:
         kind="mergesort",
     ).reset_index(drop=True)
 
+    df = finalize_gdp_release_types(df)
+
     # ---------------------------------------------------------------
     # CLASSIC CONSENSUS SURPRISE
     # ---------------------------------------------------------------
@@ -456,6 +511,8 @@ def main() -> None:
         "vintage_date",
         "source",
         "source_url",
+        "release_type",
+        "regime_eligible",
         "point_in_time_safe",
         "consensus_available",
         "classic_surprise",
@@ -525,12 +582,25 @@ def main() -> None:
         ),
     ]
 
+    # GDP vintage hardening: same reference-period revisions are explicitly
+    # tagged and excluded from regime eligibility, but retained for research.
+    gdp = df[df["indicator"] == "GDP"]
+    gdp_revision_count = int((gdp["release_type"] == "SAME_PERIOD_REVISION").sum())
+    gdp_new_period_count = int((gdp["release_type"] == "NEW_PERIOD_RELEASE").sum())
+    gates.append(
+        GateResult(
+            "GDP_VINTAGE_CLASSIFICATION",
+            bool((gdp["release_type"].isin(["NEW_PERIOD_RELEASE", "SAME_PERIOD_REVISION"])).all()),
+            f"GDP new periods={gdp_new_period_count}, same-period revisions={gdp_revision_count}",
+        )
+    )
+
     failed = [g for g in gates if not g.passed]
     if failed:
         for gate in gates:
             status = "PASS" if gate.passed else "FAIL"
             print(f"{status}: {gate.name} — {gate.detail}")
-        raise AssertionError("Economic Surprise Engine v1.2 quality gate failed.")
+        raise AssertionError("Economic Surprise Engine v1.3 quality gate failed.")
 
     summary = build_summary(df)
 
@@ -542,7 +612,7 @@ def main() -> None:
     # ---------------------------------------------------------------
     print("=" * 60)
     print("US500 Macro Intelligence")
-    print("Economic Surprise Engine v1.2")
+    print("Economic Surprise Engine v1.3")
     print("=" * 60)
     print(f"Input records: {len(df)}")
     print(f"PIT-safe records: {int(df['point_in_time_safe'].sum())}/{len(df)}")
@@ -596,7 +666,7 @@ def main() -> None:
     print(OUTPUT_FILE)
     print(SUMMARY_FILE)
 
-    print("\nECONOMIC SURPRISE ENGINE v1.2: PASS")
+    print("\nECONOMIC SURPRISE ENGINE v1.3: PASS")
 
 
 if __name__ == "__main__":
