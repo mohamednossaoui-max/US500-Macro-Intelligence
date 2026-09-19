@@ -15,6 +15,8 @@ from __future__ import annotations
 import io
 import time
 import hashlib
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
@@ -140,22 +142,136 @@ def load_treasury(s, package=None):
             })
     return rows
 
+def us_federal_holidays(year):
+    """Return observed U.S. federal holiday dates for the year."""
+    from datetime import date, timedelta
+    def nth_weekday(month, weekday, n):
+        d = date(year, month, 1)
+        d += timedelta(days=(weekday - d.weekday()) % 7)
+        d += timedelta(weeks=n-1)
+        return d
+    def last_weekday(month, weekday):
+        import calendar
+        last = calendar.monthrange(year, month)[1]
+        d = date(year, month, last)
+        d -= timedelta(days=(d.weekday() - weekday) % 7)
+        return d
+    fixed = [(1,1),(6,19),(7,4),(11,11),(12,25)]
+    out = set()
+    for m, day in fixed:
+        d = date(year,m,day)
+        if d.weekday() == 5:
+            out.add(d - timedelta(days=1))
+        elif d.weekday() == 6:
+            out.add(d + timedelta(days=1))
+        else:
+            out.add(d)
+    out.add(nth_weekday(1,0,3))   # MLK
+    out.add(nth_weekday(2,0,3))   # Washington's Birthday
+    out.add(last_weekday(5,0))    # Memorial Day
+    out.add(nth_weekday(9,0,1))   # Labor Day
+    out.add(nth_weekday(10,0,2))  # Columbus Day
+    out.add(nth_weekday(11,3,4))  # Thanksgiving
+    return out
+
+def scheduled_nfci_release_dates():
+    """Generate Chicago Fed NFCI release dates without relying on ALFRED's calendar endpoint.
+
+    Chicago Fed states that NFCI/ANFCI are released at 8:30 a.m. ET on Wednesday
+    for the prior Friday; if a federal holiday falls on Wednesday or earlier in
+    the week, the release moves to Thursday.
+    """
+    dates = []
+    obs = pd.date_range(START, END, freq="W-FRI")
+    holidays = set()
+    for y in range(START.year, END.year + 1):
+        holidays |= us_federal_holidays(y)
+    for od in obs:
+        rd = od + pd.Timedelta(days=5)  # following Wednesday
+        if rd.date() in holidays or (rd - pd.Timedelta(days=1)).date() in holidays or (rd - pd.Timedelta(days=2)).date() in holidays:
+            rd = od + pd.Timedelta(days=6)  # Thursday
+        if START <= rd <= END:
+            dates.append(rd)
+    return dates
+
 def load_nfci_release_dates(s):
-    # ALFRED release-date list is the PIT calendar for the Chicago Fed release.
-    # It contains release dates on which any series from the release was revised.
-    r = get(s, ALFRED_RELEASE_DATES)
-    text = r.text
-    # The download page exposes a text/xlsx filename. Try the plain text endpoint.
-    txt_url = "https://alfred.stlouisfed.org/release/downloaddates?rid=221&format=txt"
+    """Load ALFRED release dates, with deterministic Chicago Fed schedule fallback."""
     try:
-        rr = get(s, txt_url)
-        text = rr.text
-    except Exception:
-        pass
-    dates = pd.to_datetime(pd.Series(
-        __import__("re").findall(r"\b20\d{2}-\d{2}-\d{2}\b", text)
-    ), errors="coerce").dropna().drop_duplicates().sort_values()
-    return [d for d in dates if START <= d <= END]
+        r = get(s, ALFRED_RELEASE_DATES, tries=3, timeout=20)
+        text = r.text
+        dates = pd.to_datetime(pd.Series(
+            re.findall(r"\b20\d{2}-\d{2}-\d{2}\b", text)
+        ), errors="coerce").dropna().drop_duplicates().sort_values()
+        dates = [d for d in dates if START <= d <= END]
+        if dates:
+            print(f"NFCI release calendar: ALFRED ({len(dates)} dates)")
+            return dates
+    except Exception as exc:
+        print(f"NFCI release calendar: ALFRED unavailable ({exc}); using Chicago Fed schedule fallback.")
+    dates = scheduled_nfci_release_dates()
+    print(f"NFCI release calendar: deterministic Chicago Fed schedule ({len(dates)} dates)")
+    return dates
+
+def fetch_nfci_vintage(s, vintage, series_list):
+    ids = ",".join(series_list)
+    url = f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={ids}&vintage_date={vintage}"
+    try:
+        r = get(s, url, tries=4, timeout=60)
+        return vintage, pd.read_csv(io.BytesIO(r.content))
+    except Exception as exc:
+        return vintage, exc
+
+def load_nfci_pair(s):
+    release_dates = load_nfci_release_dates(s)
+    rows = []
+    if not release_dates:
+        return rows
+
+    # Fetch both NFCI and ANFCI in one ALFRED request per vintage, concurrently.
+    results = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(fetch_nfci_vintage, session(), rd.date().isoformat(), ["NFCI","ANFCI"]) for rd in release_dates]
+        for fut in as_completed(futures):
+            results.append(fut.result())
+
+    for vintage, result in results:
+        if isinstance(result, Exception):
+            print(f"WARN: NFCI vintage {vintage} failed: {result}")
+            continue
+        df = result
+        if "observation_date" not in df.columns:
+            continue
+        df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
+        for series in ["NFCI","ANFCI"]:
+            if series not in df.columns:
+                continue
+            vals = pd.to_numeric(df[series], errors="coerce")
+            sub = pd.DataFrame({"observation_date":df["observation_date"], series:vals}).dropna()
+            sub = sub[(sub.observation_date >= START) & (sub.observation_date <= END)]
+            rd = pd.Timestamp(vintage)
+            sub = sub[sub.observation_date <= rd - pd.Timedelta(days=1)]
+            for _, x in sub.iterrows():
+                rows.append({
+                    "indicator":series,
+                    "observation_date":pd.Timestamp(x.observation_date).date().isoformat(),
+                    "availability_date":rd.date().isoformat(),
+                    "actual":float(x[series]),
+                    "unit":"INDEX_LEVEL","frequency":"WEEKLY",
+                    "source":"Chicago Fed",
+                    "source_url":CHICAGO_URL,
+                    "vintage":rd.date().isoformat(),
+                    "revision_flag":False,
+                    "point_in_time_safe":True,
+                    "availability_semantics":"ARCHIVED_VINTAGE",
+                })
+
+    # Keep the earliest vintage for each observation: first release, not a later revision.
+    out = {}
+    for row in rows:
+        k = (row["indicator"], row["observation_date"])
+        if k not in out or row["availability_date"] < out[k]["availability_date"]:
+            out[k] = row
+    return list(out.values())
 
 def load_nfci(s, series):
     release_dates = load_nfci_release_dates(s)
@@ -216,8 +332,7 @@ def main():
     rows += load_vix(s)
     treasury_package = None
     rows += load_treasury(s, treasury_package)
-    rows += load_nfci(s, "NFCI")
-    rows += load_nfci(s, "ANFCI")
+    rows += load_nfci_pair(s)
 
     # Build curve only where both Treasury observations share the same date.
     tmp = pd.DataFrame(rows)
