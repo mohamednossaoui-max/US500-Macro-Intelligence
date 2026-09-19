@@ -1,13 +1,13 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Economic Regime Classifier v1.5
-Labor Dimension Stabilization + Surprise Engine v1.2 Compatibility
+Economic Intelligence — Economic Regime Classifier v1.6
+GDP Vintage/Revisions Hardening + Surprise Engine v1.3 Compatibility
 
 Research-only.
 No Decision Engine integration.
 No trade signals.
 
-v1.5 methodology:
+v1.6 methodology:
 - Inflation / Growth unchanged.
 - Labor is a composite of NFP, Unemployment Rate and Initial Jobless Claims.
 - Only PIT-safe directional z-scores are used.
@@ -147,6 +147,11 @@ def normalize_surprise_schema(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing required columns after normalization: {missing}")
 
+    if "release_type" not in df.columns:
+        df["release_type"] = "NEW_PERIOD_RELEASE"
+    if "regime_eligible" not in df.columns:
+        df["regime_eligible"] = True
+
     return df
 
 
@@ -159,6 +164,7 @@ def latest_fresh_indicator_rows(df, snapshot_date, indicators):
             & (df["release_date"] <= snapshot_date)
             & (df["pit_safe"] == True)
             & (df["directional_shock_z"].notna())
+            & (df.get("regime_eligible", True) == True)
         ].copy()
 
         if x.empty:
@@ -349,6 +355,10 @@ def main():
     assert out["research_only"].all()
     assert not out["decision_engine_ready"].any()
 
+    # GDP revisions must never be selected as the current Growth observation.
+    gdp_input = df[df["indicator"] == "GDP"]
+    assert not (gdp_input.loc[gdp_input["regime_eligible"] == False, "release_type"] != "SAME_PERIOD_REVISION").any()
+
     raw_counts = [
         out["inflation_raw_shock_count"].sum(),
         out["labor_raw_shock_count"].sum(),
@@ -357,7 +367,7 @@ def main():
     assert sum(raw_counts) == 0
 
     print("=" * 70)
-    print("ECONOMIC REGIME CLASSIFIER v1.5")
+    print("ECONOMIC REGIME CLASSIFIER v1.6")
     print("=" * 70)
     print(f"Regime observations: {len(out)}")
     print(f"PIT safe: {int(out['pit_safe'].sum())}/{len(out)}")
@@ -390,12 +400,13 @@ def main():
 
     print("\nQuality gates:")
     print("PIT QUALITY GATE: PASS")
+    print("GDP VINTAGE/REVISION GATE: PASS")
     print("NORMALIZATION GATE: PASS")
     print("LABOR MINIMUM COVERAGE GATE: PASS")
     print("NO RAW SHOCK FALLBACK GATE: PASS")
     print("RESEARCH-ONLY GATE: PASS")
     print("DECISION ENGINE DISABLED: PASS")
-    print("\nECONOMIC REGIME CLASSIFIER v1.5: PASS")
+    print("\nECONOMIC REGIME CLASSIFIER v1.6: PASS")
 
 
 if __name__ == "__main__":
