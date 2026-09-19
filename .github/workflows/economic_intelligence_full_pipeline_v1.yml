@@ -884,7 +884,7 @@ jobs:
           echo "Decision Engine integration: DISABLED"
           echo ""
           echo "ECONOMIC INTELLIGENCE PIPELINE: PASS"
-          echo ""
+            echo ""
           echo "Research-only."
           echo "No trading signal generated."
           echo "============================================================"
