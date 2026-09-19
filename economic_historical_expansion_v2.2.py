@@ -50,50 +50,45 @@ HEADERS = {
 }
 
 # ---------------------------------------------------------------------
-# DOL / ALFRED Claims reconstruction
+# DOL Claims reconstruction — official newsroom releases
 #
-# GitHub Actions runners can receive HTTP 403 from the DOL PDF endpoint.
-# We therefore keep the DOL PDF parser as the first path, but use an
-# explicit ALFRED vintage of the DOL/FRED ICSA series as the deterministic
-# fallback.  The fallback uses vintage_date == release_date and never uses
-# the current revised series.
+# The previous v2.2 implementation used ALFRED for every weekly release.
+# GitHub Actions cannot reliably reach ALFRED from this workflow: all 105
+# requests timed out.  We therefore use the U.S. Department of Labor's
+# official News Releases index, which exposes the original weekly release
+# text and the advance seasonally-adjusted initial-claims value.
 #
-# This preserves point-in-time availability for the research dataset.
+# This is preferable for a PIT dataset because each value is taken from the
+# release published on that release date, rather than from today's revised
+# ICSA series.
 # ---------------------------------------------------------------------
 
-def parse_claims_pdf(content, url):
-    reader = PdfReader(BytesIO(content))
-    text = "\n".join((p.extract_text() or "") for p in reader.pages)
-    flat = re.sub(r"\s+", " ", text)
+def parse_claims_release_block(text, release_date, url):
+    """Parse one official DOL weekly claims release text block."""
+    flat = re.sub(r"\s+", " ", text or "").strip()
 
-    if "UNEMPLOYMENT INSURANCE WEEKLY CLAIMS" not in flat.upper():
+    if "UNEMPLOYMENT INSURANCE WEEKLY CLAIMS REPORT" not in flat.upper():
         return None
-
-    md = re.search(
-        r"(\b(?:January|February|March|April|May|June|July|August|September|"
-        r"October|November|December)\s+\d{1,2},\s+20(?:20|21))",
-        flat,
-        re.I,
-    )
-
-    mw = re.search(
-        r"week ending\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,\s+20(?:20|21))",
-        flat,
-        re.I,
-    )
 
     ma = re.search(
         r"advance figure for seasonally adjusted initial claims was\s+([\d,]+)",
         flat,
         re.I,
     )
-
-    if not (md and mw and ma):
+    if not ma:
         return None
 
-    release = pd.to_datetime(md.group(1)).strftime("%Y-%m-%d")
+    mw = re.search(
+        r"week ending\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,\s*\d{4})?)",
+        flat,
+        re.I,
+    )
+    if not mw:
+        return None
 
-    week = re.sub(r"(st|nd|rd|th)", "", mw.group(1))
+    week = re.sub(r"(st|nd|rd|th)", "", mw.group(1), flags=re.I)
+    if "," not in week:
+        week = f"{week}, {pd.Timestamp(release_date):%Y}"
     week = pd.to_datetime(week).strftime("%Y-%m-%d")
 
     actual = int(ma.group(1).replace(",", ""))
@@ -107,18 +102,16 @@ def parse_claims_pdf(content, url):
         flat,
         re.I,
     )
-
     if mr:
-        revision = int(mr.group(2).replace(",", ""))
+        direction = 1 if mr.group(1).lower() == "up" else -1
+        revision = direction * int(mr.group(2).replace(",", ""))
         previous = int(mr.group(4).replace(",", ""))
     else:
-        mp = re.search(
-            r"previous week's level was\s+([\d,]+)",
-            flat,
-            re.I,
-        )
+        mp = re.search(r"previous week's level was\s+([\d,]+)", flat, re.I)
         if mp:
             previous = int(mp.group(1).replace(",", ""))
+
+    release = pd.Timestamp(release_date).strftime("%Y-%m-%d")
 
     return {
         "indicator": "INITIAL_JOBLESS_CLAIMS",
@@ -138,35 +131,20 @@ def parse_claims_pdf(content, url):
 
 
 def candidate_release_dates(year):
-    """
-    Build the official weekly release calendar for 2020/2021.
-
-    Normal schedule: Thursday.
-    Thanksgiving exception:
-      2020-11-25 (Wednesday)
-      2021-11-24 (Wednesday)
-
-    The DOL archive documents Thursday publication with federal-holiday
-    exceptions.
-    """
+    """Official weekly release dates for 2020/2021."""
     dates = []
-
-    start = pd.Timestamp(f"{year}-01-01")
+    d = pd.Timestamp(f"{year}-01-01")
     end = pd.Timestamp(f"{year}-12-31")
-
-    d = start
 
     while d <= end:
         if d.weekday() == 3:  # Thursday
             dates.append(d)
         d += pd.Timedelta(days=1)
 
-    # Thanksgiving Wednesday replaces the Thursday release.
     if year == 2020:
         dates = [d for d in dates if d != pd.Timestamp("2020-11-26")]
         dates.append(pd.Timestamp("2020-11-25"))
-
-    if year == 2021:
+    elif year == 2021:
         dates = [d for d in dates if d != pd.Timestamp("2021-11-25")]
         dates.append(pd.Timestamp("2021-11-24"))
 
@@ -174,267 +152,153 @@ def candidate_release_dates(year):
 
 
 def week_ending_for_release(release_date):
-    """
-    Initial claims are reported for the Saturday immediately preceding
-    the release date.
-    """
+    """Saturday immediately preceding the DOL release date."""
     d = pd.Timestamp(release_date).normalize()
-    previous_saturday = d - pd.Timedelta(days=(d.weekday() - 5) % 7)
-
-    # If release itself is Saturday, use the prior Saturday.
-    if previous_saturday >= d:
-        previous_saturday -= pd.Timedelta(days=7)
-
-    return previous_saturday.strftime("%Y-%m-%d")
+    return (d - pd.Timedelta(days=(d.weekday() - 5) % 7)).strftime("%Y-%m-%d")
 
 
-def direct_dol_pdf_url(release_date):
-    d = pd.Timestamp(release_date)
-    return f"https://oui.doleta.gov/press/{d:%Y}/{d:%m%d%y}.pdf"
-
-
-def try_dol_pdf(session, release_date):
-    """
-    Try the actual DOL release PDF first.
-
-    GitHub Actions may receive 403 from oui.doleta.gov. That is treated
-    as an acquisition failure, not as a data value.
-    """
-    url = direct_dol_pdf_url(release_date)
-
-    try:
-        r = session.get(
-            url,
-            timeout=20,
-            headers=HEADERS,
-        )
-
-        if r.status_code != 200:
-            return None
-
-        if not r.content.startswith(b"%PDF"):
-            return None
-
-        return parse_claims_pdf(r.content, url)
-
-    except Exception:
-        return None
-
-
-def fetch_alfred_vintage(session, release_date):
-    """
-    Deterministic PIT fallback.
-
-    ICSA is the seasonally adjusted Initial Claims series underlying
-    the DOL weekly release.  ALFRED permits retrieval using a historical
-    vintage date.  We use vintage_date == DOL release_date and select
-    the Saturday observation immediately preceding the release.
-
-    This is NOT the current revised series.
-    """
-    release = pd.Timestamp(release_date)
-    week_ending = week_ending_for_release(release)
-
-    url = (
-        "https://alfred.stlouisfed.org/graph/alfredgraph.csv"
-        f"?id=ICSA"
-        f"&cosd={week_ending}"
-        f"&coed={week_ending}"
-        f"&vintage_date={release:%Y-%m-%d}"
+def dol_newsroom_page_url(year, page):
+    return (
+        "https://www.dol.gov/newsroom/releases"
+        f"?agency=All&state=All&topic=132&year={year}&page={page}"
     )
 
-    try:
-        r = session.get(
-            url,
-            timeout=30,
-            headers=HEADERS,
-        )
-        r.raise_for_status()
 
-        if not r.text.strip():
-            return None
+def parse_newsroom_page(html, year):
+    """Extract original weekly-claims releases from one DOL index page."""
+    soup = BeautifulSoup(html, "html.parser")
+    rows = []
 
-        from io import StringIO
+    for link in soup.find_all("a"):
+        title = link.get_text(" ", strip=True)
+        if title.lower() != "unemployment insurance weekly claims report":
+            continue
 
-        df = pd.read_csv(StringIO(r.text))
+        href = link.get("href") or ""
+        if href.startswith("/"):
+            href = "https://www.dol.gov" + href
+        elif not href.startswith("http"):
+            href = "https://www.dol.gov/" + href.lstrip("/")
 
-        if df.empty:
-            return None
+        release_date = None
+        m = re.search(r"eta(20\d{6})", href, re.I)
+        if m:
+            release_date = pd.to_datetime(m.group(1), format="%Y%m%d")
 
-        # ALFRED normally returns observation_date + ICSA.
-        value_col = None
-        for col in df.columns:
-            if str(col).upper() == "ICSA":
-                value_col = col
+        node = link
+        block = ""
+        for _ in range(8):
+            node = node.parent
+            if node is None:
+                break
+            candidate = node.get_text(" ", strip=True)
+            if "advance figure for seasonally adjusted initial claims was" in candidate.lower():
+                block = candidate
                 break
 
-        if value_col is None:
-            return None
+        if not block:
+            block = link.parent.get_text(" ", strip=True) if link.parent else ""
 
-        value = pd.to_numeric(
-            df.iloc[0][value_col],
-            errors="coerce",
-        )
+        if release_date is None:
+            md = re.search(
+                r"\b(?:January|February|March|April|May|June|July|August|September|"
+                r"October|November|December)\s+\d{1,2},\s+20\d{2}\b",
+                block,
+                re.I,
+            )
+            if md:
+                release_date = pd.to_datetime(md.group(0))
 
-        if pd.isna(value):
-            return None
+        if release_date is None or release_date.year != year:
+            continue
 
-        actual = int(round(float(value)))
+        row = parse_claims_release_block(block, release_date, href)
+        if row:
+            rows.append(row)
 
-        return {
-            "indicator": "INITIAL_JOBLESS_CLAIMS",
-            "agency": "DOL",
-            "release_date": release.strftime("%Y-%m-%d"),
-            "release_time": "08:30 ET",
-            "reference_period": f"Week ending {week_ending}",
-            "actual": actual,
-            "previous": None,
-            "revision": None,
-            "consensus": None,
-            "consensus_source": None,
-            "vintage_date": release.strftime("%Y-%m-%d"),
-            "source": (
-                "DOL Initial Claims — ALFRED PIT vintage "
-                "of ICSA"
-            ),
-            "source_url": url,
-        }
-
-    except Exception as exc:
-        print(
-            f"  ALFRED unavailable for {release:%Y-%m-%d}: "
-            f"{type(exc).__name__}"
-        )
-        return None
+    # Deduplicate in case the page template contains duplicate links.
+    unique = {}
+    for row in rows:
+        unique[row["release_date"]] = row
+    return list(unique.values())
 
 
-def fetch_alfred_one(release_date):
-    """Fetch one DOL ICSA observation as a point-in-time ALFRED vintage."""
-    release = pd.Timestamp(release_date)
-    week_ending = week_ending_for_release(release)
-    url = (
-        "https://alfred.stlouisfed.org/graph/alfredgraph.csv"
-        f"?id=ICSA"
-        f"&cosd={week_ending}"
-        f"&coed={week_ending}"
-        f"&vintage_date={release:%Y-%m-%d}"
-    )
+def fetch_dol_newsroom_page(year, page):
+    """Fetch one official DOL filtered newsroom page."""
+    url = dol_newsroom_page_url(year, page)
+    headers = dict(HEADERS)
+    headers.update({
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.dol.gov/newsroom/releases",
+    })
 
-    try:
-        r = requests.get(
-            url,
-            timeout=(4, 8),
-            headers=HEADERS,
-        )
-        r.raise_for_status()
-        text = r.text.strip()
-        if not text:
-            return None
+    last_error = None
+    for attempt in range(2):
+        try:
+            r = requests.get(url, timeout=(5, 15), headers=headers)
+            r.raise_for_status()
+            return parse_newsroom_page(r.text, year)
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            if attempt == 0:
+                time.sleep(1)
 
-        from io import StringIO
-        df = pd.read_csv(StringIO(text))
-        if df.empty:
-            return None
-
-        value_col = next(
-            (c for c in df.columns if str(c).upper().startswith("ICSA")),
-            None,
-        )
-        if value_col is None:
-            return None
-
-        value = pd.to_numeric(df.iloc[0][value_col], errors="coerce")
-        if pd.isna(value):
-            return None
-
-        actual = int(round(float(value)))
-        release_str = release.strftime("%Y-%m-%d")
-
-        return {
-            "indicator": "INITIAL_JOBLESS_CLAIMS",
-            "agency": "DOL",
-            "release_date": release_str,
-            "release_time": "08:30 ET",
-            "reference_period": f"Week ending {week_ending}",
-            "actual": actual,
-            "previous": None,
-            "revision": None,
-            "consensus": None,
-            "consensus_source": None,
-            "vintage_date": release_str,
-            "source": "DOL Initial Claims — ALFRED PIT vintage of ICSA",
-            "source_url": url,
-        }
-    except Exception as exc:
-        return (release_date, f"{type(exc).__name__}: {exc}")
+    print(f"  DOL newsroom page FAIL: {year} page {page} -> {last_error}")
+    return []
 
 
 def collect_claims():
     """
-    Fast 2020-2021 Claims collection.
+    Collect 2020-2021 Initial Jobless Claims from official DOL release pages.
 
-    The GitHub runner previously spent ~20s on each blocked DOL PDF request
-    and then another ~30s on the ALFRED fallback.  That can turn 105 weekly
-    releases into a very long sequential run.
-
-    We therefore use ALFRED PIT vintages directly and fetch them concurrently.
-    ALFRED is specifically designed to preserve historical information sets;
-    its documentation describes a vintage as data as it existed on a past
-    date.  We use vintage_date == release_date and never use today's revised
-    ICSA series.
-
-    If ALFRED fails for an individual date, the date is reported and the
-    quality gate stops the pipeline rather than silently substituting a
-    revised/current value.
+    We intentionally do not use FRED/ICSA current data or ALFRED.  The value
+    is the advance seasonally-adjusted initial-claims number printed in the
+    DOL release itself, with vintage_date equal to the release date.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    release_dates = (
+    expected = (
         candidate_release_dates(2020)
         + candidate_release_dates(2021)
     )
+    expected_map = {
+        d.strftime("%Y-%m-%d"): d for d in expected
+    }
 
-    print(f"Claims release dates expected: {len(release_dates)}")
-    print("Using parallel ALFRED PIT retrieval (no sequential DOL 403 wait).")
+    print(f"Claims release dates expected: {len(expected)}")
+    print("Using parallel official DOL newsroom release index retrieval.")
 
-    found = []
-    failures = []
+    found = {}
+    page_jobs = [(year, page) for year in (2020, 2021) for page in range(1, 7)]
 
-    # Eight workers keeps the run fast without creating an excessive request
-    # burst against ALFRED.
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=6) as pool:
         futures = {
-            pool.submit(fetch_alfred_one, d): d
-            for d in release_dates
+            pool.submit(fetch_dol_newsroom_page, year, page): (year, page)
+            for year, page in page_jobs
         }
-
         for future in as_completed(futures):
-            release_date = futures[future]
-            result = future.result()
+            year, page = futures[future]
+            rows = future.result()
+            for row in rows:
+                if row["release_date"] in expected_map:
+                    found[row["release_date"]] = row
+            if rows:
+                print(
+                    f"  DOL newsroom {year} page {page}: "
+                    f"{len(rows)} claims releases"
+                )
 
-            if isinstance(result, tuple):
-                failures.append(result)
-                print(f"  ALFRED FAIL: {result[0]} -> {result[1]}")
-                continue
+    found_rows = [found[k] for k in sorted(found)]
+    missing = [k for k in sorted(expected_map) if k not in found]
 
-            if result is None:
-                failures.append((release_date.strftime("%Y-%m-%d"), "empty PIT response"))
-                print(f"  ALFRED FAIL: {release_date:%Y-%m-%d} -> empty PIT response")
-                continue
+    print(f"Claims PIT records collected: {len(found_rows)}/{len(expected)}")
 
-            found.append(result)
-            print(f"  ALFRED PIT OK: {result['release_date']} -> {result['actual']:,}")
+    if missing:
+        print(f"Claims PIT failures: {len(missing)}")
+        for date in missing[:15]:
+            print(f"  - {date}: missing official DOL newsroom release")
 
-    found.sort(key=lambda r: (r["release_date"], r["reference_period"]))
-
-    print(f"Claims PIT records collected: {len(found)}/{len(release_dates)}")
-
-    if failures:
-        print(f"Claims PIT failures: {len(failures)}")
-        for date, reason in sorted(failures)[:10]:
-            print(f"  - {date}: {reason}")
-
-    return found
+    return found_rows
 
 
 def rid(row):
