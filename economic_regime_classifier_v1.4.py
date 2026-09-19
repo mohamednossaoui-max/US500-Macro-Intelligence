@@ -1,13 +1,16 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Economic Regime Classifier v1.3
+Economic Intelligence — Economic Regime Classifier v1.4
 
 Purpose:
 - Build PIT-safe economic regime observations from the Economic Surprise Engine.
-- Use the latest valid observation available as of each snapshot date.
+- Use only PIT-safe information available as of each snapshot date.
+- Normalize dimension inputs using PIT directional z-scores only.
 - Aggregate multiple indicators inside each macro dimension.
+- Apply indicator-specific freshness controls.
+- Prevent stale observations from representing the current regime.
+- Avoid raw-shock / z-score mixing.
 - Avoid look-ahead bias.
-- Avoid mixing z-score and raw-shock scales in the same dimension.
 - Research-only.
 - NO Decision Engine integration.
 - NO trading signal generation.
@@ -35,13 +38,17 @@ INPUT_FILE = "economic_surprise_engine_v1.csv"
 OUTPUT_EVENTS = "economic_regime_events_v1.csv"
 OUTPUT_SUMMARY = "economic_regime_summary_v1.csv"
 
-# Regime thresholds
+
+# ============================================================
+# REGIME THRESHOLDS
+# ============================================================
+
 POSITIVE_THRESHOLD = 0.5
 NEGATIVE_THRESHOLD = -0.5
 
 
 # ============================================================
-# MACRO DIMENSION MAP
+# INDICATOR -> MACRO DIMENSION
 # ============================================================
 
 DIMENSION_MAP = {
@@ -54,6 +61,36 @@ DIMENSION_MAP = {
 
     "GDP": "GROWTH",
     "ISM_MANUFACTURING_PMI": "GROWTH",
+}
+
+
+# ============================================================
+# INDICATOR-SPECIFIC FRESHNESS WINDOWS
+# ============================================================
+#
+# The purpose is NOT to claim that an observation becomes
+# economically meaningless exactly at these boundaries.
+#
+# These are conservative research-engine controls preventing
+# very old information from being treated as current.
+#
+# Weekly claims -> short window
+# Monthly indicators -> medium window
+# Quarterly GDP -> longer window
+# ============================================================
+
+MAX_AGE_DAYS = {
+    "CPI": 45,
+    "CORE_CPI": 45,
+
+    "NFP": 45,
+    "UNEMPLOYMENT_RATE": 45,
+
+    "INITIAL_JOBLESS_CLAIMS": 21,
+
+    "ISM_MANUFACTURING_PMI": 45,
+
+    "GDP": 120,
 }
 
 
@@ -80,7 +117,30 @@ def clean_string(value) -> str:
 
 
 # ============================================================
-# BUILD DIMENSION SCORE
+# EMPTY DIMENSION RESULT
+# ============================================================
+
+def empty_dimension_result():
+    """
+    Return a standardized empty dimension result.
+    """
+
+    return {
+        "score": np.nan,
+        "method": "NO_FRESH_ZSCORE",
+        "observation_date": pd.NaT,
+        "age_days": np.nan,
+        "indicator_count": 0,
+        "indicators": "",
+        "zscore_count": 0,
+        "raw_shock_count": 0,
+        "stale_indicator_count": 0,
+        "stale_indicators": "",
+    }
+
+
+# ============================================================
+# BUILD DIMENSION SCORE — v1.4
 # ============================================================
 
 def build_dimension_score(
@@ -89,55 +149,50 @@ def build_dimension_score(
     snapshot_date: pd.Timestamp,
 ):
     """
-    Build one macro dimension score using only information
-    available on or before snapshot_date.
+    Build one macro dimension score.
 
-    Methodology:
+    v1.4 methodology:
 
     1. Restrict observations to:
-       - same dimension
+       - same macro dimension
        - release_date <= snapshot_date
-       - PIT safe
-       - valid directional release shock
+       - PIT-safe records
+       - valid directional z-score
 
     2. For every indicator:
-       - select the latest valid observation available
-         at the snapshot date.
+       - select the latest observation available
+         as of snapshot_date.
 
-    3. If at least one selected indicator has a z-score:
-       - use ONLY z-scores
-       - do not mix raw shocks with z-scores.
+    3. Apply indicator-specific freshness control.
 
-    4. Otherwise:
-       - use raw directional shocks.
+    4. Exclude stale observations.
 
-    5. Average the selected indicator values.
+    5. Use ONLY directional PIT z-scores.
+
+    6. Average the valid fresh z-scores.
+
+    IMPORTANT:
+    Raw directional shocks are NEVER used as a fallback.
+
+    This guarantees that all dimension scores are expressed
+    on the same normalized scale.
 
     Returns:
-        dictionary containing the dimension score and metadata.
+        dictionary containing score and metadata.
     """
 
     dimension_df = df[
         (df["dimension"] == dimension)
         & (df["release_date"] <= snapshot_date)
         & (df["pit_safe"] == True)
-        & (df["directional_release_shock"].notna())
+        & (df["directional_shock_z"].notna())
     ].copy()
 
     if dimension_df.empty:
-        return {
-            "score": np.nan,
-            "method": "NO_DATA",
-            "observation_date": pd.NaT,
-            "age_days": np.nan,
-            "indicator_count": 0,
-            "indicators": "",
-            "zscore_count": 0,
-            "raw_shock_count": 0,
-        }
+        return empty_dimension_result()
 
     # --------------------------------------------------------
-    # Latest valid observation per indicator
+    # Latest available observation per indicator
     # --------------------------------------------------------
 
     dimension_df = dimension_df.sort_values(
@@ -152,78 +207,131 @@ def build_dimension_score(
     )
 
     if latest_by_indicator.empty:
+        return empty_dimension_result()
+
+    # --------------------------------------------------------
+    # Calculate observation age
+    # --------------------------------------------------------
+
+    latest_by_indicator["age_days"] = (
+        snapshot_date
+        - latest_by_indicator["release_date"]
+    ).dt.days
+
+    # --------------------------------------------------------
+    # Apply indicator-specific freshness
+    # --------------------------------------------------------
+
+    latest_by_indicator["max_age_days"] = (
+        latest_by_indicator["indicator"]
+        .map(MAX_AGE_DAYS)
+    )
+
+    # --------------------------------------------------------
+    # Detect unknown freshness configuration
+    # --------------------------------------------------------
+
+    unknown_freshness = sorted(
+        latest_by_indicator.loc[
+            latest_by_indicator["max_age_days"].isna(),
+            "indicator",
+        ]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    if unknown_freshness:
+        raise RuntimeError(
+            "Missing freshness configuration for indicators: "
+            f"{unknown_freshness}"
+        )
+
+    # --------------------------------------------------------
+    # Fresh vs stale
+    # --------------------------------------------------------
+
+    latest_by_indicator["is_fresh"] = (
+        latest_by_indicator["age_days"]
+        <= latest_by_indicator["max_age_days"]
+    )
+
+    stale = latest_by_indicator[
+        ~latest_by_indicator["is_fresh"]
+    ].copy()
+
+    fresh = latest_by_indicator[
+        latest_by_indicator["is_fresh"]
+        & latest_by_indicator["directional_shock_z"].notna()
+    ].copy()
+
+    # --------------------------------------------------------
+    # No fresh observations
+    # --------------------------------------------------------
+
+    if fresh.empty:
         return {
             "score": np.nan,
-            "method": "NO_DATA",
+            "method": "NO_FRESH_ZSCORE",
             "observation_date": pd.NaT,
             "age_days": np.nan,
             "indicator_count": 0,
             "indicators": "",
             "zscore_count": 0,
             "raw_shock_count": 0,
+            "stale_indicator_count": len(stale),
+            "stale_indicators": ",".join(
+                sorted(
+                    stale["indicator"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                )
+            ),
         }
 
     # --------------------------------------------------------
-    # Z-score availability
+    # FINAL NORMALIZED SCORE
     # --------------------------------------------------------
-
-    z_available = latest_by_indicator[
-        latest_by_indicator["directional_shock_z"].notna()
-    ].copy()
-
-    # --------------------------------------------------------
-    # Preferred method:
-    # Use z-scores only if at least one valid z-score exists.
     #
-    # We deliberately do NOT mix z-scores and raw shocks.
+    # ONLY z-scores are used.
+    #
+    # No raw directional shock is ever introduced.
     # --------------------------------------------------------
 
-    if not z_available.empty:
+    values = fresh[
+        "directional_shock_z"
+    ].astype(float)
 
-        values = z_available["directional_shock_z"].astype(float)
-
-        score = values.mean()
-
-        used = z_available.copy()
-
-        method = "MEAN_PIT_ZSCORES"
-
-        zscore_count = len(used)
-        raw_shock_count = 0
+    score = values.mean()
 
     # --------------------------------------------------------
-    # Fallback:
-    # No z-score available -> use raw directional shocks.
+    # Metadata
     # --------------------------------------------------------
 
-    else:
+    latest_observation_date = fresh[
+        "release_date"
+    ].max()
 
-        values = latest_by_indicator[
-            "directional_release_shock"
-        ].astype(float)
-
-        score = values.mean()
-
-        used = latest_by_indicator.copy()
-
-        method = "MEAN_RAW_DIRECTIONAL_SHOCK"
-
-        zscore_count = 0
-        raw_shock_count = len(used)
-
-    # --------------------------------------------------------
-    # Observation metadata
-    # --------------------------------------------------------
-
-    latest_observation_date = used["release_date"].max()
-
-    age_days = (
-        snapshot_date - latest_observation_date
-    ).days
+    latest_age_days = int(
+        (
+            snapshot_date
+            - latest_observation_date
+        ).days
+    )
 
     indicators = ",".join(
         sorted(
-            used["indicator"]
+            fresh["indicator"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+    )
+
+    stale_indicators = ",".join(
+        sorted(
+            stale["indicator"]
             .dropna()
             .astype(str)
             .unique()
@@ -232,13 +340,24 @@ def build_dimension_score(
 
     return {
         "score": float(score),
-        "method": method,
+
+        "method": "MEAN_FRESH_PIT_ZSCORES",
+
         "observation_date": latest_observation_date,
-        "age_days": int(age_days),
-        "indicator_count": len(used),
+
+        "age_days": latest_age_days,
+
+        "indicator_count": len(fresh),
+
         "indicators": indicators,
-        "zscore_count": zscore_count,
-        "raw_shock_count": raw_shock_count,
+
+        "zscore_count": len(fresh),
+
+        "raw_shock_count": 0,
+
+        "stale_indicator_count": len(stale),
+
+        "stale_indicators": stale_indicators,
     }
 
 
@@ -254,9 +373,11 @@ def classify_regime(
     """
     Classify the economic regime from the three macro dimensions.
 
+    All inputs are normalized PIT z-score based dimension scores.
+
     Inflation:
-        positive = inflationary pressure
-        negative = disinflationary pressure
+        positive = stronger inflationary pressure
+        negative = stronger disinflationary pressure
 
     Labor:
         positive = stronger labor conditions
@@ -293,7 +414,7 @@ def classify_regime(
         return "PARTIAL_DATA"
 
     # --------------------------------------------------------
-    # All dimensions available
+    # Dimension states
     # --------------------------------------------------------
 
     inflation_positive = (
@@ -322,7 +443,6 @@ def classify_regime(
 
     # ========================================================
     # REGIME 1
-    # Inflationary Growth
     # ========================================================
 
     if (
@@ -334,7 +454,6 @@ def classify_regime(
 
     # ========================================================
     # REGIME 2
-    # Disinflationary Growth
     # ========================================================
 
     if (
@@ -346,7 +465,6 @@ def classify_regime(
 
     # ========================================================
     # REGIME 3
-    # Stagflationary
     # ========================================================
 
     if (
@@ -358,7 +476,6 @@ def classify_regime(
 
     # ========================================================
     # REGIME 4
-    # Disinflationary Slowdown
     # ========================================================
 
     if (
@@ -370,7 +487,6 @@ def classify_regime(
 
     # ========================================================
     # REGIME 5
-    # Recessionary Pressure
     # ========================================================
 
     if (
@@ -380,7 +496,7 @@ def classify_regime(
         return "RECESSIONARY_PRESSURE"
 
     # ========================================================
-    # Everything else
+    # DEFAULT
     # ========================================================
 
     return "MIXED"
@@ -392,10 +508,10 @@ def classify_regime(
 
 def main():
 
-    print("=" * 72)
+    print("=" * 80)
     print("US500 MACRO INTELLIGENCE")
-    print("ECONOMIC INTELLIGENCE — ECONOMIC REGIME CLASSIFIER v1.3")
-    print("=" * 72)
+    print("ECONOMIC INTELLIGENCE — ECONOMIC REGIME CLASSIFIER v1.4")
+    print("=" * 80)
 
     # ========================================================
     # LOAD DATA
@@ -403,6 +519,7 @@ def main():
 
     try:
         df = pd.read_csv(INPUT_FILE)
+
     except FileNotFoundError:
         raise RuntimeError(
             f"Input file not found: {INPUT_FILE}"
@@ -485,7 +602,7 @@ def main():
     unknown_indicators = sorted(
         df.loc[
             df["dimension"].isna(),
-            "indicator"
+            "indicator",
         ]
         .dropna()
         .unique()
@@ -535,13 +652,31 @@ def main():
     )
 
     # ========================================================
+    # Z-SCORE COVERAGE
+    # ========================================================
+
+    zscore_count = int(
+        df["directional_shock_z"].notna().sum()
+    )
+
+    print(
+        f"Directional PIT z-score records: "
+        f"{zscore_count}/{len(df)}"
+    )
+
+    if zscore_count == 0:
+        raise RuntimeError(
+            "No directional PIT z-scores available."
+        )
+
+    # ========================================================
     # SNAPSHOT DATES
     # ========================================================
 
     snapshot_dates = sorted(
         df.loc[
             df["pit_safe"],
-            "release_date"
+            "release_date",
         ]
         .dropna()
         .unique()
@@ -587,10 +722,6 @@ def main():
             growth["score"],
         )
 
-        # ----------------------------------------------------
-        # Dimensions available
-        # ----------------------------------------------------
-
         dimensions_available = sum(
             pd.notna(value)
             for value in [
@@ -601,7 +732,7 @@ def main():
         )
 
         # ----------------------------------------------------
-        # Store row
+        # Store observation
         # ----------------------------------------------------
 
         regime_rows.append({
@@ -613,22 +744,39 @@ def main():
             # ------------------------------
 
             "inflation_score": inflation["score"],
+
             "inflation_method": inflation["method"],
+
             "inflation_observation_date": (
                 inflation["observation_date"]
             ),
-            "inflation_age_days": inflation["age_days"],
+
+            "inflation_age_days": (
+                inflation["age_days"]
+            ),
+
             "inflation_indicator_count": (
                 inflation["indicator_count"]
             ),
+
             "inflation_indicators": (
                 inflation["indicators"]
             ),
+
             "inflation_zscore_count": (
                 inflation["zscore_count"]
             ),
+
             "inflation_raw_shock_count": (
                 inflation["raw_shock_count"]
+            ),
+
+            "inflation_stale_indicator_count": (
+                inflation["stale_indicator_count"]
+            ),
+
+            "inflation_stale_indicators": (
+                inflation["stale_indicators"]
             ),
 
             # ------------------------------
@@ -636,22 +784,39 @@ def main():
             # ------------------------------
 
             "labor_score": labor["score"],
+
             "labor_method": labor["method"],
+
             "labor_observation_date": (
                 labor["observation_date"]
             ),
-            "labor_age_days": labor["age_days"],
+
+            "labor_age_days": (
+                labor["age_days"]
+            ),
+
             "labor_indicator_count": (
                 labor["indicator_count"]
             ),
+
             "labor_indicators": (
                 labor["indicators"]
             ),
+
             "labor_zscore_count": (
                 labor["zscore_count"]
             ),
+
             "labor_raw_shock_count": (
                 labor["raw_shock_count"]
+            ),
+
+            "labor_stale_indicator_count": (
+                labor["stale_indicator_count"]
+            ),
+
+            "labor_stale_indicators": (
+                labor["stale_indicators"]
             ),
 
             # ------------------------------
@@ -659,22 +824,39 @@ def main():
             # ------------------------------
 
             "growth_score": growth["score"],
+
             "growth_method": growth["method"],
+
             "growth_observation_date": (
                 growth["observation_date"]
             ),
-            "growth_age_days": growth["age_days"],
+
+            "growth_age_days": (
+                growth["age_days"]
+            ),
+
             "growth_indicator_count": (
                 growth["indicator_count"]
             ),
+
             "growth_indicators": (
                 growth["indicators"]
             ),
+
             "growth_zscore_count": (
                 growth["zscore_count"]
             ),
+
             "growth_raw_shock_count": (
                 growth["raw_shock_count"]
+            ),
+
+            "growth_stale_indicator_count": (
+                growth["stale_indicator_count"]
+            ),
+
+            "growth_stale_indicators": (
+                growth["stale_indicators"]
             ),
 
             # ------------------------------
@@ -696,7 +878,6 @@ def main():
             "decision_engine_ready": False,
 
             "pit_safe": True,
-
         })
 
     # ========================================================
@@ -795,6 +976,63 @@ def main():
             )
 
     # ========================================================
+    # NORMALIZATION QUALITY GATE
+    # ========================================================
+    #
+    # There must be NO raw-shock contribution to any
+    # dimension score in v1.4.
+    # ========================================================
+
+    raw_columns = [
+        "inflation_raw_shock_count",
+        "labor_raw_shock_count",
+        "growth_raw_shock_count",
+    ]
+
+    raw_usage = (
+        regime_df[raw_columns]
+        .fillna(0)
+        .sum()
+        .sum()
+    )
+
+    if raw_usage != 0:
+        raise RuntimeError(
+            "Normalization quality gate failed: "
+            "raw directional shocks entered dimension scores."
+        )
+
+    # ========================================================
+    # DIMENSION SCORE METHOD GATE
+    # ========================================================
+
+    valid_methods = {
+        "MEAN_FRESH_PIT_ZSCORES",
+        "NO_FRESH_ZSCORE",
+    }
+
+    method_columns = [
+        "inflation_method",
+        "labor_method",
+        "growth_method",
+    ]
+
+    for column in method_columns:
+
+        invalid_methods = set(
+            regime_df[column]
+            .dropna()
+            .astype(str)
+            .unique()
+        ) - valid_methods
+
+        if invalid_methods:
+            raise RuntimeError(
+                f"Invalid dimension method(s) in "
+                f"{column}: {sorted(invalid_methods)}"
+            )
+
+    # ========================================================
     # PIT FLAG GATE
     # ========================================================
 
@@ -803,6 +1041,24 @@ def main():
     ):
         raise RuntimeError(
             "Regime output contains PIT-unsafe rows."
+        )
+
+    # ========================================================
+    # RESEARCH-ONLY GATE
+    # ========================================================
+
+    if not bool(
+        regime_df["research_only"].all()
+    ):
+        raise RuntimeError(
+            "Research-only gate failed."
+        )
+
+    if bool(
+        regime_df["decision_engine_ready"].any()
+    ):
+        raise RuntimeError(
+            "Decision Engine integration must remain disabled."
         )
 
     # ========================================================
@@ -846,7 +1102,6 @@ def main():
                 group["dimensions_available"]
                 .mean()
             ),
-
         })
 
     summary_df = pd.DataFrame(
@@ -854,7 +1109,7 @@ def main():
     )
 
     # ========================================================
-    # OVERALL SUMMARY ROW
+    # OVERALL SUMMARY
     # ========================================================
 
     overall = pd.DataFrame([{
@@ -884,7 +1139,6 @@ def main():
             regime_df["dimensions_available"]
             .mean()
         ),
-
     }])
 
     summary_df = pd.concat(
@@ -913,9 +1167,9 @@ def main():
     # CONSOLE REPORT
     # ========================================================
 
-    print("\n" + "=" * 72)
-    print("REGIME CLASSIFIER SUMMARY")
-    print("=" * 72)
+    print("\n" + "=" * 80)
+    print("REGIME CLASSIFIER SUMMARY — v1.4")
+    print("=" * 80)
 
     print(
         f"\nInput records: "
@@ -925,6 +1179,11 @@ def main():
     print(
         f"PIT safe input records: "
         f"{int(df['pit_safe'].sum())}/{len(df)}"
+    )
+
+    print(
+        f"Directional PIT z-score records: "
+        f"{zscore_count}/{len(df)}"
     )
 
     print(
@@ -942,8 +1201,12 @@ def main():
         f"{df['dimension'].dropna().nunique()}"
     )
 
+    # ========================================================
+    # REGIME DISTRIBUTION
+    # ========================================================
+
     print("\nREGIME DISTRIBUTION")
-    print("-" * 72)
+    print("-" * 80)
 
     print(
         regime_df[
@@ -954,8 +1217,12 @@ def main():
         .to_string()
     )
 
+    # ========================================================
+    # DIMENSION COVERAGE
+    # ========================================================
+
     print("\nDIMENSION COVERAGE")
-    print("-" * 72)
+    print("-" * 80)
 
     print(
         "Inflation score coverage: "
@@ -975,8 +1242,34 @@ def main():
         f"/{len(regime_df)}"
     )
 
+    # ========================================================
+    # FRESHNESS / INDICATOR USAGE
+    # ========================================================
+
+    print("\nDIMENSION INDICATOR USAGE")
+    print("-" * 80)
+
+    for dimension in [
+        "INFLATION",
+        "LABOR",
+        "GROWTH",
+    ]:
+
+        subset = df[
+            df["dimension"] == dimension
+        ]
+
+        print(
+            f"{dimension}: "
+            f"{', '.join(sorted(subset['indicator'].unique()))}"
+        )
+
+    # ========================================================
+    # REGIME OBSERVATIONS
+    # ========================================================
+
     print("\nREGIME OBSERVATIONS")
-    print("-" * 72)
+    print("-" * 80)
 
     display_columns = [
         "release_date",
@@ -993,28 +1286,19 @@ def main():
         ].to_string(index=False)
     )
 
-    print("\nOUTPUTS")
-    print("-" * 72)
-
-    print(
-        f"- {OUTPUT_EVENTS}"
-    )
-
-    print(
-        f"- {OUTPUT_SUMMARY}"
-    )
-
     # ========================================================
     # QUALITY GATES
     # ========================================================
 
     print("\nQUALITY GATES")
-    print("-" * 72)
+    print("-" * 80)
 
     print("PIT QUALITY GATE: PASS")
     print("LOOK-AHEAD GATE: PASS")
     print("AGE CONSISTENCY GATE: PASS")
-    print("DIMENSION STANDARDIZATION GATE: PASS")
+    print("NORMALIZATION GATE: PASS")
+    print("FRESHNESS CONTROL: ACTIVE")
+    print("RAW/Z-SCORE MIXING: DISABLED")
     print("REGIME CLASSIFICATION GATE: PASS")
     print("DECISION ENGINE INTEGRATION: DISABLED")
 
@@ -1027,7 +1311,7 @@ def main():
         "and is NOT a trading signal."
     )
 
-    print("=" * 72)
+    print("=" * 80)
 
 
 # ============================================================
