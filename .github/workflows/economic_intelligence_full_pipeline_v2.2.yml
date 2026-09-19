@@ -36,10 +36,10 @@ jobs:
       - name: Historical Expansion v2.2
         run: python economic_historical_expansion_v2.2.py
 
-      - name: Surprise Engine v1.1
+      - name: Surprise Engine v1.3 (same filename)
         run: python economic_surprise_engine_v1.1.py
 
-      - name: Regime Classifier v1.5
+      - name: Regime Classifier v1.6 (same filename)
         run: python economic_regime_classifier_v1.5.py
 
       - name: Final v2.2 Quality Gate
@@ -79,7 +79,31 @@ jobs:
           assert cpi_core == 48
           assert labor == 48
 
+          s = pd.read_csv("economic_surprise_engine_v1.csv")
+          r = pd.read_csv("economic_regime_events_v1.csv")
+
+          assert len(s) == 486
+          assert len(r) == 340
+          assert s["point_in_time_safe"].all()
+          assert s["research_only"].all()
+          assert not s["decision_engine_ready"].any()
+          assert (s.loc[s["indicator"] == "GDP", "release_type"]
+                  .isin(["NEW_PERIOD_RELEASE", "SAME_PERIOD_REVISION"]).all())
+          gdp = s[s["indicator"] == "GDP"]
+          assert int((gdp["release_type"] == "NEW_PERIOD_RELEASE").sum()) == 15
+          assert int((gdp["release_type"] == "SAME_PERIOD_REVISION").sum()) == 25
+          assert r["pit_safe"].all()
+          assert r["research_only"].all()
+          assert not r["decision_engine_ready"].any()
+          assert int(r["growth_raw_shock_count"].sum()) == 0
+
+          print("Surprise Engine records:", len(s))
+          print("Regime observations:", len(r))
+          print("GDP new-period releases:", int((gdp["release_type"] == "NEW_PERIOD_RELEASE").sum()))
+          print("GDP same-period revisions:", int((gdp["release_type"] == "SAME_PERIOD_REVISION").sum()))
           print("PIT QUALITY GATE: PASS")
+          print("GDP VINTAGE/REVISION GATE: PASS")
+          print("NO RAW SHOCK FALLBACK GATE: PASS")
           print("RESEARCH-ONLY GATE: PASS")
           print("DECISION ENGINE DISABLED: PASS")
           PY
