@@ -25,15 +25,11 @@ jobs:
 
       - name: Syntax check
         run: |
-          python -m py_compile economic_historical_collector_v1_9.py
           python -m py_compile economic_historical_collector_v1_9_1.py
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
 
-      - name: Historical Collector v1.9
-        run: python economic_historical_collector_v1_9.py
-
-      - name: Add verified 2025 Claims + ISM
+      - name: Historical Collector v1.9.1 — 2025 Claims + ISM
         run: python economic_historical_collector_v1_9_1.py
 
       - name: Surprise Engine v1.1
