@@ -56,18 +56,23 @@ jobs:
                     h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
           ism = ((h["indicator"] == "ISM_MANUFACTURING_PMI") &
                  h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
+          # For monthly BLS series, use the reference period year rather than
+          # release year. December 2021 was released in January 2022, so a
+          # release-date filter would incorrectly report 46 instead of 48.
+          ref_year = h["reference_period"].astype(str).str.extract(r"(20\d{2})", expand=False)
+
           cpi_core = ((h["indicator"].isin(["CPI", "CORE_CPI"])) &
-                      h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
+                      ref_year.isin(["2020", "2021"])).sum()
           labor = ((h["indicator"].isin(["NFP", "UNEMPLOYMENT_RATE"])) &
-                   h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
+                   ref_year.isin(["2020", "2021"])).sum()
 
           print("Historical records:", len(h))
           print("PIT safe:", int(q["point_in_time_safe"].sum()), "/", len(q))
           print("Historical consensus:", int(q["historical_consensus_available"].sum()))
           print("2020-2021 Claims:", int(claims))
           print("2020-2021 ISM:", int(ism))
-          print("2020-2021 CPI/Core CPI:", int(cpi_core))
-          print("2020-2021 NFP/Unemployment:", int(labor))
+          print("2020-2021 CPI/Core CPI (reference years):", int(cpi_core))
+          print("2020-2021 NFP/Unemployment (reference years):", int(labor))
 
           assert ism == 24
           assert claims >= 90
