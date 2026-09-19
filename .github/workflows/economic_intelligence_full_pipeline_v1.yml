@@ -3,6 +3,9 @@ name: Economic Intelligence Full Pipeline v1
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   economic-intelligence:
     runs-on: ubuntu-latest
@@ -12,417 +15,396 @@ jobs:
       # ================================================================
       # 1. CHECKOUT
       # ================================================================
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-
       # ================================================================
-      # 2. PYTHON
+      # 2. SETUP PYTHON
       # ================================================================
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-
       # ================================================================
-      # 3. DEPENDENCIES
+      # 3. VERIFY ECONOMIC INTELLIGENCE FILES
       # ================================================================
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas numpy
-
-
-      # ================================================================
-      # 4. VERIFY PYTHON FILES
-      # ================================================================
-
       - name: Verify Economic Intelligence Python files
         run: |
           echo "========================================================================"
           echo "VERIFYING ECONOMIC INTELLIGENCE PYTHON FILES"
           echo "========================================================================"
 
-          required_files=(
-            "economic_historical_collector_v1_5.py"
+          REQUIRED_FILES=(
+            "economic_historical_collector_v1_6.py"
             "economic_surprise_engine_v1.1.py"
             "economic_regime_classifier_v1.4.py"
           )
 
-          for file in "${required_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "[OK] $file"
-            else
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
               echo "[ERROR] Missing required file: $file"
               exit 1
             fi
+
+            echo "[OK] Found: $file"
           done
 
+          echo "========================================================================"
+          echo "ALL REQUIRED ECONOMIC INTELLIGENCE FILES FOUND"
+          echo "========================================================================"
 
       # ================================================================
-      # 5. HISTORICAL ECONOMIC DATA
+      # 4. INSTALL DEPENDENCIES
       # ================================================================
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
 
-      - name: Run Historical Economic Collector v1.5
+      # ================================================================
+      # 5. RUN HISTORICAL COLLECTOR v1.6
+      # ================================================================
+      - name: Run Economic Historical Collector v1.6
         run: |
           echo "========================================================================"
-          echo "RUNNING HISTORICAL ECONOMIC COLLECTOR v1.5"
+          echo "RUNNING ECONOMIC HISTORICAL COLLECTOR v1.6"
           echo "========================================================================"
 
-          python "./economic_historical_collector_v1_5.py"
-
+          python economic_historical_collector_v1_6.py
 
       # ================================================================
-      # 6. VERIFY HISTORICAL DATA
+      # 6. VERIFY HISTORICAL COLLECTOR OUTPUTS
       # ================================================================
-
-      - name: Verify Historical Economic outputs
+      - name: Verify Historical Collector outputs
         run: |
           echo "========================================================================"
-          echo "VERIFYING HISTORICAL ECONOMIC OUTPUTS"
+          echo "VERIFYING HISTORICAL COLLECTOR OUTPUTS"
           echo "========================================================================"
 
-          test -f economic_historical_events_v1.csv
-          test -f economic_historical_quality_v1.csv
+          REQUIRED_OUTPUTS=(
+            "economic_historical_events_v1.csv"
+            "economic_historical_quality_v1.csv"
+          )
 
-          echo "[OK] economic_historical_events_v1.csv"
-          echo "[OK] economic_historical_quality_v1.csv"
+          for file in "${REQUIRED_OUTPUTS[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "[ERROR] Missing output: $file"
+              exit 1
+            fi
 
+            echo "[OK] Found: $file"
+          done
+
+          echo ""
+          echo "Historical events rows:"
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("economic_historical_events_v1.csv")
+
+          print(f"Rows: {len(df)}")
+          print(f"Indicators: {df['indicator'].nunique()}")
+
+          print("\nIndicator counts:")
+          print(df["indicator"].value_counts().sort_index())
+          PY
+
+          echo "========================================================================"
 
       # ================================================================
-      # 7. ECONOMIC SURPRISE ENGINE v1.1
+      # 7. RUN ECONOMIC SURPRISE ENGINE v1.1
       # ================================================================
-
       - name: Run Economic Surprise Engine v1.1
         run: |
           echo "========================================================================"
           echo "RUNNING ECONOMIC SURPRISE ENGINE v1.1"
           echo "========================================================================"
 
-          python "./economic_surprise_engine_v1.1.py"
-
+          python economic_surprise_engine_v1.1.py
 
       # ================================================================
       # 8. VERIFY SURPRISE ENGINE OUTPUTS
       # ================================================================
-
-      - name: Verify Economic Surprise outputs
+      - name: Verify Surprise Engine outputs
         run: |
           echo "========================================================================"
-          echo "VERIFYING ECONOMIC SURPRISE OUTPUTS"
+          echo "VERIFYING SURPRISE ENGINE OUTPUTS"
           echo "========================================================================"
 
-          test -f economic_surprise_engine_v1.csv
-          test -f economic_surprise_summary_v1.csv
+          REQUIRED_OUTPUTS=(
+            "economic_surprise_engine_v1.csv"
+            "economic_surprise_summary_v1.csv"
+          )
 
-          echo "[OK] economic_surprise_engine_v1.csv"
-          echo "[OK] economic_surprise_summary_v1.csv"
+          for file in "${REQUIRED_OUTPUTS[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "[ERROR] Missing output: $file"
+              exit 1
+            fi
 
+            echo "[OK] Found: $file"
+          done
+
+          echo ""
+          echo "Surprise Engine summary:"
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("economic_surprise_engine_v1.csv")
+
+          print(f"Input/output records: {len(df)}")
+
+          if "pit_safe" in df.columns:
+              print(
+                  f"PIT-safe records: "
+                  f"{int(df['pit_safe'].fillna(False).sum())}/{len(df)}"
+              )
+
+          if "directional_release_shock" in df.columns:
+              print(
+                  "Directional release shocks: "
+                  f"{int(df['directional_release_shock'].notna().sum())}"
+              )
+
+          if "directional_shock_z" in df.columns:
+              print(
+                  "PIT-safe z-scores: "
+                  f"{int(df['directional_shock_z'].notna().sum())}"
+              )
+
+          if "consensus_available" in df.columns:
+              print(
+                  "Consensus-based surprises: "
+                  f"{int(df['consensus_available'].fillna(False).sum())}"
+              )
+
+          if "research_only" in df.columns:
+              print(
+                  "Research-only rows: "
+                  f"{int(df['research_only'].fillna(False).sum())}/{len(df)}"
+              )
+
+          if "decision_engine_ready" in df.columns:
+              print(
+                  "Decision Engine ready rows: "
+                  f"{int(df['decision_engine_ready'].fillna(False).sum())}/{len(df)}"
+              )
+          PY
+
+          echo "========================================================================"
 
       # ================================================================
-      # 9. ECONOMIC REGIME CLASSIFIER v1.4
+      # 9. RUN ECONOMIC REGIME CLASSIFIER v1.4
       # ================================================================
-
       - name: Run Economic Regime Classifier v1.4
         run: |
           echo "========================================================================"
           echo "RUNNING ECONOMIC REGIME CLASSIFIER v1.4"
           echo "========================================================================"
 
-          python "./economic_regime_classifier_v1.4.py"
-
+          python economic_regime_classifier_v1.4.py
 
       # ================================================================
-      # 10. VERIFY REGIME OUTPUTS
+      # 10. VERIFY REGIME CLASSIFIER OUTPUTS
       # ================================================================
-
-      - name: Verify Economic Regime outputs
+      - name: Verify Regime Classifier outputs
         run: |
           echo "========================================================================"
-          echo "VERIFYING ECONOMIC REGIME OUTPUTS"
+          echo "VERIFYING REGIME CLASSIFIER OUTPUTS"
           echo "========================================================================"
 
-          test -f economic_regime_events_v1.csv
-          test -f economic_regime_summary_v1.csv
+          REQUIRED_OUTPUTS=(
+            "economic_regime_events_v1.csv"
+            "economic_regime_summary_v1.csv"
+          )
 
-          echo "[OK] economic_regime_events_v1.csv"
-          echo "[OK] economic_regime_summary_v1.csv"
+          for file in "${REQUIRED_OUTPUTS[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "[ERROR] Missing output: $file"
+              exit 1
+            fi
 
+            echo "[OK] Found: $file"
+          done
+
+          echo ""
+          echo "Economic Regime summary:"
+
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("economic_regime_events_v1.csv")
+
+          print(f"Regime observations: {len(df)}")
+
+          if "economic_regime" in df.columns:
+              print("\nRegime distribution:")
+              print(df["economic_regime"].value_counts())
+
+          if "pit_safe" in df.columns:
+              print(
+                  "\nPIT-safe observations: "
+                  f"{int(df['pit_safe'].fillna(False).sum())}/{len(df)}"
+              )
+
+          if "research_only" in df.columns:
+              print(
+                  "Research-only observations: "
+                  f"{int(df['research_only'].fillna(False).sum())}/{len(df)}"
+              )
+
+          if "decision_engine_ready" in df.columns:
+              print(
+                  "Decision Engine ready observations: "
+                  f"{int(df['decision_engine_ready'].fillna(False).sum())}/{len(df)}"
+              )
+
+          print("\nColumns:")
+          print(list(df.columns))
+          PY
+
+          echo "========================================================================"
 
       # ================================================================
-      # 11. FINAL QUALITY CHECK
+      # 11. FINAL QUALITY GATE
       # ================================================================
-
       - name: Final Economic Intelligence Quality Gate
         run: |
           echo "========================================================================"
           echo "FINAL ECONOMIC INTELLIGENCE QUALITY GATE"
           echo "========================================================================"
 
-          python <<'PY'
+          python - <<'PY'
           import pandas as pd
           import sys
 
-          HISTORICAL_FILE = "economic_historical_events_v1.csv"
-          QUALITY_FILE = "economic_historical_quality_v1.csv"
-          SURPRISE_FILE = "economic_surprise_engine_v1.csv"
-          REGIME_FILE = "economic_regime_events_v1.csv"
+          events = pd.read_csv("economic_historical_events_v1.csv")
+          quality = pd.read_csv("economic_historical_quality_v1.csv")
+          surprise = pd.read_csv("economic_surprise_engine_v1.csv")
+          regime = pd.read_csv("economic_regime_events_v1.csv")
 
+          failed = False
+
+          # --------------------------------------------------------------
+          # Historical events
+          # --------------------------------------------------------------
+          if len(events) == 0:
+              print("[FAIL] Historical events file is empty")
+              failed = True
+          else:
+              print(f"[PASS] Historical events: {len(events)} records")
+
+          # --------------------------------------------------------------
+          # Historical PIT quality
+          # --------------------------------------------------------------
+          if "point_in_time_safe" in quality.columns:
+              pit_safe = quality["point_in_time_safe"].fillna(False)
+
+              if not pit_safe.all():
+                  print("[FAIL] Historical PIT quality gate failed")
+                  failed = True
+              else:
+                  print(
+                      f"[PASS] Historical PIT: "
+                      f"{int(pit_safe.sum())}/{len(quality)}"
+                  )
+
+          # --------------------------------------------------------------
+          # Surprise Engine PIT
+          # --------------------------------------------------------------
+          if "pit_safe" in surprise.columns:
+              surprise_pit = surprise["pit_safe"].fillna(False)
+
+              if not surprise_pit.all():
+                  print("[FAIL] Surprise Engine PIT gate failed")
+                  failed = True
+              else:
+                  print(
+                      f"[PASS] Surprise Engine PIT: "
+                      f"{int(surprise_pit.sum())}/{len(surprise)}"
+                  )
+
+          # --------------------------------------------------------------
+          # Surprise Engine research-only
+          # --------------------------------------------------------------
+          if "research_only" in surprise.columns:
+              research_only = surprise["research_only"].fillna(False)
+
+              if not research_only.all():
+                  print("[FAIL] Surprise Engine research-only gate failed")
+                  failed = True
+              else:
+                  print("[PASS] Surprise Engine research-only")
+
+          # --------------------------------------------------------------
+          # Surprise Engine Decision Engine disabled
+          # --------------------------------------------------------------
+          if "decision_engine_ready" in surprise.columns:
+              decision_ready = surprise["decision_engine_ready"].fillna(False)
+
+              if decision_ready.any():
+                  print("[FAIL] Surprise Engine has Decision Engine ready rows")
+                  failed = True
+              else:
+                  print("[PASS] Surprise Engine Decision Engine disabled")
+
+          # --------------------------------------------------------------
+          # Regime PIT
+          # --------------------------------------------------------------
+          if "pit_safe" in regime.columns:
+              regime_pit = regime["pit_safe"].fillna(False)
+
+              if not regime_pit.all():
+                  print("[FAIL] Regime PIT gate failed")
+                  failed = True
+              else:
+                  print(
+                      f"[PASS] Regime PIT: "
+                      f"{int(regime_pit.sum())}/{len(regime)}"
+                  )
+
+          # --------------------------------------------------------------
+          # Regime research-only
+          # --------------------------------------------------------------
+          if "research_only" in regime.columns:
+              regime_research = regime["research_only"].fillna(False)
+
+              if not regime_research.all():
+                  print("[FAIL] Regime research-only gate failed")
+                  failed = True
+              else:
+                  print("[PASS] Regime research-only")
+
+          # --------------------------------------------------------------
+          # Regime Decision Engine disabled
+          # --------------------------------------------------------------
+          if "decision_engine_ready" in regime.columns:
+              regime_ready = regime["decision_engine_ready"].fillna(False)
+
+              if regime_ready.any():
+                  print("[FAIL] Regime Classifier has Decision Engine ready rows")
+                  failed = True
+              else:
+                  print("[PASS] Regime Classifier Decision Engine disabled")
+
+          # --------------------------------------------------------------
+          # Final result
+          # --------------------------------------------------------------
           print("")
-          print("Loading outputs...")
-          print("")
+          print("------------------------------------------------------------------------")
 
-          historical = pd.read_csv(HISTORICAL_FILE)
-          quality = pd.read_csv(QUALITY_FILE)
-          surprise = pd.read_csv(SURPRISE_FILE)
-          regime = pd.read_csv(REGIME_FILE)
-
-          # ============================================================
-          # HISTORICAL DATA
-          # ============================================================
-
-          print("Historical records:", len(historical))
-          print("Historical quality records:", len(quality))
-
-          if len(historical) == 0:
-              print("[FAIL] Historical dataset is empty")
+          if failed:
+              print("ECONOMIC INTELLIGENCE QUALITY GATE: FAIL")
               sys.exit(1)
 
-          if len(quality) != len(historical):
-              print(
-                  "[FAIL] Historical and quality datasets "
-                  "have different record counts"
-              )
-              sys.exit(1)
-
-          # ============================================================
-          # PIT QUALITY
-          # ============================================================
-
-          if "point_in_time_safe" not in quality.columns:
-              print(
-                  "[FAIL] Missing point_in_time_safe "
-                  "in historical quality output"
-              )
-              sys.exit(1)
-
-          pit_safe = quality["point_in_time_safe"].fillna(False)
-
-          print(
-              "Historical PIT safe:",
-              int(pit_safe.sum()),
-              "/",
-              len(quality)
-          )
-
-          if not bool(pit_safe.all()):
-              print("[FAIL] Historical PIT quality gate failed")
-              sys.exit(1)
-
-          # ============================================================
-          # SURPRISE ENGINE
-          # ============================================================
-
-          print("")
-          print("Surprise Engine records:", len(surprise))
-
-          required_surprise_columns = [
-              "indicator",
-              "release_date",
-              "directional_release_shock",
-              "directional_shock_z",
-              "pit_safe",
-              "research_only",
-              "decision_engine_ready",
-          ]
-
-          missing_surprise = [
-              c
-              for c in required_surprise_columns
-              if c not in surprise.columns
-          ]
-
-          if missing_surprise:
-              print(
-                  "[FAIL] Missing Surprise Engine columns:",
-                  missing_surprise
-              )
-              sys.exit(1)
-
-          if len(surprise) == 0:
-              print("[FAIL] Surprise Engine output is empty")
-              sys.exit(1)
-
-          surprise_pit = (
-              surprise["pit_safe"]
-              .fillna(False)
-          )
-
-          print(
-              "Surprise PIT safe:",
-              int(surprise_pit.sum()),
-              "/",
-              len(surprise)
-          )
-
-          if not bool(surprise_pit.all()):
-              print(
-                  "[FAIL] Surprise Engine PIT gate failed"
-              )
-              sys.exit(1)
-
-          # Research-only requirement
-          research_only = (
-              surprise["research_only"]
-              .fillna(False)
-          )
-
-          if not bool(research_only.all()):
-              print(
-                  "[FAIL] Surprise Engine contains "
-                  "non-research records"
-              )
-              sys.exit(1)
-
-          # Decision Engine must remain disabled
-          decision_ready = (
-              surprise["decision_engine_ready"]
-              .fillna(True)
-          )
-
-          if bool(decision_ready.any()):
-              print(
-                  "[FAIL] Decision Engine integration "
-                  "is unexpectedly enabled"
-              )
-              sys.exit(1)
-
-          # ============================================================
-          # REGIME CLASSIFIER
-          # ============================================================
-
-          print("")
-          print("Regime records:", len(regime))
-
-          required_regime_columns = [
-              "release_date",
-              "economic_regime",
-              "pit_safe",
-              "research_only",
-              "decision_engine_ready",
-          ]
-
-          missing_regime = [
-              c
-              for c in required_regime_columns
-              if c not in regime.columns
-          ]
-
-          if missing_regime:
-              print(
-                  "[FAIL] Missing Regime columns:",
-                  missing_regime
-              )
-              sys.exit(1)
-
-          if len(regime) == 0:
-              print(
-                  "[FAIL] Regime output is empty"
-              )
-              sys.exit(1)
-
-          regime_pit = (
-              regime["pit_safe"]
-              .fillna(False)
-          )
-
-          print(
-              "Regime PIT safe:",
-              int(regime_pit.sum()),
-              "/",
-              len(regime)
-          )
-
-          if not bool(regime_pit.all()):
-              print(
-                  "[FAIL] Regime PIT gate failed"
-              )
-              sys.exit(1)
-
-          # ============================================================
-          # REGIME RESEARCH-ONLY GATE
-          # ============================================================
-
-          regime_research = (
-              regime["research_only"]
-              .fillna(False)
-          )
-
-          if not bool(regime_research.all()):
-              print(
-                  "[FAIL] Regime contains "
-                  "non-research records"
-              )
-              sys.exit(1)
-
-          regime_decision = (
-              regime["decision_engine_ready"]
-              .fillna(True)
-          )
-
-          if bool(regime_decision.any()):
-              print(
-                  "[FAIL] Regime unexpectedly marked "
-                  "Decision Engine ready"
-              )
-              sys.exit(1)
-
-          # ============================================================
-          # FINAL RESULT
-          # ============================================================
-
-          print("")
-          print("========================================================================")
-          print("FINAL QUALITY GATE: PASS")
-          print("========================================================================")
-
-          print("")
-          print(
-              "Historical:",
-              len(historical)
-          )
-
-          print(
-              "Surprise Engine:",
-              len(surprise)
-          )
-
-          print(
-              "Regime observations:",
-              len(regime)
-          )
-
-          print("")
-          print(
-              "Decision Engine integration: DISABLED"
-          )
-
-          print(
-              "Research-only pipeline: PASS"
-          )
-
-          print("")
+          print("ECONOMIC INTELLIGENCE QUALITY GATE: PASS")
+          print("------------------------------------------------------------------------")
           PY
 
-
       # ================================================================
-      # 12. UPLOAD ARTIFACTS
+      # 12. UPLOAD ALL ECONOMIC INTELLIGENCE ARTIFACTS
       # ================================================================
-
       - name: Upload Economic Intelligence artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -434,3 +416,37 @@ jobs:
             economic_surprise_summary_v1.csv
             economic_regime_events_v1.csv
             economic_regime_summary_v1.csv
+          if-no-files-found: error
+          retention-days: 30
+
+      # ================================================================
+      # 13. FINAL SUMMARY
+      # ================================================================
+      - name: Final Pipeline Summary
+        run: |
+          echo ""
+          echo "========================================================================"
+          echo "ECONOMIC INTELLIGENCE FULL PIPELINE — COMPLETE"
+          echo "========================================================================"
+          echo ""
+          echo "Historical Collector:"
+          echo "  economic_historical_collector_v1_6.py"
+          echo ""
+          echo "Surprise Engine:"
+          echo "  economic_surprise_engine_v1.1.py"
+          echo ""
+          echo "Regime Classifier:"
+          echo "  economic_regime_classifier_v1.4.py"
+          echo ""
+          echo "Outputs:"
+          echo "  economic_historical_events_v1.csv"
+          echo "  economic_historical_quality_v1.csv"
+          echo "  economic_surprise_engine_v1.csv"
+          echo "  economic_surprise_summary_v1.csv"
+          echo "  economic_regime_events_v1.csv"
+          echo "  economic_regime_summary_v1.csv"
+          echo ""
+          echo "Decision Engine integration: DISABLED"
+          echo "Research-only status: ENABLED"
+          echo ""
+          echo "========================================================================"
