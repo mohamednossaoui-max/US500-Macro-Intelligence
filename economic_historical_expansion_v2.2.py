@@ -308,21 +308,86 @@ def fetch_alfred_vintage(session, release_date):
         return None
 
 
+def fetch_alfred_one(release_date):
+    """Fetch one DOL ICSA observation as a point-in-time ALFRED vintage."""
+    release = pd.Timestamp(release_date)
+    week_ending = week_ending_for_release(release)
+    url = (
+        "https://alfred.stlouisfed.org/graph/alfredgraph.csv"
+        f"?id=ICSA"
+        f"&cosd={week_ending}"
+        f"&coed={week_ending}"
+        f"&vintage_date={release:%Y-%m-%d}"
+    )
+
+    try:
+        r = requests.get(
+            url,
+            timeout=(4, 8),
+            headers=HEADERS,
+        )
+        r.raise_for_status()
+        text = r.text.strip()
+        if not text:
+            return None
+
+        from io import StringIO
+        df = pd.read_csv(StringIO(text))
+        if df.empty:
+            return None
+
+        value_col = next(
+            (c for c in df.columns if str(c).upper().startswith("ICSA")),
+            None,
+        )
+        if value_col is None:
+            return None
+
+        value = pd.to_numeric(df.iloc[0][value_col], errors="coerce")
+        if pd.isna(value):
+            return None
+
+        actual = int(round(float(value)))
+        release_str = release.strftime("%Y-%m-%d")
+
+        return {
+            "indicator": "INITIAL_JOBLESS_CLAIMS",
+            "agency": "DOL",
+            "release_date": release_str,
+            "release_time": "08:30 ET",
+            "reference_period": f"Week ending {week_ending}",
+            "actual": actual,
+            "previous": None,
+            "revision": None,
+            "consensus": None,
+            "consensus_source": None,
+            "vintage_date": release_str,
+            "source": "DOL Initial Claims — ALFRED PIT vintage of ICSA",
+            "source_url": url,
+        }
+    except Exception as exc:
+        return (release_date, f"{type(exc).__name__}: {exc}")
+
+
 def collect_claims():
     """
-    Collect all 2020-2021 weekly observations.
+    Fast 2020-2021 Claims collection.
 
-    Priority:
-      1. DOL original release PDF.
-      2. ALFRED PIT vintage reconstruction.
+    The GitHub runner previously spent ~20s on each blocked DOL PDF request
+    and then another ~30s on the ALFRED fallback.  That can turn 105 weekly
+    releases into a very long sequential run.
 
-    We never fall back to the current revised DOL series.
+    We therefore use ALFRED PIT vintages directly and fetch them concurrently.
+    ALFRED is specifically designed to preserve historical information sets;
+    its documentation describes a vintage as data as it existed on a past
+    date.  We use vintage_date == release_date and never use today's revised
+    ICSA series.
+
+    If ALFRED fails for an individual date, the date is reported and the
+    quality gate stops the pipeline rather than silently substituting a
+    revised/current value.
     """
-    session = requests.Session()
-    session.headers.update(HEADERS)
-
-    found = []
-    seen = set()
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     release_dates = (
         candidate_release_dates(2020)
@@ -330,50 +395,44 @@ def collect_claims():
     )
 
     print(f"Claims release dates expected: {len(release_dates)}")
+    print("Using parallel ALFRED PIT retrieval (no sequential DOL 403 wait).")
 
-    for release_date in release_dates:
+    found = []
+    failures = []
 
-        release_key = release_date.strftime("%Y-%m-%d")
+    # Eight workers keeps the run fast without creating an excessive request
+    # burst against ALFRED.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {
+            pool.submit(fetch_alfred_one, d): d
+            for d in release_dates
+        }
 
-        rec = try_dol_pdf(session, release_date)
+        for future in as_completed(futures):
+            release_date = futures[future]
+            result = future.result()
 
-        if rec is not None:
-            print(
-                f"  DOL PDF OK: "
-                f"{release_key} -> {rec['actual']:,}"
-            )
-        else:
-            rec = fetch_alfred_vintage(
-                session,
-                release_date,
-            )
+            if isinstance(result, tuple):
+                failures.append(result)
+                print(f"  ALFRED FAIL: {result[0]} -> {result[1]}")
+                continue
 
-            if rec is not None:
-                print(
-                    f"  ALFRED PIT OK: "
-                    f"{release_key} -> {rec['actual']:,}"
-                )
+            if result is None:
+                failures.append((release_date.strftime("%Y-%m-%d"), "empty PIT response"))
+                print(f"  ALFRED FAIL: {release_date:%Y-%m-%d} -> empty PIT response")
+                continue
 
-        if rec is None:
-            print(
-                f"  ERROR: no PIT source for "
-                f"{release_key}"
-            )
-            continue
+            found.append(result)
+            print(f"  ALFRED PIT OK: {result['release_date']} -> {result['actual']:,}")
 
-        key = (
-            rec["release_date"],
-            rec["reference_period"],
-        )
+    found.sort(key=lambda r: (r["release_date"], r["reference_period"]))
 
-        if key in seen:
-            continue
+    print(f"Claims PIT records collected: {len(found)}/{len(release_dates)}")
 
-        seen.add(key)
-        found.append(rec)
-
-        # Small delay to avoid hammering either endpoint.
-        time.sleep(0.15)
+    if failures:
+        print(f"Claims PIT failures: {len(failures)}")
+        for date, reason in sorted(failures)[:10]:
+            print(f"  - {date}: {reason}")
 
     return found
 
