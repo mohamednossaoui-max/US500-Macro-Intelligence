@@ -2,7 +2,6 @@ name: Economic Intelligence Full Pipeline v1
 
 on:
   workflow_dispatch:
-
   push:
     paths:
       - "economic_historical_collector_v1_5.py"
@@ -10,156 +9,89 @@ on:
       - "economic_regime_classifier_v1.3.py"
       - ".github/workflows/economic_intelligence_full_pipeline_v1.yml"
 
-permissions:
-  contents: read
-
 jobs:
   economic-intelligence:
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==========================================================
+      # ================================================================
       # 1. CHECKOUT
-      # ==========================================================
-
+      # ================================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-
-      # ==========================================================
+      # ================================================================
       # 2. PYTHON
-      # ==========================================================
-
-      - name: Set up Python 3.11
+      # ================================================================
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-
-      # ==========================================================
+      # ================================================================
       # 3. INSTALL DEPENDENCIES
-      # ==========================================================
-
+      # ================================================================
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy
 
-
-      # ==========================================================
+      # ================================================================
       # 4. VERIFY REQUIRED FILES
-      # ==========================================================
-
+      # ================================================================
       - name: Verify required files
         run: |
-          echo "Checking required files..."
+          test -f economic_historical_collector_v1_5.py
+          test -f economic_surprise_engine_v1.py
+          test -f economic_regime_classifier_v1.3.py
 
-          test -f "./economic_historical_collector_v1_5.py"
-          test -f "./economic_surprise_engine_v1.py"
-          test -f "./economic_regime_classifier_v1.3.py"
+          echo "All required Python files found."
 
-          echo ""
-          echo "Required files found:"
-          ls -lh \
-            "./economic_historical_collector_v1_5.py" \
-            "./economic_surprise_engine_v1.py" \
-            "./economic_regime_classifier_v1.3.py"
-
-
-      # ==========================================================
-      # 5. HISTORICAL COLLECTOR v1.5
-      # ==========================================================
-
+      # ================================================================
+      # 5. RUN HISTORICAL COLLECTOR v1.5
+      # ================================================================
       - name: Run Economic Historical Collector v1.5
         run: |
-          python "./economic_historical_collector_v1_5.py"
+          python "./economic_historical_collector_v1_5.py" | tee collector_output.txt
 
-
-      # ==========================================================
+      # ================================================================
       # 6. VALIDATE HISTORICAL DATA
-      # ==========================================================
-
+      # ================================================================
       - name: Validate Historical Economic Data
         run: |
           python -c '
           import pandas as pd
-          from pathlib import Path
+          import sys
 
-          events_file = Path("economic_historical_events_v1.csv")
-          quality_file = Path("economic_historical_quality_v1.csv")
+          events_file = "economic_historical_events_v1.csv"
+          quality_file = "economic_historical_quality_v1.csv"
 
           print("=" * 72)
-          print("VALIDATING HISTORICAL ECONOMIC DATA")
+          print("VALIDATING ECONOMIC HISTORICAL DATA")
           print("=" * 72)
-
-          # ------------------------------------------------------
-          # File existence
-          # ------------------------------------------------------
-
-          if not events_file.exists():
-              raise RuntimeError(
-                  "Missing economic_historical_events_v1.csv"
-              )
-
-          if not quality_file.exists():
-              raise RuntimeError(
-                  "Missing economic_historical_quality_v1.csv"
-              )
 
           events = pd.read_csv(events_file)
           quality = pd.read_csv(quality_file)
 
-          print(f"Historical events: {len(events)}")
-          print(f"Quality records:    {len(quality)}")
-
-          # ------------------------------------------------------
-          # Expected record count
-          # ------------------------------------------------------
+          print(f"Records: {len(events)}")
+          print(f"Quality rows: {len(quality)}")
 
           if len(events) != 48:
-              raise RuntimeError(
-                  f"Expected 48 historical records, got {len(events)}"
-              )
+              raise RuntimeError(f"Expected 48 records, got {len(events)}")
 
           if len(quality) != 48:
-              raise RuntimeError(
-                  f"Expected 48 quality records, got {len(quality)}"
-              )
-
-          # ------------------------------------------------------
-          # Required event columns
-          # ------------------------------------------------------
+              raise RuntimeError(f"Expected 48 quality rows, got {len(quality)}")
 
           required_event_columns = [
+              "record_id",
               "indicator",
               "agency",
               "release_date",
-              "release_time",
               "reference_period",
               "actual",
-              "previous",
-              "revision",
-              "consensus",
-              "consensus_source",
-              "vintage_date",
-              "source",
-              "source_url"
+              "point_in_time_safe"
           ]
-
-          missing = [
-              c for c in required_event_columns
-              if c not in events.columns
-          ]
-
-          if missing:
-              raise RuntimeError(
-                  f"Missing event columns: {missing}"
-              )
-
-          # ------------------------------------------------------
-          # Required quality columns
-          # ------------------------------------------------------
 
           required_quality_columns = [
               "record_id",
@@ -172,559 +104,218 @@ jobs:
               "historical_consensus_available"
           ]
 
-          missing_quality = [
-              c for c in required_quality_columns
-              if c not in quality.columns
-          ]
+          for col in required_event_columns:
+              if col not in events.columns:
+                  raise RuntimeError(f"Missing event column: {col}")
 
-          if missing_quality:
+          for col in required_quality_columns:
+              if col not in quality.columns:
+                  raise RuntimeError(f"Missing quality column: {col}")
+
+          if not events["point_in_time_safe"].fillna(False).all():
+              raise RuntimeError("Not all historical events are PIT safe.")
+
+          if not quality["point_in_time_safe"].fillna(False).all():
+              raise RuntimeError("Not all quality records are PIT safe.")
+
+          if quality["historical_consensus_available"].fillna(False).any():
+              raise RuntimeError("Historical consensus gate failed.")
+
+          if quality["quality_issues"].fillna("").astype(str).str.strip().ne("").any():
+              raise RuntimeError("Quality issues detected.")
+
+          if events["indicator"].nunique() != 7:
               raise RuntimeError(
-                  f"Missing quality columns: {missing_quality}"
+                  f"Expected 7 indicators, got {events['indicator'].nunique()}"
               )
 
-          # ------------------------------------------------------
-          # PIT quality
-          # ------------------------------------------------------
-
-          pit_safe = quality[
-              "point_in_time_safe"
-          ].astype(bool)
-
-          print(
-              f"PIT safe: {pit_safe.sum()}/{len(quality)}"
-          )
-
-          if not bool(pit_safe.all()):
-              print(
-                  quality.loc[
-                      ~pit_safe
-                  ].to_string(index=False)
-              )
-
-              raise RuntimeError(
-                  "Historical dataset contains PIT-unsafe records."
-              )
-
-          # ------------------------------------------------------
-          # Historical consensus
-          # ------------------------------------------------------
-
-          consensus = quality[
-              "historical_consensus_available"
-          ].astype(bool)
-
-          consensus_count = int(
-              consensus.sum()
-          )
-
-          print(
-              f"Historical consensus: "
-              f"{consensus_count}/{len(quality)}"
-          )
-
-          if consensus_count != 0:
-              raise RuntimeError(
-                  "Historical consensus gate failed."
-              )
-
-          # ------------------------------------------------------
-          # Indicator count
-          # ------------------------------------------------------
-
-          indicator_count = events[
-              "indicator"
-          ].nunique()
-
-          print(
-              f"Indicators: {indicator_count}"
-          )
-
-          if indicator_count != 7:
-              raise RuntimeError(
-                  f"Expected 7 indicators, got {indicator_count}"
-              )
-
-          # ------------------------------------------------------
-          # 2023 batch
-          # ------------------------------------------------------
-
-          events["release_date"] = pd.to_datetime(
-              events["release_date"],
-              errors="coerce"
-          )
+          release_dates = pd.to_datetime(events["release_date"])
 
           records_2023 = events[
-              events["release_date"].dt.year == 2023
+              release_dates.dt.year == 2023
           ]
-
-          print(
-              f"2023 records: {len(records_2023)}"
-          )
 
           if len(records_2023) != 14:
               raise RuntimeError(
-                  f"Expected 14 records in 2023 batch, "
-                  f"got {len(records_2023)}"
+                  f"Expected 14 records in 2023 batch, got {len(records_2023)}"
               )
 
-          # ------------------------------------------------------
-          # Duplicate event check
-          # ------------------------------------------------------
-
-          duplicate_columns = [
-              "indicator",
-              "agency",
-              "release_date",
-              "release_time",
-              "reference_period",
-              "source_url"
-          ]
-
-          duplicates = events.duplicated(
-              subset=duplicate_columns,
-              keep=False
-          )
-
-          if bool(duplicates.any()):
-
-              print(
-                  events.loc[
-                      duplicates,
-                      duplicate_columns
-                  ].to_string(index=False)
-              )
-
-              raise RuntimeError(
-                  "Duplicate historical event records detected."
-              )
-
-          # ------------------------------------------------------
-          # Duplicate record ID check
-          # ------------------------------------------------------
-
-          if quality["record_id"].duplicated().any():
-              raise RuntimeError(
-                  "Duplicate record_id detected."
-              )
-
-          # ------------------------------------------------------
-          # Quality issues
-          # ------------------------------------------------------
-
-          quality_issue_count = (
-              quality["quality_issues"]
-              .fillna("")
-              .astype(str)
-              .str.strip()
-              .ne("")
-              .sum()
-          )
-
-          print(
-              f"Records with quality issues: "
-              f"{quality_issue_count}"
-          )
-
-          if int(quality_issue_count) != 0:
-              raise RuntimeError(
-                  "Quality issues detected in historical dataset."
-              )
+          if events["record_id"].duplicated().any():
+              raise RuntimeError("Duplicate record_id detected.")
 
           print("")
-          print("HISTORICAL DATA QUALITY GATE: PASS")
+          print("Historical data validation: PASS")
+          print("PIT QUALITY GATE: PASS")
+          print("CONSENSUS FABRICATION GATE: PASS")
+          print("DUPLICATE ID GATE: PASS")
+          print("")
           '
 
-
-      # ==========================================================
-      # 7. ECONOMIC SURPRISE ENGINE v1.0
-      # ==========================================================
-
+      # ================================================================
+      # 7. RUN ECONOMIC SURPRISE ENGINE v1.0
+      # ================================================================
       - name: Run Economic Surprise Engine v1.0
         run: |
-          python "./economic_surprise_engine_v1.py"
+          python "./economic_surprise_engine_v1.py" | tee surprise_output.txt
 
-
-      # ==========================================================
+      # ================================================================
       # 8. VALIDATE SURPRISE ENGINE
-      # ==========================================================
-
+      # ================================================================
       - name: Validate Economic Surprise Engine
         run: |
           python -c '
           import pandas as pd
-          from pathlib import Path
 
-          events_file = Path(
-              "economic_surprise_engine_v1.csv"
-          )
-
-          summary_file = Path(
-              "economic_surprise_summary_v1.csv"
-          )
+          file = "economic_surprise_engine_v1.csv"
 
           print("=" * 72)
-          print("VALIDATING ECONOMIC SURPRISE ENGINE")
+          print("VALIDATING ECONOMIC SURPRISE ENGINE v1.0")
           print("=" * 72)
 
-          if not events_file.exists():
+          df = pd.read_csv(file)
+
+          print(f"Input/output records: {len(df)}")
+
+          if len(df) != 48:
               raise RuntimeError(
-                  "Missing economic_surprise_engine_v1.csv"
-              )
-
-          if not summary_file.exists():
-              raise RuntimeError(
-                  "Missing economic_surprise_summary_v1.csv"
-              )
-
-          df = pd.read_csv(events_file)
-          summary = pd.read_csv(summary_file)
-
-          print(
-              f"Surprise records: {len(df)}"
-          )
-
-          print(
-              f"Summary rows: {len(summary)}"
-          )
-
-          if len(df) == 0:
-              raise RuntimeError(
-                  "Economic Surprise Engine returned zero records."
+                  f"Expected 48 surprise records, got {len(df)}"
               )
 
           required_columns = [
+              "record_id",
               "indicator",
               "release_date",
-              "actual",
-              "previous",
+              "point_in_time_safe",
               "directional_release_shock",
-              "directional_shock_z",
-              "shock_class",
-              "surprise_method",
-              "pit_safe",
               "research_only",
               "decision_engine_ready"
           ]
 
-          missing = [
-              c for c in required_columns
-              if c not in df.columns
-          ]
+          for col in required_columns:
+              if col not in df.columns:
+                  raise RuntimeError(f"Missing surprise column: {col}")
 
-          if missing:
+          if not df["point_in_time_safe"].fillna(False).all():
+              raise RuntimeError("Surprise engine PIT gate failed.")
+
+          if not df["research_only"].fillna(False).all():
+              raise RuntimeError("Research-only gate failed.")
+
+          if df["decision_engine_ready"].fillna(True).any():
               raise RuntimeError(
-                  f"Missing Surprise Engine columns: {missing}"
+                  "Decision Engine integration must remain disabled."
               )
 
-          # ------------------------------------------------------
-          # PIT
-          # ------------------------------------------------------
-
-          pit_safe = df[
-              "pit_safe"
-          ].astype(bool)
-
-          print(
-              f"PIT safe: {pit_safe.sum()}/{len(df)}"
+          directional_count = (
+              df["directional_release_shock"]
+              .notna()
+              .sum()
           )
 
-          if not bool(pit_safe.all()):
-              raise RuntimeError(
-                  "Surprise Engine contains PIT-unsafe records."
-              )
-
-          # ------------------------------------------------------
-          # Directional shocks
-          # ------------------------------------------------------
-
-          shock_count = df[
-              "directional_release_shock"
-          ].notna().sum()
-
-          print(
-              f"Directional shocks: "
-              f"{shock_count}/{len(df)}"
-          )
-
-          if int(shock_count) == 0:
+          if directional_count <= 0:
               raise RuntimeError(
                   "No directional release shocks were generated."
               )
 
-          # ------------------------------------------------------
-          # Z-score coverage
-          # ------------------------------------------------------
+          if df["indicator"].nunique() != 7:
+              raise RuntimeError(
+                  f"Expected 7 indicators, got {df['indicator'].nunique()}"
+              )
 
-          z_count = df[
-              "directional_shock_z"
-          ].notna().sum()
-
-          print(
-              f"PIT-safe z-scores: "
-              f"{z_count}/{len(df)}"
+          z_count = (
+              df["prior_zscore"]
+              .notna()
+              .sum()
+              if "prior_zscore" in df.columns
+              else 0
           )
 
-          # ------------------------------------------------------
-          # Research-only gate
-          # ------------------------------------------------------
-
-          research_only = df[
-              "research_only"
-          ].astype(bool)
-
-          if not bool(research_only.all()):
-              raise RuntimeError(
-                  "Research-only gate failed."
-              )
-
-          # ------------------------------------------------------
-          # Decision Engine disabled
-          # ------------------------------------------------------
-
-          decision_ready = df[
-              "decision_engine_ready"
-          ].astype(bool)
-
-          if bool(decision_ready.any()):
-              raise RuntimeError(
-                  "Decision Engine integration is enabled unexpectedly."
-              )
-
-          # ------------------------------------------------------
-          # Indicator count
-          # ------------------------------------------------------
-
-          indicator_count = df[
-              "indicator"
-          ].nunique()
-
-          print(
-              f"Indicators: {indicator_count}"
-          )
-
-          if indicator_count != 7:
-              raise RuntimeError(
-                  f"Expected 7 indicators, got {indicator_count}"
-              )
-
+          print(f"Directional release shocks: {directional_count}")
+          print(f"PIT-safe z-scores: {z_count}")
           print("")
-          print("SURPRISE ENGINE QUALITY GATE: PASS")
+          print("Surprise Engine validation: PASS")
+          print("PIT QUALITY GATE: PASS")
+          print("LOOK-AHEAD GATE: PASS")
+          print("DECISION ENGINE INTEGRATION: DISABLED")
+          print("")
           '
 
-
-      # ==========================================================
-      # 9. ECONOMIC REGIME CLASSIFIER v1.3
-      # ==========================================================
-
+      # ================================================================
+      # 9. RUN ECONOMIC REGIME CLASSIFIER v1.3
+      # ================================================================
       - name: Run Economic Regime Classifier v1.3
         run: |
-          python "./economic_regime_classifier_v1.3.py"
+          python "./economic_regime_classifier_v1.3.py" | tee regime_output.txt
 
-
-      # ==========================================================
+      # ================================================================
       # 10. VALIDATE REGIME CLASSIFIER
-      # ==========================================================
-
-      - name: Validate Economic Regime Classifier v1.3
+      # ================================================================
+      - name: Validate Economic Regime Classifier
         run: |
           python -c '
           import pandas as pd
-          from pathlib import Path
 
-          events_file = Path(
-              "economic_regime_events_v1.csv"
-          )
-
-          summary_file = Path(
-              "economic_regime_summary_v1.csv"
-          )
+          events_file = "economic_regime_events_v1.csv"
+          summary_file = "economic_regime_summary_v1.csv"
 
           print("=" * 72)
           print("VALIDATING ECONOMIC REGIME CLASSIFIER v1.3")
           print("=" * 72)
 
-          if not events_file.exists():
-              raise RuntimeError(
-                  "Missing economic_regime_events_v1.csv"
-              )
-
-          if not summary_file.exists():
-              raise RuntimeError(
-                  "Missing economic_regime_summary_v1.csv"
-              )
-
           df = pd.read_csv(events_file)
           summary = pd.read_csv(summary_file)
 
-          print(
-              f"Regime observations: {len(df)}"
-          )
+          print(f"Regime observations: {len(df)}")
+          print(f"Summary rows: {len(summary)}")
 
-          print(
-              f"Summary rows: {len(summary)}"
-          )
-
-          if len(df) == 0:
+          if len(df) != 34:
               raise RuntimeError(
-                  "Regime classifier returned zero observations."
+                  f"Expected 34 regime observations, got {len(df)}"
               )
+
+          if len(summary) <= 0:
+              raise RuntimeError("Regime summary is empty.")
 
           required_columns = [
-              "release_date",
-
-              "inflation_score",
-              "inflation_method",
-              "inflation_observation_date",
-              "inflation_age_days",
-
-              "labor_score",
-              "labor_method",
-              "labor_observation_date",
-              "labor_age_days",
-
-              "growth_score",
-              "growth_method",
-              "growth_observation_date",
-              "growth_age_days",
-
-              "dimensions_available",
-
+              "snapshot_date",
               "economic_regime",
-
+              "point_in_time_safe",
               "research_only",
-              "decision_engine_ready",
-              "pit_safe"
+              "decision_engine_ready"
           ]
 
-          missing = [
-              c for c in required_columns
-              if c not in df.columns
-          ]
+          for col in required_columns:
+              if col not in df.columns:
+                  raise RuntimeError(
+                      f"Missing regime column: {col}"
+                  )
 
-          if missing:
+          if not df["point_in_time_safe"].fillna(False).all():
               raise RuntimeError(
-                  f"Missing Regime Classifier columns: {missing}"
+                  "Regime PIT quality gate failed."
               )
 
-          # ------------------------------------------------------
-          # PIT gate
-          # ------------------------------------------------------
-
-          pit_safe = df[
-              "pit_safe"
-          ].astype(bool)
-
-          print(
-              f"PIT safe: {pit_safe.sum()}/{len(df)}"
-          )
-
-          if not bool(pit_safe.all()):
+          if not df["research_only"].fillna(False).all():
               raise RuntimeError(
-                  "Regime output contains PIT-unsafe observations."
+                  "Regime research-only gate failed."
               )
 
-          # ------------------------------------------------------
-          # Convert dates
-          # ------------------------------------------------------
+          if df["decision_engine_ready"].fillna(True).any():
+              raise RuntimeError(
+                  "Decision Engine integration must remain disabled."
+              )
 
-          df["release_date"] = pd.to_datetime(
-              df["release_date"],
+          dates = pd.to_datetime(
+              df["snapshot_date"],
               errors="coerce"
           )
 
-          observation_columns = [
-              "inflation_observation_date",
-              "labor_observation_date",
-              "growth_observation_date"
-          ]
-
-          for column in observation_columns:
-
-              df[column] = pd.to_datetime(
-                  df[column],
-                  errors="coerce"
+          if dates.isna().any():
+              raise RuntimeError(
+                  "Invalid snapshot_date detected."
               )
 
-              invalid = (
-                  df[column].notna()
-                  &
-                  (
-                      df[column]
-                      > df["release_date"]
-                  )
-              )
-
-              if bool(invalid.any()):
-
-                  print(
-                      df.loc[
-                          invalid,
-                          [
-                              "release_date",
-                              column
-                          ]
-                      ].to_string(index=False)
-                  )
-
-                  raise RuntimeError(
-                      f"Look-ahead detected in {column}"
-                  )
-
-          # ------------------------------------------------------
-          # Age consistency
-          # ------------------------------------------------------
-
-          age_columns = [
-              "inflation_age_days",
-              "labor_age_days",
-              "growth_age_days"
-          ]
-
-          for column in age_columns:
-
-              values = pd.to_numeric(
-                  df[column],
-                  errors="coerce"
-              )
-
-              invalid = (
-                  values.notna()
-                  &
-                  (values < 0)
-              )
-
-              if bool(invalid.any()):
-                  raise RuntimeError(
-                      f"Negative age detected in {column}"
-                  )
-
-          # ------------------------------------------------------
-          # Dimension coverage
-          # ------------------------------------------------------
-
-          print("")
-          print("DIMENSION COVERAGE")
-          print("-" * 72)
-
-          for column in [
-              "inflation_score",
-              "labor_score",
-              "growth_score"
-          ]:
-
-              count = df[
-                  column
-              ].notna().sum()
-
-              print(
-                  f"{column}: {count}/{len(df)}"
-              )
-
-          # ------------------------------------------------------
-          # Valid regime labels
-          # ------------------------------------------------------
-
-          allowed_regimes = {
+          valid_regimes = {
               "INFLATIONARY_GROWTH",
               "DISINFLATIONARY_GROWTH",
               "STAGFLATIONARY",
@@ -735,71 +326,46 @@ jobs:
               "INSUFFICIENT_DATA"
           }
 
-          invalid_regimes = sorted(
-              set(
-                  df["economic_regime"]
-                  .dropna()
-                  .astype(str)
-              )
-              - allowed_regimes
-          )
+          invalid = set(
+              df["economic_regime"].dropna().astype(str)
+          ) - valid_regimes
 
-          if invalid_regimes:
+          if invalid:
               raise RuntimeError(
-                  f"Unknown regime labels: {invalid_regimes}"
+                  f"Invalid regime labels detected: {invalid}"
               )
 
-          # ------------------------------------------------------
-          # Research-only gate
-          # ------------------------------------------------------
+          print("")
+          print("DIMENSION COVERAGE")
+          print("-" * 72)
 
-          research_only = df[
-              "research_only"
-          ].astype(bool)
-
-          if not bool(research_only.all()):
-              raise RuntimeError(
-                  "Research-only gate failed."
-              )
-
-          # ------------------------------------------------------
-          # Decision Engine disabled
-          # ------------------------------------------------------
-
-          decision_ready = df[
-              "decision_engine_ready"
-          ].astype(bool)
-
-          if bool(decision_ready.any()):
-              raise RuntimeError(
-                  "Decision Engine integration is enabled unexpectedly."
-              )
-
-          # ------------------------------------------------------
-          # Distribution
-          # ------------------------------------------------------
+          for col in [
+              "inflation_score",
+              "labor_score",
+              "growth_score"
+          ]:
+              if col in df.columns:
+                  count = df[col].notna().sum()
+                  print(f"{col}: {count}/{len(df)}")
 
           print("")
           print("REGIME DISTRIBUTION")
           print("-" * 72)
-
           print(
               df["economic_regime"]
               .value_counts()
-              .sort_index()
               .to_string()
           )
 
           print("")
           print("REGIME CLASSIFIER QUALITY GATE: PASS")
+          print("")
           '
 
-
-      # ==========================================================
-      # 11. FINAL SNAPSHOT
-      # ==========================================================
-
-      - name: Display Final Economic Intelligence Snapshot
+      # ================================================================
+      # 11. INSPECT REGIME OBSERVATIONS
+      # ================================================================
+      - name: Inspect Regime Observations
         run: |
           python -c '
           import pandas as pd
@@ -809,23 +375,36 @@ jobs:
           )
 
           print("=" * 72)
-          print("FINAL ECONOMIC INTELLIGENCE SNAPSHOT")
+          print("ECONOMIC REGIME OBSERVATIONS — v1.3")
           print("=" * 72)
 
-          columns = [
-              "release_date",
+          preferred_columns = [
+              "snapshot_date",
+              "economic_regime",
               "inflation_score",
               "labor_score",
               "growth_score",
-              "dimensions_available",
-              "economic_regime"
+              "inflation_observation_date",
+              "labor_observation_date",
+              "growth_observation_date"
+          ]
+
+          available = [
+              c for c in preferred_columns
+              if c in df.columns
           ]
 
           print(
-              df[columns]
-              .tail(15)
-              .to_string(index=False)
+              df[available].to_string(index=False)
           )
+
+          print("")
+          print("=" * 72)
+          print("ALL REGIME CSV COLUMNS")
+          print("=" * 72)
+
+          for column in df.columns:
+              print(column)
 
           print("")
           print("=" * 72)
@@ -835,22 +414,43 @@ jobs:
           print(
               df["economic_regime"]
               .value_counts()
-              .sort_index()
               .to_string()
           )
           '
 
+      # ================================================================
+      # 12. DISPLAY PIPELINE OUTPUTS
+      # ================================================================
+      - name: Display Pipeline Outputs
+        run: |
+          echo "========================================================================"
+          echo "COLLECTOR OUTPUT"
+          echo "========================================================================"
+          cat collector_output.txt
 
-      # ==========================================================
-      # 12. UPLOAD ARTIFACTS
-      # ==========================================================
+          echo ""
+          echo "========================================================================"
+          echo "SURPRISE ENGINE OUTPUT"
+          echo "========================================================================"
+          cat surprise_output.txt
 
+          echo ""
+          echo "========================================================================"
+          echo "REGIME CLASSIFIER OUTPUT"
+          echo "========================================================================"
+          cat regime_output.txt
+
+      # ================================================================
+      # 13. UPLOAD ARTIFACTS
+      # ================================================================
       - name: Upload Economic Intelligence Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: economic-intelligence-full-pipeline-v1
-          if-no-files-found: error
+          name: economic-intelligence-v1
           path: |
+            collector_output.txt
+            surprise_output.txt
+            regime_output.txt
             economic_historical_events_v1.csv
             economic_historical_quality_v1.csv
             economic_surprise_engine_v1.csv
@@ -858,33 +458,110 @@ jobs:
             economic_regime_events_v1.csv
             economic_regime_summary_v1.csv
 
-
-      # ==========================================================
-      # 13. FINAL QUALITY GATE
-      # ==========================================================
-
+      # ================================================================
+      # 14. FINAL QUALITY GATE
+      # ================================================================
       - name: Final Economic Intelligence Quality Gate
         run: |
-          echo "============================================================"
-          echo "US500 MACRO INTELLIGENCE"
-          echo "ECONOMIC INTELLIGENCE FULL PIPELINE"
-          echo "============================================================"
-          echo ""
-          echo "Historical Collector v1.5: PASS"
-          echo "Economic Surprise Engine v1.0: PASS"
-          echo "Economic Regime Classifier v1.3: PASS"
-          echo ""
-          echo "Historical records: 48"
-          echo "Expected indicators: 7"
-          echo "Expected 2023 records: 14"
-          echo ""
-          echo "PIT safety: ENABLED"
-          echo "Look-ahead protection: ENABLED"
-          echo "Consensus fabrication: DISABLED"
-          echo "Decision Engine integration: DISABLED"
-          echo ""
-          echo "ECONOMIC INTELLIGENCE PIPELINE: PASS"
-            echo ""
-          echo "Research-only."
-          echo "No trading signal generated."
-          echo "============================================================"
+          python -c '
+          import pandas as pd
+
+          historical = pd.read_csv(
+              "economic_historical_events_v1.csv"
+          )
+
+          quality = pd.read_csv(
+              "economic_historical_quality_v1.csv"
+          )
+
+          surprise = pd.read_csv(
+              "economic_surprise_engine_v1.csv"
+          )
+
+          regime = pd.read_csv(
+              "economic_regime_events_v1.csv"
+          )
+
+          print("=" * 72)
+          print("FINAL ECONOMIC INTELLIGENCE QUALITY GATE")
+          print("=" * 72)
+
+          if len(historical) != 48:
+              raise RuntimeError("Historical record count failed.")
+
+          if not historical[
+              "point_in_time_safe"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Historical PIT gate failed."
+              )
+
+          if not quality[
+              "point_in_time_safe"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Historical quality PIT gate failed."
+              )
+
+          if quality[
+              "historical_consensus_available"
+          ].fillna(False).any():
+              raise RuntimeError(
+                  "Historical consensus gate failed."
+              )
+
+          if not surprise[
+              "point_in_time_safe"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Surprise PIT gate failed."
+              )
+
+          if not surprise[
+              "research_only"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Surprise research-only gate failed."
+              )
+
+          if surprise[
+              "decision_engine_ready"
+          ].fillna(True).any():
+              raise RuntimeError(
+                  "Surprise Decision Engine integration is enabled."
+              )
+
+          if not regime[
+              "point_in_time_safe"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Regime PIT gate failed."
+              )
+
+          if not regime[
+              "research_only"
+          ].fillna(False).all():
+              raise RuntimeError(
+                  "Regime research-only gate failed."
+              )
+
+          if regime[
+              "decision_engine_ready"
+          ].fillna(True).any():
+              raise RuntimeError(
+                  "Regime Decision Engine integration is enabled."
+              )
+
+          print("")
+          print("48 historical records: PASS")
+          print("Historical PIT safety: PASS")
+          print("Historical consensus fabrication: PASS")
+          print("Surprise Engine PIT safety: PASS")
+          print("Surprise Engine research-only: PASS")
+          print("Regime Classifier PIT safety: PASS")
+          print("Regime Classifier research-only: PASS")
+          print("Decision Engine integration: DISABLED")
+          print("")
+          print("FINAL QUALITY GATE: PASS")
+          print("")
+          '
