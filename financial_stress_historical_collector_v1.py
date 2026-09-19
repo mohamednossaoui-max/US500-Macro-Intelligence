@@ -26,7 +26,7 @@ START = pd.Timestamp("2020-01-01")
 END = pd.Timestamp.today().normalize()
 
 VIX_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
-FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
+H15_CMT_URL = "https://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=bf17364827e38702b42a58cf8eaa3f78&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn&type=package"
 ALFRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 ALFRED_GRAPH = "https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series}&vintage_date={vintage}"
 ALFRED_RELEASE_DATES = "https://alfred.stlouisfed.org/release/downloaddates?rid=221"
@@ -45,11 +45,11 @@ def session():
     s.headers.update({"User-Agent": "US500-Macro-Intelligence/2.0"})
     return s
 
-def get(s, url, tries=4):
+def get(s, url, tries=4, timeout=45):
     last = None
     for i in range(tries):
         try:
-            r = s.get(url, timeout=45)
+            r = s.get(url, timeout=timeout)
             r.raise_for_status()
             return r
         except Exception as e:
@@ -92,32 +92,52 @@ def load_vix(s):
         })
     return rows
 
-def load_treasury(s, series, indicator):
-    r = get(s, FRED_URL.format(series=series))
-    df = pd.read_csv(io.BytesIO(r.content))
-    date_col = "observation_date" if "observation_date" in df.columns else df.columns[0]
-    value_col = series
+def load_treasury(s, package=None):
+    """Load 2Y/10Y Treasury CMTs from the official Fed H.15 DDP package.
+
+    The package is downloaded once because FRED transport can time out in CI.
+    H.15 is the authoritative source used here. The release is posted Monday-Friday
+    at 4:15pm ET, so an EOD observation is information-available on its observation
+    date after the daily release.
+    """
+    if package is None:
+        r = get(s, H15_CMT_URL, tries=5, timeout=90)
+        package = pd.read_csv(io.BytesIO(r.content), header=5)
+
+    # H.15 DDP Treasury Constant Maturities package has date + 11 maturity columns.
+    if package.shape[1] < 12:
+        raise RuntimeError(f"Unexpected H.15 Treasury package shape: {package.shape}")
+
+    df = package.copy()
+    date_col = df.columns[0]
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-    df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
-    df = df.dropna(subset=[date_col,value_col])
-    df = df[(df[date_col] >= START) & (df[date_col] <= END)]
+
+    # The package order is: date, 1m, 3m, 6m, 1y, 2y, 3y, 5y, 7y, 10y, 20y, 30y.
+    maturity_map = {
+        "TREASURY_2Y": df.columns[5],
+        "TREASURY_10Y": df.columns[9],
+    }
+
     rows = []
-    for _, x in df.iterrows():
-        d = x[date_col]
-        avail = next_business_day(d)
-        rows.append({
-            "indicator":indicator,
-            "observation_date":d.date().isoformat(),
-            "availability_date":avail.date().isoformat(),
-            "actual":float(x[value_col]),
-            "unit":"PERCENT","frequency":"DAILY",
-            "source":"Federal Reserve H.15",
-            "source_url":H15_URL,
-            "vintage":avail.date().isoformat(),
-            "revision_flag":False,
-            "point_in_time_safe":True,
-            "availability_semantics":"OFFICIAL_RELEASE",
-        })
+    for indicator, value_col in maturity_map.items():
+        df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
+        sub = df.dropna(subset=[date_col, value_col])
+        sub = sub[(sub[date_col] >= START) & (sub[date_col] <= END)]
+        for _, x in sub.iterrows():
+            d = pd.Timestamp(x[date_col])
+            rows.append({
+                "indicator":indicator,
+                "observation_date":d.date().isoformat(),
+                "availability_date":d.date().isoformat(),
+                "actual":float(x[value_col]),
+                "unit":"PERCENT","frequency":"DAILY",
+                "source":"Federal Reserve H.15",
+                "source_url":H15_CMT_URL,
+                "vintage":d.date().isoformat(),
+                "revision_flag":False,
+                "point_in_time_safe":True,
+                "availability_semantics":"OFFICIAL_RELEASE",
+            })
     return rows
 
 def load_nfci_release_dates(s):
@@ -194,8 +214,8 @@ def main():
     s = session()
     rows = []
     rows += load_vix(s)
-    rows += load_treasury(s, "DGS2", "TREASURY_2Y")
-    rows += load_treasury(s, "DGS10", "TREASURY_10Y")
+    treasury_package = None
+    rows += load_treasury(s, treasury_package)
     rows += load_nfci(s, "NFCI")
     rows += load_nfci(s, "ANFCI")
 
