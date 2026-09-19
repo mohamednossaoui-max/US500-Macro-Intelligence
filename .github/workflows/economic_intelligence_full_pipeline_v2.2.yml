@@ -5,76 +5,344 @@ on:
 
 jobs:
   economic-intelligence-v2-2:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy requests beautifulsoup4 pypdf
 
-      - name: Verify v2.2 standalone files
+      # ============================================================
+      # 4. SHOW REPOSITORY STATE
+      # ============================================================
+      - name: Show repository files
         run: |
-          test -f economic_historical_expansion_v2_2.py
-          test -f economic_surprise_engine_v1.1.py
-          test -f economic_regime_classifier_v1.5.py
+          echo "=========================================="
+          echo "CURRENT DIRECTORY"
+          echo "=========================================="
+          pwd
 
+          echo ""
+          echo "=========================================="
+          echo "ROOT FILES"
+          echo "=========================================="
+          find . -maxdepth 2 -type f | sort
+
+          echo ""
+          echo "=========================================="
+          echo "GIT COMMIT"
+          echo "=========================================="
+          git rev-parse HEAD
+
+          echo ""
+          echo "=========================================="
+          echo "GIT STATUS"
+          echo "=========================================="
+          git status --short
+
+      # ============================================================
+      # 5. VERIFY REQUIRED FILES
+      # ============================================================
+      - name: Verify v2.2 files
+        run: |
+          echo "Checking required files..."
+
+          if [ -f "economic_historical_expansion_v2.2.py" ]; then
+            echo "OK: economic_historical_expansion_v2.2.py"
+          else
+            echo "ERROR: economic_historical_expansion_v2.2.py NOT FOUND"
+            exit 1
+          fi
+
+          if [ -f "economic_surprise_engine_v1.1.py" ]; then
+            echo "OK: economic_surprise_engine_v1.1.py"
+          else
+            echo "ERROR: economic_surprise_engine_v1.1.py NOT FOUND"
+            exit 1
+          fi
+
+          if [ -f "economic_regime_classifier_v1.5.py" ]; then
+            echo "OK: economic_regime_classifier_v1.5.py"
+          else
+            echo "ERROR: economic_regime_classifier_v1.5.py NOT FOUND"
+            exit 1
+          fi
+
+          echo ""
+          echo "ALL REQUIRED FILES FOUND."
+
+      # ============================================================
+      # 6. SYNTAX CHECK
+      # ============================================================
       - name: Syntax check
         run: |
-          python -m py_compile economic_historical_expansion_v2_2.py
+          python -m py_compile economic_historical_expansion_v2.2.py
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
 
+          echo "SYNTAX CHECK: PASS"
+
+      # ============================================================
+      # 7. HISTORICAL EXPANSION v2.2
+      # ============================================================
       - name: Historical Expansion v2.2
-        run: python economic_historical_expansion_v2_2.py
+        run: |
+          python economic_historical_expansion_v2.2.py
 
-      - name: Surprise Engine v1.1
-        run: python economic_surprise_engine_v1.1.py
+      # ============================================================
+      # 8. VERIFY HISTORICAL OUTPUT
+      # ============================================================
+      - name: Verify historical expansion output
+        run: |
+          echo "Checking historical output files..."
 
-      - name: Regime Classifier v1.5
-        run: python economic_regime_classifier_v1.5.py
+          test -f economic_historical_events_v1.csv
+          test -f economic_historical_quality_v1.csv
 
+          echo "Historical output files found."
+
+          python - <<'PY'
+          import pandas as pd
+
+          h = pd.read_csv("economic_historical_events_v1.csv")
+          q = pd.read_csv("economic_historical_quality_v1.csv")
+
+          print("Historical records:", len(h))
+          print("Quality records:", len(q))
+
+          print("")
+          print("Indicators:")
+          print(h["indicator"].value_counts())
+
+          print("")
+          print("PIT safe:",
+                int(q["point_in_time_safe"].sum()),
+                "/",
+                len(q))
+
+          print("")
+          print("Historical consensus:",
+                int(q["historical_consensus_available"].sum()))
+
+          assert len(h) == len(q)
+          assert q["point_in_time_safe"].all()
+          assert not q["historical_consensus_available"].any()
+
+          print("")
+          print("HISTORICAL OUTPUT GATE: PASS")
+          PY
+
+      # ============================================================
+      # 9. SURPRISE ENGINE v1.1
+      # ============================================================
+      - name: Economic Surprise Engine v1.1
+        run: |
+          python economic_surprise_engine_v1.1.py
+
+      # ============================================================
+      # 10. VERIFY SURPRISE ENGINE
+      # ============================================================
+      - name: Verify Surprise Engine output
+        run: |
+          test -f economic_surprise_engine_v1.csv
+          test -f economic_surprise_summary_v1.csv
+
+          echo "Surprise Engine outputs found."
+
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("economic_surprise_engine_v1.csv")
+
+          print("Surprise Engine records:", len(df))
+
+          if "point_in_time_safe" in df.columns:
+              assert df["point_in_time_safe"].all()
+
+          if "research_only" in df.columns:
+              assert df["research_only"].all()
+
+          if "decision_engine_ready" in df.columns:
+              assert not df["decision_engine_ready"].any()
+
+          print("SURPRISE ENGINE GATE: PASS")
+          PY
+
+      # ============================================================
+      # 11. REGIME CLASSIFIER v1.5
+      # ============================================================
+      - name: Economic Regime Classifier v1.5
+        run: |
+          python economic_regime_classifier_v1.5.py
+
+      # ============================================================
+      # 12. VERIFY REGIME OUTPUT
+      # ============================================================
+      - name: Verify Regime Classifier output
+        run: |
+          test -f economic_regime_events_v1.csv
+          test -f economic_regime_summary_v1.csv
+
+          echo "Regime Classifier outputs found."
+
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("economic_regime_events_v1.csv")
+
+          print("Regime observations:", len(df))
+
+          if "point_in_time_safe" in df.columns:
+              assert df["point_in_time_safe"].all()
+
+          if "research_only" in df.columns:
+              assert df["research_only"].all()
+
+          if "decision_engine_ready" in df.columns:
+              assert not df["decision_engine_ready"].any()
+
+          print("")
+          print("Regime distribution:")
+
+          if "regime" in df.columns:
+              print(df["regime"].value_counts())
+
+          print("")
+          print("REGIME CLASSIFIER GATE: PASS")
+          PY
+
+      # ============================================================
+      # 13. FINAL v2.2 QUALITY GATE
+      # ============================================================
       - name: Final v2.2 Quality Gate
         run: |
           python - <<'PY'
           import pandas as pd
+
           h = pd.read_csv("economic_historical_events_v1.csv")
           q = pd.read_csv("economic_historical_quality_v1.csv")
 
+          print("==========================================")
+          print("FINAL ECONOMIC INTELLIGENCE v2.2 GATE")
+          print("==========================================")
+
+          # --------------------------------------------------------
+          # Basic integrity
+          # --------------------------------------------------------
+          assert len(h) == len(q)
+
+          # --------------------------------------------------------
+          # PIT
+          # --------------------------------------------------------
           assert q["point_in_time_safe"].all()
+
+          # --------------------------------------------------------
+          # No fabricated historical consensus
+          # --------------------------------------------------------
           assert not q["historical_consensus_available"].any()
 
-          claims = ((h["indicator"] == "INITIAL_JOBLESS_CLAIMS") &
-                    h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
-          ism = ((h["indicator"] == "ISM_MANUFACTURING_PMI") &
-                 h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
+          # --------------------------------------------------------
+          # 2020-2021 ISM
+          # --------------------------------------------------------
+          ism = (
+              (h["indicator"] == "ISM_MANUFACTURING_PMI") &
+              h["release_date"]
+                .astype(str)
+                .str[:4]
+                .isin(["2020", "2021"])
+          ).sum()
+
+          # --------------------------------------------------------
+          # 2020-2021 Initial Jobless Claims
+          # --------------------------------------------------------
+          claims = (
+              (h["indicator"] == "INITIAL_JOBLESS_CLAIMS") &
+              h["release_date"]
+                .astype(str)
+                .str[:4]
+                .isin(["2020", "2021"])
+          ).sum()
 
           print("Historical records:", len(h))
-          print("PIT safe:", int(q["point_in_time_safe"].sum()), "/", len(q))
-          print("Historical consensus:", int(q["historical_consensus_available"].sum()))
-          print("2020-2021 Claims:", int(claims))
+          print("PIT safe:",
+                int(q["point_in_time_safe"].sum()),
+                "/",
+                len(q))
+
+          print("Historical consensus:",
+                int(q["historical_consensus_available"].sum()))
+
           print("2020-2021 ISM:", int(ism))
+          print("2020-2021 Claims:", int(claims))
 
-          assert ism == 24
-          assert claims >= 90
+          print("")
+          print("Indicators:")
+          print(h["indicator"].value_counts())
 
+          # --------------------------------------------------------
+          # Expected ISM expansion
+          # --------------------------------------------------------
+          assert ism == 24, (
+              f"Expected 24 ISM 2020-2021 observations, got {ism}"
+          )
+
+          # --------------------------------------------------------
+          # Claims minimum coverage
+          # --------------------------------------------------------
+          assert claims >= 90, (
+              f"DOL Claims archive incomplete: {claims}"
+          )
+
+          # --------------------------------------------------------
+          # Research-only gates
+          # --------------------------------------------------------
+          if "research_only" in h.columns:
+              assert h["research_only"].all()
+
+          print("")
           print("PIT QUALITY GATE: PASS")
+          print("HISTORICAL CONSENSUS GATE: PASS")
+          print("ISM 2020-2021 GATE: PASS")
+          print("CLAIMS 2020-2021 GATE: PASS")
           print("RESEARCH-ONLY GATE: PASS")
           print("DECISION ENGINE DISABLED: PASS")
+
+          print("")
+          print("==========================================")
+          print("ECONOMIC INTELLIGENCE v2.2: PASS")
+          print("==========================================")
           PY
 
+      # ============================================================
+      # 14. UPLOAD ARTIFACTS
+      # ============================================================
       - name: Upload v2.2 artifacts
         uses: actions/upload-artifact@v4
         with:
           name: economic-intelligence-v2-2
+          if-no-files-found: error
           path: |
             economic_historical_events_v1.csv
             economic_historical_quality_v1.csv
