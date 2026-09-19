@@ -38,7 +38,7 @@ jobs:
           REQUIRED_FILES=(
             "economic_historical_collector_v1_7.py"
             "economic_surprise_engine_v1.1.py"
-            "economic_regime_classifier_v1.4.py"
+            "economic_regime_classifier_v1.5.py"
           )
 
           for file in "${REQUIRED_FILES[@]}"; do
