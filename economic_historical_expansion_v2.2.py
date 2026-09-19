@@ -14,6 +14,7 @@ No Decision Engine integration.
 
 from pathlib import Path
 from io import BytesIO
+from math import nan
 import hashlib
 import re
 import time
