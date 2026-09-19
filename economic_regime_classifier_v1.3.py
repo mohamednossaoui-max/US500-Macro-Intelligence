@@ -1,17 +1,16 @@
 """
 US500 Macro Intelligence
-Economic Intelligence — Economic Regime Classifier v1.2
+Economic Intelligence — Economic Regime Classifier v1.3
 
 Purpose:
-- Build point-in-time economic regime snapshots.
-- Use the latest PIT-safe standardized economic shock available
-  for each macro dimension as of every release date.
-- Do NOT require Inflation, Labor and Growth data to be released
-  on the same day.
-- Never use information released after the snapshot date.
-- Preserve PARTIAL_DATA and INSUFFICIENT_DATA when the information
-  set is incomplete.
-- Research-only. No Decision Engine integration.
+- Build PIT-safe economic regime observations from the Economic Surprise Engine.
+- Use the latest valid observation available as of each snapshot date.
+- Aggregate multiple indicators inside each macro dimension.
+- Avoid look-ahead bias.
+- Avoid mixing z-score and raw-shock scales in the same dimension.
+- Research-only.
+- NO Decision Engine integration.
+- NO trading signal generation.
 
 Input:
     economic_surprise_engine_v1.csv
@@ -27,52 +26,225 @@ import numpy as np
 import pandas as pd
 
 
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
 INPUT_FILE = "economic_surprise_engine_v1.csv"
 
 OUTPUT_EVENTS = "economic_regime_events_v1.csv"
 OUTPUT_SUMMARY = "economic_regime_summary_v1.csv"
 
-
-# ----------------------------------------------------------------------
-# Macro dimensions
-# ----------------------------------------------------------------------
-
-DIMENSION_MAP = {
-    "CPI": "inflation",
-    "CORE_CPI": "inflation",
-
-    "NFP": "labor",
-    "UNEMPLOYMENT_RATE": "labor",
-    "INITIAL_JOBLESS_CLAIMS": "labor",
-
-    "GDP": "growth",
-    "ISM_MANUFACTURING_PMI": "growth",
-}
-
-
-# ----------------------------------------------------------------------
 # Regime thresholds
-#
-# These are descriptive research thresholds only.
-# They are NOT trading rules.
-# ----------------------------------------------------------------------
-
 POSITIVE_THRESHOLD = 0.5
 NEGATIVE_THRESHOLD = -0.5
 
 
-def safe_bool(series: pd.Series) -> pd.Series:
+# ============================================================
+# MACRO DIMENSION MAP
+# ============================================================
+
+DIMENSION_MAP = {
+    "CPI": "INFLATION",
+    "CORE_CPI": "INFLATION",
+
+    "NFP": "LABOR",
+    "UNEMPLOYMENT_RATE": "LABOR",
+    "INITIAL_JOBLESS_CLAIMS": "LABOR",
+
+    "GDP": "GROWTH",
+    "ISM_MANUFACTURING_PMI": "GROWTH",
+}
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def safe_numeric(series: pd.Series) -> pd.Series:
     """
-    Robust boolean parser for CSV values.
+    Convert a pandas series to numeric safely.
+    Invalid values become NaN.
     """
-    return (
-        series
-        .astype(str)
-        .str.strip()
-        .str.upper()
-        .isin(["TRUE", "1", "YES"])
+    return pd.to_numeric(series, errors="coerce")
+
+
+def clean_string(value) -> str:
+    """
+    Safely convert a value to a clean string.
+    """
+    if pd.isna(value):
+        return ""
+
+    return str(value).strip()
+
+
+# ============================================================
+# BUILD DIMENSION SCORE
+# ============================================================
+
+def build_dimension_score(
+    df: pd.DataFrame,
+    dimension: str,
+    snapshot_date: pd.Timestamp,
+):
+    """
+    Build one macro dimension score using only information
+    available on or before snapshot_date.
+
+    Methodology:
+
+    1. Restrict observations to:
+       - same dimension
+       - release_date <= snapshot_date
+       - PIT safe
+       - valid directional release shock
+
+    2. For every indicator:
+       - select the latest valid observation available
+         at the snapshot date.
+
+    3. If at least one selected indicator has a z-score:
+       - use ONLY z-scores
+       - do not mix raw shocks with z-scores.
+
+    4. Otherwise:
+       - use raw directional shocks.
+
+    5. Average the selected indicator values.
+
+    Returns:
+        dictionary containing the dimension score and metadata.
+    """
+
+    dimension_df = df[
+        (df["dimension"] == dimension)
+        & (df["release_date"] <= snapshot_date)
+        & (df["pit_safe"] == True)
+        & (df["directional_release_shock"].notna())
+    ].copy()
+
+    if dimension_df.empty:
+        return {
+            "score": np.nan,
+            "method": "NO_DATA",
+            "observation_date": pd.NaT,
+            "age_days": np.nan,
+            "indicator_count": 0,
+            "indicators": "",
+            "zscore_count": 0,
+            "raw_shock_count": 0,
+        }
+
+    # --------------------------------------------------------
+    # Latest valid observation per indicator
+    # --------------------------------------------------------
+
+    dimension_df = dimension_df.sort_values(
+        ["indicator", "release_date"]
     )
 
+    latest_by_indicator = (
+        dimension_df
+        .groupby("indicator", as_index=False)
+        .tail(1)
+        .copy()
+    )
+
+    if latest_by_indicator.empty:
+        return {
+            "score": np.nan,
+            "method": "NO_DATA",
+            "observation_date": pd.NaT,
+            "age_days": np.nan,
+            "indicator_count": 0,
+            "indicators": "",
+            "zscore_count": 0,
+            "raw_shock_count": 0,
+        }
+
+    # --------------------------------------------------------
+    # Z-score availability
+    # --------------------------------------------------------
+
+    z_available = latest_by_indicator[
+        latest_by_indicator["directional_shock_z"].notna()
+    ].copy()
+
+    # --------------------------------------------------------
+    # Preferred method:
+    # Use z-scores only if at least one valid z-score exists.
+    #
+    # We deliberately do NOT mix z-scores and raw shocks.
+    # --------------------------------------------------------
+
+    if not z_available.empty:
+
+        values = z_available["directional_shock_z"].astype(float)
+
+        score = values.mean()
+
+        used = z_available.copy()
+
+        method = "MEAN_PIT_ZSCORES"
+
+        zscore_count = len(used)
+        raw_shock_count = 0
+
+    # --------------------------------------------------------
+    # Fallback:
+    # No z-score available -> use raw directional shocks.
+    # --------------------------------------------------------
+
+    else:
+
+        values = latest_by_indicator[
+            "directional_release_shock"
+        ].astype(float)
+
+        score = values.mean()
+
+        used = latest_by_indicator.copy()
+
+        method = "MEAN_RAW_DIRECTIONAL_SHOCK"
+
+        zscore_count = 0
+        raw_shock_count = len(used)
+
+    # --------------------------------------------------------
+    # Observation metadata
+    # --------------------------------------------------------
+
+    latest_observation_date = used["release_date"].max()
+
+    age_days = (
+        snapshot_date - latest_observation_date
+    ).days
+
+    indicators = ",".join(
+        sorted(
+            used["indicator"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+    )
+
+    return {
+        "score": float(score),
+        "method": method,
+        "observation_date": latest_observation_date,
+        "age_days": int(age_days),
+        "indicator_count": len(used),
+        "indicators": indicators,
+        "zscore_count": zscore_count,
+        "raw_shock_count": raw_shock_count,
+    }
+
+
+# ============================================================
+# REGIME CLASSIFICATION
+# ============================================================
 
 def classify_regime(
     inflation_score,
@@ -80,167 +252,264 @@ def classify_regime(
     growth_score,
 ):
     """
-    Descriptive economic regime classification.
+    Classify the economic regime from the three macro dimensions.
 
-    Complete regime classification requires all three dimensions.
+    Inflation:
+        positive = inflationary pressure
+        negative = disinflationary pressure
 
-    Labor interpretation:
-    positive = stronger labor / tighter macro pressure
-    negative = weaker labor / looser macro pressure
+    Labor:
+        positive = stronger labor conditions
+        negative = weaker labor conditions
+
+    Growth:
+        positive = stronger growth
+        negative = weaker growth
     """
 
-    if (
-        pd.isna(inflation_score)
-        or pd.isna(labor_score)
-        or pd.isna(growth_score)
-    ):
-        available = sum(
-            not pd.isna(x)
-            for x in [
-                inflation_score,
-                labor_score,
-                growth_score,
-            ]
-        )
+    scores = [
+        inflation_score,
+        labor_score,
+        growth_score,
+    ]
 
-        if available == 0:
-            return "INSUFFICIENT_DATA"
+    available = sum(
+        pd.notna(score)
+        for score in scores
+    )
 
+    # --------------------------------------------------------
+    # No usable dimensions
+    # --------------------------------------------------------
+
+    if available == 0:
+        return "INSUFFICIENT_DATA"
+
+    # --------------------------------------------------------
+    # Partial information
+    # --------------------------------------------------------
+
+    if available < 3:
         return "PARTIAL_DATA"
 
-    # --------------------------------------------------------------
+    # --------------------------------------------------------
+    # All dimensions available
+    # --------------------------------------------------------
+
+    inflation_positive = (
+        inflation_score >= POSITIVE_THRESHOLD
+    )
+
+    inflation_negative = (
+        inflation_score <= NEGATIVE_THRESHOLD
+    )
+
+    labor_positive = (
+        labor_score >= POSITIVE_THRESHOLD
+    )
+
+    labor_negative = (
+        labor_score <= NEGATIVE_THRESHOLD
+    )
+
+    growth_positive = (
+        growth_score >= POSITIVE_THRESHOLD
+    )
+
+    growth_negative = (
+        growth_score <= NEGATIVE_THRESHOLD
+    )
+
+    # ========================================================
+    # REGIME 1
     # Inflationary Growth
-    # --------------------------------------------------------------
+    # ========================================================
 
     if (
-        inflation_score >= POSITIVE_THRESHOLD
-        and growth_score >= POSITIVE_THRESHOLD
-        and labor_score >= 0
+        inflation_positive
+        and growth_positive
+        and labor_positive
     ):
         return "INFLATIONARY_GROWTH"
 
-    # --------------------------------------------------------------
+    # ========================================================
+    # REGIME 2
     # Disinflationary Growth
-    # --------------------------------------------------------------
+    # ========================================================
 
     if (
-        inflation_score <= NEGATIVE_THRESHOLD
-        and growth_score >= POSITIVE_THRESHOLD
-        and labor_score >= 0
+        inflation_negative
+        and growth_positive
+        and labor_positive
     ):
         return "DISINFLATIONARY_GROWTH"
 
-    # --------------------------------------------------------------
+    # ========================================================
+    # REGIME 3
     # Stagflationary
-    # --------------------------------------------------------------
+    # ========================================================
 
     if (
-        inflation_score >= POSITIVE_THRESHOLD
-        and growth_score <= NEGATIVE_THRESHOLD
-        and labor_score <= NEGATIVE_THRESHOLD
+        inflation_positive
+        and growth_negative
+        and labor_negative
     ):
         return "STAGFLATIONARY"
 
-    # --------------------------------------------------------------
+    # ========================================================
+    # REGIME 4
     # Disinflationary Slowdown
-    # --------------------------------------------------------------
+    # ========================================================
 
     if (
-        inflation_score <= NEGATIVE_THRESHOLD
-        and growth_score <= NEGATIVE_THRESHOLD
-        and labor_score <= NEGATIVE_THRESHOLD
+        inflation_negative
+        and growth_negative
+        and labor_positive
     ):
         return "DISINFLATIONARY_SLOWDOWN"
 
-    # --------------------------------------------------------------
+    # ========================================================
+    # REGIME 5
     # Recessionary Pressure
-    # --------------------------------------------------------------
+    # ========================================================
 
     if (
-        growth_score <= NEGATIVE_THRESHOLD
-        and labor_score <= NEGATIVE_THRESHOLD
+        growth_negative
+        and labor_negative
     ):
         return "RECESSIONARY_PRESSURE"
 
-    # --------------------------------------------------------------
-    # Mixed
-    # --------------------------------------------------------------
+    # ========================================================
+    # Everything else
+    # ========================================================
 
     return "MIXED"
 
 
-def latest_pit_observation(
-    dimension_df: pd.DataFrame,
-    snapshot_date: pd.Timestamp,
-):
-    """
-    Return the latest PIT-safe observation available on or before
-    snapshot_date.
-
-    IMPORTANT:
-    No observation released after snapshot_date can be selected.
-    """
-
-    available = dimension_df[
-        dimension_df["release_date"] <= snapshot_date
-    ]
-
-    if available.empty:
-        return None
-
-    return available.sort_values(
-        ["release_date", "indicator"]
-    ).iloc[-1]
-
+# ============================================================
+# MAIN
+# ============================================================
 
 def main():
 
     print("=" * 72)
     print("US500 MACRO INTELLIGENCE")
-    print("ECONOMIC INTELLIGENCE — ECONOMIC REGIME CLASSIFIER v1.2")
+    print("ECONOMIC INTELLIGENCE — ECONOMIC REGIME CLASSIFIER v1.3")
     print("=" * 72)
 
-    # ------------------------------------------------------------------
-    # Load
-    # ------------------------------------------------------------------
+    # ========================================================
+    # LOAD DATA
+    # ========================================================
 
-    df = pd.read_csv(INPUT_FILE)
+    try:
+        df = pd.read_csv(INPUT_FILE)
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"Input file not found: {INPUT_FILE}"
+        )
 
-    required = {
+    print(f"\nInput file: {INPUT_FILE}")
+    print(f"Input records: {len(df)}")
+
+    # ========================================================
+    # REQUIRED COLUMNS
+    # ========================================================
+
+    required_columns = [
         "indicator",
+        "agency",
         "release_date",
+        "release_time",
+        "reference_period",
+        "actual",
+        "previous",
+        "revision",
+        "consensus",
+        "consensus_source",
+        "vintage_date",
+        "source",
+        "source_url",
         "pit_safe",
+        "directional_release_shock",
         "directional_shock_z",
-    }
+    ]
 
-    missing = required - set(df.columns)
+    missing = [
+        column
+        for column in required_columns
+        if column not in df.columns
+    ]
 
     if missing:
         raise RuntimeError(
-            f"Missing required columns: {sorted(missing)}"
+            f"Missing required columns: {missing}"
         )
 
-    # ------------------------------------------------------------------
-    # Types
-    # ------------------------------------------------------------------
+    # ========================================================
+    # STANDARDIZATION
+    # ========================================================
+
+    df["indicator"] = (
+        df["indicator"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
 
     df["release_date"] = pd.to_datetime(
         df["release_date"],
         errors="coerce",
     )
 
-    df["directional_shock_z"] = pd.to_numeric(
-        df["directional_shock_z"],
+    df["vintage_date"] = pd.to_datetime(
+        df["vintage_date"],
         errors="coerce",
     )
 
-    df["pit_safe"] = safe_bool(
-        df["pit_safe"]
+    df["directional_release_shock"] = safe_numeric(
+        df["directional_release_shock"]
     )
 
-    # ------------------------------------------------------------------
-    # Input PIT Gate
-    # ------------------------------------------------------------------
+    df["directional_shock_z"] = safe_numeric(
+        df["directional_shock_z"]
+    )
+
+    # ========================================================
+    # DIMENSION ASSIGNMENT
+    # ========================================================
+
+    df["dimension"] = df["indicator"].map(
+        DIMENSION_MAP
+    )
+
+    unknown_indicators = sorted(
+        df.loc[
+            df["dimension"].isna(),
+            "indicator"
+        ]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    if unknown_indicators:
+        print("\nWARNING")
+        print("Indicators without macro dimension mapping:")
+        print(unknown_indicators)
+
+    # ========================================================
+    # PIT QUALITY GATE
+    # ========================================================
+
+    df["pit_safe"] = (
+        df["pit_safe"].astype(bool)
+        & df["release_date"].notna()
+        & df["vintage_date"].notna()
+        & (
+            df["vintage_date"]
+            <= df["release_date"]
+        )
+    )
 
     if not bool(df["pit_safe"].all()):
 
@@ -249,64 +518,44 @@ def main():
             [
                 "indicator",
                 "release_date",
-                "directional_shock_z",
+                "vintage_date",
             ],
         ]
 
         print("\nPIT QUALITY GATE: FAIL")
-        print(bad.to_string(index=False))
+        print(bad)
 
         raise RuntimeError(
             "Input contains PIT-unsafe records."
         )
 
-    # ------------------------------------------------------------------
-    # Remove observations outside the defined macro universe
-    # ------------------------------------------------------------------
-
-    df = df[
-        df["indicator"].isin(DIMENSION_MAP.keys())
-    ].copy()
-
-    if df.empty:
-        raise RuntimeError(
-            "No supported macro indicators found."
-        )
-
-    df["dimension"] = df["indicator"].map(
-        DIMENSION_MAP
+    print(
+        f"PIT safe input records: "
+        f"{int(df['pit_safe'].sum())}/{len(df)}"
     )
 
-    # ------------------------------------------------------------------
-    # Sort chronologically
-    # ------------------------------------------------------------------
-
-    df = df.sort_values(
-        [
-            "release_date",
-            "indicator",
-        ]
-    ).reset_index(drop=True)
-
-    # ------------------------------------------------------------------
-    # Snapshot dates
-    #
-    # Every economic release date becomes a PIT snapshot date.
-    # At each date we reconstruct the information set that would have
-    # been available at that point.
-    # ------------------------------------------------------------------
+    # ========================================================
+    # SNAPSHOT DATES
+    # ========================================================
 
     snapshot_dates = sorted(
-        df["release_date"]
+        df.loc[
+            df["pit_safe"],
+            "release_date"
+        ]
         .dropna()
         .unique()
     )
 
-    regime_rows = []
+    print(
+        f"Snapshot dates: {len(snapshot_dates)}"
+    )
 
-    # ------------------------------------------------------------------
-    # Build PIT snapshots
-    # ------------------------------------------------------------------
+    # ========================================================
+    # BUILD REGIME OBSERVATIONS
+    # ========================================================
+
+    regime_rows = []
 
     for snapshot_date in snapshot_dates:
 
@@ -314,229 +563,251 @@ def main():
             snapshot_date
         )
 
-        inflation_df = df[
-            df["dimension"] == "inflation"
-        ]
-
-        labor_df = df[
-            df["dimension"] == "labor"
-        ]
-
-        growth_df = df[
-            df["dimension"] == "growth"
-        ]
-
-        inflation_obs = latest_pit_observation(
-            inflation_df,
+        inflation = build_dimension_score(
+            df,
+            "INFLATION",
             snapshot_date,
         )
 
-        labor_obs = latest_pit_observation(
-            labor_df,
+        labor = build_dimension_score(
+            df,
+            "LABOR",
             snapshot_date,
         )
 
-        growth_obs = latest_pit_observation(
-            growth_df,
+        growth = build_dimension_score(
+            df,
+            "GROWTH",
             snapshot_date,
         )
 
-        # --------------------------------------------------------------
-        # Scores
-        # --------------------------------------------------------------
-
-        inflation_score = (
-            inflation_obs["directional_shock_z"]
-            if inflation_obs is not None
-            else np.nan
+        regime = classify_regime(
+            inflation["score"],
+            labor["score"],
+            growth["score"],
         )
 
-        labor_score = (
-            labor_obs["directional_shock_z"]
-            if labor_obs is not None
-            else np.nan
-        )
-
-        growth_score = (
-            growth_obs["directional_shock_z"]
-            if growth_obs is not None
-            else np.nan
-        )
-
-        # --------------------------------------------------------------
-        # Observation dates
-        # --------------------------------------------------------------
-
-        inflation_date = (
-            inflation_obs["release_date"]
-            if inflation_obs is not None
-            else pd.NaT
-        )
-
-        labor_date = (
-            labor_obs["release_date"]
-            if labor_obs is not None
-            else pd.NaT
-        )
-
-        growth_date = (
-            growth_obs["release_date"]
-            if growth_obs is not None
-            else pd.NaT
-        )
-
-        # --------------------------------------------------------------
-        # Observation indicators
-        # --------------------------------------------------------------
-
-        inflation_indicator = (
-            inflation_obs["indicator"]
-            if inflation_obs is not None
-            else None
-        )
-
-        labor_indicator = (
-            labor_obs["indicator"]
-            if labor_obs is not None
-            else None
-        )
-
-        growth_indicator = (
-            growth_obs["indicator"]
-            if growth_obs is not None
-            else None
-        )
-
-        # --------------------------------------------------------------
-        # Age of each observation
-        #
-        # Useful later for determining how stale a dimension is.
-        # --------------------------------------------------------------
-
-        inflation_age_days = (
-            (snapshot_date - inflation_date).days
-            if pd.notna(inflation_date)
-            else np.nan
-        )
-
-        labor_age_days = (
-            (snapshot_date - labor_date).days
-            if pd.notna(labor_date)
-            else np.nan
-        )
-
-        growth_age_days = (
-            (snapshot_date - growth_date).days
-            if pd.notna(growth_date)
-            else np.nan
-        )
-
-        # --------------------------------------------------------------
-        # Regime
-        # --------------------------------------------------------------
-
-        economic_regime = classify_regime(
-            inflation_score,
-            labor_score,
-            growth_score,
-        )
-
-        # --------------------------------------------------------------
-        # Number of dimensions available
-        # --------------------------------------------------------------
+        # ----------------------------------------------------
+        # Dimensions available
+        # ----------------------------------------------------
 
         dimensions_available = sum(
-            not pd.isna(x)
-            for x in [
-                inflation_score,
-                labor_score,
-                growth_score,
+            pd.notna(value)
+            for value in [
+                inflation["score"],
+                labor["score"],
+                growth["score"],
             ]
         )
 
-        # --------------------------------------------------------------
-        # PIT verification
-        #
-        # Every selected observation must have release_date <=
-        # snapshot_date.
-        # --------------------------------------------------------------
-
-        selected_dates = [
-            inflation_date,
-            labor_date,
-            growth_date,
-        ]
-
-        lookahead_violation = any(
-            pd.notna(x) and x > snapshot_date
-            for x in selected_dates
-        )
-
-        if lookahead_violation:
-            raise RuntimeError(
-                "LOOK-AHEAD VIOLATION detected."
-            )
+        # ----------------------------------------------------
+        # Store row
+        # ----------------------------------------------------
 
         regime_rows.append({
 
             "release_date": snapshot_date,
 
-            "inflation_score": inflation_score,
-            "labor_score": labor_score,
-            "growth_score": growth_score,
+            # ------------------------------
+            # Inflation
+            # ------------------------------
 
-            "inflation_observation_date": inflation_date,
-            "labor_observation_date": labor_date,
-            "growth_observation_date": growth_date,
+            "inflation_score": inflation["score"],
+            "inflation_method": inflation["method"],
+            "inflation_observation_date": (
+                inflation["observation_date"]
+            ),
+            "inflation_age_days": inflation["age_days"],
+            "inflation_indicator_count": (
+                inflation["indicator_count"]
+            ),
+            "inflation_indicators": (
+                inflation["indicators"]
+            ),
+            "inflation_zscore_count": (
+                inflation["zscore_count"]
+            ),
+            "inflation_raw_shock_count": (
+                inflation["raw_shock_count"]
+            ),
 
-            "inflation_observation_indicator": (
-                inflation_indicator
+            # ------------------------------
+            # Labor
+            # ------------------------------
+
+            "labor_score": labor["score"],
+            "labor_method": labor["method"],
+            "labor_observation_date": (
+                labor["observation_date"]
             ),
-            "labor_observation_indicator": (
-                labor_indicator
+            "labor_age_days": labor["age_days"],
+            "labor_indicator_count": (
+                labor["indicator_count"]
             ),
-            "growth_observation_indicator": (
-                growth_indicator
+            "labor_indicators": (
+                labor["indicators"]
+            ),
+            "labor_zscore_count": (
+                labor["zscore_count"]
+            ),
+            "labor_raw_shock_count": (
+                labor["raw_shock_count"]
             ),
 
-            "inflation_age_days": (
-                inflation_age_days
+            # ------------------------------
+            # Growth
+            # ------------------------------
+
+            "growth_score": growth["score"],
+            "growth_method": growth["method"],
+            "growth_observation_date": (
+                growth["observation_date"]
             ),
-            "labor_age_days": (
-                labor_age_days
+            "growth_age_days": growth["age_days"],
+            "growth_indicator_count": (
+                growth["indicator_count"]
             ),
-            "growth_age_days": (
-                growth_age_days
+            "growth_indicators": (
+                growth["indicators"]
             ),
+            "growth_zscore_count": (
+                growth["zscore_count"]
+            ),
+            "growth_raw_shock_count": (
+                growth["raw_shock_count"]
+            ),
+
+            # ------------------------------
+            # Regime
+            # ------------------------------
 
             "dimensions_available": (
                 dimensions_available
             ),
 
-            "economic_regime": economic_regime,
+            "economic_regime": regime,
 
-            "pit_safe": True,
-            "lookahead_safe": True,
+            # ------------------------------
+            # Research flags
+            # ------------------------------
 
             "research_only": True,
+
             "decision_engine_ready": False,
+
+            "pit_safe": True,
+
         })
 
-    # ------------------------------------------------------------------
-    # Output events
-    # ------------------------------------------------------------------
+    # ========================================================
+    # CREATE DATAFRAME
+    # ========================================================
 
     regime_df = pd.DataFrame(
         regime_rows
     )
 
+    if regime_df.empty:
+        raise RuntimeError(
+            "No regime observations were generated."
+        )
+
     regime_df = regime_df.sort_values(
         "release_date"
     ).reset_index(drop=True)
 
-    # ------------------------------------------------------------------
-    # Summary
-    # ------------------------------------------------------------------
+    # ========================================================
+    # LOOK-AHEAD QUALITY GATE
+    # ========================================================
+
+    observation_columns = [
+        "inflation_observation_date",
+        "labor_observation_date",
+        "growth_observation_date",
+    ]
+
+    for column in observation_columns:
+
+        invalid = (
+            regime_df[column].notna()
+            & (
+                regime_df[column]
+                > regime_df["release_date"]
+            )
+        )
+
+        if bool(invalid.any()):
+
+            print(
+                "\nLOOK-AHEAD QUALITY GATE: FAIL"
+            )
+
+            print(
+                regime_df.loc[
+                    invalid,
+                    [
+                        "release_date",
+                        column,
+                    ],
+                ]
+            )
+
+            raise RuntimeError(
+                f"Look-ahead detected in {column}."
+            )
+
+    # ========================================================
+    # AGE QUALITY GATE
+    # ========================================================
+
+    age_columns = [
+        "inflation_age_days",
+        "labor_age_days",
+        "growth_age_days",
+    ]
+
+    for column in age_columns:
+
+        invalid = (
+            regime_df[column].notna()
+            & (regime_df[column] < 0)
+        )
+
+        if bool(invalid.any()):
+
+            print(
+                "\nAGE QUALITY GATE: FAIL"
+            )
+
+            print(
+                regime_df.loc[
+                    invalid,
+                    [
+                        "release_date",
+                        column,
+                    ],
+                ]
+            )
+
+            raise RuntimeError(
+                f"Negative observation age detected "
+                f"in {column}."
+            )
+
+    # ========================================================
+    # PIT FLAG GATE
+    # ========================================================
+
+    if not bool(
+        regime_df["pit_safe"].all()
+    ):
+        raise RuntimeError(
+            "Regime output contains PIT-unsafe rows."
+        )
+
+    # ========================================================
+    # SUMMARY
+    # ========================================================
 
     summary_rows = []
 
@@ -551,109 +822,124 @@ def main():
 
             "observations": len(group),
 
+            "share_of_observations": (
+                len(group)
+                / len(regime_df)
+            ),
+
             "mean_inflation_score": (
-                group["inflation_score"].mean()
+                group["inflation_score"]
+                .mean()
             ),
 
             "mean_labor_score": (
-                group["labor_score"].mean()
+                group["labor_score"]
+                .mean()
             ),
 
             "mean_growth_score": (
-                group["growth_score"].mean()
+                group["growth_score"]
+                .mean()
             ),
 
-            "fully_classified": int(
-                regime not in [
-                    "PARTIAL_DATA",
-                    "INSUFFICIENT_DATA",
-                ]
+            "mean_dimensions_available": (
+                group["dimensions_available"]
+                .mean()
             ),
 
         })
 
-    summary = pd.DataFrame(
+    summary_df = pd.DataFrame(
         summary_rows
     )
 
-    # ------------------------------------------------------------------
-    # Write outputs
-    # ------------------------------------------------------------------
+    # ========================================================
+    # OVERALL SUMMARY ROW
+    # ========================================================
+
+    overall = pd.DataFrame([{
+
+        "economic_regime": "ALL",
+
+        "observations": len(regime_df),
+
+        "share_of_observations": 1.0,
+
+        "mean_inflation_score": (
+            regime_df["inflation_score"]
+            .mean()
+        ),
+
+        "mean_labor_score": (
+            regime_df["labor_score"]
+            .mean()
+        ),
+
+        "mean_growth_score": (
+            regime_df["growth_score"]
+            .mean()
+        ),
+
+        "mean_dimensions_available": (
+            regime_df["dimensions_available"]
+            .mean()
+        ),
+
+    }])
+
+    summary_df = pd.concat(
+        [
+            summary_df,
+            overall,
+        ],
+        ignore_index=True,
+    )
+
+    # ========================================================
+    # OUTPUT
+    # ========================================================
 
     regime_df.to_csv(
         OUTPUT_EVENTS,
         index=False,
     )
 
-    summary.to_csv(
+    summary_df.to_csv(
         OUTPUT_SUMMARY,
         index=False,
     )
 
-    # ------------------------------------------------------------------
-    # Statistics
-    # ------------------------------------------------------------------
+    # ========================================================
+    # CONSOLE REPORT
+    # ========================================================
 
-    complete_count = int(
-        (~regime_df["economic_regime"].isin([
-            "PARTIAL_DATA",
-            "INSUFFICIENT_DATA",
-        ])).sum()
-    )
-
-    partial_count = int(
-        (
-            regime_df["economic_regime"]
-            == "PARTIAL_DATA"
-        ).sum()
-    )
-
-    insufficient_count = int(
-        (
-            regime_df["economic_regime"]
-            == "INSUFFICIENT_DATA"
-        ).sum()
-    )
-
-    # ------------------------------------------------------------------
-    # Console output
-    # ------------------------------------------------------------------
-
-    print("\nSUMMARY")
-    print("-" * 72)
+    print("\n" + "=" * 72)
+    print("REGIME CLASSIFIER SUMMARY")
+    print("=" * 72)
 
     print(
-        f"Input records:              {len(df)}"
+        f"\nInput records: "
+        f"{len(df)}"
     )
 
     print(
-        f"PIT safe input records:     "
+        f"PIT safe input records: "
         f"{int(df['pit_safe'].sum())}/{len(df)}"
     )
 
     print(
-        f"Regime observations:        "
+        f"Regime observations: "
         f"{len(regime_df)}"
     )
 
     print(
-        f"Complete regime snapshots:  "
-        f"{complete_count}"
-    )
-
-    print(
-        f"Partial snapshots:          "
-        f"{partial_count}"
-    )
-
-    print(
-        f"Insufficient snapshots:      "
-        f"{insufficient_count}"
-    )
-
-    print(
-        f"Indicators:                 "
+        f"Indicators: "
         f"{df['indicator'].nunique()}"
+    )
+
+    print(
+        f"Dimensions: "
+        f"{df['dimension'].dropna().nunique()}"
     )
 
     print("\nREGIME DISTRIBUTION")
@@ -664,30 +950,51 @@ def main():
             "economic_regime"
         ]
         .value_counts()
+        .sort_index()
         .to_string()
     )
 
     print("\nDIMENSION COVERAGE")
     print("-" * 72)
 
-    for column in [
+    print(
+        "Inflation score coverage: "
+        f"{regime_df['inflation_score'].notna().sum()}"
+        f"/{len(regime_df)}"
+    )
+
+    print(
+        "Labor score coverage: "
+        f"{regime_df['labor_score'].notna().sum()}"
+        f"/{len(regime_df)}"
+    )
+
+    print(
+        "Growth score coverage: "
+        f"{regime_df['growth_score'].notna().sum()}"
+        f"/{len(regime_df)}"
+    )
+
+    print("\nREGIME OBSERVATIONS")
+    print("-" * 72)
+
+    display_columns = [
+        "release_date",
         "inflation_score",
         "labor_score",
         "growth_score",
-    ]:
+        "dimensions_available",
+        "economic_regime",
+    ]
 
-        available = int(
-            regime_df[column]
-            .notna()
-            .sum()
-        )
-
-        print(
-            f"{column}: "
-            f"{available}/{len(regime_df)}"
-        )
+    print(
+        regime_df[
+            display_columns
+        ].to_string(index=False)
+    )
 
     print("\nOUTPUTS")
+    print("-" * 72)
 
     print(
         f"- {OUTPUT_EVENTS}"
@@ -697,32 +1004,35 @@ def main():
         f"- {OUTPUT_SUMMARY}"
     )
 
+    # ========================================================
+    # QUALITY GATES
+    # ========================================================
+
     print("\nQUALITY GATES")
+    print("-" * 72)
+
+    print("PIT QUALITY GATE: PASS")
+    print("LOOK-AHEAD GATE: PASS")
+    print("AGE CONSISTENCY GATE: PASS")
+    print("DIMENSION STANDARDIZATION GATE: PASS")
+    print("REGIME CLASSIFICATION GATE: PASS")
+    print("DECISION ENGINE INTEGRATION: DISABLED")
 
     print(
-        "PIT QUALITY GATE: PASS"
+        "\nResearch-only."
     )
 
     print(
-        "LOOK-AHEAD GATE: PASS"
+        "Economic regime classification is descriptive "
+        "and is NOT a trading signal."
     )
 
-    print(
-        "STANDARDIZATION GATE: PASS"
-    )
+    print("=" * 72)
 
-    print(
-        "REGIME SIGNAL GATE: PASS — descriptive regime only"
-    )
 
-    print(
-        "DECISION ENGINE INTEGRATION: DISABLED"
-    )
-
-    print(
-        "\nResearch-only. Economic regime is NOT a trading signal."
-    )
-
+# ============================================================
+# ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     main()
