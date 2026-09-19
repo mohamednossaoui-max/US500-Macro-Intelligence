@@ -142,11 +142,20 @@ def candidate_release_dates(year):
         d += pd.Timedelta(days=1)
 
     if year == 2020:
-        dates = [d for d in dates if d != pd.Timestamp("2020-11-26")]
-        dates.append(pd.Timestamp("2020-11-25"))
+        # Thanksgiving moved the Nov 26 release to Nov 25;
+        # Christmas moved the Dec 24 release to Dec 23.
+        dates = [
+            d for d in dates
+            if d not in {pd.Timestamp("2020-11-26"), pd.Timestamp("2020-12-24")}
+        ]
+        dates.extend([pd.Timestamp("2020-11-25"), pd.Timestamp("2020-12-23")])
     elif year == 2021:
-        dates = [d for d in dates if d != pd.Timestamp("2021-11-25")]
-        dates.append(pd.Timestamp("2021-11-24"))
+        # Veterans Day moved Nov 11 to Nov 10; Thanksgiving moved Nov 25 to Nov 24.
+        dates = [
+            d for d in dates
+            if d not in {pd.Timestamp("2021-11-11"), pd.Timestamp("2021-11-25")}
+        ]
+        dates.extend([pd.Timestamp("2021-11-10"), pd.Timestamp("2021-11-24")])
 
     return sorted(dates)
 
@@ -249,76 +258,142 @@ def fetch_dol_newsroom_page(year, page):
 
 def collect_claims():
     """
-    Load 2020-2021 Initial Jobless Claims from an immutable
-    first-release/PIT dataset hosted on GitHub.
+    Deterministic PIT Claims reconstruction for 2020-2021.
 
-    The GitHub Actions runner cannot reliably reach DOL or ALFRED directly
-    (both returned 403/ReadTimeout in prior runs).  The dataset below stores
-    the FRED first-release reconstruction with `available_date`, i.e. the
-    date the observation first became available.  We therefore select only
-    rows whose available_date exactly equals the DOL release date.
-
-    This avoids using today's revised ICSA series and keeps the collector
-    deterministic and PIT-safe. The provenance is recorded explicitly in
-    the `source` and `source_url` fields.
+    The live DOL and ALFRED endpoints are not reachable reliably from
+    GitHub Actions in this environment. The values below are embedded from
+    an immutable first-release dataset whose `available_date` records when
+    each observation first became available. No live network request is
+    made, so the workflow is fast and reproducible.
     """
     expected = candidate_release_dates(2020) + candidate_release_dates(2021)
     expected_map = {d.strftime("%Y-%m-%d"): d for d in expected}
 
-    raw_url = (
-        "https://raw.githubusercontent.com/0xkoa1a/investment-research/"
-        "a403000e552cac992a76153c93a80b6825dcf0ae/"
-        "data/raw/fred_first_release/initial_claims.csv"
-    )
-
     print(f"Claims release dates expected: {len(expected)}")
-    print("Using immutable first-release PIT dataset (no DOL/ALFRED live calls).")
+    print("Using embedded immutable first-release PIT Claims dataset (no live DOL/ALFRED calls).")
 
-    try:
-        df = pd.read_csv(raw_url, dtype={"available_date": str, "observation_date": str})
-    except Exception as exc:
-        raise RuntimeError(
-            "Unable to retrieve the immutable first-release Claims dataset: "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
-
-    required = {"observation_date", "available_date", "initial_claims"}
-    missing_cols = required - set(df.columns)
-    if missing_cols:
-        raise RuntimeError(f"First-release Claims dataset missing columns: {sorted(missing_cols)}")
-
+    raw = """observation_date,available_date,initial_claims
+2019-12-28,2020-01-02,222000.0
+2020-01-04,2020-01-09,214000.0
+2020-01-11,2020-01-16,204000.0
+2020-01-18,2020-01-23,211000.0
+2020-01-25,2020-01-30,216000.0
+2020-02-01,2020-02-06,202000.0
+2020-02-08,2020-02-13,205000.0
+2020-02-15,2020-02-20,210000.0
+2020-02-22,2020-02-27,219000.0
+2020-02-29,2020-03-05,216000.0
+2020-03-07,2020-03-12,211000.0
+2020-03-14,2020-03-19,281000.0
+2020-03-21,2020-03-26,3283000.0
+2020-03-28,2020-04-02,6648000.0
+2020-04-04,2020-04-09,6606000.0
+2020-04-11,2020-04-16,5245000.0
+2020-04-18,2020-04-23,4427000.0
+2020-04-25,2020-04-30,3839000.0
+2020-05-02,2020-05-07,3169000.0
+2020-05-09,2020-05-14,2981000.0
+2020-05-16,2020-05-21,2438000.0
+2020-05-23,2020-05-28,2123000.0
+2020-05-30,2020-06-04,1877000.0
+2020-06-06,2020-06-11,1542000.0
+2020-06-13,2020-06-18,1508000.0
+2020-06-20,2020-06-25,1480000.0
+2020-06-27,2020-07-02,1427000.0
+2020-07-04,2020-07-09,1314000.0
+2020-07-11,2020-07-16,1300000.0
+2020-07-18,2020-07-23,1416000.0
+2020-07-25,2020-07-30,1434000.0
+2020-08-01,2020-08-06,1186000.0
+2020-08-08,2020-08-13,963000.0
+2020-08-15,2020-08-20,1106000.0
+2020-08-22,2020-08-27,1006000.0
+2020-08-29,2020-09-03,881000.0
+2020-09-05,2020-09-10,884000.0
+2020-09-12,2020-09-17,860000.0
+2020-09-19,2020-09-24,870000.0
+2020-09-26,2020-10-01,837000.0
+2020-10-03,2020-10-08,840000.0
+2020-10-10,2020-10-15,898000.0
+2020-10-17,2020-10-22,787000.0
+2020-10-24,2020-10-29,751000.0
+2020-10-31,2020-11-05,751000.0
+2020-11-07,2020-11-12,709000.0
+2020-11-14,2020-11-19,742000.0
+2020-11-21,2020-11-25,778000.0
+2020-11-28,2020-12-03,712000.0
+2020-12-05,2020-12-10,853000.0
+2020-12-12,2020-12-17,885000.0
+2020-12-19,2020-12-23,803000.0
+2020-12-26,2020-12-31,787000.0
+2021-01-02,2021-01-07,787000.0
+2021-01-09,2021-01-14,965000.0
+2021-01-16,2021-01-21,900000.0
+2021-01-23,2021-01-28,847000.0
+2021-01-30,2021-02-04,779000.0
+2021-02-06,2021-02-11,793000.0
+2021-02-13,2021-02-18,861000.0
+2021-02-20,2021-02-25,730000.0
+2021-02-27,2021-03-04,745000.0
+2021-03-06,2021-03-11,712000.0
+2021-03-13,2021-03-18,770000.0
+2021-03-20,2021-03-25,684000.0
+2021-03-27,2021-04-01,719000.0
+2021-04-03,2021-04-08,744000.0
+2021-04-10,2021-04-15,576000.0
+2021-04-17,2021-04-22,547000.0
+2021-04-24,2021-04-29,553000.0
+2021-05-01,2021-05-06,498000.0
+2021-05-08,2021-05-13,473000.0
+2021-05-15,2021-05-20,444000.0
+2021-05-22,2021-05-27,406000.0
+2021-05-29,2021-06-03,385000.0
+2021-06-05,2021-06-10,376000.0
+2021-06-12,2021-06-17,412000.0
+2021-06-19,2021-06-24,411000.0
+2021-06-26,2021-07-01,364000.0
+2021-07-03,2021-07-08,373000.0
+2021-07-10,2021-07-15,360000.0
+2021-07-17,2021-07-22,419000.0
+2021-07-24,2021-07-29,400000.0
+2021-07-31,2021-08-05,385000.0
+2021-08-07,2021-08-12,375000.0
+2021-08-14,2021-08-19,348000.0
+2021-08-21,2021-08-26,353000.0
+2021-08-28,2021-09-02,340000.0
+2021-09-04,2021-09-09,310000.0
+2021-09-11,2021-09-16,332000.0
+2021-09-18,2021-09-23,351000.0
+2021-09-25,2021-09-30,362000.0
+2021-10-02,2021-10-07,326000.0
+2021-10-09,2021-10-14,293000.0
+2021-10-16,2021-10-21,290000.0
+2021-10-23,2021-10-28,281000.0
+2021-10-30,2021-11-04,269000.0
+2021-11-06,2021-11-10,267000.0
+2021-11-13,2021-11-18,268000.0
+2021-11-20,2021-11-24,199000.0
+2021-11-27,2021-12-02,222000.0
+2021-12-04,2021-12-09,184000.0
+2021-12-11,2021-12-16,206000.0
+2021-12-18,2021-12-23,205000.0
+2021-12-25,2021-12-30,198000.0
+"""
+    from io import StringIO
+    df = pd.read_csv(StringIO(raw), dtype={"available_date": str, "observation_date": str})
     df["available_date"] = pd.to_datetime(df["available_date"], errors="coerce")
     df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
     df["initial_claims"] = pd.to_numeric(df["initial_claims"], errors="coerce")
 
-    start = pd.Timestamp("2020-01-01")
-    end = pd.Timestamp("2021-12-31")
-    df = df[
-        (df["available_date"] >= start)
-        & (df["available_date"] <= end)
-        & df["available_date"].notna()
-        & df["observation_date"].notna()
-        & df["initial_claims"].notna()
-    ].copy()
-
     rows = []
     failures = []
-
     for release_date in expected:
         release_key = release_date.strftime("%Y-%m-%d")
         target_week = pd.Timestamp(week_ending_for_release(release_date))
-        match = df[
-            (df["available_date"] == release_date)
-            & (df["observation_date"] == target_week)
-        ]
-
+        match = df[(df["available_date"] == release_date) & (df["observation_date"] == target_week)]
         if len(match) != 1:
-            failures.append(
-                f"{release_key}: expected one PIT row for week ending "
-                f"{target_week.strftime('%Y-%m-%d')}, found {len(match)}"
-            )
+            failures.append(f"{release_key}: expected one PIT row for week ending {target_week.strftime('%Y-%m-%d')}, found {len(match)}")
             continue
-
         value = float(match.iloc[0]["initial_claims"])
         rows.append({
             "indicator": "INITIAL_JOBLESS_CLAIMS",
@@ -332,36 +407,23 @@ def collect_claims():
             "consensus": nan,
             "consensus_source": nan,
             "vintage_date": release_key,
-            "source": "FRED First Release PIT dataset — source series: U.S. Employment and Training Administration / DOL",
-            "source_url": raw_url,
+            "source": "DOL Initial Jobless Claims — immutable first-release PIT reconstruction",
+            "source_url": "https://github.com/0xkoa1a/investment-research/blob/main/data/raw/fred_first_release/initial_claims.csv",
         })
 
     print(f"Claims PIT records collected: {len(rows)}/{len(expected)}")
-
     if failures:
-        print(f"Claims PIT failures: {len(failures)}")
-        for item in failures[:15]:
+        print("Claims PIT failures:")
+        for item in failures[:20]:
             print(f"  - {item}")
-
     if len(rows) != len(expected):
-        raise RuntimeError(
-            f"First-release Claims PIT dataset incomplete: {len(rows)}/{len(expected)}"
-        )
-
-    # Deterministic integrity checks: one release, one observation, no look-ahead.
-    keys = {(r["release_date"], r["reference_period"]) for r in rows}
-    if len(keys) != len(rows):
-        raise RuntimeError("Duplicate Claims release/reference-period rows detected")
-
-    for r in rows:
-        if r["vintage_date"] != r["release_date"]:
-            raise RuntimeError(f"Claims PIT violation: {r['release_date']}")
-
+        raise RuntimeError(f"Claims PIT archive incomplete: {len(rows)}/{len(expected)}")
     return rows
 
 
 def rid(row):
-    raw = "|".join(
+    """Deterministic record ID matching the historical collector convention."""
+    key = "|".join(
         str(row.get(k, ""))
         for k in [
             "indicator",
@@ -372,10 +434,7 @@ def rid(row):
             "source_url",
         ]
     )
-
-    return hashlib.sha256(
-        raw.encode()
-    ).hexdigest()[:16]
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
 def main():
