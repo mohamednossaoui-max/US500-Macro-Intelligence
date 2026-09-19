@@ -195,136 +195,132 @@ def scheduled_nfci_release_dates():
     return dates
 
 def load_nfci_release_dates(s):
-    """Load ALFRED release dates, with deterministic Chicago Fed schedule fallback."""
-    try:
-        r = get(s, ALFRED_RELEASE_DATES, tries=3, timeout=20)
-        text = r.text
-        dates = pd.to_datetime(pd.Series(
-            re.findall(r"\b20\d{2}-\d{2}-\d{2}\b", text)
-        ), errors="coerce").dropna().drop_duplicates().sort_values()
-        dates = [d for d in dates if START <= d <= END]
-        if dates:
-            print(f"NFCI release calendar: ALFRED ({len(dates)} dates)")
-            return dates
-    except Exception as exc:
-        print(f"NFCI release calendar: ALFRED unavailable ({exc}); using Chicago Fed schedule fallback.")
+    """Use a deterministic Chicago Fed release schedule.
+
+    ALFRED's release-calendar endpoint is deliberately not used here because it
+    has proved unreliable in CI. Chicago Fed documents weekly NFCI/ANFCI releases
+    on Wednesday at 8:30 ET, shifted to Thursday when the applicable federal
+    holiday falls on Wednesday or earlier in the week.
+    """
     dates = scheduled_nfci_release_dates()
     print(f"NFCI release calendar: deterministic Chicago Fed schedule ({len(dates)} dates)")
     return dates
 
-def fetch_nfci_vintage(s, vintage, series_list):
-    ids = ",".join(series_list)
-    url = f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={ids}&vintage_date={vintage}"
-    try:
-        r = get(s, url, tries=4, timeout=60)
-        return vintage, pd.read_csv(io.BytesIO(r.content))
-    except Exception as exc:
-        return vintage, exc
+def fetch_nfci_vintage_batch(s, vintages):
+    """Fetch many ALFRED vintages in one request.
+
+    ALFRED's public graph endpoint accepts repeated series IDs with a matching
+    comma-separated vintage_date list. Batching reduces hundreds of HTTP calls
+    to roughly a few dozen while preserving PIT vintage semantics.
+    """
+    ids = ",".join(["NFCI", "ANFCI"] * len(vintages))
+    vintage_arg = ",".join(vintages)
+    url = f"https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={ids}&vintage_date={vintage_arg}"
+    r = get(s, url, tries=3, timeout=30)
+    return pd.read_csv(io.BytesIO(r.content))
+
+def parse_nfci_batch(df, vintages):
+    """Extract the observation corresponding to each release/vintage.
+
+    Each Chicago Fed release reports the prior Friday. We use the official
+    release date as availability_date and the matching Friday as observation_date.
+    """
+    if "observation_date" not in df.columns:
+        # ALFRED normally calls this DATE in the CSV graph endpoint.
+        if "DATE" in df.columns:
+            df = df.rename(columns={"DATE": "observation_date"})
+        else:
+            raise RuntimeError(f"Unexpected ALFRED columns: {list(df.columns)[:8]}")
+
+    df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
+    rows = []
+    vintage_set = set(vintages)
+
+    for col in df.columns:
+        if col == "observation_date":
+            continue
+        m = re.match(r"^(NFCI|ANFCI)_(\d{8})$", str(col))
+        if not m:
+            continue
+        series = m.group(1)
+        vintage = pd.Timestamp(m.group(2)).date().isoformat()
+        if vintage not in vintage_set:
+            continue
+
+        # A release on Wednesday/Thursday covers the previous Friday.
+        release = pd.Timestamp(vintage)
+        expected_obs = release - pd.Timedelta(days=5 if release.weekday() == 2 else 6)
+        sub = df[df.observation_date == expected_obs]
+        if sub.empty:
+            # Defensive fallback: choose the latest observation strictly before release.
+            sub = df[(df.observation_date < release)].sort_values("observation_date").tail(1)
+        if sub.empty:
+            continue
+
+        value = pd.to_numeric(sub.iloc[0][col], errors="coerce")
+        if pd.isna(value):
+            continue
+
+        rows.append({
+            "indicator": series,
+            "observation_date": pd.Timestamp(sub.iloc[0]["observation_date"]).date().isoformat(),
+            "availability_date": vintage,
+            "actual": float(value),
+            "unit": "INDEX_LEVEL",
+            "frequency": "WEEKLY",
+            "source": "Chicago Fed",
+            "source_url": CHICAGO_URL,
+            "vintage": vintage,
+            "revision_flag": False,
+            "point_in_time_safe": True,
+            "availability_semantics": "ARCHIVED_VINTAGE",
+        })
+    return rows
 
 def load_nfci_pair(s):
     release_dates = load_nfci_release_dates(s)
-    rows = []
     if not release_dates:
-        return rows
+        return []
 
-    # Fetch both NFCI and ANFCI in one ALFRED request per vintage, concurrently.
-    results = []
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = [ex.submit(fetch_nfci_vintage, session(), rd.date().isoformat(), ["NFCI","ANFCI"]) for rd in release_dates]
-        for fut in as_completed(futures):
-            results.append(fut.result())
-
-    for vintage, result in results:
-        if isinstance(result, Exception):
-            print(f"WARN: NFCI vintage {vintage} failed: {result}")
-            continue
-        df = result
-        if "observation_date" not in df.columns:
-            continue
-        df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
-        for series in ["NFCI","ANFCI"]:
-            if series not in df.columns:
-                continue
-            vals = pd.to_numeric(df[series], errors="coerce")
-            sub = pd.DataFrame({"observation_date":df["observation_date"], series:vals}).dropna()
-            sub = sub[(sub.observation_date >= START) & (sub.observation_date <= END)]
-            rd = pd.Timestamp(vintage)
-            sub = sub[sub.observation_date <= rd - pd.Timedelta(days=1)]
-            for _, x in sub.iterrows():
-                rows.append({
-                    "indicator":series,
-                    "observation_date":pd.Timestamp(x.observation_date).date().isoformat(),
-                    "availability_date":rd.date().isoformat(),
-                    "actual":float(x[series]),
-                    "unit":"INDEX_LEVEL","frequency":"WEEKLY",
-                    "source":"Chicago Fed",
-                    "source_url":CHICAGO_URL,
-                    "vintage":rd.date().isoformat(),
-                    "revision_flag":False,
-                    "point_in_time_safe":True,
-                    "availability_semantics":"ARCHIVED_VINTAGE",
-                })
-
-    # Keep the earliest vintage for each observation: first release, not a later revision.
-    out = {}
-    for row in rows:
-        k = (row["indicator"], row["observation_date"])
-        if k not in out or row["availability_date"] < out[k]["availability_date"]:
-            out[k] = row
-    return list(out.values())
-
-def load_nfci(s, series):
-    release_dates = load_nfci_release_dates(s)
+    vintage_strings = [pd.Timestamp(d).date().isoformat() for d in release_dates]
+    # Twelve vintages per request keeps payloads modest and avoids the slow,
+    # hundreds-of-requests behavior of the previous implementation.
+    batches = [vintage_strings[i:i + 12] for i in range(0, len(vintage_strings), 12)]
     rows = []
-    seen = set()
+    failures = 0
 
-    for rd in release_dates:
-        url = ALFRED_GRAPH.format(series=series, vintage=rd.date().isoformat())
-        try:
-            r = get(s, url, tries=3)
-            df = pd.read_csv(io.BytesIO(r.content))
-        except Exception:
-            continue
+    print(f"NFCI/ANFCI: {len(vintage_strings)} vintages in {len(batches)} batched requests")
 
-        if "observation_date" not in df.columns or series not in df.columns:
-            continue
+    def worker(batch):
+        return fetch_nfci_vintage_batch(session(), batch), batch
 
-        df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
-        df[series] = pd.to_numeric(df[series], errors="coerce")
-        df = df.dropna(subset=["observation_date", series])
-        # Only keep observations that were available by this release and are in our window.
-        df = df[(df["observation_date"] >= START) &
-                (df["observation_date"] <= END) &
-                (df["observation_date"] <= rd - pd.Timedelta(days=1))]
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futures = [ex.submit(worker, batch) for batch in batches]
+        completed = 0
+        for fut in as_completed(futures):
+            completed += 1
+            try:
+                df, batch = fut.result()
+                rows.extend(parse_nfci_batch(df, batch))
+                print(f"NFCI/ANFCI batch {completed}/{len(batches)}: PASS ({len(batch)} vintages)")
+            except Exception as exc:
+                failures += 1
+                print(f"NFCI/ANFCI batch {completed}/{len(batches)}: WARN — {exc}")
 
-        for _, x in df.iterrows():
-            od = x["observation_date"]
-            key = (od.date().isoformat(), rd.date().isoformat())
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append({
-                "indicator":series,
-                "observation_date":od.date().isoformat(),
-                "availability_date":rd.date().isoformat(),
-                "actual":float(x[series]),
-                "unit":"INDEX_LEVEL","frequency":"WEEKLY",
-                "source":"Chicago Fed",
-                "source_url":CHICAGO_URL,
-                "vintage":rd.date().isoformat(),
-                "revision_flag":True,
-                "point_in_time_safe":True,
-                "availability_semantics":"ARCHIVED_VINTAGE",
-            })
-
-    # For each observation, retain the earliest available vintage: this is the
-    # first information set in which that observation existed.
+    # One PIT record per indicator/observation. If duplicate vintages occur,
+    # retain the earliest availability date.
     out = {}
     for row in rows:
-        k = row["observation_date"]
-        if k not in out or row["availability_date"] < out[k]["availability_date"]:
-            out[k] = row
-    return list(out.values())
+        key = (row["indicator"], row["observation_date"])
+        if key not in out or row["availability_date"] < out[key]["availability_date"]:
+            out[key] = row
+
+    result = list(out.values())
+    expected = max(0, len(release_dates)) * 2
+    print(f"NFCI/ANFCI collected: {len(result)} records; batch failures: {failures}; expected upper bound: {expected}")
+    if failures == len(batches):
+        raise RuntimeError("All NFCI/ANFCI ALFRED batches failed; refusing to fabricate or use revised current data.")
+    return result
 
 def main():
     s = session()
