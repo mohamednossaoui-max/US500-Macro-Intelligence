@@ -27,7 +27,7 @@ jobs:
           python-version: "3.11"
 
       # ================================================================
-      # 3. VERIFY ECONOMIC INTELLIGENCE FILES
+      # 3. VERIFY PYTHON FILES
       # ================================================================
       - name: Verify Economic Intelligence Python files
         run: |
@@ -36,7 +36,7 @@ jobs:
           echo "========================================================================"
 
           REQUIRED_FILES=(
-            "economic_historical_collector_v1_6.py"
+            "economic_historical_collector_v1_7.py"
             "economic_surprise_engine_v1.1.py"
             "economic_regime_classifier_v1.4.py"
           )
@@ -51,8 +51,9 @@ jobs:
           done
 
           echo "========================================================================"
-          echo "ALL REQUIRED ECONOMIC INTELLIGENCE FILES FOUND"
+          echo "ALL REQUIRED PYTHON FILES FOUND"
           echo "========================================================================"
+
 
       # ================================================================
       # 4. INSTALL DEPENDENCIES
@@ -62,19 +63,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy
 
+
       # ================================================================
-      # 5. RUN HISTORICAL COLLECTOR v1.6
+      # 5. RUN HISTORICAL COLLECTOR v1.7
       # ================================================================
-      - name: Run Economic Historical Collector v1.6
+      - name: Run Economic Historical Collector v1.7
         run: |
           echo "========================================================================"
-          echo "RUNNING ECONOMIC HISTORICAL COLLECTOR v1.6"
+          echo "RUNNING ECONOMIC HISTORICAL COLLECTOR v1.7"
           echo "========================================================================"
 
-          python economic_historical_collector_v1_6.py
+          python economic_historical_collector_v1_7.py
+
 
       # ================================================================
-      # 6. VERIFY HISTORICAL COLLECTOR OUTPUTS
+      # 6. VERIFY HISTORICAL OUTPUTS
       # ================================================================
       - name: Verify Historical Collector outputs
         run: |
@@ -97,20 +100,31 @@ jobs:
           done
 
           echo ""
-          echo "Historical events rows:"
+          echo "Historical dataset summary:"
+
           python - <<'PY'
           import pandas as pd
 
           df = pd.read_csv("economic_historical_events_v1.csv")
 
-          print(f"Rows: {len(df)}")
+          print(f"Total records: {len(df)}")
           print(f"Indicators: {df['indicator'].nunique()}")
 
-          print("\nIndicator counts:")
+          print("\nRecords by indicator:")
           print(df["indicator"].value_counts().sort_index())
+
+          print("\nRecords with previous:")
+          print(
+              f"{df['previous'].notna().sum()}/{len(df)}"
+          )
+
+          print("\nDate range:")
+          print(f"First release: {df['release_date'].min()}")
+          print(f"Last release:  {df['release_date'].max()}")
           PY
 
           echo "========================================================================"
+
 
       # ================================================================
       # 7. RUN ECONOMIC SURPRISE ENGINE v1.1
@@ -122,6 +136,7 @@ jobs:
           echo "========================================================================"
 
           python economic_surprise_engine_v1.1.py
+
 
       # ================================================================
       # 8. VERIFY SURPRISE ENGINE OUTPUTS
@@ -147,52 +162,80 @@ jobs:
           done
 
           echo ""
-          echo "Surprise Engine summary:"
+          echo "ECONOMIC SURPRISE ENGINE v1.1 — SUMMARY"
+          echo "------------------------------------------------------------------------"
+
           python - <<'PY'
           import pandas as pd
 
           df = pd.read_csv("economic_surprise_engine_v1.csv")
 
-          print(f"Input/output records: {len(df)}")
+          print(f"Input records: {len(df)}")
 
           if "pit_safe" in df.columns:
+              pit = df["pit_safe"].fillna(False)
               print(
-                  f"PIT-safe records: "
-                  f"{int(df['pit_safe'].fillna(False).sum())}/{len(df)}"
-              )
-
-          if "directional_release_shock" in df.columns:
-              print(
-                  "Directional release shocks: "
-                  f"{int(df['directional_release_shock'].notna().sum())}"
-              )
-
-          if "directional_shock_z" in df.columns:
-              print(
-                  "PIT-safe z-scores: "
-                  f"{int(df['directional_shock_z'].notna().sum())}"
+                  f"PIT-safe records: {pit.sum()}/{len(df)}"
               )
 
           if "consensus_available" in df.columns:
+              consensus = df["consensus_available"].fillna(False)
               print(
-                  "Consensus-based surprises: "
-                  f"{int(df['consensus_available'].fillna(False).sum())}"
+                  f"Consensus-based surprises: {consensus.sum()}"
               )
 
-          if "research_only" in df.columns:
+          if "directional_release_shock" in df.columns:
+              shocks = df["directional_release_shock"].notna()
               print(
-                  "Research-only rows: "
-                  f"{int(df['research_only'].fillna(False).sum())}/{len(df)}"
+                  f"Directional release shocks: {shocks.sum()}"
+              )
+
+          if "directional_shock_z" in df.columns:
+              z = df["directional_shock_z"].notna()
+              print(
+                  f"PIT-safe z-scores: {z.sum()}"
+              )
+
+          if "prior_valid_observation_count" in df.columns:
+              print(
+                  f"Maximum prior history: "
+                  f"{df['prior_valid_observation_count'].max()}"
+              )
+
+          print("\nZ-score coverage by indicator:")
+
+          if "directional_shock_z" in df.columns:
+              coverage = (
+                  df.groupby("indicator")["directional_shock_z"]
+                  .agg(
+                      total="size",
+                      z_scores=lambda x: x.notna().sum()
+                  )
+              )
+
+              for indicator, row in coverage.iterrows():
+                  print(
+                      f"  {indicator:<30}"
+                      f"{int(row['z_scores'])}/{int(row['total'])}"
+                  )
+
+          if "research_only" in df.columns:
+              research = df["research_only"].fillna(False)
+              print(
+                  f"\nResearch-only rows: "
+                  f"{research.sum()}/{len(df)}"
               )
 
           if "decision_engine_ready" in df.columns:
+              ready = df["decision_engine_ready"].fillna(False)
               print(
-                  "Decision Engine ready rows: "
-                  f"{int(df['decision_engine_ready'].fillna(False).sum())}/{len(df)}"
+                  f"Decision Engine ready rows: "
+                  f"{ready.sum()}/{len(df)}"
               )
           PY
 
           echo "========================================================================"
+
 
       # ================================================================
       # 9. RUN ECONOMIC REGIME CLASSIFIER v1.4
@@ -205,8 +248,9 @@ jobs:
 
           python economic_regime_classifier_v1.4.py
 
+
       # ================================================================
-      # 10. VERIFY REGIME CLASSIFIER OUTPUTS
+      # 10. VERIFY REGIME OUTPUTS
       # ================================================================
       - name: Verify Regime Classifier outputs
         run: |
@@ -229,7 +273,8 @@ jobs:
           done
 
           echo ""
-          echo "Economic Regime summary:"
+          echo "ECONOMIC REGIME CLASSIFIER v1.4 — SUMMARY"
+          echo "------------------------------------------------------------------------"
 
           python - <<'PY'
           import pandas as pd
@@ -243,28 +288,33 @@ jobs:
               print(df["economic_regime"].value_counts())
 
           if "pit_safe" in df.columns:
+              pit = df["pit_safe"].fillna(False)
               print(
-                  "\nPIT-safe observations: "
-                  f"{int(df['pit_safe'].fillna(False).sum())}/{len(df)}"
+                  f"\nPIT-safe observations: "
+                  f"{pit.sum()}/{len(df)}"
               )
 
           if "research_only" in df.columns:
+              research = df["research_only"].fillna(False)
               print(
-                  "Research-only observations: "
-                  f"{int(df['research_only'].fillna(False).sum())}/{len(df)}"
+                  f"Research-only observations: "
+                  f"{research.sum()}/{len(df)}"
               )
 
           if "decision_engine_ready" in df.columns:
+              ready = df["decision_engine_ready"].fillna(False)
               print(
-                  "Decision Engine ready observations: "
-                  f"{int(df['decision_engine_ready'].fillna(False).sum())}/{len(df)}"
+                  f"Decision Engine ready: "
+                  f"{ready.sum()}/{len(df)}"
               )
 
-          print("\nColumns:")
-          print(list(df.columns))
+          print("\nDate range:")
+          print(f"First: {df['release_date'].min()}")
+          print(f"Last:  {df['release_date'].max()}")
           PY
 
           echo "========================================================================"
+
 
       # ================================================================
       # 11. FINAL QUALITY GATE
@@ -279,131 +329,203 @@ jobs:
           import pandas as pd
           import sys
 
-          events = pd.read_csv("economic_historical_events_v1.csv")
-          quality = pd.read_csv("economic_historical_quality_v1.csv")
-          surprise = pd.read_csv("economic_surprise_engine_v1.csv")
-          regime = pd.read_csv("economic_regime_events_v1.csv")
-
           failed = False
 
+          events = pd.read_csv(
+              "economic_historical_events_v1.csv"
+          )
+
+          quality = pd.read_csv(
+              "economic_historical_quality_v1.csv"
+          )
+
+          surprise = pd.read_csv(
+              "economic_surprise_engine_v1.csv"
+          )
+
+          regime = pd.read_csv(
+              "economic_regime_events_v1.csv"
+          )
+
           # --------------------------------------------------------------
-          # Historical events
+          # HISTORICAL DATASET
           # --------------------------------------------------------------
+
           if len(events) == 0:
-              print("[FAIL] Historical events file is empty")
+              print("[FAIL] Historical dataset is empty")
               failed = True
           else:
-              print(f"[PASS] Historical events: {len(events)} records")
+              print(
+                  f"[PASS] Historical dataset: "
+                  f"{len(events)} records"
+              )
 
           # --------------------------------------------------------------
-          # Historical PIT quality
+          # HISTORICAL PIT
           # --------------------------------------------------------------
+
           if "point_in_time_safe" in quality.columns:
-              pit_safe = quality["point_in_time_safe"].fillna(False)
 
-              if not pit_safe.all():
-                  print("[FAIL] Historical PIT quality gate failed")
+              pit = quality[
+                  "point_in_time_safe"
+              ].fillna(False)
+
+              if not pit.all():
+                  print(
+                      "[FAIL] Historical PIT QUALITY GATE"
+                  )
                   failed = True
               else:
                   print(
-                      f"[PASS] Historical PIT: "
-                      f"{int(pit_safe.sum())}/{len(quality)}"
+                      f"[PASS] Historical PIT QUALITY GATE: "
+                      f"{pit.sum()}/{len(pit)}"
                   )
 
           # --------------------------------------------------------------
-          # Surprise Engine PIT
+          # SURPRISE PIT
           # --------------------------------------------------------------
-          if "pit_safe" in surprise.columns:
-              surprise_pit = surprise["pit_safe"].fillna(False)
 
-              if not surprise_pit.all():
-                  print("[FAIL] Surprise Engine PIT gate failed")
+          if "pit_safe" in surprise.columns:
+
+              pit = surprise[
+                  "pit_safe"
+              ].fillna(False)
+
+              if not pit.all():
+                  print(
+                      "[FAIL] Surprise Engine PIT QUALITY GATE"
+                  )
                   failed = True
               else:
                   print(
                       f"[PASS] Surprise Engine PIT: "
-                      f"{int(surprise_pit.sum())}/{len(surprise)}"
+                      f"{pit.sum()}/{len(pit)}"
                   )
 
           # --------------------------------------------------------------
-          # Surprise Engine research-only
+          # SURPRISE RESEARCH ONLY
           # --------------------------------------------------------------
+
           if "research_only" in surprise.columns:
-              research_only = surprise["research_only"].fillna(False)
 
-              if not research_only.all():
-                  print("[FAIL] Surprise Engine research-only gate failed")
+              research = surprise[
+                  "research_only"
+              ].fillna(False)
+
+              if not research.all():
+                  print(
+                      "[FAIL] Surprise Engine research-only gate"
+                  )
                   failed = True
               else:
-                  print("[PASS] Surprise Engine research-only")
+                  print(
+                      "[PASS] Surprise Engine RESEARCH-ONLY"
+                  )
 
           # --------------------------------------------------------------
-          # Surprise Engine Decision Engine disabled
+          # SURPRISE DECISION ENGINE DISABLED
           # --------------------------------------------------------------
+
           if "decision_engine_ready" in surprise.columns:
-              decision_ready = surprise["decision_engine_ready"].fillna(False)
 
-              if decision_ready.any():
-                  print("[FAIL] Surprise Engine has Decision Engine ready rows")
+              ready = surprise[
+                  "decision_engine_ready"
+              ].fillna(False)
+
+              if ready.any():
+                  print(
+                      "[FAIL] Surprise Engine Decision Engine enabled"
+                  )
                   failed = True
               else:
-                  print("[PASS] Surprise Engine Decision Engine disabled")
+                  print(
+                      "[PASS] Surprise Engine Decision Engine DISABLED"
+                  )
 
           # --------------------------------------------------------------
-          # Regime PIT
+          # REGIME PIT
           # --------------------------------------------------------------
+
           if "pit_safe" in regime.columns:
-              regime_pit = regime["pit_safe"].fillna(False)
 
-              if not regime_pit.all():
-                  print("[FAIL] Regime PIT gate failed")
+              pit = regime[
+                  "pit_safe"
+              ].fillna(False)
+
+              if not pit.all():
+                  print(
+                      "[FAIL] Regime PIT QUALITY GATE"
+                  )
                   failed = True
               else:
                   print(
                       f"[PASS] Regime PIT: "
-                      f"{int(regime_pit.sum())}/{len(regime)}"
+                      f"{pit.sum()}/{len(pit)}"
                   )
 
           # --------------------------------------------------------------
-          # Regime research-only
+          # REGIME RESEARCH ONLY
           # --------------------------------------------------------------
+
           if "research_only" in regime.columns:
-              regime_research = regime["research_only"].fillna(False)
 
-              if not regime_research.all():
-                  print("[FAIL] Regime research-only gate failed")
+              research = regime[
+                  "research_only"
+              ].fillna(False)
+
+              if not research.all():
+                  print(
+                      "[FAIL] Regime research-only gate"
+                  )
                   failed = True
               else:
-                  print("[PASS] Regime research-only")
+                  print(
+                      "[PASS] Regime Classifier RESEARCH-ONLY"
+                  )
 
           # --------------------------------------------------------------
-          # Regime Decision Engine disabled
+          # REGIME DECISION ENGINE DISABLED
           # --------------------------------------------------------------
+
           if "decision_engine_ready" in regime.columns:
-              regime_ready = regime["decision_engine_ready"].fillna(False)
 
-              if regime_ready.any():
-                  print("[FAIL] Regime Classifier has Decision Engine ready rows")
+              ready = regime[
+                  "decision_engine_ready"
+              ].fillna(False)
+
+              if ready.any():
+                  print(
+                      "[FAIL] Regime Classifier Decision Engine enabled"
+                  )
                   failed = True
               else:
-                  print("[PASS] Regime Classifier Decision Engine disabled")
+                  print(
+                      "[PASS] Regime Classifier Decision Engine DISABLED"
+                  )
 
           # --------------------------------------------------------------
-          # Final result
+          # FINAL RESULT
           # --------------------------------------------------------------
+
           print("")
           print("------------------------------------------------------------------------")
 
           if failed:
-              print("ECONOMIC INTELLIGENCE QUALITY GATE: FAIL")
+              print(
+                  "ECONOMIC INTELLIGENCE QUALITY GATE: FAIL"
+              )
               sys.exit(1)
 
-          print("ECONOMIC INTELLIGENCE QUALITY GATE: PASS")
+          print(
+              "ECONOMIC INTELLIGENCE QUALITY GATE: PASS"
+          )
+
           print("------------------------------------------------------------------------")
           PY
 
+
       # ================================================================
-      # 12. UPLOAD ALL ECONOMIC INTELLIGENCE ARTIFACTS
+      # 12. UPLOAD ARTIFACTS
       # ================================================================
       - name: Upload Economic Intelligence artifacts
         uses: actions/upload-artifact@v4
@@ -419,6 +541,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+
       # ================================================================
       # 13. FINAL SUMMARY
       # ================================================================
@@ -430,7 +553,7 @@ jobs:
           echo "========================================================================"
           echo ""
           echo "Historical Collector:"
-          echo "  economic_historical_collector_v1_6.py"
+          echo "  economic_historical_collector_v1_7.py"
           echo ""
           echo "Surprise Engine:"
           echo "  economic_surprise_engine_v1.1.py"
@@ -438,15 +561,14 @@ jobs:
           echo "Regime Classifier:"
           echo "  economic_regime_classifier_v1.4.py"
           echo ""
-          echo "Outputs:"
-          echo "  economic_historical_events_v1.csv"
-          echo "  economic_historical_quality_v1.csv"
-          echo "  economic_surprise_engine_v1.csv"
-          echo "  economic_surprise_summary_v1.csv"
-          echo "  economic_regime_events_v1.csv"
-          echo "  economic_regime_summary_v1.csv"
+          echo "Pipeline:"
+          echo "  Historical Collector v1.7"
+          echo "          ↓"
+          echo "  Surprise Engine v1.1"
+          echo "          ↓"
+          echo "  Regime Classifier v1.4"
           echo ""
           echo "Decision Engine integration: DISABLED"
-          echo "Research-only status: ENABLED"
+          echo "Research-only: ENABLED"
           echo ""
           echo "========================================================================"
