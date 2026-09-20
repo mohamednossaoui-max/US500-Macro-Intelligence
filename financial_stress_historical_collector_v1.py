@@ -30,7 +30,8 @@ END = pd.Timestamp.today().normalize()
 VIX_URL = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
 H15_CMT_URL = "https://www.federalreserve.gov/datadownload/Output.aspx?rel=H15&series=bf17364827e38702b42a58cf8eaa3f78&lastobs=&from=&to=&filetype=csv&label=include&layout=seriescolumn&type=package"
 ALFRED_URL = "https://api.stlouisfed.org/fred/series/observations"
-ALFRED_INITIAL_RELEASE = "https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series}&output_type=4&cosd=2020-01-01&coed={end}"
+ALFRED_INITIAL_RELEASE = "https://alfred.stlouisfed.org/graph/alfredgraph.csv?id={series}&output_type=4&cosd={start}&coed={end}"
+ALFRED_CHUNK_MONTHS = 6
 
 H15_URL = "https://www.federalreserve.gov/releases/h15/"
 CHICAGO_URL = "https://www.chicagofed.org/research/data/nfci/current-data"
@@ -141,49 +142,97 @@ def load_treasury(s, package=None):
             })
     return rows
 
-def load_nfci_initial_release(s, series):
-    """Load ALFRED output_type=4 (initial release only) for one series.
+def _chunk_ranges(start, end, months=6):
+    """Return non-overlapping calendar chunks for ALFRED bulk retrieval."""
+    out = []
+    cur = pd.Timestamp(start).normalize()
+    finish = pd.Timestamp(end).normalize()
+    while cur <= finish:
+        nxt = cur + pd.DateOffset(months=months) - pd.Timedelta(days=1)
+        if nxt > finish:
+            nxt = finish
+        out.append((cur, nxt))
+        cur = nxt + pd.Timedelta(days=1)
+    return out
 
-    This is intentionally one request per series, not one request per weekly
-    vintage. ALFRED documents output_type=4 as "Observations, Initial Release
-    Only" and includes the realtime_start date, i.e. when the initial value was
-    released. This gives us the PIT availability date without reconstructing a
-    350-date release calendar.
-    """
-    end = END.date().isoformat()
-    url = ALFRED_INITIAL_RELEASE.format(series=series, end=end)
-    print(f"{series}: requesting ALFRED initial-release-only data")
-    r = get(s, url, tries=3, timeout=60)
-    df = pd.read_csv(io.BytesIO(r.content))
-    # ALFRED text/CSV output may expose DATE/observation_date and
-    # realtime_start/value columns depending on the endpoint representation.
+def _parse_alfred_initial_csv(content, series):
+    df = pd.read_csv(io.BytesIO(content))
     lower = {str(c).lower(): c for c in df.columns}
     date_col = lower.get("observation_date") or lower.get("date")
     value_col = lower.get("value") or lower.get(series.lower())
     rt_col = lower.get("realtime_start") or lower.get("realtime start")
     if not date_col or not value_col or not rt_col:
         raise RuntimeError(f"Unexpected ALFRED {series} columns: {list(df.columns)}")
-
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
     df[rt_col] = pd.to_datetime(df[rt_col], errors="coerce")
     df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
-    df = df.dropna(subset=[date_col, rt_col, value_col])
+    return df.dropna(subset=[date_col, rt_col, value_col]), date_col, value_col, rt_col
+
+def load_nfci_initial_release(s, series):
+    """Load ALFRED output_type=4 in small calendar chunks.
+
+    The previous FIXED 4 implementation made one very large ALFRED request,
+    which timed out in GitHub Actions. FIXED 5 keeps the same PIT methodology
+    but splits the request into six-month chunks. Each chunk is an
+    "Observations, Initial Release Only" request, so realtime_start remains the
+    initial availability date. There is deliberately no fallback to revised
+    Chicago Fed/FRED history.
+    """
+    frames = []
+    failures = []
+    ranges = _chunk_ranges(START, END, ALFRED_CHUNK_MONTHS)
+    print(f"{series}: ALFRED initial-release-only, {len(ranges)} chunks")
+    for i, (a, b) in enumerate(ranges, 1):
+        url = ALFRED_INITIAL_RELEASE.format(
+            series=series,
+            start=a.date().isoformat(),
+            end=b.date().isoformat(),
+        )
+        try:
+            r = get(s, url, tries=2, timeout=45)
+            df, date_col, value_col, rt_col = _parse_alfred_initial_csv(r.content, series)
+            frames.append(df)
+            print(f"{series}: chunk {i}/{len(ranges)} OK ({a.date()} to {b.date()})")
+        except Exception as exc:
+            failures.append((i, str(a.date()), str(b.date()), exc))
+            print(f"{series}: chunk {i}/{len(ranges)} FAIL — {exc}")
+
+    if failures:
+        raise RuntimeError(
+            f"{series}: {len(failures)}/{len(ranges)} ALFRED chunks failed; "
+            "refusing to substitute revised data. First failure: " + str(failures[0])
+        )
+
+    df = pd.concat(frames, ignore_index=True)
+    lower = {str(c).lower(): c for c in df.columns}
+    date_col = lower.get("observation_date") or lower.get("date")
+    value_col = lower.get("value") or lower.get(series.lower())
+    rt_col = lower.get("realtime_start") or lower.get("realtime start")
     df = df[(df[date_col] >= START) & (df[date_col] <= END)]
     df = df[df[rt_col] <= END]
 
+    # Defensive uniqueness: output_type=4 should already provide the first
+    # released observation, but overlapping/duplicate source rows are rejected
+    # unless they are identical.
+    df = df.sort_values([date_col, rt_col])
     rows = []
+    seen = set()
     for _, x in df.iterrows():
         od = pd.Timestamp(x[date_col])
         avail = pd.Timestamp(x[rt_col])
         if avail < od:
-            # A release cannot make an observation available before its period.
-            # Keep the record out rather than inventing a timing correction.
             continue
+        key = od.date().isoformat()
+        value = float(x[value_col])
+        tup = (key, avail.date().isoformat(), value)
+        if key in seen:
+            continue
+        seen.add(key)
         rows.append({
             "indicator": series,
-            "observation_date": od.date().isoformat(),
+            "observation_date": key,
             "availability_date": avail.date().isoformat(),
-            "actual": float(x[value_col]),
+            "actual": value,
             "unit": "INDEX_LEVEL",
             "frequency": "WEEKLY",
             "source": "Chicago Fed",
@@ -282,7 +331,7 @@ def main():
     out["record_id"] = out.apply(rid, axis=1)
     out.to_csv(OUT, index=False)
 
-    print("Financial Stress Historical Collector v1")
+    print("Financial Stress Historical Collector v1 — FIXED 5")
     print(f"Records: {len(out)}")
     print(f"Indicators: {out.indicator.nunique()}")
     print(f"PIT safe: {int(out.point_in_time_safe.sum())}/{len(out)}")
