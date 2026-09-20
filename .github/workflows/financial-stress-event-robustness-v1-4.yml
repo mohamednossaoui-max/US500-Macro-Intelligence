@@ -1,0 +1,99 @@
+name: Financial Stress Event Robustness Review v1.4
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  event-robustness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Trigger fresh Historical Collector v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PREVIOUS="$(gh run list --repo "$REPOSITORY" --workflow financial-stress-historical-v1.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId // ""' || true)"
+          gh workflow run financial-stress-historical-v1.yml --repo "$REPOSITORY" --ref main
+
+          RUN_ID=""
+          for i in $(seq 1 60); do
+            RUN_ID="$(gh run list --repo "$REPOSITORY" --workflow financial-stress-historical-v1.yml --branch main --limit 10 --json databaseId,createdAt --jq 'sort_by(.createdAt) | reverse | .[] | .databaseId' | while read -r ID; do
+              if [ -n "$ID" ] && [ "$ID" != "$PREVIOUS" ]; then echo "$ID"; break; fi
+            done)"
+            [ -n "$RUN_ID" ] && break
+            sleep 5
+          done
+          [ -n "$RUN_ID" ] || { echo "Collector run not detected."; exit 1; }
+
+          for i in $(seq 1 90); do
+            STATUS="$(gh run view "$RUN_ID" --repo "$REPOSITORY" --json status --jq '.status')"
+            CONCLUSION="$(gh run view "$RUN_ID" --repo "$REPOSITORY" --json conclusion --jq '.conclusion // ""')"
+            echo "Status=$STATUS Conclusion=$CONCLUSION"
+            if [ "$STATUS" = "completed" ]; then
+              [ "$CONCLUSION" = "success" ] || { gh run view "$RUN_ID" --repo "$REPOSITORY" --log-failed || true; exit 1; }
+              break
+            fi
+            sleep 10
+          done
+          echo "COLLECTOR_RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+
+      - name: Download collector artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          rm -rf raw_collector_artifact
+          mkdir -p raw_collector_artifact
+          gh run download "$COLLECTOR_RUN_ID" --repo "$REPOSITORY" --dir raw_collector_artifact
+          CSV_PATH="$(find raw_collector_artifact -type f -name 'financial_stress_records_input_v1.csv' -print -quit)"
+          [ -n "$CSV_PATH" ] || { echo "Raw collector CSV not found."; exit 1; }
+          cp "$CSV_PATH" financial_stress_records_input_v1.csv
+
+      - name: Run v1.4
+        run: |
+          python -m py_compile financial_stress_methodology_review_v1_3.py
+          python -m py_compile financial_stress_event_robustness_v1_4.py
+          python financial_stress_event_robustness_v1_4.py
+
+      - name: Research-only guard
+        run: |
+          set -euo pipefail
+          if grep -RniE "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal" financial_stress_event_robustness_v1_4.py; then
+            echo "Research-only guard failed."
+            exit 1
+          fi
+          echo "Research-only guard passed."
+
+      - name: Validate outputs
+        run: |
+          test -s financial_stress_event_robustness_summary_v1_4.csv
+          test -s financial_stress_event_robustness_events_v1_4.csv
+
+      - name: Upload v1.4 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-stress-event-robustness-v1-4
+          path: |
+            financial_stress_event_robustness_summary_v1_4.csv
+            financial_stress_event_robustness_events_v1_4.csv
+          if-no-files-found: error
+          retention-days: 90
