@@ -1,0 +1,108 @@
+name: Macro Context v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macro-context:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+
+      # --------------------------------------------------
+      # Required input files
+      # --------------------------------------------------
+      - name: Verify Macro Context inputs
+        run: |
+          test -f fed_intelligence_output_v1.json
+          test -f economic_regime_events_v1.csv
+          test -f financial_stress_research_v1.csv
+
+      # --------------------------------------------------
+      # Build Macro Context
+      # --------------------------------------------------
+      - name: Run Macro Context v1
+        run: |
+          python macro_context_v1.py
+
+      # --------------------------------------------------
+      # Validate outputs
+      # --------------------------------------------------
+      - name: Validate Macro Context
+        run: |
+          test -f macro_context_v1.json
+          test -f macro_context_v1.csv
+
+          python - <<'PY'
+          import json
+          import pandas as pd
+
+          with open(
+              "macro_context_v1.json",
+              "r",
+              encoding="utf-8"
+          ) as f:
+              data = json.load(f)
+
+          df = pd.read_csv(
+              "macro_context_v1.csv"
+          )
+
+          assert data["research_only"] is True
+          assert data["decision_engine_ready"] is False
+          assert data["trade_signal"] is None
+          assert data["forecast"] is None
+
+          assert len(df) == 1
+
+          assert bool(
+              data["temporal_alignment"]["anti_lookahead"]
+          ) is True
+
+          print("Macro Context validation passed.")
+          print(
+              "Context date:",
+              data["context_date"]
+          )
+          print(
+              "Economic regime:",
+              data["economic"]["economic_regime"]
+          )
+          print(
+              "Financial stress regime:",
+              data["financial_stress"]["research_regime"]
+          )
+          print(
+              "Fed score:",
+              data["fed"]["fed_score"]
+          )
+          PY
+
+      # --------------------------------------------------
+      # Upload research artifact
+      # --------------------------------------------------
+      - name: Upload Macro Context artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-context-v1
+          path: |
+            macro_context_v1.json
+            macro_context_v1.csv
+          if-no-files-found: error
+          retention-days: 90
