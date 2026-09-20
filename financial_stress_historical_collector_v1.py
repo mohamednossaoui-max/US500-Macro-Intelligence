@@ -7,29 +7,27 @@ Research-only. No Decision Engine integration.
 Sources:
 - VIX: Cboe daily historical CSV.
 - Treasury 2Y/10Y: Federal Reserve H.15.
-- NFCI/ANFCI: Chicago Fed series via ALFRED initial-release-only transport.
-  ALFRED output_type=4 supplies the initial release and its realtime_start date.
+- NFCI/ANFCI: FRED API using output_type=4
+  (Initial Release Only).
 
-FIXED 6:
-- Improved ALFRED transport reliability for CI runners.
-- curl IPv4 + HTTP/1.1 transport.
-- Longer timeout and retry/backoff.
-- requests fallback.
-- PIT methodology unchanged.
-- No revised-data fallback.
+FIXED 7:
+- Replaced ALFRED transport with FRED API.
+- NFCI/ANFCI retrieved through official FRED API.
+- output_type=4 preserves Initial Release Only semantics.
+- FRED API key is read from GitHub Actions secret:
+  FRED_API_KEY
+- No fallback to revised data.
+- PIT methodology preserved.
+- Research-only.
+- No Decision Engine integration.
 """
 
 from __future__ import annotations
 
-import io
-import time
 import hashlib
-import re
-import subprocess
-
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
-from urllib.parse import quote
+import io
+import os
+import time
 
 import pandas as pd
 import requests
@@ -40,6 +38,10 @@ OUT = "financial_stress_records_input_v1.csv"
 START = pd.Timestamp("2020-01-01")
 END = pd.Timestamp.today().normalize()
 
+
+# ============================================================
+# Official sources
+# ============================================================
 
 VIX_URL = (
     "https://cdn.cboe.com/api/global/us_indices/daily_prices/"
@@ -53,17 +55,9 @@ H15_CMT_URL = (
     "&layout=seriescolumn&type=package"
 )
 
-ALFRED_URL = "https://api.stlouisfed.org/fred/series/observations"
-
-ALFRED_INITIAL_RELEASE = (
-    "https://alfred.stlouisfed.org/graph/alfredgraph.csv"
-    "?id={series}&output_type=4&cosd={start}&coed={end}"
+FRED_API_URL = (
+    "https://api.stlouisfed.org/fred/series/observations"
 )
-
-ALFRED_CHUNK_MONTHS = 6
-
-ALFRED_TRANSPORT_TIMEOUT = 90
-
 
 H15_URL = "https://www.federalreserve.gov/releases/h15/"
 
@@ -71,6 +65,21 @@ CHICAGO_URL = (
     "https://www.chicagofed.org/research/data/nfci/current-data"
 )
 
+
+# ============================================================
+# Runtime settings
+# ============================================================
+
+REQUEST_TIMEOUT = 90
+REQUEST_TRIES = 5
+
+FRED_API_TIMEOUT = 90
+FRED_API_TRIES = 5
+
+
+# ============================================================
+# Output schema
+# ============================================================
 
 COLS = [
     "indicator",
@@ -88,113 +97,42 @@ COLS = [
 ]
 
 
+# ============================================================
+# HTTP session
+# ============================================================
+
 def session():
     s = requests.Session()
 
     s.headers.update(
         {
-            "User-Agent": "US500-Macro-Intelligence/2.0"
+            "User-Agent": (
+                "US500-Macro-Intelligence/2.0"
+            )
         }
     )
 
     return s
 
 
-def _curl_get(url, timeout=90, tries=3):
+def get(
+    s,
+    url,
+    tries=REQUEST_TRIES,
+    timeout=REQUEST_TIMEOUT,
+):
     """
-    Reliable transport for public CSV endpoints on CI runners.
+    Standard HTTP GET helper.
 
-    Used specifically for ALFRED because direct requests can time out
-    from GitHub Actions runners.
+    No source substitution is performed.
     """
 
     last = None
 
     for i in range(tries):
+
         try:
-            cp = subprocess.run(
-                [
-                    "curl",
-                    "--fail",
-                    "--silent",
-                    "--show-error",
-                    "--location",
-                    "--ipv4",
-                    "--http1.1",
-                    "--connect-timeout",
-                    "20",
-                    "--max-time",
-                    str(timeout),
-                    "--retry",
-                    "1",
-                    "--retry-delay",
-                    "2",
-                    "--retry-all-errors",
-                    "-A",
-                    "US500-Macro-Intelligence/2.0",
-                    url,
-                ],
-                check=True,
-                capture_output=True,
-                timeout=timeout + 10,
-            )
 
-            return cp.stdout
-
-        except Exception as exc:
-            last = exc
-
-            if i < tries - 1:
-                time.sleep(2 ** i)
-
-    raise RuntimeError(
-        f"curl GET failed: {url}: {last}"
-    )
-
-
-def get(s, url, tries=4, timeout=45):
-    """
-    HTTP GET helper.
-
-    ALFRED:
-        Try curl first because GitHub Actions runners have shown
-        intermittent requests timeouts against ALFRED.
-
-    Other sources:
-        Continue using requests.
-
-    No source substitution is performed here.
-    """
-
-    last = None
-
-    # Dedicated ALFRED transport path.
-    if "alfred.stlouisfed.org/graph/alfredgraph.csv" in url:
-        try:
-            content = _curl_get(
-                url,
-                timeout=max(90, timeout),
-                tries=3,
-            )
-
-            r = requests.Response()
-            r.status_code = 200
-            r.url = url
-            r._content = content
-
-            return r
-
-        except Exception as exc:
-            last = exc
-
-            print(
-                "ALFRED curl transport failed; "
-                f"trying requests: {exc}"
-            )
-
-    # Standard requests fallback.
-    for i in range(tries):
-        try:
             r = s.get(
                 url,
                 timeout=(20, timeout),
@@ -204,18 +142,25 @@ def get(s, url, tries=4, timeout=45):
 
             return r
 
-        except Exception as e:
-            last = e
+        except Exception as exc:
+
+            last = exc
 
             if i < tries - 1:
                 time.sleep(2 ** i)
 
     raise RuntimeError(
-        f"GET failed: {url}: {last}"
+        f"GET failed for source endpoint after "
+        f"{tries} attempts: {last}"
     )
 
 
+# ============================================================
+# Record ID
+# ============================================================
+
 def rid(row):
+
     key = "|".join(
         str(row[c])
         for c in COLS
@@ -226,20 +171,20 @@ def rid(row):
     ).hexdigest()
 
 
-def next_business_day(ts):
-    x = (
-        pd.Timestamp(ts)
-        + pd.Timedelta(days=1)
-    )
-
-    while x.weekday() >= 5:
-        x += pd.Timedelta(days=1)
-
-    return x
-
+# ============================================================
+# VIX
+# ============================================================
 
 def load_vix(s):
-    r = get(s, VIX_URL)
+
+    print("VIX: downloading Cboe historical data")
+
+    r = get(
+        s,
+        VIX_URL,
+        tries=REQUEST_TRIES,
+        timeout=REQUEST_TIMEOUT,
+    )
 
     df = pd.read_csv(
         io.BytesIO(r.content)
@@ -256,7 +201,10 @@ def load_vix(s):
     )
 
     df = df.dropna(
-        subset=["DATE", "CLOSE"]
+        subset=[
+            "DATE",
+            "CLOSE",
+        ]
     )
 
     df = df[
@@ -273,48 +221,73 @@ def load_vix(s):
         rows.append(
             {
                 "indicator": "VIX",
+
                 "observation_date":
                     d.date().isoformat(),
+
                 "availability_date":
                     d.date().isoformat(),
+
                 "actual":
                     float(x["CLOSE"]),
-                "unit": "INDEX_LEVEL",
-                "frequency": "DAILY",
-                "source": "Cboe",
-                "source_url": VIX_URL,
+
+                "unit":
+                    "INDEX_LEVEL",
+
+                "frequency":
+                    "DAILY",
+
+                "source":
+                    "Cboe",
+
+                "source_url":
+                    VIX_URL,
+
                 "vintage":
                     d.date().isoformat(),
-                "revision_flag": False,
-                "point_in_time_safe": True,
+
+                "revision_flag":
+                    False,
+
+                "point_in_time_safe":
+                    True,
+
                 "availability_semantics":
                     "EOD_CLOSE",
             }
         )
 
+    print(
+        f"VIX: {len(rows)} records"
+    )
+
     return rows
 
 
-def load_treasury(s, package=None):
+# ============================================================
+# Treasury 2Y / 10Y
+# ============================================================
+
+def load_treasury(
+    s,
+    package=None,
+):
     """
-    Load 2Y/10Y Treasury CMTs from the official Fed H.15 DDP package.
-
-    The package is downloaded once because FRED transport can time out in CI.
-
-    H.15 is the authoritative source used here.
-
-    The release is posted Monday-Friday at 4:15pm ET,
-    so an EOD observation is information-available on
-    its observation date after the daily release.
+    Load 2Y/10Y Treasury Constant Maturity
+    from official Federal Reserve H.15.
     """
+
+    print(
+        "Treasury: downloading Federal Reserve H.15"
+    )
 
     if package is None:
 
         r = get(
             s,
             H15_CMT_URL,
-            tries=5,
-            timeout=90,
+            tries=REQUEST_TRIES,
+            timeout=REQUEST_TIMEOUT,
         )
 
         package = pd.read_csv(
@@ -322,10 +295,8 @@ def load_treasury(s, package=None):
             header=5,
         )
 
-    # H.15 DDP Treasury Constant Maturities package:
-    # date + 11 maturity columns.
-
     if package.shape[1] < 12:
+
         raise RuntimeError(
             "Unexpected H.15 Treasury package shape: "
             f"{package.shape}"
@@ -340,7 +311,7 @@ def load_treasury(s, package=None):
         errors="coerce",
     )
 
-    # Package order:
+    # H.15 package:
     #
     # date,
     # 1m,
@@ -389,314 +360,279 @@ def load_treasury(s, package=None):
 
             rows.append(
                 {
-                    "indicator": indicator,
+                    "indicator":
+                        indicator,
+
                     "observation_date":
                         d.date().isoformat(),
+
                     "availability_date":
                         d.date().isoformat(),
+
                     "actual":
                         float(x[value_col]),
-                    "unit": "PERCENT",
-                    "frequency": "DAILY",
+
+                    "unit":
+                        "PERCENT",
+
+                    "frequency":
+                        "DAILY",
+
                     "source":
                         "Federal Reserve H.15",
+
                     "source_url":
                         H15_CMT_URL,
+
                     "vintage":
                         d.date().isoformat(),
-                    "revision_flag": False,
-                    "point_in_time_safe": True,
+
+                    "revision_flag":
+                        False,
+
+                    "point_in_time_safe":
+                        True,
+
                     "availability_semantics":
                         "OFFICIAL_RELEASE",
                 }
             )
 
+    print(
+        f"Treasury: {len(rows)} records"
+    )
+
     return rows
 
 
-def _chunk_ranges(
-    start,
-    end,
-    months=6,
-):
-    """
-    Return non-overlapping calendar chunks
-    for ALFRED bulk retrieval.
-    """
+# ============================================================
+# FRED API
+# ============================================================
 
-    out = []
+def get_fred_api_key():
 
-    cur = (
-        pd.Timestamp(start)
-        .normalize()
+    api_key = os.environ.get(
+        "FRED_API_KEY"
     )
 
-    finish = (
-        pd.Timestamp(end)
-        .normalize()
-    )
-
-    while cur <= finish:
-
-        nxt = (
-            cur
-            + pd.DateOffset(months=months)
-            - pd.Timedelta(days=1)
-        )
-
-        if nxt > finish:
-            nxt = finish
-
-        out.append(
-            (cur, nxt)
-        )
-
-        cur = (
-            nxt
-            + pd.Timedelta(days=1)
-        )
-
-    return out
-
-
-def _parse_alfred_initial_csv(
-    content,
-    series,
-):
-    df = pd.read_csv(
-        io.BytesIO(content)
-    )
-
-    lower = {
-        str(c).lower(): c
-        for c in df.columns
-    }
-
-    date_col = (
-        lower.get("observation_date")
-        or lower.get("date")
-    )
-
-    value_col = (
-        lower.get("value")
-        or lower.get(series.lower())
-    )
-
-    rt_col = (
-        lower.get("realtime_start")
-        or lower.get("realtime start")
-    )
-
-    if not date_col or not value_col or not rt_col:
+    if not api_key:
 
         raise RuntimeError(
-            f"Unexpected ALFRED {series} columns: "
-            f"{list(df.columns)}"
+            "FRED_API_KEY GitHub Actions secret "
+            "is missing."
         )
 
-    df[date_col] = pd.to_datetime(
-        df[date_col],
-        errors="coerce",
-    )
+    return api_key
 
-    df[rt_col] = pd.to_datetime(
-        df[rt_col],
-        errors="coerce",
-    )
 
-    df[value_col] = pd.to_numeric(
-        df[value_col],
-        errors="coerce",
-    )
+def get_fred_observations(
+    s,
+    series,
+):
+    """
+    Retrieve FRED observations using:
 
-    return (
-        df.dropna(
-            subset=[
-                date_col,
-                rt_col,
-                value_col,
+        output_type=4
+
+    which means:
+
+        Observations, Initial Release Only.
+
+    The API returns realtime_start for each
+    observation. This becomes availability_date.
+    """
+
+    api_key = get_fred_api_key()
+
+    params = {
+        "series_id":
+            series,
+
+        "api_key":
+            api_key,
+
+        "file_type":
+            "json",
+
+        "observation_start":
+            START.date().isoformat(),
+
+        "observation_end":
+            END.date().isoformat(),
+
+        "output_type":
+            4,
+
+        "sort_order":
+            "asc",
+
+        "limit":
+            100000,
+    }
+
+    last = None
+
+    for attempt in range(
+        1,
+        FRED_API_TRIES + 1,
+    ):
+
+        try:
+
+            print(
+                f"{series}: FRED API request "
+                f"attempt {attempt}/{FRED_API_TRIES}"
+            )
+
+            r = s.get(
+                FRED_API_URL,
+                params=params,
+                timeout=(
+                    20,
+                    FRED_API_TIMEOUT,
+                ),
+            )
+
+            r.raise_for_status()
+
+            payload = r.json()
+
+            if "observations" not in payload:
+
+                raise RuntimeError(
+                    f"FRED API response for {series} "
+                    "does not contain observations."
+                )
+
+            observations = payload[
+                "observations"
             ]
-        ),
-        date_col,
-        value_col,
-        rt_col,
+
+            print(
+                f"{series}: FRED returned "
+                f"{len(observations)} observations"
+            )
+
+            return observations
+
+        except Exception as exc:
+
+            last = exc
+
+            print(
+                f"{series}: FRED API attempt "
+                f"{attempt} failed: {exc}"
+            )
+
+            if attempt < FRED_API_TRIES:
+                time.sleep(
+                    2 ** (attempt - 1)
+                )
+
+    raise RuntimeError(
+        f"{series}: FRED API retrieval failed "
+        f"after {FRED_API_TRIES} attempts: "
+        f"{last}"
     )
 
+
+# ============================================================
+# Parse FRED Initial Release
+# ============================================================
 
 def load_nfci_initial_release(
     s,
     series,
 ):
     """
-    Load ALFRED output_type=4 in small calendar chunks.
+    Load NFCI/ANFCI using FRED API output_type=4.
 
-    FIXED 6 improves transport reliability only.
+    IMPORTANT:
 
-    Methodology remains:
+    output_type=4 means Initial Release Only.
 
-    - ALFRED initial-release-only.
-    - output_type=4.
-    - realtime_start retained.
-    - No fallback to revised Chicago Fed/FRED history.
-    - PIT safety preserved.
+    Therefore we do NOT use the current revised
+    historical series as a substitute.
+
+    realtime_start is treated as the date the
+    observation became available.
     """
 
-    frames = []
-
-    failures = []
-
-    ranges = _chunk_ranges(
-        START,
-        END,
-        ALFRED_CHUNK_MONTHS,
-    )
-
-    print(
-        f"{series}: "
-        "ALFRED initial-release-only, "
-        f"{len(ranges)} chunks"
-    )
-
-    for i, (a, b) in enumerate(
-        ranges,
-        1,
-    ):
-
-        url = ALFRED_INITIAL_RELEASE.format(
-            series=series,
-            start=a.date().isoformat(),
-            end=b.date().isoformat(),
-        )
-
-        try:
-
-            r = get(
-                s,
-                url,
-                tries=3,
-                timeout=ALFRED_TRANSPORT_TIMEOUT,
-            )
-
-            (
-                df,
-                date_col,
-                value_col,
-                rt_col,
-            ) = _parse_alfred_initial_csv(
-                r.content,
-                series,
-            )
-
-            frames.append(df)
-
-            print(
-                f"{series}: "
-                f"chunk {i}/{len(ranges)} OK "
-                f"({a.date()} to {b.date()})"
-            )
-
-        except Exception as exc:
-
-            failures.append(
-                (
-                    i,
-                    str(a.date()),
-                    str(b.date()),
-                    exc,
-                )
-            )
-
-            print(
-                f"{series}: "
-                f"chunk {i}/{len(ranges)} FAIL — "
-                f"{exc}"
-            )
-
-    if failures:
-
-        raise RuntimeError(
-            f"{series}: "
-            f"{len(failures)}/{len(ranges)} "
-            "ALFRED chunks failed; "
-            "refusing to substitute revised data. "
-            "First failure: "
-            + str(failures[0])
-        )
-
-    df = pd.concat(
-        frames,
-        ignore_index=True,
-    )
-
-    lower = {
-        str(c).lower(): c
-        for c in df.columns
-    }
-
-    date_col = (
-        lower.get("observation_date")
-        or lower.get("date")
-    )
-
-    value_col = (
-        lower.get("value")
-        or lower.get(series.lower())
-    )
-
-    rt_col = (
-        lower.get("realtime_start")
-        or lower.get("realtime start")
-    )
-
-    df = df[
-        (df[date_col] >= START)
-        & (df[date_col] <= END)
-    ]
-
-    df = df[
-        df[rt_col] <= END
-    ]
-
-    # Defensive uniqueness.
-    #
-    # output_type=4 should already provide the
-    # first released observation, but overlapping
-    # or duplicate source rows are rejected unless
-    # they represent the same observation key.
-
-    df = df.sort_values(
-        [date_col, rt_col]
+    observations = get_fred_observations(
+        s,
+        series,
     )
 
     rows = []
 
     seen = set()
 
-    for _, x in df.iterrows():
+    for obs in observations:
 
-        od = pd.Timestamp(
-            x[date_col]
+        observation_date = obs.get(
+            "date"
         )
 
-        avail = pd.Timestamp(
-            x[rt_col]
+        value = obs.get(
+            "value"
         )
 
-        if avail < od:
+        availability_date = obs.get(
+            "realtime_start"
+        )
+
+        if not observation_date:
             continue
 
-        key = od.date().isoformat()
+        if not value:
+            continue
 
-        value = float(
-            x[value_col]
+        if value in (
+            ".",
+            "",
+            "nan",
+            "NaN",
+        ):
+            continue
+
+        if not availability_date:
+            raise RuntimeError(
+                f"{series}: missing realtime_start "
+                f"for observation {observation_date}"
+            )
+
+        od = pd.Timestamp(
+            observation_date
         )
 
-        tup = (
-            key,
-            avail.date().isoformat(),
-            value,
+        ad = pd.Timestamp(
+            availability_date
         )
 
+        if pd.isna(od) or pd.isna(ad):
+            continue
+
+        if od < START or od > END:
+            continue
+
+        # Conservative PIT check.
+        if ad < od:
+
+            raise RuntimeError(
+                f"{series}: PIT violation: "
+                f"availability_date {ad.date()} "
+                f"is earlier than observation_date "
+                f"{od.date()}"
+            )
+
+        key = (
+            series,
+            od.date().isoformat(),
+        )
+
+        # output_type=4 should already contain
+        # the initial release. This is an additional
+        # defensive uniqueness check.
         if key in seen:
             continue
 
@@ -704,22 +640,49 @@ def load_nfci_initial_release(
 
         rows.append(
             {
-                "indicator": series,
-                "observation_date": key,
+                "indicator":
+                    series,
+
+                "observation_date":
+                    od.date().isoformat(),
+
                 "availability_date":
-                    avail.date().isoformat(),
-                "actual": value,
-                "unit": "INDEX_LEVEL",
-                "frequency": "WEEKLY",
-                "source": "Chicago Fed",
-                "source_url": CHICAGO_URL,
+                    ad.date().isoformat(),
+
+                "actual":
+                    float(value),
+
+                "unit":
+                    "INDEX_LEVEL",
+
+                "frequency":
+                    "WEEKLY",
+
+                "source":
+                    "Chicago Fed",
+
+                "source_url":
+                    CHICAGO_URL,
+
                 "vintage":
-                    avail.date().isoformat(),
-                "revision_flag": False,
-                "point_in_time_safe": True,
+                    ad.date().isoformat(),
+
+                "revision_flag":
+                    False,
+
+                "point_in_time_safe":
+                    True,
+
                 "availability_semantics":
-                    "ARCHIVED_VINTAGE",
+                    "FRED_INITIAL_RELEASE",
             }
+        )
+
+    if not rows:
+
+        raise RuntimeError(
+            f"{series}: FRED returned zero "
+            "usable initial-release observations."
         )
 
     print(
@@ -730,75 +693,51 @@ def load_nfci_initial_release(
     return rows
 
 
+# ============================================================
+# NFCI + ANFCI
+# ============================================================
+
 def load_nfci_pair(s):
-    """
-    Load NFCI and ANFCI using two PIT-safe
-    initial-release requests.
-
-    Do not fall back to the current Chicago Fed CSV.
-
-    Chicago Fed history is revised as incoming data
-    and weights change. Using current revised history
-    as if it were known then would violate the project's
-    PIT requirement.
-    """
 
     rows = []
 
-    failures = []
+    print(
+        "NFCI/ANFCI: using FRED API "
+        "output_type=4 — Initial Release Only"
+    )
 
-    with ThreadPoolExecutor(
-        max_workers=2
-    ) as ex:
+    # Sequential requests intentionally.
+    #
+    # There are only two series and this avoids
+    # unnecessary simultaneous API connections
+    # from GitHub Actions.
 
-        futs = {
-            ex.submit(
-                load_nfci_initial_release,
-                session(),
-                series,
-            ): series
-            for series in (
-                "NFCI",
-                "ANFCI",
+    for series in (
+        "NFCI",
+        "ANFCI",
+    ):
+
+        try:
+
+            series_rows = (
+                load_nfci_initial_release(
+                    s,
+                    series,
+                )
             )
-        }
 
-        for fut in as_completed(futs):
-
-            series = futs[fut]
-
-            try:
-
-                rows.extend(
-                    fut.result()
-                )
-
-            except Exception as exc:
-
-                failures.append(
-                    (
-                        series,
-                        exc,
-                    )
-                )
-
-                print(
-                    f"{series}: FAIL — "
-                    f"{exc}"
-                )
-
-    if failures:
-
-        raise RuntimeError(
-            "NFCI/ANFCI initial-release "
-            "retrieval failed: "
-            + "; ".join(
-                f"{s}: {e}"
-                for s, e in failures
+            rows.extend(
+                series_rows
             )
-        )
 
-    # Enforce logical PIT key defensively.
+        except Exception as exc:
+
+            raise RuntimeError(
+                f"{series}: initial-release "
+                f"retrieval failed: {exc}"
+            ) from exc
+
+    # Defensive PIT key enforcement.
 
     out = {}
 
@@ -809,36 +748,77 @@ def load_nfci_pair(s):
             row["observation_date"],
         )
 
-        if (
-            key not in out
-            or row["availability_date"]
-            < out[key]["availability_date"]
-        ):
+        if key not in out:
 
             out[key] = row
+
+        else:
+
+            existing = out[key]
+
+            if (
+                row["availability_date"]
+                < existing["availability_date"]
+            ):
+
+                out[key] = row
 
     result = list(
         out.values()
     )
 
     print(
-        f"NFCI/ANFCI collected: "
+        "NFCI/ANFCI collected: "
         f"{len(result)} records"
     )
 
     return result
 
 
+# ============================================================
+# Main
+# ============================================================
+
 def main():
+
+    print(
+        "=================================================="
+    )
+
+    print(
+        "US500 Macro Intelligence"
+    )
+
+    print(
+        "Financial Stress Historical Collector v1"
+    )
+
+    print(
+        "FIXED 7 — FRED API / Initial Release Only"
+    )
+
+    print(
+        "Research-only — No Decision Engine"
+    )
+
+    print(
+        "=================================================="
+    )
 
     s = session()
 
     rows = []
 
+    # --------------------------------------------------------
     # VIX
+    # --------------------------------------------------------
+
     rows += load_vix(s)
 
+    # --------------------------------------------------------
     # Treasury 2Y / 10Y
+    # --------------------------------------------------------
+
     treasury_package = None
 
     rows += load_treasury(
@@ -846,13 +826,19 @@ def main():
         treasury_package,
     )
 
+    # --------------------------------------------------------
     # NFCI / ANFCI
+    # --------------------------------------------------------
+
     rows += load_nfci_pair(s)
 
-    # Build curve only where both
-    # Treasury observations share the same date.
+    # --------------------------------------------------------
+    # Build 10Y - 2Y curve
+    # --------------------------------------------------------
 
-    tmp = pd.DataFrame(rows)
+    tmp = pd.DataFrame(
+        rows
+    )
 
     for c in [
         "observation_date",
@@ -883,19 +869,32 @@ def main():
         )
     )
 
-    common = t2.index.intersection(
-        t10.index
+    common = (
+        t2.index.intersection(
+            t10.index
+        )
+    )
+
+    print(
+        f"Curve: {len(common)} "
+        "common Treasury dates"
     )
 
     for d in common:
 
         a = (
             float(
-                t10.loc[d, "actual"]
+                t10.loc[
+                    d,
+                    "actual",
+                ]
             )
             -
             float(
-                t2.loc[d, "actual"]
+                t2.loc[
+                    d,
+                    "actual",
+                ]
             )
         )
 
@@ -923,12 +922,14 @@ def main():
                         avail
                     ).date().isoformat(),
 
-                "actual": a,
+                "actual":
+                    a,
 
                 "unit":
                     "PERCENTAGE_POINTS",
 
-                "frequency": "DAILY",
+                "frequency":
+                    "DAILY",
 
                 "source":
                     "Federal Reserve H.15",
@@ -941,7 +942,8 @@ def main():
                         avail
                     ).date().isoformat(),
 
-                "revision_flag": False,
+                "revision_flag":
+                    False,
 
                 "point_in_time_safe":
                     True,
@@ -950,6 +952,10 @@ def main():
                     "OFFICIAL_RELEASE",
             }
         )
+
+    # --------------------------------------------------------
+    # DataFrame
+    # --------------------------------------------------------
 
     out = pd.DataFrame(
         rows,
@@ -974,9 +980,9 @@ def main():
         drop=True
     )
 
-    # --------------------------------------------------
+    # --------------------------------------------------------
     # Conservative Point-in-Time Quality Gate
-    # --------------------------------------------------
+    # --------------------------------------------------------
 
     od = pd.to_datetime(
         out["observation_date"]
@@ -988,9 +994,14 @@ def main():
 
     if (ad < od).any():
 
+        bad = out.loc[
+            ad < od
+        ].head(10)
+
         raise AssertionError(
             "availability_date earlier "
-            "than observation_date"
+            "than observation_date.\n"
+            f"{bad.to_string()}"
         )
 
     if not out[
@@ -1001,27 +1012,35 @@ def main():
             "Non-PIT-safe record found"
         )
 
-    # --------------------------------------------------
+    # --------------------------------------------------------
     # Record IDs
-    # --------------------------------------------------
+    # --------------------------------------------------------
 
     out["record_id"] = out.apply(
         rid,
         axis=1,
     )
 
-    # --------------------------------------------------
+    # --------------------------------------------------------
     # Output
-    # --------------------------------------------------
+    # --------------------------------------------------------
 
     out.to_csv(
         OUT,
         index=False,
     )
 
+    # --------------------------------------------------------
+    # Final report
+    # --------------------------------------------------------
+
+    print(
+        "=================================================="
+    )
+
     print(
         "Financial Stress Historical "
-        "Collector v1 — FIXED 6"
+        "Collector v1 — FIXED 7"
     )
 
     print(
@@ -1040,13 +1059,27 @@ def main():
     )
 
     print(
+        "Records by indicator:"
+    )
+
+    print(
         out.groupby(
             "indicator"
-        ).size().to_string()
+        )
+        .size()
+        .to_string()
     )
 
     print(
         "PIT QUALITY GATE: PASS"
+    )
+
+    print(
+        f"Output: {OUT}"
+    )
+
+    print(
+        "=================================================="
     )
 
 
