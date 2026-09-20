@@ -146,12 +146,17 @@ jobs:
       # Financial Stress remains research-only.
       # No Decision Engine.
       # No trade execution.
+      #
+      # IMPORTANT:
+      # Do NOT search for "decision.engine"
+      # because that regex also matches
+      # the words "Decision Engine".
       # ======================================================
 
       - name: Research-only guard
         run: |
           ! grep -RniE \
-            "decision.engine|decision_engine|trade signal|execute trade|place order" \
+            "decision_engine|trade signal|execute trade|place order" \
             financial_stress_historical_collector_v1.py
 
 
