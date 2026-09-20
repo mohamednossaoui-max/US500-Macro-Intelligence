@@ -14,34 +14,44 @@ permissions:
   contents: read
 
 jobs:
+
   validate:
+
     name: Historical Validation
+
     runs-on: ubuntu-latest
 
     steps:
 
-      # ------------------------------------------------------------
+      # ============================================================
       # 1. Checkout repository
-      # ------------------------------------------------------------
+      # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------------
-      # 2. Set up Python FIRST
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 2. Set up Python
+      # ============================================================
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ------------------------------------------------------------
-      # 3. Install dependencies BEFORE any Python validation
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 3. Install dependencies
+      # ============================================================
+
       - name: Install dependencies
         run: |
+
           set -e
 
           python -m pip install --upgrade pip
+
           pip install pandas numpy
 
           python - <<'PY'
@@ -53,14 +63,19 @@ jobs:
           print("Dependency validation: PASS")
           PY
 
-      # ------------------------------------------------------------
-      # 4. Identify Research workflow run
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 4. Identify research workflow run
+      # ============================================================
+
       - name: Identify research workflow run
         id: research_run
+
         env:
           GH_TOKEN: ${{ github.token }}
+
         run: |
+
           set -e
 
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
@@ -73,8 +88,11 @@ jobs:
             echo "Research conclusion: ${CONCLUSION}"
 
             if [ "${CONCLUSION}" != "success" ]; then
+
               echo "Research workflow did not succeed."
+
               exit 1
+
             fi
 
           else
@@ -91,8 +109,11 @@ jobs:
             )"
 
             if [ -z "${RUN_ID}" ] || [ "${RUN_ID}" = "null" ]; then
+
               echo "ERROR: No successful research workflow run found."
+
               exit 1
+
             fi
 
             echo "Latest successful research run ID: ${RUN_ID}"
@@ -101,18 +122,24 @@ jobs:
 
           echo "run_id=${RUN_ID}" >> "${GITHUB_OUTPUT}"
 
-      # ------------------------------------------------------------
-      # 5. Download Research artifact
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 5. Download research artifact
+      # ============================================================
+
       - name: Download research artifact
+
         env:
           GH_TOKEN: ${{ github.token }}
+
         run: |
+
           set -e
 
           RUN_ID="${{ steps.research_run.outputs.run_id }}"
 
           rm -rf research_artifact
+
           mkdir -p research_artifact
 
           echo "Downloading research artifact..."
@@ -122,15 +149,23 @@ jobs:
             --name financial-stress-research-v1 \
             --dir research_artifact
 
-      # ------------------------------------------------------------
-      # 6. Locate Research CSV
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 6. Locate research CSV
+      # ============================================================
+
       - name: Locate research CSV
+
         run: |
+
           set -e
 
           echo "Research artifact contents:"
-          find research_artifact -maxdepth 5 -type f -print
+
+          find research_artifact \
+            -maxdepth 5 \
+            -type f \
+            -print
 
           RESEARCH_FILE="$(
             find research_artifact \
@@ -141,36 +176,49 @@ jobs:
           )"
 
           if [ -z "${RESEARCH_FILE}" ]; then
+
             echo "ERROR: financial_stress_research_v1.csv not found."
+
             exit 1
+
           fi
 
           echo "Selected research file:"
           echo "${RESEARCH_FILE}"
 
-          cp "${RESEARCH_FILE}" financial_stress_research_v1.csv
+          cp \
+            "${RESEARCH_FILE}" \
+            financial_stress_research_v1.csv
 
           echo "Copied to repository root."
 
           ls -lh financial_stress_research_v1.csv
 
-      # ------------------------------------------------------------
-      # 7. Validate research input
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 7. Validate ACTUAL Research v1 schema
+      # ============================================================
+
       - name: Validate research input
+
         run: |
+
           set -e
 
           test -s financial_stress_research_v1.csv
 
           echo "CSV header:"
+
           head -n 1 financial_stress_research_v1.csv
 
           echo
+
           echo "CSV row count:"
+
           wc -l financial_stress_research_v1.csv
 
           python - <<'PY'
+
           import pandas as pd
 
           path = "financial_stress_research_v1.csv"
@@ -178,47 +226,64 @@ jobs:
           df = pd.read_csv(path)
 
           print("Rows:", len(df))
+
           print("Columns:", list(df.columns))
 
           if df.empty:
+
               raise SystemExit(
                   "ERROR: Research CSV contains zero rows."
               )
 
+          # IMPORTANT:
+          # These are the ACTUAL columns produced by
+          # financial_stress_analyzer_v1.py
+
           required = [
-              "date",
+              "asof_date",
               "VIX",
+              "TREASURY_2Y",
+              "TREASURY_10Y",
+              "YIELD_10Y_2Y_SPREAD",
               "NFCI",
               "ANFCI",
-              "YIELD_CURVE",
               "VIX_Z",
               "NFCI_Z",
               "ANFCI_Z",
               "YIELD_CURVE_STRESS_Z",
-              "FINANCIAL_STRESS_COMPOSITE",
-              "RESEARCH_REGIME",
+              "stress_component_count",
+              "composite_stress_score",
+              "research_regime",
               "point_in_time_safe",
+              "record_id",
           ]
 
           missing = [
-              c for c in required
-              if c not in df.columns
+              column
+              for column in required
+              if column not in df.columns
           ]
 
           if missing:
+
               raise SystemExit(
                   "ERROR: Missing required columns: "
                   + ", ".join(missing)
               )
 
           print("Schema validation: PASS")
+
           PY
 
-      # ------------------------------------------------------------
-      # 8. Validate validator syntax
-      # ------------------------------------------------------------
+
+      # ============================================================
+      # 8. Validate Python syntax
+      # ============================================================
+
       - name: Validate validator syntax
+
         run: |
+
           set -e
 
           python -m py_compile \
@@ -226,88 +291,137 @@ jobs:
 
           echo "Python syntax validation: PASS"
 
-      # ------------------------------------------------------------
+
+      # ============================================================
       # 9. Run Historical Validation
-      # ------------------------------------------------------------
+      # ============================================================
+
       - name: Run Financial Stress Historical Validation
+
         run: |
+
           set -e
 
-          python financial_stress_historical_validation_v1.py
+          python \
+            financial_stress_historical_validation_v1.py
 
-      # ------------------------------------------------------------
+
+      # ============================================================
       # 10. Verify validation outputs
-      # ------------------------------------------------------------
+      # ============================================================
+
       - name: Verify validation outputs
+
         run: |
+
           set -e
 
           required_files=(
+
             "financial_stress_validation_v1.csv"
+
             "financial_stress_validation_summary_v1.csv"
+
             "financial_stress_validation_events_v1.csv"
+
           )
 
           for file in "${required_files[@]}"; do
 
             if [ ! -s "${file}" ]; then
+
               echo "ERROR: Missing or empty output: ${file}"
+
               exit 1
+
             fi
 
             echo "PASS: ${file}"
+
             ls -lh "${file}"
 
           done
 
-      # ------------------------------------------------------------
+
+      # ============================================================
       # 11. Research-only guard
-      # ------------------------------------------------------------
+      # ============================================================
+
       - name: Research-only guard
+
         run: |
+
           set -e
 
           if grep -RniE \
             "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal" \
             financial_stress_historical_validation_v1.py
           then
+
             echo "ERROR: Potential Decision Engine or trade execution integration detected."
+
             exit 1
+
           fi
 
           echo "Research-only guard: PASS"
 
-      # ------------------------------------------------------------
+
+      # ============================================================
       # 12. Print validation summary
-      # ------------------------------------------------------------
+      # ============================================================
+
       - name: Print validation summary
+
         run: |
-          echo
-          echo "=============================================="
-          echo "FINANCIAL STRESS VALIDATION SUMMARY"
-          echo "=============================================="
-          echo
-
-          cat financial_stress_validation_summary_v1.csv
 
           echo
-          echo "=============================================="
-          echo "VALIDATION EVENTS"
-          echo "=============================================="
+
+          echo "============================================================"
+
+          echo "FINANCIAL STRESS HISTORICAL VALIDATION V1"
+
+          echo "============================================================"
+
           echo
 
-          head -n 30 \
-            financial_stress_validation_events_v1.csv
+          echo "SUMMARY:"
 
-      # ------------------------------------------------------------
-      # 13. Upload validation artifacts
-      # ------------------------------------------------------------
-      - name: Upload validation artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: financial-stress-validation-v1
-          path: |
-            financial_stress_validation_v1.csv
+          cat \
             financial_stress_validation_summary_v1.csv
+
+          echo
+
+          echo "============================================================"
+
+          echo "VALIDATION EVENTS"
+
+          echo "============================================================"
+
+          echo
+
+          head -n 50 \
             financial_stress_validation_events_v1.csv
+
+
+      # ============================================================
+      # 13. Upload validation artifacts
+      # ============================================================
+
+      - name: Upload validation artifacts
+
+        uses: actions/upload-artifact@v4
+
+        with:
+
+          name: financial-stress-validation-v1
+
+          path: |
+
+            financial_stress_validation_v1.csv
+
+            financial_stress_validation_summary_v1.csv
+
+            financial_stress_validation_events_v1.csv
+
           retention-days: 90
