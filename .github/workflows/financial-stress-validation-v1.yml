@@ -27,7 +27,34 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------
-      # 2. Identify Research workflow run
+      # 2. Set up Python FIRST
+      # ------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ------------------------------------------------------------
+      # 3. Install dependencies BEFORE any Python validation
+      # ------------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+          python - <<'PY'
+          import pandas
+          import numpy
+
+          print("pandas:", pandas.__version__)
+          print("numpy:", numpy.__version__)
+          print("Dependency validation: PASS")
+          PY
+
+      # ------------------------------------------------------------
+      # 4. Identify Research workflow run
       # ------------------------------------------------------------
       - name: Identify research workflow run
         id: research_run
@@ -37,6 +64,7 @@ jobs:
           set -e
 
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
+
             RUN_ID="${{ github.event.workflow_run.id }}"
             CONCLUSION="${{ github.event.workflow_run.conclusion }}"
 
@@ -46,11 +74,11 @@ jobs:
 
             if [ "${CONCLUSION}" != "success" ]; then
               echo "Research workflow did not succeed."
-              echo "Skipping validation."
               exit 1
             fi
 
           else
+
             echo "Manual workflow_dispatch detected."
 
             RUN_ID="$(
@@ -68,12 +96,13 @@ jobs:
             fi
 
             echo "Latest successful research run ID: ${RUN_ID}"
+
           fi
 
           echo "run_id=${RUN_ID}" >> "${GITHUB_OUTPUT}"
 
       # ------------------------------------------------------------
-      # 3. Download Research artifact
+      # 5. Download Research artifact
       # ------------------------------------------------------------
       - name: Download research artifact
         env:
@@ -94,7 +123,7 @@ jobs:
             --dir research_artifact
 
       # ------------------------------------------------------------
-      # 4. Locate Research CSV
+      # 6. Locate Research CSV
       # ------------------------------------------------------------
       - name: Locate research CSV
         run: |
@@ -126,7 +155,7 @@ jobs:
           ls -lh financial_stress_research_v1.csv
 
       # ------------------------------------------------------------
-      # 5. Basic input validation
+      # 7. Validate research input
       # ------------------------------------------------------------
       - name: Validate research input
         run: |
@@ -186,26 +215,12 @@ jobs:
           PY
 
       # ------------------------------------------------------------
-      # 6. Python environment
-      # ------------------------------------------------------------
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # ------------------------------------------------------------
-      # 7. Install dependencies
-      # ------------------------------------------------------------
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas numpy
-
-      # ------------------------------------------------------------
-      # 8. Validate Python syntax
+      # 8. Validate validator syntax
       # ------------------------------------------------------------
       - name: Validate validator syntax
         run: |
+          set -e
+
           python -m py_compile \
             financial_stress_historical_validation_v1.py
 
@@ -216,6 +231,8 @@ jobs:
       # ------------------------------------------------------------
       - name: Run Financial Stress Historical Validation
         run: |
+          set -e
+
           python financial_stress_historical_validation_v1.py
 
       # ------------------------------------------------------------
@@ -232,6 +249,7 @@ jobs:
           )
 
           for file in "${required_files[@]}"; do
+
             if [ ! -s "${file}" ]; then
               echo "ERROR: Missing or empty output: ${file}"
               exit 1
@@ -239,6 +257,7 @@ jobs:
 
             echo "PASS: ${file}"
             ls -lh "${file}"
+
           done
 
       # ------------------------------------------------------------
