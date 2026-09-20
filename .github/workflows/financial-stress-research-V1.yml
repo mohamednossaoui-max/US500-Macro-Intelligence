@@ -1,0 +1,349 @@
+name: financial-stress-research-v1
+
+on:
+  workflow_run:
+    workflows:
+      - financial-stress-historical-v1
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  analyze:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. Checkout repository
+      # ============================================================
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. Setup Python
+      # ============================================================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. Install dependencies
+      # ============================================================
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pandas numpy
+
+
+      # ============================================================
+      # 4. Download EXACT artifact from the successful
+      #    Financial Stress Historical Collector run
+      # ============================================================
+      - name: Download historical collector artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: financial-stress-historical-v1
+          path: input
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+
+      # ============================================================
+      # 5. Inspect downloaded artifact
+      # ============================================================
+      - name: Inspect downloaded artifact
+        run: |
+          set -e
+
+          echo "============================================================"
+          echo "Downloaded artifact contents"
+          echo "============================================================"
+
+          find input -maxdepth 3 -type f -print
+
+          echo
+          echo "============================================================"
+          echo "Input directory"
+          echo "============================================================"
+
+          ls -lah input
+
+
+      # ============================================================
+      # 6. Verify historical CSV exists and is not empty
+      # ============================================================
+      - name: Verify historical input
+        run: |
+          set -e
+
+          FILE="input/financial_stress_records_input_v1.csv"
+
+          echo "Checking:"
+          echo "$FILE"
+
+          test -f "$FILE"
+          test -s "$FILE"
+
+          echo
+          echo "============================================================"
+          echo "CSV file information"
+          echo "============================================================"
+
+          ls -lah "$FILE"
+
+          echo
+          echo "============================================================"
+          echo "CSV line count"
+          echo "============================================================"
+
+          wc -l "$FILE"
+
+          echo
+          echo "============================================================"
+          echo "CSV first 10 lines"
+          echo "============================================================"
+
+          head -10 "$FILE"
+
+          echo
+          echo "============================================================"
+          echo "CSV last 5 lines"
+          echo "============================================================"
+
+          tail -5 "$FILE"
+
+
+      # ============================================================
+      # 7. Copy artifact to repository root
+      # ============================================================
+      - name: Prepare analyzer input
+        run: |
+          set -e
+
+          SOURCE="input/financial_stress_records_input_v1.csv"
+          TARGET="./financial_stress_records_input_v1.csv"
+
+          cp "$SOURCE" "$TARGET"
+
+          echo "============================================================"
+          echo "Analyzer input prepared"
+          echo "============================================================"
+
+          ls -lah "$TARGET"
+
+          echo
+          echo "Line count:"
+          wc -l "$TARGET"
+
+
+      # ============================================================
+      # 8. Final input validation
+      # ============================================================
+      - name: Validate analyzer input
+        run: |
+          set -e
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = "financial_stress_records_input_v1.csv"
+
+          df = pd.read_csv(path)
+
+          print("Input file:", path)
+          print("Rows:", len(df))
+          print("Columns:", len(df.columns))
+          print()
+          print("Columns:")
+          for c in df.columns:
+              print(" -", c)
+
+          if df.empty:
+              raise RuntimeError(
+                  "Historical collector CSV contains zero data rows."
+              )
+
+          required = {
+              "indicator",
+              "observation_date",
+              "availability_date",
+              "actual",
+              "unit",
+              "frequency",
+              "source",
+              "source_url",
+              "vintage",
+              "revision_flag",
+              "point_in_time_safe",
+              "availability_semantics",
+          }
+
+          missing = required - set(df.columns)
+
+          if missing:
+              raise RuntimeError(
+                  f"Historical collector CSV is missing columns: {sorted(missing)}"
+              )
+
+          if not df["point_in_time_safe"].all():
+              raise RuntimeError(
+                  "Historical collector CSV contains non-PIT-safe rows."
+              )
+
+          print()
+          print("Indicator counts:")
+          print(df["indicator"].value_counts().sort_index())
+
+          print()
+          print("Input validation: PASS")
+          PY
+
+
+      # ============================================================
+      # 9. Python syntax check
+      # ============================================================
+      - name: Syntax check
+        run: |
+          python -m py_compile financial_stress_analyzer_v1.py
+
+
+      # ============================================================
+      # 10. Run Financial Stress Research Analyzer
+      # ============================================================
+      - name: Run financial stress research analyzer
+        run: |
+          python financial_stress_analyzer_v1.py
+
+
+      # ============================================================
+      # 11. Verify research output
+      # ============================================================
+      - name: Verify research output
+        run: |
+          set -e
+
+          test -s financial_stress_research_v1.csv
+          test -s financial_stress_research_summary_v1.csv
+
+          python - <<'PY'
+          import pandas as pd
+
+          research = pd.read_csv(
+              "financial_stress_research_v1.csv"
+          )
+
+          summary = pd.read_csv(
+              "financial_stress_research_summary_v1.csv"
+          )
+
+          required = {
+              "asof_date",
+              "VIX",
+              "TREASURY_2Y",
+              "TREASURY_10Y",
+              "YIELD_10Y_2Y_SPREAD",
+              "NFCI",
+              "ANFCI",
+              "VIX_Z",
+              "NFCI_Z",
+              "ANFCI_Z",
+              "YIELD_CURVE_STRESS_Z",
+              "stress_component_count",
+              "composite_stress_score",
+              "research_regime",
+              "point_in_time_safe",
+              "record_id",
+          }
+
+          missing = required - set(research.columns)
+
+          if missing:
+              raise RuntimeError(
+                  f"Research output missing columns: {sorted(missing)}"
+              )
+
+          if len(research) == 0:
+              raise RuntimeError(
+                  "Research output contains zero rows."
+              )
+
+          if not research["point_in_time_safe"].all():
+              raise RuntimeError(
+                  "Research output contains non-PIT-safe rows."
+              )
+
+          if research["record_id"].isna().any():
+              raise RuntimeError(
+                  "Research output contains missing record_id."
+              )
+
+          print("============================================================")
+          print("Financial Stress Research Verification")
+          print("============================================================")
+
+          print("Research rows:", len(research))
+
+          print(
+              "Scored rows:",
+              int(
+                  research["composite_stress_score"]
+                  .notna()
+                  .sum()
+              )
+          )
+
+          print(
+              "Date range:",
+              research["asof_date"].min(),
+              "->",
+              research["asof_date"].max(),
+          )
+
+          print()
+          print("Research regimes:")
+
+          print(
+              research["research_regime"]
+              .value_counts(dropna=False)
+              .sort_index()
+          )
+
+          print()
+          print("Summary rows:", len(summary))
+
+          print()
+          print("Verification: PASS")
+          PY
+
+
+      # ============================================================
+      # 12. Research-only safety guard
+      # ============================================================
+      - name: Research-only guard
+        run: |
+          set -e
+
+          ! grep -RniE \
+            "decision_engine|trade signal|execute trade|place order|buy signal|sell signal" \
+            financial_stress_analyzer_v1.py
+
+
+      # ============================================================
+      # 13. Upload Financial Stress Research artifacts
+      # ============================================================
+      - name: Upload research artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-stress-research-v1
+          path: |
+            financial_stress_research_v1.csv
+            financial_stress_research_summary_v1.csv
+          if-no-files-found: error
