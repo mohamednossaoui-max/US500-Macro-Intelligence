@@ -1,55 +1,36 @@
 name: financial-stress-research-v1
 
 on:
-  workflow_dispatch:
-
   workflow_run:
     workflows:
       - financial-stress-historical-v1
     types:
       - completed
 
-
 permissions:
   actions: read
   contents: read
 
-
 jobs:
-
   analyze:
-
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
-
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
-
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pandas numpy
 
-
-      # ======================================================
-      # Download the exact artifact produced by the
-      # successful Financial Stress Historical workflow.
-      # ======================================================
-
       - name: Download historical collector artifact
-        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v5
         with:
           name: financial-stress-historical-v1
@@ -57,61 +38,40 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-
-      # ======================================================
-      # Manual execution support
-      # ======================================================
-
-      - name: Prepare manual input
-        if: github.event_name == 'workflow_dispatch'
+      - name: Verify downloaded input
         run: |
-          if [ ! -f financial_stress_records_input_v1.csv ]; then
-            echo "Manual run requires financial_stress_records_input_v1.csv in the repository."
-            exit 1
-          fi
+          echo "Downloaded files:"
+          find input -maxdepth 2 -type f -print
 
-          mkdir -p input
+          test -s input/financial_stress_records_input_v1.csv
 
-          cp financial_stress_records_input_v1.csv input/
+          echo "Input size:"
+          wc -l input/financial_stress_records_input_v1.csv
 
+          echo "Input preview:"
+          head -5 input/financial_stress_records_input_v1.csv
 
       - name: Prepare analyzer input
         run: |
-          test -s input/financial_stress_records_input_v1.csv
-
-          cp \
-            input/financial_stress_records_input_v1.csv \
-            .
-
+          cp input/financial_stress_records_input_v1.csv .
 
       - name: Syntax check
         run: |
-          python -m py_compile \
-            financial_stress_analyzer_v1.py
-
+          python -m py_compile financial_stress_analyzer_v1.py
 
       - name: Run financial stress research analyzer
         run: |
           python financial_stress_analyzer_v1.py
 
-
-      # ======================================================
-      # Verify research output
-      # ======================================================
-
       - name: Verify output
         run: |
-
           test -s financial_stress_research_v1.csv
-
           test -s financial_stress_research_summary_v1.csv
 
           python - <<'PY'
           import pandas as pd
 
-          p = pd.read_csv(
-              "financial_stress_research_v1.csv"
-          )
+          p = pd.read_csv("financial_stress_research_v1.csv")
 
           required = {
               "asof_date",
@@ -132,75 +92,38 @@ jobs:
               "record_id",
           }
 
-          missing = (
-              required
-              - set(p.columns)
-          )
+          missing = required - set(p.columns)
 
-          assert not missing, (
-              f"Missing columns: {missing}"
-          )
-
-          assert len(p) > 0, (
-              "Research output contains zero rows"
-          )
-
-          assert p[
-              "point_in_time_safe"
-          ].all(), (
+          assert not missing, f"Missing columns: {missing}"
+          assert len(p) > 0, "Research output contains zero rows"
+          assert p["point_in_time_safe"].all(), \
               "Non-PIT-safe research row found"
-          )
+          assert p["record_id"].notna().all()
 
-          assert p[
-              "record_id"
-          ].notna().all()
-
-          print(
-              "Rows:",
-              len(p)
-          )
-
+          print("Rows:", len(p))
           print(
               "Scored rows:",
-              int(
-                  p[
-                      "composite_stress_score"
-                  ].notna().sum()
-              )
+              int(p["composite_stress_score"].notna().sum())
           )
 
           print(
               "Research regimes:",
               sorted(
-                  p[
-                      "research_regime"
-                  ]
+                  p["research_regime"]
                   .dropna()
                   .unique()
                   .tolist()
               )
           )
 
-          print(
-              "Verification: PASS"
-          )
+          print("Verification: PASS")
           PY
-
-
-      # ======================================================
-      # Research-only guard
-      # ======================================================
 
       - name: Research-only guard
         run: |
           ! grep -RniE \
             "decision_engine|trade signal|execute trade|place order|buy signal|sell signal" \
             financial_stress_analyzer_v1.py
-
-
-      # ======================================================
-      # Upload research artifacts
-      # ======================================================
 
       - name: Upload research artifacts
         uses: actions/upload-artifact@v4
