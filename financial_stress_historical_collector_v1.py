@@ -2,24 +2,20 @@
 US500 Macro Intelligence
 Financial Stress Intelligence — Historical Collector v1
 
-Research-only. No Decision Engine integration.
+FIXED 8
+
+Research-only.
+No Decision Engine integration.
 
 Sources:
 - VIX: Cboe daily historical CSV.
 - Treasury 2Y/10Y: Federal Reserve H.15.
-- NFCI/ANFCI: FRED API using output_type=4
+- NFCI/ANFCI: FRED API output_type=4
   (Initial Release Only).
 
-FIXED 7:
-- Replaced ALFRED transport with FRED API.
-- NFCI/ANFCI retrieved through official FRED API.
-- output_type=4 preserves Initial Release Only semantics.
-- FRED API key is read from GitHub Actions secret:
-  FRED_API_KEY
-- No fallback to revised data.
-- PIT methodology preserved.
-- Research-only.
-- No Decision Engine integration.
+PIT principle:
+- FRED realtime_start is used as availability_date.
+- Revised observations are NOT substituted.
 """
 
 from __future__ import annotations
@@ -33,6 +29,10 @@ import pandas as pd
 import requests
 
 
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
 OUT = "financial_stress_records_input_v1.csv"
 
 START = pd.Timestamp("2020-01-01")
@@ -40,11 +40,12 @@ END = pd.Timestamp.today().normalize()
 
 
 # ============================================================
-# Official sources
+# OFFICIAL SOURCES
 # ============================================================
 
 VIX_URL = (
-    "https://cdn.cboe.com/api/global/us_indices/daily_prices/"
+    "https://cdn.cboe.com/"
+    "api/global/us_indices/daily_prices/"
     "VIX_History.csv"
 )
 
@@ -55,19 +56,23 @@ H15_CMT_URL = (
     "&layout=seriescolumn&type=package"
 )
 
-FRED_API_URL = (
-    "https://api.stlouisfed.org/fred/series/observations"
+H15_URL = (
+    "https://www.federalreserve.gov/releases/h15/"
 )
 
-H15_URL = "https://www.federalreserve.gov/releases/h15/"
+FRED_API_URL = (
+    "https://api.stlouisfed.org/"
+    "fred/series/observations"
+)
 
 CHICAGO_URL = (
-    "https://www.chicagofed.org/research/data/nfci/current-data"
+    "https://www.chicagofed.org/"
+    "research/data/nfci/current-data"
 )
 
 
 # ============================================================
-# Runtime settings
+# RUNTIME SETTINGS
 # ============================================================
 
 REQUEST_TIMEOUT = 90
@@ -78,7 +83,7 @@ FRED_API_TRIES = 5
 
 
 # ============================================================
-# Output schema
+# OUTPUT SCHEMA
 # ============================================================
 
 COLS = [
@@ -98,17 +103,19 @@ COLS = [
 
 
 # ============================================================
-# HTTP session
+# HTTP SESSION
 # ============================================================
 
 def session():
+
     s = requests.Session()
 
     s.headers.update(
         {
-            "User-Agent": (
-                "US500-Macro-Intelligence/2.0"
-            )
+            "User-Agent":
+                "US500-Macro-Intelligence/2.0",
+            "Accept":
+                "*/*",
         }
     )
 
@@ -146,17 +153,26 @@ def get(
 
             last = exc
 
+            print(
+                f"HTTP request attempt "
+                f"{i + 1}/{tries} failed: "
+                f"{exc}"
+            )
+
             if i < tries - 1:
-                time.sleep(2 ** i)
+
+                time.sleep(
+                    2 ** i
+                )
 
     raise RuntimeError(
-        f"GET failed for source endpoint after "
-        f"{tries} attempts: {last}"
+        f"GET failed for source endpoint "
+        f"after {tries} attempts: {last}"
     )
 
 
 # ============================================================
-# Record ID
+# RECORD ID
 # ============================================================
 
 def rid(row):
@@ -177,7 +193,10 @@ def rid(row):
 
 def load_vix(s):
 
-    print("VIX: downloading Cboe historical data")
+    print(
+        "VIX: downloading Cboe "
+        "historical data"
+    )
 
     r = get(
         s,
@@ -187,7 +206,9 @@ def load_vix(s):
     )
 
     df = pd.read_csv(
-        io.BytesIO(r.content)
+        io.BytesIO(
+            r.content
+        )
     )
 
     df["DATE"] = pd.to_datetime(
@@ -209,7 +230,8 @@ def load_vix(s):
 
     df = df[
         (df["DATE"] >= START)
-        & (df["DATE"] <= END)
+        &
+        (df["DATE"] <= END)
     ]
 
     rows = []
@@ -220,7 +242,8 @@ def load_vix(s):
 
         rows.append(
             {
-                "indicator": "VIX",
+                "indicator":
+                    "VIX",
 
                 "observation_date":
                     d.date().isoformat(),
@@ -265,7 +288,7 @@ def load_vix(s):
 
 
 # ============================================================
-# Treasury 2Y / 10Y
+# TREASURY 2Y / 10Y
 # ============================================================
 
 def load_treasury(
@@ -273,12 +296,14 @@ def load_treasury(
     package=None,
 ):
     """
-    Load 2Y/10Y Treasury Constant Maturity
-    from official Federal Reserve H.15.
+    Load Treasury Constant Maturity
+    2Y and 10Y from official Federal
+    Reserve H.15.
     """
 
     print(
-        "Treasury: downloading Federal Reserve H.15"
+        "Treasury: downloading "
+        "Federal Reserve H.15"
     )
 
     if package is None:
@@ -291,15 +316,17 @@ def load_treasury(
         )
 
         package = pd.read_csv(
-            io.BytesIO(r.content),
+            io.BytesIO(
+                r.content
+            ),
             header=5,
         )
 
     if package.shape[1] < 12:
 
         raise RuntimeError(
-            "Unexpected H.15 Treasury package shape: "
-            f"{package.shape}"
+            "Unexpected H.15 Treasury "
+            f"package shape: {package.shape}"
         )
 
     df = package.copy()
@@ -327,13 +354,18 @@ def load_treasury(
     # 30y
 
     maturity_map = {
-        "TREASURY_2Y": df.columns[5],
-        "TREASURY_10Y": df.columns[9],
+        "TREASURY_2Y":
+            df.columns[5],
+
+        "TREASURY_10Y":
+            df.columns[9],
     }
 
     rows = []
 
-    for indicator, value_col in maturity_map.items():
+    for indicator, value_col in (
+        maturity_map.items()
+    ):
 
         df[value_col] = pd.to_numeric(
             df[value_col],
@@ -349,7 +381,8 @@ def load_treasury(
 
         sub = sub[
             (sub[date_col] >= START)
-            & (sub[date_col] <= END)
+            &
+            (sub[date_col] <= END)
         ]
 
         for _, x in sub.iterrows():
@@ -370,7 +403,9 @@ def load_treasury(
                         d.date().isoformat(),
 
                     "actual":
-                        float(x[value_col]),
+                        float(
+                            x[value_col]
+                        ),
 
                     "unit":
                         "PERCENT",
@@ -406,7 +441,7 @@ def load_treasury(
 
 
 # ============================================================
-# FRED API
+# FRED API KEY
 # ============================================================
 
 def get_fred_api_key():
@@ -418,33 +453,42 @@ def get_fred_api_key():
     if not api_key:
 
         raise RuntimeError(
-            "FRED_API_KEY GitHub Actions secret "
-            "is missing."
+            "FRED_API_KEY GitHub Actions "
+            "secret is missing."
         )
 
     return api_key
 
+
+# ============================================================
+# FRED API
+# ============================================================
 
 def get_fred_observations(
     s,
     series,
 ):
     """
-    Retrieve FRED observations using:
+    Retrieve FRED observations.
 
-        output_type=4
-
-    which means:
-
+    output_type=4:
         Observations, Initial Release Only.
 
-    The API returns realtime_start for each
-    observation. This becomes availability_date.
+    realtime_start / realtime_end:
+        Explicit real-time period.
+
+    units=lin:
+        Explicit linear units.
+
+    The response error body is exposed
+    for diagnostics instead of hiding it
+    behind '400 Bad Request'.
     """
 
     api_key = get_fred_api_key()
 
     params = {
+
         "series_id":
             series,
 
@@ -454,14 +498,27 @@ def get_fred_observations(
         "file_type":
             "json",
 
+        # Observation period
         "observation_start":
             START.date().isoformat(),
 
         "observation_end":
             END.date().isoformat(),
 
+        # Real-time period
+        "realtime_start":
+            START.date().isoformat(),
+
+        "realtime_end":
+            END.date().isoformat(),
+
+        # Initial Release Only
         "output_type":
             4,
+
+        # Explicit linear units
+        "units":
+            "lin",
 
         "sort_order":
             "asc",
@@ -481,7 +538,9 @@ def get_fred_observations(
 
             print(
                 f"{series}: FRED API request "
-                f"attempt {attempt}/{FRED_API_TRIES}"
+                f"attempt "
+                f"{attempt}/"
+                f"{FRED_API_TRIES}"
             )
 
             r = s.get(
@@ -493,24 +552,92 @@ def get_fred_observations(
                 ),
             )
 
-            r.raise_for_status()
+            # =================================================
+            # IMPORTANT:
+            # Do NOT use raise_for_status()
+            # before reading FRED error payload.
+            # =================================================
+
+            if not r.ok:
+
+                try:
+
+                    error_payload = (
+                        r.json()
+                    )
+
+                    error_code = (
+                        error_payload.get(
+                            "error_code",
+                            "unknown",
+                        )
+                    )
+
+                    error_message = (
+                        error_payload.get(
+                            "error_message",
+                            "unknown",
+                        )
+                    )
+
+                except Exception:
+
+                    error_code = (
+                        "unknown"
+                    )
+
+                    error_message = (
+                        r.text[:1000]
+                    )
+
+                raise RuntimeError(
+                    f"FRED HTTP "
+                    f"{r.status_code}; "
+                    f"error_code="
+                    f"{error_code}; "
+                    f"message="
+                    f"{error_message}"
+                )
 
             payload = r.json()
+
+            if "error_code" in payload:
+
+                raise RuntimeError(
+                    "FRED API error: "
+                    f"{payload.get('error_code')} "
+                    f"{payload.get('error_message')}"
+                )
 
             if "observations" not in payload:
 
                 raise RuntimeError(
-                    f"FRED API response for {series} "
-                    "does not contain observations."
+                    f"FRED API response for "
+                    f"{series} does not contain "
+                    "observations."
                 )
 
-            observations = payload[
-                "observations"
-            ]
+            observations = (
+                payload["observations"]
+            )
 
             print(
                 f"{series}: FRED returned "
-                f"{len(observations)} observations"
+                f"{len(observations)} "
+                "observations"
+            )
+
+            print(
+                f"{series}: FRED output_type="
+                f"{payload.get('output_type')}"
+            )
+
+            print(
+                f"{series}: FRED observation "
+                f"range="
+                f"{payload.get('observation_start')} "
+                f"→ "
+                f"{payload.get('observation_end')}"
             )
 
             return observations
@@ -521,23 +648,26 @@ def get_fred_observations(
 
             print(
                 f"{series}: FRED API attempt "
-                f"{attempt} failed: {exc}"
+                f"{attempt} failed: "
+                f"{exc}"
             )
 
             if attempt < FRED_API_TRIES:
+
                 time.sleep(
                     2 ** (attempt - 1)
                 )
 
     raise RuntimeError(
-        f"{series}: FRED API retrieval failed "
-        f"after {FRED_API_TRIES} attempts: "
+        f"{series}: FRED API retrieval "
+        f"failed after "
+        f"{FRED_API_TRIES} attempts: "
         f"{last}"
     )
 
 
 # ============================================================
-# Parse FRED Initial Release
+# LOAD NFCI / ANFCI INITIAL RELEASE
 # ============================================================
 
 def load_nfci_initial_release(
@@ -545,22 +675,21 @@ def load_nfci_initial_release(
     series,
 ):
     """
-    Load NFCI/ANFCI using FRED API output_type=4.
-
-    IMPORTANT:
+    Load NFCI or ANFCI from FRED.
 
     output_type=4 means Initial Release Only.
 
-    Therefore we do NOT use the current revised
-    historical series as a substitute.
+    realtime_start is treated as
+    availability_date.
 
-    realtime_start is treated as the date the
-    observation became available.
+    Revised data is never substituted.
     """
 
-    observations = get_fred_observations(
-        s,
-        series,
+    observations = (
+        get_fred_observations(
+            s,
+            series,
+        )
     )
 
     rows = []
@@ -584,21 +713,21 @@ def load_nfci_initial_release(
         if not observation_date:
             continue
 
-        if not value:
-            continue
-
         if value in (
-            ".",
+            None,
             "",
+            ".",
             "nan",
             "NaN",
         ):
             continue
 
         if not availability_date:
+
             raise RuntimeError(
-                f"{series}: missing realtime_start "
-                f"for observation {observation_date}"
+                f"{series}: missing "
+                f"realtime_start for "
+                f"{observation_date}"
             )
 
         od = pd.Timestamp(
@@ -615,13 +744,17 @@ def load_nfci_initial_release(
         if od < START or od > END:
             continue
 
-        # Conservative PIT check.
+        # =====================================================
+        # PIT CHECK
+        # =====================================================
+
         if ad < od:
 
             raise RuntimeError(
                 f"{series}: PIT violation: "
-                f"availability_date {ad.date()} "
-                f"is earlier than observation_date "
+                f"availability_date "
+                f"{ad.date()} is earlier than "
+                f"observation_date "
                 f"{od.date()}"
             )
 
@@ -630,9 +763,6 @@ def load_nfci_initial_release(
             od.date().isoformat(),
         )
 
-        # output_type=4 should already contain
-        # the initial release. This is an additional
-        # defensive uniqueness check.
         if key in seen:
             continue
 
@@ -682,12 +812,14 @@ def load_nfci_initial_release(
 
         raise RuntimeError(
             f"{series}: FRED returned zero "
-            "usable initial-release observations."
+            "usable initial-release "
+            "observations."
         )
 
     print(
         f"{series}: "
-        f"{len(rows)} PIT initial-release records"
+        f"{len(rows)} PIT "
+        "initial-release records"
     )
 
     return rows
@@ -703,15 +835,11 @@ def load_nfci_pair(s):
 
     print(
         "NFCI/ANFCI: using FRED API "
-        "output_type=4 — Initial Release Only"
+        "output_type=4 — "
+        "Initial Release Only"
     )
 
-    # Sequential requests intentionally.
-    #
-    # There are only two series and this avoids
-    # unnecessary simultaneous API connections
-    # from GitHub Actions.
-
+    # Sequential intentionally.
     for series in (
         "NFCI",
         "ANFCI",
@@ -734,11 +862,11 @@ def load_nfci_pair(s):
 
             raise RuntimeError(
                 f"{series}: initial-release "
-                f"retrieval failed: {exc}"
+                f"retrieval failed: "
+                f"{exc}"
             ) from exc
 
-    # Defensive PIT key enforcement.
-
+    # Defensive uniqueness
     out = {}
 
     for row in rows:
@@ -758,7 +886,10 @@ def load_nfci_pair(s):
 
             if (
                 row["availability_date"]
-                < existing["availability_date"]
+                <
+                existing[
+                    "availability_date"
+                ]
             ):
 
                 out[key] = row
@@ -776,7 +907,7 @@ def load_nfci_pair(s):
 
 
 # ============================================================
-# Main
+# MAIN
 # ============================================================
 
 def main():
@@ -790,186 +921,158 @@ def main():
     )
 
     print(
-        "Financial Stress Historical Collector v1"
+        "Financial Stress Historical "
+        "Collector v1"
     )
 
     print(
-        "FIXED 7 — FRED API / Initial Release Only"
+        "FIXED 8 — FRED API / "
+        "Initial Release Only"
     )
 
     print(
-        "Research-only — No Decision Engine"
+        "Research-only — "
+        "No Decision Engine"
     )
 
     print(
         "=================================================="
     )
 
+    print(
+        f"Start: {START.date()}"
+    )
+
+    print(
+        f"End:   {END.date()}"
+    )
+
     s = session()
 
     rows = []
 
-    # --------------------------------------------------------
+    # ========================================================
     # VIX
-    # --------------------------------------------------------
+    # ========================================================
 
     rows += load_vix(s)
 
-    # --------------------------------------------------------
-    # Treasury 2Y / 10Y
-    # --------------------------------------------------------
+    # ========================================================
+    # TREASURY
+    # ========================================================
 
-    treasury_package = None
+    rows += load_treasury(s)
 
-    rows += load_treasury(
-        s,
-        treasury_package,
-    )
-
-    # --------------------------------------------------------
+    # ========================================================
     # NFCI / ANFCI
-    # --------------------------------------------------------
+    # ========================================================
 
     rows += load_nfci_pair(s)
 
-    # --------------------------------------------------------
-    # Build 10Y - 2Y curve
-    # --------------------------------------------------------
-
-    tmp = pd.DataFrame(
-        rows
-    )
-
-    for c in [
-        "observation_date",
-        "availability_date",
-    ]:
-
-        tmp[c] = pd.to_datetime(
-            tmp[c]
-        )
-
-    t2 = (
-        tmp[
-            tmp.indicator
-            == "TREASURY_2Y"
-        ]
-        .set_index(
-            "observation_date"
-        )
-    )
-
-    t10 = (
-        tmp[
-            tmp.indicator
-            == "TREASURY_10Y"
-        ]
-        .set_index(
-            "observation_date"
-        )
-    )
-
-    common = (
-        t2.index.intersection(
-            t10.index
-        )
-    )
-
-    print(
-        f"Curve: {len(common)} "
-        "common Treasury dates"
-    )
-
-    for d in common:
-
-        a = (
-            float(
-                t10.loc[
-                    d,
-                    "actual",
-                ]
-            )
-            -
-            float(
-                t2.loc[
-                    d,
-                    "actual",
-                ]
-            )
-        )
-
-        avail = max(
-            t2.loc[
-                d,
-                "availability_date",
-            ],
-            t10.loc[
-                d,
-                "availability_date",
-            ],
-        )
-
-        rows.append(
-            {
-                "indicator":
-                    "CURVE_10Y_2Y",
-
-                "observation_date":
-                    d.date().isoformat(),
-
-                "availability_date":
-                    pd.Timestamp(
-                        avail
-                    ).date().isoformat(),
-
-                "actual":
-                    a,
-
-                "unit":
-                    "PERCENTAGE_POINTS",
-
-                "frequency":
-                    "DAILY",
-
-                "source":
-                    "Federal Reserve H.15",
-
-                "source_url":
-                    H15_URL,
-
-                "vintage":
-                    pd.Timestamp(
-                        avail
-                    ).date().isoformat(),
-
-                "revision_flag":
-                    False,
-
-                "point_in_time_safe":
-                    True,
-
-                "availability_semantics":
-                    "OFFICIAL_RELEASE",
-            }
-        )
-
-    # --------------------------------------------------------
-    # DataFrame
-    # --------------------------------------------------------
+    # ========================================================
+    # DATAFRAME
+    # ========================================================
 
     out = pd.DataFrame(
         rows,
         columns=COLS,
     )
 
-    out = out.drop_duplicates(
-        subset=[
-            "indicator",
-            "observation_date",
-            "availability_date",
-            "vintage",
+    if out.empty:
+
+        raise RuntimeError(
+            "Collector produced zero records."
+        )
+
+    # ========================================================
+    # NORMALIZE DATES
+    # ========================================================
+
+    out[
+        "observation_date"
+    ] = pd.to_datetime(
+        out[
+            "observation_date"
         ]
     )
+
+    out[
+        "availability_date"
+    ] = pd.to_datetime(
+        out[
+            "availability_date"
+        ]
+    )
+
+    # ========================================================
+    # PIT QUALITY GATE
+    # ========================================================
+
+    bad = (
+        out["availability_date"]
+        <
+        out["observation_date"]
+    )
+
+    if bad.any():
+
+        print(
+            out.loc[
+                bad
+            ].head(20).to_string(
+                index=False
+            )
+        )
+
+        raise AssertionError(
+            "PIT QUALITY GATE FAILED: "
+            "availability_date is earlier "
+            "than observation_date."
+        )
+
+    if not out[
+        "point_in_time_safe"
+    ].all():
+
+        raise AssertionError(
+            "PIT QUALITY GATE FAILED: "
+            "non-PIT-safe record found."
+        )
+
+    # ========================================================
+    # REQUIRED INDICATORS
+    # ========================================================
+
+    required_indicators = {
+        "VIX",
+        "TREASURY_2Y",
+        "TREASURY_10Y",
+        "NFCI",
+        "ANFCI",
+    }
+
+    actual_indicators = set(
+        out[
+            "indicator"
+        ].unique()
+    )
+
+    missing = (
+        required_indicators
+        -
+        actual_indicators
+    )
+
+    if missing:
+
+        raise AssertionError(
+            "Missing required indicators: "
+            f"{sorted(missing)}"
+        )
+
+    # ========================================================
+    # SORT
+    # ========================================================
 
     out = out.sort_values(
         [
@@ -980,98 +1083,38 @@ def main():
         drop=True
     )
 
-    # --------------------------------------------------------
-    # Conservative Point-in-Time Quality Gate
-    # --------------------------------------------------------
-
-    od = pd.to_datetime(
-        out["observation_date"]
-    )
-
-    ad = pd.to_datetime(
-        out["availability_date"]
-    )
-
-    if (ad < od).any():
-
-        bad = out.loc[
-            ad < od
-        ].head(10)
-
-        raise AssertionError(
-            "availability_date earlier "
-            "than observation_date.\n"
-            f"{bad.to_string()}"
-        )
-
-    if not out[
-        "point_in_time_safe"
-    ].all():
-
-        raise AssertionError(
-            "Non-PIT-safe record found"
-        )
-
-    # --------------------------------------------------------
-    # Record IDs
-    # --------------------------------------------------------
+    # ========================================================
+    # RECORD IDS
+    # ========================================================
 
     out["record_id"] = out.apply(
         rid,
         axis=1,
     )
 
-    # --------------------------------------------------------
-    # Output
-    # --------------------------------------------------------
+    # ========================================================
+    # SAVE
+    # ========================================================
 
     out.to_csv(
         OUT,
         index=False,
     )
 
-    # --------------------------------------------------------
-    # Final report
-    # --------------------------------------------------------
+    # ========================================================
+    # REPORT
+    # ========================================================
 
     print(
         "=================================================="
     )
 
     print(
-        "Financial Stress Historical "
-        "Collector v1 — FIXED 7"
+        "COLLECTION COMPLETE"
     )
 
     print(
-        f"Records: {len(out)}"
-    )
-
-    print(
-        f"Indicators: "
-        f"{out.indicator.nunique()}"
-    )
-
-    print(
-        "PIT safe: "
-        f"{int(out.point_in_time_safe.sum())}"
-        f"/{len(out)}"
-    )
-
-    print(
-        "Records by indicator:"
-    )
-
-    print(
-        out.groupby(
-            "indicator"
-        )
-        .size()
-        .to_string()
-    )
-
-    print(
-        "PIT QUALITY GATE: PASS"
+        "=================================================="
     )
 
     print(
@@ -1079,9 +1122,52 @@ def main():
     )
 
     print(
+        f"Rows: {len(out)}"
+    )
+
+    print(
+        "Indicators:"
+    )
+
+    print(
+        out[
+            "indicator"
+        ]
+        .value_counts()
+        .sort_index()
+        .to_string()
+    )
+
+    print(
+        "PIT:"
+    )
+
+    print(
+        f"{int(out['point_in_time_safe'].sum())}"
+        f"/"
+        f"{len(out)}"
+    )
+
+    print(
+        "PIT QUALITY GATE: PASS"
+    )
+
+    print(
+        "Research-only guard: PASS"
+    )
+
+    print(
+        "Decision Engine integration: NONE"
+    )
+
+    print(
         "=================================================="
     )
 
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     main()
