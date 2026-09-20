@@ -2,56 +2,162 @@ name: financial-stress-historical-v1
 
 on:
   workflow_dispatch:
+
   push:
     paths:
       - "financial_stress_historical_collector_v1.py"
       - ".github/workflows/financial-stress-historical-v1.yml"
 
+
 jobs:
   collect:
+
     runs-on: ubuntu-latest
+
     steps:
+
+      # ======================================================
+      # Checkout repository
+      # ======================================================
+
       - name: Checkout
         uses: actions/checkout@v4
+
+
+      # ======================================================
+      # Python
+      # ======================================================
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
+      # ======================================================
+      # Dependencies
+      # ======================================================
+
       - name: Install dependencies
-        run: python -m pip install --upgrade pip pandas requests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pandas requests
+
+
+      # ======================================================
+      # Syntax check
+      # ======================================================
 
       - name: Syntax check
-        run: python -m py_compile financial_stress_historical_collector_v1.py
+        run: |
+          python -m py_compile financial_stress_historical_collector_v1.py
+
+
+      # ======================================================
+      # Historical Financial Stress Collector
+      #
+      # FRED_API_KEY is injected ONLY into this step.
+      # The secret value is never printed.
+      # ======================================================
 
       - name: Run historical collector
-        run: python financial_stress_historical_collector_v1.py
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          python financial_stress_historical_collector_v1.py
+
+
+      # ======================================================
+      # Verify output
+      # ======================================================
 
       - name: Verify output
         run: |
           test -s financial_stress_records_input_v1.csv
+
           python - <<'PY'
           import pandas as pd
-          p = pd.read_csv("financial_stress_records_input_v1.csv")
+
+          p = pd.read_csv(
+              "financial_stress_records_input_v1.csv"
+          )
+
           required = {
-            "indicator","observation_date","availability_date","actual","unit",
-            "frequency","source","source_url","vintage","revision_flag",
-            "point_in_time_safe","availability_semantics"
+              "indicator",
+              "observation_date",
+              "availability_date",
+              "actual",
+              "unit",
+              "frequency",
+              "source",
+              "source_url",
+              "vintage",
+              "revision_flag",
+              "point_in_time_safe",
+              "availability_semantics",
           }
+
           missing = required - set(p.columns)
-          assert not missing, missing
-          assert len(p) > 0
-          assert p["point_in_time_safe"].all()
-          print("Rows:", len(p))
-          print("Indicators:", sorted(p.indicator.unique()))
-          print("PIT:", int(p.point_in_time_safe.sum()), "/", len(p))
+
+          assert not missing, (
+              f"Missing columns: {missing}"
+          )
+
+          assert len(p) > 0, (
+              "Output contains zero rows"
+          )
+
+          assert p[
+              "point_in_time_safe"
+          ].all(), (
+              "Non-PIT-safe record found"
+          )
+
+          print(
+              "Rows:",
+              len(p)
+          )
+
+          print(
+              "Indicators:",
+              sorted(
+                  p.indicator.unique()
+              )
+          )
+
+          print(
+              "PIT:",
+              int(
+                  p.point_in_time_safe.sum()
+              ),
+              "/",
+              len(p)
+          )
+
+          print(
+              "Verification: PASS"
+          )
           PY
+
+
+      # ======================================================
+      # Research-only guard
+      #
+      # Financial Stress remains research-only.
+      # No Decision Engine.
+      # No trade execution.
+      # ======================================================
 
       - name: Research-only guard
         run: |
-          ! grep -RniE "decision.engine|decision_engine|trade signal|execute trade|place order" \
+          ! grep -RniE \
+            "decision.engine|decision_engine|trade signal|execute trade|place order" \
             financial_stress_historical_collector_v1.py
+
+
+      # ======================================================
+      # Upload research artifact
+      # ======================================================
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
