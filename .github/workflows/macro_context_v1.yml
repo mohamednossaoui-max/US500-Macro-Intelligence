@@ -47,7 +47,7 @@ jobs:
           ARTIFACT_ID=$(gh api \
             --method GET \
             "repos/${GITHUB_REPOSITORY}/actions/artifacts" \
-            -f name="economic-intelligence-v2-2" \
+            -f name="economic-intelligence-v2-3-refresh" \
             -f per_page=100 \
             --jq '
               [
@@ -76,7 +76,10 @@ jobs:
             "$RUNNER_TEMP/economic/economic.zip" \
             -d "$RUNNER_TEMP/economic"
 
-          find "$RUNNER_TEMP/economic" -type f -maxdepth 3 -print
+          find "$RUNNER_TEMP/economic" \
+            -type f \
+            -maxdepth 3 \
+            -print
 
           ECONOMIC_FILE=$(find "$RUNNER_TEMP/economic" \
             -type f \
