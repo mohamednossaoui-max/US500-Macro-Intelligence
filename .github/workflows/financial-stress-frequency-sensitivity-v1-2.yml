@@ -1,0 +1,95 @@
+name: Financial Stress Frequency Sensitivity v1.2
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Financial Stress Historical Collector v1"
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  frequency-sensitivity:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download historical collector artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: financial-stress-historical-v1
+          path: input_artifact
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate raw PIT input
+        shell: bash
+        run: |
+          set -euo pipefail
+          found="$(find input_artifact . -type f -name 'financial_stress_records_input_v1.csv' -print -quit)"
+          if [ -z "$found" ]; then
+            echo "ERROR: financial_stress_records_input_v1.csv not found"
+            exit 1
+          fi
+          cp "$found" financial_stress_records_input_v1.csv
+          python - <<'PY'
+          import pandas as pd
+          p = "financial_stress_records_input_v1.csv"
+          df = pd.read_csv(p)
+          print("Rows:", len(df))
+          print("Columns:", list(df.columns))
+          if len(df) == 0:
+              raise SystemExit("ERROR: raw PIT input contains zero rows")
+          PY
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate and run v1.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile financial_stress_frequency_sensitivity_v1_2.py
+          python financial_stress_frequency_sensitivity_v1_2.py
+
+      - name: Research-only guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE \
+            "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal" \
+            financial_stress_frequency_sensitivity_v1_2.py; then
+            echo "ERROR: Research-only guard triggered."
+            exit 1
+          fi
+          echo "Research-only guard: PASS"
+
+      - name: Validate outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s financial_stress_validation_v1_2.csv
+          test -s financial_stress_validation_summary_v1_2.csv
+          test -s financial_stress_validation_events_v1_2.csv
+          test -s financial_stress_frequency_sensitivity_v1_2.csv
+
+      - name: Upload v1.2 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-stress-frequency-sensitivity-v1-2
+          path: |
+            financial_stress_validation_v1_2.csv
+            financial_stress_validation_summary_v1_2.csv
+            financial_stress_validation_events_v1_2.csv
+            financial_stress_frequency_sensitivity_v1_2.csv
