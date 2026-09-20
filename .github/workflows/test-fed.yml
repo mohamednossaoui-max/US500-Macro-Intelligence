@@ -1,25 +1,84 @@
-name: Test Fed Intelligence
+name: Fed Intelligence
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test-fed:
+  fed-intelligence:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ------------------------------------------------------
+      # Checkout repository
+      # ------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------
+      # Python
+      # ------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ------------------------------------------------------
+      # Install dependencies
+      # ------------------------------------------------------
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install pandas requests beautifulsoup4 pypdf lxml
 
-      - name: Run Fed Intelligence test
+      # ------------------------------------------------------
+      # Run existing Fed Intelligence engine
+      # and export stable JSON artifact
+      # ------------------------------------------------------
+      - name: Run Fed Intelligence
         run: |
-          python fed_intelligence.py
+          python fed_intelligence_export_v1.py
+
+      # ------------------------------------------------------
+      # Verify artifact
+      # ------------------------------------------------------
+      - name: Verify Fed Intelligence output
+        run: |
+          test -f fed_intelligence_output_v1.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("fed_intelligence_output_v1.json")
+
+          data = json.loads(
+              path.read_text(encoding="utf-8")
+          )
+
+          print("JSON loaded successfully.")
+          print("available:", data.get("available"))
+          print("as_of_date:", data.get("as_of_date"))
+          print("latest_fomc:", data.get("latest_fomc"))
+          print("fed_chair:", data.get("fed_chair"))
+          print("latest_sep_date:", data.get("latest_sep_date"))
+
+          assert isinstance(data, dict)
+          assert "available" in data
+          assert "as_of_date" in data
+          assert "latest_fomc" in data
+          PY
+
+      # ------------------------------------------------------
+      # Upload artifact
+      # ------------------------------------------------------
+      - name: Upload Fed Intelligence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fed-intelligence-v1
+          path: fed_intelligence_output_v1.json
+          if-no-files-found: error
+          retention-days: 90
