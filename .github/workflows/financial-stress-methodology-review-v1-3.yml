@@ -1,0 +1,214 @@
+name: Financial Stress Methodology Review v1.3
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  methodology-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Trigger fresh Historical Collector v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          PREVIOUS_RUN_ID="$(gh run list \
+            --repo "$REPOSITORY" \
+            --workflow financial-stress-historical-v1.yml \
+            --branch main \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // ""' || true)"
+
+          gh workflow run financial-stress-historical-v1.yml \
+            --repo "$REPOSITORY" \
+            --ref main
+
+          echo "Waiting for the NEW Historical Collector run to appear..."
+          COLLECTOR_RUN_ID=""
+
+          for i in $(seq 1 60); do
+            RUN_ID="$(gh run list \
+              --repo "$REPOSITORY" \
+              --workflow financial-stress-historical-v1.yml \
+              --branch main \
+              --limit 10 \
+              --json databaseId,headBranch,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[] | select(.headBranch=="main") | .databaseId' \
+              | while read -r ID; do
+                  if [ -n "$ID" ] && [ "$ID" != "$PREVIOUS_RUN_ID" ]; then
+                    echo "$ID"
+                    break
+                  fi
+                done)"
+
+            if [ -n "${RUN_ID:-}" ]; then
+              COLLECTOR_RUN_ID="$RUN_ID"
+              echo "New collector run: $COLLECTOR_RUN_ID"
+              break
+            fi
+
+            sleep 5
+          done
+
+          if [ -z "$COLLECTOR_RUN_ID" ]; then
+            echo "ERROR: Could not detect Historical Collector run."
+            exit 1
+          fi
+
+          echo "Waiting for collector completion..."
+
+          for i in $(seq 1 90); do
+            STATUS="$(gh run view "$COLLECTOR_RUN_ID" \
+              --repo "$REPOSITORY" \
+              --json status \
+              --jq '.status')"
+
+            CONCLUSION="$(gh run view "$COLLECTOR_RUN_ID" \
+              --repo "$REPOSITORY" \
+              --json conclusion \
+              --jq '.conclusion // ""')"
+
+            echo "Status=$STATUS Conclusion=$CONCLUSION"
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" != "success" ]; then
+                echo "ERROR: Historical Collector failed."
+                gh run view "$COLLECTOR_RUN_ID" --repo "$REPOSITORY" --log-failed || true
+                exit 1
+              fi
+              break
+            fi
+
+            sleep 10
+          done
+
+          echo "COLLECTOR_RUN_ID=$COLLECTOR_RUN_ID" >> "$GITHUB_ENV"
+
+      - name: Download fresh collector artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          rm -rf raw_collector_artifact
+          mkdir -p raw_collector_artifact
+
+          gh run download "$COLLECTOR_RUN_ID" \
+            --repo "$REPOSITORY" \
+            --dir raw_collector_artifact
+
+          CSV_PATH="$(find raw_collector_artifact -type f \
+            -name 'financial_stress_records_input_v1.csv' \
+            -print -quit)"
+
+          if [ -z "${CSV_PATH:-}" ]; then
+            echo "ERROR: financial_stress_records_input_v1.csv not found."
+            find raw_collector_artifact -maxdepth 5 -type f -print || true
+            exit 1
+          fi
+
+          cp "$CSV_PATH" financial_stress_records_input_v1.csv
+          echo "Using: $CSV_PATH"
+
+      - name: Validate raw PIT input
+        run: |
+          python - <<'PY'
+          import pandas as pd
+
+          f = "financial_stress_records_input_v1.csv"
+          df = pd.read_csv(f)
+
+          required = [
+              "indicator", "observation_date", "availability_date", "actual",
+              "unit", "frequency", "source", "source_url", "vintage",
+              "revision_flag", "point_in_time_safe", "availability_semantics",
+          ]
+
+          missing = [c for c in required if c not in df.columns]
+          if missing:
+              raise SystemExit(f"Missing columns: {missing}")
+
+          if len(df) == 0:
+              raise SystemExit("Raw input is empty.")
+
+          df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
+          df["availability_date"] = pd.to_datetime(df["availability_date"], errors="coerce")
+
+          if df["observation_date"].isna().any() or df["availability_date"].isna().any():
+              raise SystemExit("Invalid dates in raw input.")
+
+          if (df["availability_date"] < df["observation_date"]).any():
+              raise SystemExit("PIT violation detected.")
+
+          safe = df["point_in_time_safe"].astype(str).str.lower()
+          if (~safe.isin(["true", "1", "yes"])).any():
+              raise SystemExit("Non-PIT-safe raw rows detected.")
+
+          print(f"Raw rows: {len(df)}")
+          print(df["indicator"].value_counts().to_string())
+          print(df["frequency"].value_counts().to_string())
+          PY
+
+      - name: Compile v1.3
+        run: |
+          python -m py_compile financial_stress_methodology_review_v1_3.py
+
+      - name: Run methodology review
+        run: |
+          python financial_stress_methodology_review_v1_3.py
+
+      - name: Research-only guard
+        run: |
+          set -euo pipefail
+
+          if grep -RniE \
+            "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal" \
+            financial_stress_methodology_review_v1_3.py; then
+            echo "ERROR: Research-only guard failed."
+            exit 1
+          fi
+
+          echo "Research-only guard passed."
+
+      - name: Validate outputs
+        run: |
+          set -euo pipefail
+
+          test -s financial_stress_validation_v1_3.csv
+          test -s financial_stress_validation_summary_v1_3.csv
+          test -s financial_stress_validation_events_v1_3.csv
+          test -s financial_stress_frequency_sensitivity_v1_3.csv
+
+      - name: Upload v1.3 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-stress-methodology-review-v1-3
+          path: |
+            financial_stress_validation_v1_3.csv
+            financial_stress_validation_summary_v1_3.csv
+            financial_stress_validation_events_v1_3.csv
+            financial_stress_frequency_sensitivity_v1_3.csv
+          if-no-files-found: error
+          retention-days: 90
