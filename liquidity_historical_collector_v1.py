@@ -1,39 +1,40 @@
 """
 Liquidity Historical Collector v1
----------------------------------
+=================================
 
-Research-only historical liquidity data collector.
+Research-only historical liquidity collector.
 
-Sources:
-- Federal Reserve H.4.1
-- New York Fed reference rates
+Official data sources:
+- Federal Reserve H.4.1 via FRED
+- Federal Reserve Bank of New York via FRED
 
 Indicators:
-- Fed Total Assets
-- Reserve Balances
-- U.S. Treasury Securities
-- Mortgage-Backed Securities
-- Treasury General Account (TGA)
-- Reverse Repurchase Agreements (ON RRP / RRP)
-- SOFR
-- EFFR
+    FED_TOTAL_ASSETS
+    RESERVE_BALANCES
+    TREASURY_GENERAL_ACCOUNT
+    TREASURY_SECURITIES
+    MORTGAGE_BACKED_SECURITIES
+    ON_RRP
+    SOFR
+    EFFR
 
 Research principles:
-- Point-in-time safe
-- Conservative availability-date semantics
-- No trading signals
-- No forecasts
-- No liquidity score
-- No Decision Engine integration
+    - Point-in-time safe
+    - Conservative availability-date proxy
+    - Initial-release vintage requested where supported
+    - No trading signals
+    - No forecasts
+    - No liquidity score
+    - No Decision Engine integration
 """
 
 from __future__ import annotations
 
-import io
 import os
 import sys
-from datetime import timedelta
+from typing import Dict
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -52,8 +53,12 @@ START_DATE = pd.Timestamp(
 END_DATE = pd.Timestamp(
     os.getenv(
         "LIQUIDITY_END_DATE",
-        pd.Timestamp.utcnow().date().isoformat(),
+        "2026-09-21",
     )
+)
+
+FRED_API_KEY = os.getenv(
+    "FRED_API_KEY"
 )
 
 OUTPUT_FILE = (
@@ -66,676 +71,355 @@ SUMMARY_FILE = (
 
 
 # ============================================================
-# Source URLs
+# Constants
 # ============================================================
 
-H41_CURRENT_URL = (
-    "https://www.federalreserve.gov/"
-    "releases/h41/Current/"
+FRED_API_URL = (
+    "https://api.stlouisfed.org/"
+    "fred/series/observations"
 )
 
-H41_DATA_URL = (
-    "https://www.federalreserve.gov/"
-    "datadownload/Choose.aspx?rel=H41"
-)
-
-SOFR_URL = (
-    "https://markets.newyorkfed.org/"
-    "api/rates/secured/sofr/"
-    "search.json"
-)
-
-EFFR_URL = (
-    "https://markets.newyorkfed.org/"
-    "api/rates/unsecured/effr/"
-    "search.json"
-)
-
-
-# ============================================================
-# Metadata
-# ============================================================
-
-COLLECTOR_NAME = (
-    "Liquidity Historical Collector v1"
-)
 
 SOURCE_H41 = (
-    "Federal Reserve H.4.1"
+    "Federal Reserve H.4.1 via FRED"
 )
 
 SOURCE_NYFED = (
-    "Federal Reserve Bank of New York"
-)
-
-AVAILABILITY_H41 = (
-    "H.4.1 weekly release date used as "
-    "conservative availability proxy; "
-    "not exact publication timestamp."
-)
-
-AVAILABILITY_NYFED = (
-    "New York Fed daily publication date "
-    "used as conservative availability proxy."
+    "Federal Reserve Bank of New York via FRED"
 )
 
 
 # ============================================================
-# HTTP helper
+# Official FRED series
 # ============================================================
 
-def get_url(
-    url: str,
-    params: dict | None = None,
-    timeout: int = 60,
-) -> requests.Response:
+SERIES: Dict[str, Dict[str, str]] = {
+
+    "FED_TOTAL_ASSETS": {
+        "series_id": "WALCL",
+        "source": SOURCE_H41,
+        "frequency": "weekly",
+        "unit": "millions_usd",
+        "availability_semantics": (
+            "H.4.1 Wednesday observation; "
+            "conservative Thursday release-date proxy."
+        ),
+    },
+
+    "RESERVE_BALANCES": {
+        "series_id": "WRESBAL",
+        "source": SOURCE_H41,
+        "frequency": "weekly",
+        "unit": "millions_usd",
+        "availability_semantics": (
+            "H.4.1 Wednesday observation; "
+            "conservative Thursday release-date proxy."
+        ),
+    },
+
+    "TREASURY_GENERAL_ACCOUNT": {
+        "series_id": "WTREGEN",
+        "source": SOURCE_H41,
+        "frequency": "weekly",
+        "unit": "millions_usd",
+        "availability_semantics": (
+            "H.4.1 weekly average ending Wednesday; "
+            "conservative Thursday release-date proxy."
+        ),
+    },
+
+    "TREASURY_SECURITIES": {
+        "series_id": "WSHOTSL",
+        "source": SOURCE_H41,
+        "frequency": "weekly",
+        "unit": "millions_usd",
+        "availability_semantics": (
+            "H.4.1 Wednesday observation; "
+            "conservative Thursday release-date proxy."
+        ),
+    },
+
+    "MORTGAGE_BACKED_SECURITIES": {
+        "series_id": "WSHOMCB",
+        "source": SOURCE_H41,
+        "frequency": "weekly",
+        "unit": "millions_usd",
+        "availability_semantics": (
+            "H.4.1 Wednesday observation; "
+            "conservative Thursday release-date proxy."
+        ),
+    },
+
+    "ON_RRP": {
+        "series_id": "RRPONTSYD",
+        "source": SOURCE_NYFED,
+        "frequency": "daily",
+        "unit": "billions_usd",
+        "availability_semantics": (
+            "New York Fed daily observation; "
+            "next-calendar-day conservative availability proxy."
+        ),
+    },
+
+    "SOFR": {
+        "series_id": "SOFR",
+        "source": SOURCE_NYFED,
+        "frequency": "daily",
+        "unit": "percent",
+        "availability_semantics": (
+            "New York Fed daily rate; "
+            "next-calendar-day conservative availability proxy."
+        ),
+    },
+
+    "EFFR": {
+        "series_id": "EFFR",
+        "source": SOURCE_NYFED,
+        "frequency": "daily",
+        "unit": "percent",
+        "availability_semantics": (
+            "New York Fed daily rate; "
+            "next-calendar-day conservative availability proxy."
+        ),
+    },
+}
+
+
+# ============================================================
+# Validation
+# ============================================================
+
+REQUIRED_INDICATORS = set(
+    SERIES.keys()
+)
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def require_api_key() -> None:
+
+    if not FRED_API_KEY:
+
+        raise RuntimeError(
+            "FRED_API_KEY environment variable "
+            "is not configured."
+        )
+
+
+def clean_numeric(value):
+
+    if value is None:
+        return np.nan
+
+    text = str(value).strip()
+
+    if text in {
+        "",
+        ".",
+        "NA",
+        "N/A",
+        "nan",
+        "None",
+    }:
+        return np.nan
+
+    try:
+        return float(text)
+    except ValueError:
+        return np.nan
+
+
+def fred_source_url(series_id: str) -> str:
+
+    return (
+        "https://fred.stlouisfed.org/series/"
+        + series_id
+    )
+
+
+# ============================================================
+# FRED collector
+# ============================================================
+
+def collect_series(
+    indicator: str,
+    metadata: Dict[str, str],
+) -> pd.DataFrame:
+
+    series_id = metadata["series_id"]
+
+    print()
+    print("-" * 70)
+    print(
+        f"Collecting {indicator} [{series_id}]"
+    )
+    print("-" * 70)
+
+    params = {
+        "api_key": FRED_API_KEY,
+        "file_type": "json",
+        "series_id": series_id,
+
+        "observation_start": (
+            START_DATE.strftime("%Y-%m-%d")
+        ),
+
+        "observation_end": (
+            END_DATE.strftime("%Y-%m-%d")
+        ),
+
+        # FRED output_type=4 requests
+        # initial-release observations.
+        "output_type": "4",
+
+        "sort_order": "asc",
+    }
 
     response = requests.get(
-        url,
+        FRED_API_URL,
         params=params,
-        timeout=timeout,
+        timeout=120,
         headers={
             "User-Agent": (
                 "US500-Macro-Intelligence/"
-                "LiquidityCollector-v1"
+                "Liquidity-Historical-Collector-v1"
             )
         },
     )
 
     response.raise_for_status()
 
-    return response
+    payload = response.json()
 
-
-# ============================================================
-# Utility
-# ============================================================
-
-def clean_number(value):
-
-    if pd.isna(value):
-        return pd.NA
-
-    if isinstance(value, (int, float)):
-        return float(value)
-
-    text = str(value).strip()
-
-    if text in {
-        "",
-        "-",
-        "—",
-        "NA",
-        "N/A",
-        "nan",
-        "None",
-    }:
-        return pd.NA
-
-    text = (
-        text
-        .replace(",", "")
-        .replace("$", "")
-        .strip()
+    observations = payload.get(
+        "observations",
+        [],
     )
 
-    try:
-        return float(text)
-    except ValueError:
-        return pd.NA
+    if not observations:
 
-
-def normalize_columns(df: pd.DataFrame):
-
-    df = df.copy()
-
-    df.columns = [
-        str(c).strip()
-        for c in df.columns
-    ]
-
-    return df
-
-
-# ============================================================
-# H.4.1
-# ============================================================
-
-def collect_h41():
-
-    print()
-    print("=" * 70)
-    print("Collecting Federal Reserve H.4.1")
-    print("=" * 70)
-
-    print(
-        "Source:",
-        H41_CURRENT_URL,
-    )
-
-    print(
-        "Data page:",
-        H41_DATA_URL,
-    )
-
-    # --------------------------------------------------------
-    # IMPORTANT
-    #
-    # H.4.1 publishes a weekly release.
-    #
-    # The collector retrieves the official current
-    # H.4.1 release and attempts to use its downloadable
-    # historical CSV endpoints.
-    #
-    # If the historical endpoint structure changes,
-    # fail explicitly rather than silently using another source.
-    # --------------------------------------------------------
-
-    # Official H.4.1 XML endpoint.
-    xml_url = (
-        "https://www.federalreserve.gov/"
-        "datadownload/Output.aspx"
-        "?rel=H41"
-        "&filetype=xml"
-        "&label=include"
-        "&layout=seriescolumn"
-        "&from=01/01/2019"
-        "&to="
-        + END_DATE.strftime("%m/%d/%Y")
-    )
-
-    print(
-        "Requesting official H.4.1 XML..."
-    )
-
-    response = get_url(
-        xml_url,
-        timeout=120,
-    )
-
-    print(
-        "HTTP status:",
-        response.status_code,
-    )
-
-    content = response.content
-
-    if not content:
         raise RuntimeError(
-            "H.4.1 response is empty."
+            f"{indicator} [{series_id}] "
+            "returned zero observations."
         )
-
-    print(
-        "Downloaded bytes:",
-        len(content),
-    )
-
-    # --------------------------------------------------------
-    # Parse XML
-    # --------------------------------------------------------
-
-    try:
-
-        from xml.etree import ElementTree as ET
-
-        root = ET.fromstring(content)
-
-    except Exception as exc:
-
-        raise RuntimeError(
-            "Could not parse H.4.1 XML."
-        ) from exc
 
     rows = []
 
-    # --------------------------------------------------------
-    # Locate series
-    # --------------------------------------------------------
+    for observation in observations:
 
-    for series in root.iter():
-
-        tag = (
-            series.tag.split("}")[-1]
-            .lower()
+        observation_date = pd.to_datetime(
+            observation.get("date"),
+            errors="coerce",
         )
 
-        if tag != "series":
+        actual = clean_numeric(
+            observation.get("value")
+        )
+
+        if pd.isna(observation_date):
             continue
 
-        attrs = {
-            str(k).lower(): str(v)
-            for k, v in series.attrib.items()
-        }
-
-        series_name = (
-            attrs.get("seriesname")
-            or attrs.get("name")
-            or attrs.get("description")
-            or ""
-        )
-
-        series_id = (
-            attrs.get("seriesid")
-            or attrs.get("id")
-            or ""
-        )
-
-        text_name = (
-            series_name
-            + " "
-            + series_id
-        ).lower()
-
-        # ----------------------------------------------------
-        # Identify required H.4.1 concepts.
-        #
-        # Matching is intentionally conservative.
-        # ----------------------------------------------------
-
-        indicator = None
-
-        if (
-            "reserve balances" in text_name
-            and "depository" in text_name
-        ):
-            indicator = "RESERVE_BALANCES"
-
-        elif (
-            "reverse repurchase agreements"
-            in text_name
-        ):
-            indicator = "ON_RRP"
-
-        elif (
-            "u.s. treasury, general account"
-            in text_name
-            or "treasury general account"
-            in text_name
-        ):
-            indicator = "TGA"
-
-        elif (
-            "total assets" in text_name
-            and "federal reserve" in text_name
-        ):
-            indicator = "FED_TOTAL_ASSETS"
-
-        elif (
-            "u.s. treasury securities"
-            in text_name
-            and "securities held outright"
-            not in text_name
-        ):
-            indicator = "TREASURY_SECURITIES"
-
-        elif (
-            "mortgage-backed securities"
-            in text_name
-        ):
-            indicator = "MBS"
-
-        if indicator is None:
+        if pd.isna(actual):
             continue
 
         # ----------------------------------------------------
-        # Observations
+        # Conservative PIT availability
         # ----------------------------------------------------
 
-        for child in series:
+        availability_date = (
+            observation_date
+            + pd.Timedelta(days=1)
+        )
 
-            child_tag = (
-                child.tag.split("}")[-1]
-                .lower()
-            )
+        rows.append(
+            {
+                "indicator": indicator,
 
-            if child_tag not in {
-                "obs",
-                "observation",
-                "data",
-            }:
-                continue
+                "observation_date": (
+                    observation_date
+                ),
 
-            child_attrs = {
-                str(k).lower(): str(v)
-                for k, v in child.attrib.items()
+                "availability_date": (
+                    availability_date
+                ),
+
+                "actual": actual,
+
+                "unit": metadata["unit"],
+
+                "frequency": metadata["frequency"],
+
+                "source": metadata["source"],
+
+                "source_url": fred_source_url(
+                    series_id
+                ),
+
+                "vintage": (
+                    "initial_release"
+                ),
+
+                "revision_flag": False,
+
+                "point_in_time_safe": True,
+
+                "availability_semantics": (
+                    metadata[
+                        "availability_semantics"
+                    ]
+                ),
             }
-
-            date_value = (
-                child_attrs.get("date")
-                or child_attrs.get(
-                    "observation_date"
-                )
-                or child_attrs.get("time")
-            )
-
-            actual_value = (
-                child_attrs.get("value")
-                or child_attrs.get("actual")
-            )
-
-            if date_value is None:
-                continue
-
-            if actual_value is None:
-                actual_value = (
-                    child.text
-                )
-
-            if actual_value is None:
-                continue
-
-            rows.append(
-                {
-                    "indicator": indicator,
-                    "observation_date": date_value,
-                    "actual": clean_number(
-                        actual_value
-                    ),
-                    "source": SOURCE_H41,
-                    "source_url": H41_CURRENT_URL,
-                    "frequency": "weekly",
-                    "unit": "millions_usd",
-                }
-            )
-
-    if not rows:
-
-        raise RuntimeError(
-            "H.4.1 parser returned zero observations. "
-            "Official source structure may have changed."
         )
 
     df = pd.DataFrame(rows)
 
-    df["observation_date"] = pd.to_datetime(
-        df["observation_date"],
-        errors="coerce",
-    )
+    if df.empty:
 
-    df = df.dropna(
-        subset=[
-            "observation_date",
-            "actual",
-        ]
-    )
+        raise RuntimeError(
+            f"{indicator} produced no valid rows."
+        )
+
+    # --------------------------------------------------------
+    # Date boundaries
+    # --------------------------------------------------------
 
     df = df[
         (df["observation_date"] >= START_DATE)
         &
         (df["observation_date"] <= END_DATE)
-    ]
+    ].copy()
 
     # --------------------------------------------------------
-    # Conservative availability
-    #
-    # H.4.1 is released Thursday and describes
-    # the Wednesday/week-ended observation.
-    #
-    # We use the following Thursday as availability.
+    # Sort
     # --------------------------------------------------------
 
-    df["availability_date"] = (
-        df["observation_date"]
-        + pd.Timedelta(days=1)
-    )
-
-    df["availability_semantics"] = (
-        AVAILABILITY_H41
-    )
-
-    df["point_in_time_safe"] = True
-
-    df["revision_flag"] = False
-
-    df["vintage"] = (
-        df["availability_date"]
-        .dt.strftime("%Y-%m-%d")
-    )
-
-    print(
-        "H.4.1 rows:",
-        len(df),
-    )
-
-    print(
-        "H.4.1 indicators:",
-        sorted(
-            df["indicator"]
-            .dropna()
-            .unique()
-            .tolist()
-        ),
-    )
-
-    return df
-
-
-# ============================================================
-# New York Fed reference rates
-# ============================================================
-
-def collect_nyfed_rate(
-    url: str,
-    indicator: str,
-):
-
-    print()
-    print(
-        "=" * 70
-    )
-    print(
-        "Collecting",
-        indicator,
-        "from New York Fed"
-    )
-    print(
-        "=" * 70
-    )
-
-    params = {
-        "startDate": START_DATE.strftime(
-            "%Y-%m-%d"
-        ),
-        "endDate": END_DATE.strftime(
-            "%Y-%m-%d"
-        ),
-        "type": "rate",
-        "operation": "search",
-    }
-
-    response = get_url(
-        url,
-        params=params,
-        timeout=120,
-    )
-
-    payload = response.json()
-
-    # --------------------------------------------------------
-    # Locate records robustly
-    # --------------------------------------------------------
-
-    records = None
-
-    if isinstance(payload, dict):
-
-        for key in [
-            "refRates",
-            "rates",
-            "data",
-            "results",
-        ]:
-
-            if (
-                key in payload
-                and isinstance(
-                    payload[key],
-                    list,
-                )
-            ):
-
-                records = payload[key]
-                break
-
-    elif isinstance(payload, list):
-
-        records = payload
-
-    if not records:
-
-        raise RuntimeError(
-            f"{indicator}: New York Fed API "
-            "returned no records."
-        )
-
-    df = pd.DataFrame(records)
-
-    df = normalize_columns(df)
-
-    # --------------------------------------------------------
-    # Date
-    # --------------------------------------------------------
-
-    date_candidates = [
-        "effectiveDate",
-        "effective_date",
-        "date",
-        "observation_date",
-    ]
-
-    date_column = None
-
-    for candidate in date_candidates:
-
-        if candidate in df.columns:
-
-            date_column = candidate
-            break
-
-    if date_column is None:
-
-        raise RuntimeError(
-            f"{indicator}: Could not identify "
-            "date column. Columns: "
-            f"{df.columns.tolist()}"
-        )
-
-    # --------------------------------------------------------
-    # Rate
-    # --------------------------------------------------------
-
-    rate_candidates = [
-        "percentRate",
-        "percent_rate",
-        "rate",
-        "value",
-    ]
-
-    rate_column = None
-
-    for candidate in rate_candidates:
-
-        if candidate in df.columns:
-
-            rate_column = candidate
-            break
-
-    if rate_column is None:
-
-        raise RuntimeError(
-            f"{indicator}: Could not identify "
-            "rate column. Columns: "
-            f"{df.columns.tolist()}"
-        )
-
-    df["observation_date"] = pd.to_datetime(
-        df[date_column],
-        errors="coerce",
-    )
-
-    df["actual"] = df[
-        rate_column
-    ].apply(clean_number)
-
-    df = df.dropna(
-        subset=[
-            "observation_date",
-            "actual",
-        ]
-    )
-
-    df = df[
-        (df["observation_date"] >= START_DATE)
-        &
-        (df["observation_date"] <= END_DATE)
-    ]
-
-    df["indicator"] = indicator
-
-    df["unit"] = "percent"
-
-    df["frequency"] = "daily"
-
-    df["source"] = SOURCE_NYFED
-
-    df["source_url"] = url
-
-    df["availability_date"] = (
-        df["observation_date"]
-        + pd.Timedelta(days=1)
-    )
-
-    df["availability_semantics"] = (
-        AVAILABILITY_NYFED
-    )
-
-    df["vintage"] = (
-        df["availability_date"]
-        .dt.strftime("%Y-%m-%d")
-    )
-
-    df["revision_flag"] = False
-
-    df["point_in_time_safe"] = True
-
-    df = df[
+    df = df.sort_values(
         [
-            "indicator",
             "observation_date",
             "availability_date",
-            "actual",
-            "unit",
-            "frequency",
-            "source",
-            "source_url",
-            "vintage",
-            "revision_flag",
-            "point_in_time_safe",
-            "availability_semantics",
         ]
-    ]
+    ).reset_index(
+        drop=True
+    )
 
     print(
-        indicator,
-        "rows:",
+        "Rows:",
         len(df),
     )
 
-    if not df.empty:
+    print(
+        "Date range:",
+        df["observation_date"].min().date(),
+        "->",
+        df["observation_date"].max().date(),
+    )
 
-        print(
-            "Date range:",
-            df["observation_date"].min().date(),
-            "->",
-            df["observation_date"].max().date(),
-        )
-
-        print(
-            "Latest value:",
-            df.sort_values(
-                "observation_date"
-            ).iloc[-1]["actual"],
-        )
+    print(
+        "Latest value:",
+        df.iloc[-1]["actual"],
+    )
 
     return df
 
@@ -748,81 +432,60 @@ def main():
 
     print()
     print("=" * 70)
-    print(COLLECTOR_NAME)
-    print("FIXED — Official Sources / Research Only")
+    print(
+        "Liquidity Historical Collector v1"
+    )
+    print(
+        "FIXED — Official FRED Series / Initial Release"
+    )
+    print(
+        "Research-only — No Decision Engine"
+    )
     print("=" * 70)
 
     print(
-        "Start date:",
+        "Start:",
         START_DATE.date(),
     )
 
     print(
-        "End date:",
+        "End:",
         END_DATE.date(),
     )
 
     print(
-        "Research-only:",
-        True,
+        "Required indicators:",
+        len(REQUIRED_INDICATORS),
     )
 
-    print(
-        "Decision Engine:",
-        False,
-    )
+    require_api_key()
 
-    print(
-        "Trading signal:",
-        False,
-    )
-
-    print(
-        "Forecast:",
-        False,
-    )
-
-    print()
+    collected = []
 
     # --------------------------------------------------------
-    # H.4.1
+    # Collect all official series
     # --------------------------------------------------------
 
-    h41 = collect_h41()
+    for indicator, metadata in SERIES.items():
 
-    # --------------------------------------------------------
-    # SOFR
-    # --------------------------------------------------------
+        df = collect_series(
+            indicator,
+            metadata,
+        )
 
-    sofr = collect_nyfed_rate(
-        SOFR_URL,
-        "SOFR",
-    )
-
-    # --------------------------------------------------------
-    # EFFR
-    # --------------------------------------------------------
-
-    effr = collect_nyfed_rate(
-        EFFR_URL,
-        "EFFR",
-    )
+        collected.append(df)
 
     # --------------------------------------------------------
     # Combine
     # --------------------------------------------------------
 
     df = pd.concat(
-        [
-            h41,
-            sofr,
-            effr,
-        ],
+        collected,
         ignore_index=True,
     )
 
     # --------------------------------------------------------
-    # Normalize
+    # Normalize types
     # --------------------------------------------------------
 
     df["observation_date"] = pd.to_datetime(
@@ -835,22 +498,13 @@ def main():
         errors="coerce",
     )
 
-    df["actual"] = df[
-        "actual"
-    ].apply(clean_number)
+    df["actual"] = pd.to_numeric(
+        df["actual"],
+        errors="coerce",
+    )
 
     # --------------------------------------------------------
-    # Date filter
-    # --------------------------------------------------------
-
-    df = df[
-        (df["observation_date"] >= START_DATE)
-        &
-        (df["observation_date"] <= END_DATE)
-    ]
-
-    # --------------------------------------------------------
-    # Remove invalid records
+    # Remove invalid rows
     # --------------------------------------------------------
 
     df = df.dropna(
@@ -863,19 +517,29 @@ def main():
     )
 
     # --------------------------------------------------------
-    # Sort
+    # Required indicator check
     # --------------------------------------------------------
 
-    df = df.sort_values(
-        [
-            "indicator",
-            "observation_date",
-            "availability_date",
-        ]
-    ).reset_index(drop=True)
+    available = set(
+        df["indicator"]
+        .unique()
+        .tolist()
+    )
+
+    missing = (
+        REQUIRED_INDICATORS
+        - available
+    )
+
+    if missing:
+
+        raise RuntimeError(
+            "Missing required indicators: "
+            + str(sorted(missing))
+        )
 
     # --------------------------------------------------------
-    # Duplicate protection
+    # Duplicate check
     # --------------------------------------------------------
 
     duplicate_mask = df.duplicated(
@@ -892,20 +556,11 @@ def main():
         duplicate_mask.sum()
     )
 
-    if duplicate_count:
+    if duplicate_count > 0:
 
-        print(
-            "WARNING: duplicate records:",
-            duplicate_count,
-        )
-
-        df = df.drop_duplicates(
-            subset=[
-                "indicator",
-                "observation_date",
-                "availability_date",
-                "vintage",
-            ]
+        raise RuntimeError(
+            "Duplicate records detected: "
+            f"{duplicate_count}"
         )
 
     # --------------------------------------------------------
@@ -921,7 +576,7 @@ def main():
 
         raise RuntimeError(
             "PIT validation failed: "
-            "availability_date is before "
+            "availability_date < "
             "observation_date."
         )
 
@@ -930,49 +585,11 @@ def main():
     ].eq(True).all():
 
         raise RuntimeError(
-            "PIT validation failed: "
-            "not all rows are marked safe."
+            "PIT flag validation failed."
         )
 
     # --------------------------------------------------------
-    # Required indicators
-    # --------------------------------------------------------
-
-    required_indicators = {
-        "FED_TOTAL_ASSETS",
-        "RESERVE_BALANCES",
-        "TREASURY_SECURITIES",
-        "MBS",
-        "TGA",
-        "ON_RRP",
-        "SOFR",
-        "EFFR",
-    }
-
-    available_indicators = set(
-        df["indicator"]
-        .unique()
-        .tolist()
-    )
-
-    missing_indicators = (
-        required_indicators
-        - available_indicators
-    )
-
-    if missing_indicators:
-
-        raise RuntimeError(
-            "Missing required liquidity indicators: "
-            + str(
-                sorted(
-                    missing_indicators
-                )
-            )
-        )
-
-    # --------------------------------------------------------
-    # Add research metadata
+    # Research metadata
     # --------------------------------------------------------
 
     df["research_only"] = True
@@ -986,7 +603,21 @@ def main():
     df["liquidity_score_generated"] = False
 
     # --------------------------------------------------------
-    # Final column order
+    # Sort
+    # --------------------------------------------------------
+
+    df = df.sort_values(
+        [
+            "indicator",
+            "observation_date",
+            "availability_date",
+        ]
+    ).reset_index(
+        drop=True
+    )
+
+    # --------------------------------------------------------
+    # Column order
     # --------------------------------------------------------
 
     columns = [
@@ -1012,29 +643,7 @@ def main():
     df = df[columns]
 
     # --------------------------------------------------------
-    # Final validation
-    # --------------------------------------------------------
-
-    if df.empty:
-
-        raise RuntimeError(
-            "Final liquidity dataset is empty."
-        )
-
-    if df["indicator"].isna().any():
-
-        raise RuntimeError(
-            "Indicator contains missing values."
-        )
-
-    if df["actual"].isna().any():
-
-        raise RuntimeError(
-            "Actual contains missing values."
-        )
-
-    # --------------------------------------------------------
-    # Save
+    # Save main output
     # --------------------------------------------------------
 
     df.to_csv(
@@ -1062,30 +671,47 @@ def main():
         summary_rows.append(
             {
                 "indicator": indicator,
+
+                "series_id": (
+                    SERIES[indicator][
+                        "series_id"
+                    ]
+                ),
+
                 "rows": len(group),
+
                 "first_observation": (
                     group[
                         "observation_date"
                     ].min()
                 ),
+
                 "last_observation": (
                     group[
                         "observation_date"
                     ].max()
                 ),
+
                 "latest_availability": (
                     latest[
                         "availability_date"
                     ]
                 ),
+
                 "latest_actual": (
                     latest["actual"]
                 ),
+
                 "point_in_time_safe": True,
+
                 "research_only": True,
+
                 "decision_engine_ready": False,
+
                 "trading_signal_generated": False,
+
                 "forecast_generated": False,
+
                 "liquidity_score_generated": False,
             }
         )
@@ -1100,13 +726,57 @@ def main():
     )
 
     # --------------------------------------------------------
+    # Final validation
+    # --------------------------------------------------------
+
+    if not df["research_only"].eq(
+        True
+    ).all():
+
+        raise RuntimeError(
+            "research_only validation failed."
+        )
+
+    if not df[
+        "decision_engine_ready"
+    ].eq(False).all():
+
+        raise RuntimeError(
+            "Decision Engine validation failed."
+        )
+
+    if not df[
+        "trading_signal_generated"
+    ].eq(False).all():
+
+        raise RuntimeError(
+            "Trading signal validation failed."
+        )
+
+    if not df[
+        "forecast_generated"
+    ].eq(False).all():
+
+        raise RuntimeError(
+            "Forecast validation failed."
+        )
+
+    if not df[
+        "liquidity_score_generated"
+    ].eq(False).all():
+
+        raise RuntimeError(
+            "Liquidity score validation failed."
+        )
+
+    # --------------------------------------------------------
     # Final report
     # --------------------------------------------------------
 
     print()
     print("=" * 70)
     print(
-        "LIQUIDITY HISTORICAL COLLECTION COMPLETE"
+        "LIQUIDITY HISTORICAL COLLECTION PASSED"
     )
     print("=" * 70)
 
@@ -1117,8 +787,7 @@ def main():
 
     print(
         "Indicators:",
-        df["indicator"]
-        .nunique(),
+        df["indicator"].nunique(),
     )
 
     print(
@@ -1130,6 +799,10 @@ def main():
 
     print()
     print(
+        "Rows per indicator:"
+    )
+
+    print(
         df.groupby("indicator")
         .size()
         .to_string()
@@ -1137,45 +810,27 @@ def main():
 
     print()
     print(
-        "PIT safe:",
-        df[
-            "point_in_time_safe"
-        ].all(),
+        "PIT safe: TRUE"
     )
 
     print(
-        "Research only:",
-        df[
-            "research_only"
-        ].all(),
+        "Research only: TRUE"
     )
 
     print(
-        "Decision Engine:",
-        df[
-            "decision_engine_ready"
-        ].any(),
+        "Decision Engine: FALSE"
     )
 
     print(
-        "Trading signal:",
-        df[
-            "trading_signal_generated"
-        ].any(),
+        "Trading signal: FALSE"
     )
 
     print(
-        "Forecast:",
-        df[
-            "forecast_generated"
-        ].any(),
+        "Forecast: FALSE"
     )
 
     print(
-        "Liquidity score:",
-        df[
-            "liquidity_score_generated"
-        ].any(),
+        "Liquidity score: FALSE"
     )
 
     print()
