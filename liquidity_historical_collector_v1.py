@@ -8,9 +8,14 @@ Purpose:
     Collect historical liquidity-related observations from official
     FRED series using output_type=4 (Initial Release Only).
 
-The FRED real-time period is requested in yearly chunks because
-FRED limits the number of vintage dates returned by a single
-request to 2000.
+Method:
+    1. Retrieve the actual FRED vintage dates for each series.
+    2. Restrict vintage dates to the requested historical period.
+    3. Request observations using vintage_dates in small batches.
+    4. Use output_type=4 so the returned observations represent
+       Initial Release Only.
+    5. Deduplicate observations while preserving the earliest
+       initial-release vintage metadata.
 
 Indicators:
     WALCL      - Federal Reserve Total Assets
@@ -22,11 +27,11 @@ Indicators:
     SOFR       - Secured Overnight Financing Rate
     EFFR       - Effective Federal Funds Rate
 
-No:
-    - Liquidity score
-    - Trading signal
-    - Forecast
-    - Decision Engine
+Research-only:
+    - No liquidity score
+    - No trading signal
+    - No forecast
+    - No Decision Engine
 """
 
 import os
@@ -53,10 +58,16 @@ END_DATE = os.getenv(
     "2026-09-21"
 )
 
-FRED_API_KEY = os.getenv("FRED_API_KEY")
+FRED_API_KEY = os.getenv(
+    "FRED_API_KEY"
+)
 
-FRED_ENDPOINT = (
+FRED_OBSERVATIONS_ENDPOINT = (
     "https://api.stlouisfed.org/fred/series/observations"
+)
+
+FRED_VINTAGE_DATES_ENDPOINT = (
+    "https://api.stlouisfed.org/fred/series/vintagedates"
 )
 
 OUTPUT_FILE = Path(
@@ -67,18 +78,25 @@ SUMMARY_FILE = Path(
     "liquidity_historical_collection_summary_v1.csv"
 )
 
+# Keep this comfortably below FRED's documented
+# maximum vintage-date limit.
+VINTAGE_BATCH_SIZE = 500
+
 
 # ================================================================
 # OFFICIAL FRED SERIES
 # ================================================================
 
 SERIES = {
+
     "WALCL": {
         "indicator": "FED_TOTAL_ASSETS",
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/WALCL",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/WALCL"
+        ),
     },
 
     "WRESBAL": {
@@ -86,7 +104,9 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/WRESBAL",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/WRESBAL"
+        ),
     },
 
     "WTREGEN": {
@@ -94,7 +114,9 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/WTREGEN",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/WTREGEN"
+        ),
     },
 
     "WSHOTSL": {
@@ -102,7 +124,9 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/WSHOTSL",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/WSHOTSL"
+        ),
     },
 
     "WSHOMCB": {
@@ -110,7 +134,9 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/WSHOMCB",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/WSHOMCB"
+        ),
     },
 
     "RRPONTSYD": {
@@ -118,7 +144,9 @@ SERIES = {
         "unit": "Billions of U.S. Dollars",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/RRPONTSYD",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/RRPONTSYD"
+        ),
     },
 
     "SOFR": {
@@ -126,7 +154,9 @@ SERIES = {
         "unit": "Percent",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/SOFR",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/SOFR"
+        ),
     },
 
     "EFFR": {
@@ -134,7 +164,9 @@ SERIES = {
         "unit": "Percent",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": "https://fred.stlouisfed.org/series/EFFR",
+        "source_url": (
+            "https://fred.stlouisfed.org/series/EFFR"
+        ),
     },
 }
 
@@ -144,22 +176,39 @@ SERIES = {
 # ================================================================
 
 OUTPUT_COLUMNS = [
+
     "indicator",
+
     "observation_date",
+
     "availability_date",
+
     "actual",
+
     "unit",
+
     "frequency",
+
     "source",
+
     "source_url",
+
     "vintage",
+
     "revision_flag",
+
     "point_in_time_safe",
+
     "availability_semantics",
+
     "research_only",
+
     "decision_engine_ready",
+
     "trading_signal_generated",
+
     "forecast_generated",
+
     "liquidity_score_generated",
 ]
 
@@ -168,9 +217,13 @@ OUTPUT_COLUMNS = [
 # DATE UTILITIES
 # ================================================================
 
-def validate_date(value, name):
+def validate_date(
+    value,
+    name
+):
 
     try:
+
         return datetime.strptime(
             value,
             "%Y-%m-%d"
@@ -182,70 +235,6 @@ def validate_date(value, name):
             f"{name} must use YYYY-MM-DD format. "
             f"Received: {value}"
         ) from exc
-
-
-def generate_realtime_chunks(
-    start_date,
-    end_date
-):
-    """
-    Generate yearly real-time periods.
-
-    This avoids FRED's maximum-vintage-date limitation.
-
-    Example:
-
-        2019-01-01 → 2019-12-31
-        2020-01-01 → 2020-12-31
-        ...
-        2026-01-01 → 2026-12-31
-    """
-
-    start_dt = datetime.strptime(
-        start_date,
-        "%Y-%m-%d"
-    )
-
-    end_dt = datetime.strptime(
-        end_date,
-        "%Y-%m-%d"
-    )
-
-    chunks = []
-
-    current_year = start_dt.year
-    final_year = end_dt.year
-
-    while current_year <= final_year:
-
-        chunk_start = datetime(
-            current_year,
-            1,
-            1
-        )
-
-        chunk_end = datetime(
-            current_year,
-            12,
-            31
-        )
-
-        if chunk_start < start_dt:
-            chunk_start = start_dt
-
-        if chunk_end > end_dt:
-            chunk_end = end_dt
-
-        chunks.append(
-            (
-                chunk_start.strftime("%Y-%m-%d"),
-                chunk_end.strftime("%Y-%m-%d")
-            )
-        )
-
-        current_year += 1
-
-    return chunks
 
 
 # ================================================================
@@ -303,48 +292,23 @@ def validate_configuration():
 
 
 # ================================================================
-# FRED SINGLE REQUEST
+# FRED REQUEST HELPER
 # ================================================================
 
-def fetch_fred_chunk(
+def fred_get(
+    endpoint,
+    params,
     series_id,
-    observation_start,
-    observation_end,
-    realtime_start,
-    realtime_end
+    purpose
 ):
     """
-    Fetch one FRED real-time chunk.
-
-    output_type=4:
-        Initial Release Only
+    Generic FRED API GET helper with detailed diagnostics.
     """
-
-    params = {
-
-        "api_key": FRED_API_KEY,
-
-        "file_type": "json",
-
-        "series_id": series_id,
-
-        "observation_start": observation_start,
-
-        "observation_end": observation_end,
-
-        "output_type": 4,
-
-        "realtime_start": realtime_start,
-
-        "realtime_end": realtime_end,
-
-        "sort_order": "asc",
-    }
 
     try:
 
         response = requests.get(
-            FRED_ENDPOINT,
+            endpoint,
             params=params,
             timeout=60,
         )
@@ -352,32 +316,37 @@ def fetch_fred_chunk(
     except requests.RequestException as exc:
 
         raise RuntimeError(
-            f"FRED network error for {series_id}: "
-            f"{exc}"
+            f"FRED network error for {series_id} "
+            f"during {purpose}: {exc}"
         ) from exc
 
     if response.status_code != 200:
 
         print("")
-        print("=" * 70)
+        print("=" * 80)
         print("FRED API ERROR")
-        print("=" * 70)
-        print(f"Series: {series_id}")
+        print("=" * 80)
+
         print(
-            f"Observation period: "
-            f"{observation_start} → {observation_end}"
+            f"Series: {series_id}"
         )
+
         print(
-            f"Real-time period: "
-            f"{realtime_start} → {realtime_end}"
+            f"Purpose: {purpose}"
         )
+
         print(
-            f"HTTP status: {response.status_code}"
+            f"HTTP status: "
+            f"{response.status_code}"
         )
+
         print("")
         print("FRED response:")
-        print(response.text)
-        print("=" * 70)
+        print(
+            response.text
+        )
+
+        print("=" * 80)
         print("")
 
         raise RuntimeError(
@@ -394,29 +363,176 @@ def fetch_fred_chunk(
 
         raise RuntimeError(
             f"Invalid JSON response for "
-            f"{series_id}"
+            f"{series_id} during {purpose}."
         ) from exc
 
     if "error_code" in data:
 
         raise RuntimeError(
-            f"FRED API error "
-            f"{data.get('error_code')}: "
+            f"FRED API error for {series_id}: "
+            f"{data.get('error_code')} - "
             f"{data.get('error_message')}"
         )
 
-    if "observations" not in data:
-
-        raise RuntimeError(
-            f"FRED response for {series_id} "
-            "does not contain observations."
-        )
-
-    return data["observations"]
+    return data
 
 
 # ================================================================
-# FETCH SERIES IN YEARLY REAL-TIME CHUNKS
+# GET FRED VINTAGE DATES
+# ================================================================
+
+def fetch_vintage_dates(
+    series_id,
+    start_date,
+    end_date
+):
+    """
+    Retrieve actual FRED vintage dates for a series.
+
+    The /series/vintagedates endpoint returns dates in history
+    when observations were released or revised.
+
+    We restrict them to the requested historical period.
+    """
+
+    print("")
+    print(
+        f"[{series_id}] Fetching FRED vintage dates..."
+    )
+
+    params = {
+
+        "api_key": FRED_API_KEY,
+
+        "file_type": "json",
+
+        "series_id": series_id,
+
+        "realtime_start": start_date,
+
+        "realtime_end": end_date,
+
+        "limit": 10000,
+
+        "offset": 0,
+
+        "sort_order": "asc",
+    }
+
+    data = fred_get(
+        endpoint=FRED_VINTAGE_DATES_ENDPOINT,
+        params=params,
+        series_id=series_id,
+        purpose="vintage dates",
+    )
+
+    vintage_dates = data.get(
+        "vintage_dates",
+        []
+    )
+
+    if not vintage_dates:
+
+        raise RuntimeError(
+            f"No FRED vintage dates found "
+            f"for {series_id} between "
+            f"{start_date} and {end_date}."
+        )
+
+    # Defensive filtering.
+    filtered = [
+        date
+        for date in vintage_dates
+        if start_date <= date <= end_date
+    ]
+
+    filtered = sorted(
+        set(filtered)
+    )
+
+    print(
+        f"[{series_id}] Vintage dates found: "
+        f"{len(filtered):,}"
+    )
+
+    if filtered:
+
+        print(
+            f"[{series_id}] Vintage range: "
+            f"{filtered[0]} -> {filtered[-1]}"
+        )
+
+    if not filtered:
+
+        raise RuntimeError(
+            f"No usable vintage dates remain "
+            f"for {series_id} after filtering."
+        )
+
+    return filtered
+
+
+# ================================================================
+# FETCH OBSERVATIONS FOR VINTAGE BATCH
+# ================================================================
+
+def fetch_observation_vintage_batch(
+    series_id,
+    start_date,
+    end_date,
+    vintage_dates
+):
+    """
+    Fetch observations for a batch of actual FRED vintage dates.
+
+    output_type=4:
+        Observations, Initial Release Only.
+    """
+
+    vintage_string = ",".join(
+        vintage_dates
+    )
+
+    params = {
+
+        "api_key": FRED_API_KEY,
+
+        "file_type": "json",
+
+        "series_id": series_id,
+
+        "observation_start": start_date,
+
+        "observation_end": end_date,
+
+        "output_type": 4,
+
+        "vintage_dates": vintage_string,
+
+        "sort_order": "asc",
+
+        "limit": 100000,
+
+        "offset": 0,
+    }
+
+    data = fred_get(
+        endpoint=FRED_OBSERVATIONS_ENDPOINT,
+        params=params,
+        series_id=series_id,
+        purpose="initial-release observations",
+    )
+
+    observations = data.get(
+        "observations",
+        []
+    )
+
+    return observations
+
+
+# ================================================================
+# FETCH COMPLETE SERIES
 # ================================================================
 
 def fetch_fred_series(
@@ -425,45 +541,67 @@ def fetch_fred_series(
     end_date
 ):
     """
-    Fetch a complete series using yearly real-time chunks.
+    Fetch a complete Initial Release Only series.
 
-    The chunks are deliberately smaller than FRED's
-    2000-vintage-date limit.
+    Process:
+
+        1. Get actual vintage dates.
+        2. Split them into safe batches.
+        3. Request output_type=4 for each batch.
+        4. Combine all observations.
+        5. Deduplicate later during normalization.
     """
 
-    chunks = generate_realtime_chunks(
-        start_date,
-        end_date
+    vintage_dates = fetch_vintage_dates(
+        series_id=series_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    batches = [
+
+        vintage_dates[i:i + VINTAGE_BATCH_SIZE]
+
+        for i in range(
+            0,
+            len(vintage_dates),
+            VINTAGE_BATCH_SIZE
+        )
+    ]
+
+    print(
+        f"[{series_id}] Vintage batches: "
+        f"{len(batches)}"
     )
 
     all_observations = []
 
-    print(
-        f"Real-time chunks: {len(chunks)}"
-    )
-
-    for (
-        realtime_start,
-        realtime_end
-    ) in chunks:
+    for batch_number, batch in enumerate(
+        batches,
+        start=1
+    ):
 
         print(
-            f"  Chunk: "
-            f"{realtime_start} → "
-            f"{realtime_end}"
+            f"[{series_id}] "
+            f"Batch {batch_number}/"
+            f"{len(batches)}: "
+            f"{batch[0]} -> {batch[-1]} "
+            f"({len(batch)} vintage dates)"
         )
 
-        observations = fetch_fred_chunk(
-            series_id=series_id,
-            observation_start=start_date,
-            observation_end=end_date,
-            realtime_start=realtime_start,
-            realtime_end=realtime_end,
+        observations = (
+            fetch_observation_vintage_batch(
+                series_id=series_id,
+                start_date=start_date,
+                end_date=end_date,
+                vintage_dates=batch,
+            )
         )
 
         print(
-            f"    Received: "
-            f"{len(observations):,}"
+            f"[{series_id}] "
+            f"Batch {batch_number} returned: "
+            f"{len(observations):,} observations"
         )
 
         all_observations.extend(
@@ -471,10 +609,17 @@ def fetch_fred_series(
         )
 
     print(
-        f"Total raw observations collected "
-        f"for {series_id}: "
+        f"[{series_id}] "
+        f"Total raw observations: "
         f"{len(all_observations):,}"
     )
+
+    if not all_observations:
+
+        raise RuntimeError(
+            f"FRED returned zero observations "
+            f"for {series_id}."
+        )
 
     return all_observations
 
@@ -487,8 +632,14 @@ def convert_series(
     series_id,
     observations
 ):
+    """
+    Convert raw FRED observations into the
+    project's standardized research schema.
+    """
 
-    meta = SERIES[series_id]
+    meta = SERIES[
+        series_id
+    ]
 
     rows = []
 
@@ -503,6 +654,7 @@ def convert_series(
         )
 
         if not observation_date:
+
             continue
 
         if raw_value in (
@@ -510,6 +662,7 @@ def convert_series(
             "",
             ".",
         ):
+
             continue
 
         try:
@@ -537,15 +690,81 @@ def convert_series(
             continue
 
         # --------------------------------------------------------
-        # Conservative availability proxy
+        # FRED Initial Release Date
         # --------------------------------------------------------
 
-        availability_date = (
-            obs_dt +
-            timedelta(days=1)
-        ).strftime(
+        fred_release_date = obs.get(
+            "realtime_start"
+        )
+
+        if fred_release_date:
+
+            try:
+
+                release_dt = datetime.strptime(
+                    fred_release_date,
+                    "%Y-%m-%d"
+                )
+
+                availability_date = (
+                    release_dt.strftime(
+                        "%Y-%m-%d"
+                    )
+                )
+
+                availability_semantics = (
+                    "FRED realtime_start; "
+                    "output_type=4 Initial Release"
+                )
+
+            except ValueError:
+
+                availability_date = (
+                    obs_dt +
+                    timedelta(days=1)
+                ).strftime(
+                    "%Y-%m-%d"
+                )
+
+                availability_semantics = (
+                    "Fallback conservative +1 "
+                    "calendar-day availability proxy; "
+                    "FRED output_type=4 Initial Release"
+                )
+
+        else:
+
+            availability_date = (
+                obs_dt +
+                timedelta(days=1)
+            ).strftime(
+                "%Y-%m-%d"
+            )
+
+            availability_semantics = (
+                "Fallback conservative +1 "
+                "calendar-day availability proxy; "
+                "FRED output_type=4 Initial Release"
+            )
+
+        # --------------------------------------------------------
+        # PIT sanity
+        # --------------------------------------------------------
+
+        availability_dt = datetime.strptime(
+            availability_date,
             "%Y-%m-%d"
         )
+
+        if availability_dt < obs_dt:
+
+            raise RuntimeError(
+                f"PIT violation for {series_id}: "
+                f"observation_date="
+                f"{observation_date}, "
+                f"availability_date="
+                f"{availability_date}"
+            )
 
         rows.append(
             {
@@ -553,9 +772,7 @@ def convert_series(
                     meta["indicator"],
 
                 "observation_date":
-                    obs_dt.strftime(
-                        "%Y-%m-%d"
-                    ),
+                    observation_date,
 
                 "availability_date":
                     availability_date,
@@ -585,9 +802,7 @@ def convert_series(
                     True,
 
                 "availability_semantics":
-                    "Conservative +1 calendar day "
-                    "availability proxy; "
-                    "FRED output_type=4 initial release",
+                    availability_semantics,
 
                 "research_only":
                     True,
@@ -606,6 +821,12 @@ def convert_series(
             }
         )
 
+    print(
+        f"[{series_id}] "
+        f"Usable converted rows: "
+        f"{len(rows):,}"
+    )
+
     return rows
 
 
@@ -618,32 +839,38 @@ def collect_all_series():
     all_rows = []
 
     print("")
-    print("=" * 70)
+    print("=" * 80)
     print("Liquidity Historical Collector v1")
     print("Official FRED Series / Initial Release")
     print("Research-only — No Decision Engine")
-    print("=" * 70)
+    print("=" * 80)
+
     print(
         f"Start: {START_DATE}"
     )
+
     print(
         f"End:   {END_DATE}"
     )
+
     print(
-        f"Required indicators: "
-        f"{len(SERIES)}"
+        f"Required series: {len(SERIES)}"
     )
+
     print("")
 
     for series_id, meta in SERIES.items():
 
-        print("-" * 70)
+        print("")
+        print("-" * 80)
+
         print(
-            f"Collecting "
+            f"Collecting: "
             f"{meta['indicator']} "
             f"[{series_id}]"
         )
-        print("-" * 70)
+
+        print("-" * 80)
 
         observations = fetch_fred_series(
             series_id=series_id,
@@ -652,8 +879,8 @@ def collect_all_series():
         )
 
         rows = convert_series(
-            series_id,
-            observations,
+            series_id=series_id,
+            observations=observations,
         )
 
         if not rows:
@@ -663,13 +890,14 @@ def collect_all_series():
                 f"for {series_id}."
             )
 
-        print(
-            f"Usable observations: "
-            f"{len(rows):,}"
-        )
-
         all_rows.extend(
             rows
+        )
+
+        print(
+            f"[{series_id}] "
+            f"Added to collection: "
+            f"{len(rows):,}"
         )
 
     return all_rows
@@ -682,9 +910,9 @@ def collect_all_series():
 def validate_output(df):
 
     print("")
-    print("=" * 70)
+    print("=" * 80)
     print("Collector Output Validation")
-    print("=" * 70)
+    print("=" * 80)
 
     # ------------------------------------------------------------
     # Schema
@@ -919,7 +1147,7 @@ def validate_output(df):
         )
 
     # ------------------------------------------------------------
-    # Signals
+    # Trading signals
     # ------------------------------------------------------------
 
     if not (
@@ -977,22 +1205,66 @@ def validate_output(df):
             "Unexpected vintage metadata."
         )
 
-    print("Schema: PASS")
-    print("Indicators: PASS")
-    print("Dates: PASS")
-    print("Availability dates: PASS")
-    print("Actual values: PASS")
-    print("Duplicates: PASS")
-    print("Point-in-time safety: PASS")
-    print("Revision flags: PASS")
-    print("Research-only: PASS")
-    print("Decision Engine: FALSE")
-    print("Trading signals: FALSE")
-    print("Forecast: FALSE")
-    print("Liquidity score: FALSE")
-    print("Vintage: initial_release")
+    print(
+        "Schema: PASS"
+    )
+
+    print(
+        "Indicators: PASS"
+    )
+
+    print(
+        "Dates: PASS"
+    )
+
+    print(
+        "Availability dates: PASS"
+    )
+
+    print(
+        "Actual values: PASS"
+    )
+
+    print(
+        "Duplicates: PASS"
+    )
+
+    print(
+        "Point-in-time safety: PASS"
+    )
+
+    print(
+        "Revision flags: PASS"
+    )
+
+    print(
+        "Research-only: PASS"
+    )
+
+    print(
+        "Decision Engine: FALSE"
+    )
+
+    print(
+        "Trading signals: FALSE"
+    )
+
+    print(
+        "Forecast: FALSE"
+    )
+
+    print(
+        "Liquidity score: FALSE"
+    )
+
+    print(
+        "Vintage: initial_release"
+    )
+
     print("")
-    print("Validation: PASS")
+    print(
+        "Validation: PASS"
+    )
 
 
 # ================================================================
@@ -1010,13 +1282,11 @@ def build_summary(df):
         )
     ):
 
-        latest = (
-            group
-            .sort_values(
-                "observation_date"
-            )
-            .iloc[-1]
+        group = group.sort_values(
+            "observation_date"
         )
+
+        latest = group.iloc[-1]
 
         summary_rows.append(
             {
@@ -1092,7 +1362,15 @@ def main():
 
     try:
 
+        # --------------------------------------------------------
+        # Configuration
+        # --------------------------------------------------------
+
         validate_configuration()
+
+        # --------------------------------------------------------
+        # Collection
+        # --------------------------------------------------------
 
         rows = collect_all_series()
 
@@ -1106,29 +1384,73 @@ def main():
             rows
         )
 
+        # --------------------------------------------------------
         # Exact schema
+        # --------------------------------------------------------
+
         df = df[
             OUTPUT_COLUMNS
         ]
 
         # --------------------------------------------------------
-        # Remove duplicate observations created by chunk overlap
+        # Convert date fields before deduplication
+        # --------------------------------------------------------
+
+        df["observation_date"] = pd.to_datetime(
+            df["observation_date"]
+        )
+
+        df["availability_date"] = pd.to_datetime(
+            df["availability_date"]
+        )
+
+        # --------------------------------------------------------
+        # Deduplicate observations created by multiple
+        # vintage batches.
+        #
+        # Keep the earliest known initial-release metadata.
         # --------------------------------------------------------
 
         df = (
             df
+            .sort_values(
+                [
+                    "indicator",
+                    "observation_date",
+                    "availability_date",
+                ]
+            )
             .drop_duplicates(
                 subset=[
                     "indicator",
                     "observation_date",
-                    "availability_date",
-                    "vintage",
                 ],
                 keep="first"
             )
         )
 
+        # --------------------------------------------------------
+        # Convert dates back to ISO strings
+        # --------------------------------------------------------
+
+        df["observation_date"] = (
+            df["observation_date"]
+            .dt.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+        df["availability_date"] = (
+            df["availability_date"]
+            .dt.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+        # --------------------------------------------------------
         # Deterministic order
+        # --------------------------------------------------------
+
         df = (
             df
             .sort_values(
@@ -1142,23 +1464,35 @@ def main():
             )
         )
 
+        # --------------------------------------------------------
         # Validate
+        # --------------------------------------------------------
+
         validate_output(
             df
         )
 
+        # --------------------------------------------------------
         # Summary
+        # --------------------------------------------------------
+
         summary = build_summary(
             df
         )
 
+        # --------------------------------------------------------
         # Save records
+        # --------------------------------------------------------
+
         df.to_csv(
             OUTPUT_FILE,
             index=False
         )
 
+        # --------------------------------------------------------
         # Save summary
+        # --------------------------------------------------------
+
         summary.to_csv(
             SUMMARY_FILE,
             index=False
@@ -1169,12 +1503,14 @@ def main():
         # --------------------------------------------------------
 
         print("")
-        print("=" * 70)
+        print("=" * 80)
+
         print(
             "LIQUIDITY HISTORICAL "
             "COLLECTION COMPLETE"
         )
-        print("=" * 70)
+
+        print("=" * 80)
 
         print(
             f"Total rows: "
@@ -1188,9 +1524,9 @@ def main():
 
         print(
             f"Observation range: "
-            f"{df['observation_date'].min().date()} "
-            f"→ "
-            f"{df['observation_date'].max().date()}"
+            f"{df['observation_date'].min()} "
+            f"-> "
+            f"{df['observation_date'].max()}"
         )
 
         print("")
@@ -1211,6 +1547,30 @@ def main():
 
             print(
                 f"  {indicator:30s}"
+                f"{count:>8,}"
+            )
+
+        print("")
+        print(
+            "Required indicators:"
+        )
+
+        for series_id, meta in SERIES.items():
+
+            indicator = meta[
+                "indicator"
+            ]
+
+            count = int(
+                (
+                    df["indicator"] ==
+                    indicator
+                ).sum()
+            )
+
+            print(
+                f"  {series_id:12s}"
+                f"{indicator:30s}"
                 f"{count:>8,}"
             )
 
@@ -1249,27 +1609,38 @@ def main():
         )
 
         print("")
-        print("=" * 70)
-        print("STATUS: PASS")
-        print("=" * 70)
+        print("=" * 80)
+        print(
+            "STATUS: PASS"
+        )
+        print("=" * 80)
 
     except Exception as exc:
 
         print("")
-        print("=" * 70)
+        print("=" * 80)
+
         print(
             "LIQUIDITY HISTORICAL "
             "COLLECTOR FAILED"
         )
-        print("=" * 70)
+
+        print("=" * 80)
+
         print(
             f"Error: {exc}"
         )
-        print("=" * 70)
+
+        print("=" * 80)
         print("")
 
         sys.exit(1)
 
 
+# ================================================================
+# ENTRY POINT
+# ================================================================
+
 if __name__ == "__main__":
+
     main()
