@@ -1,7 +1,7 @@
 """
 Liquidity Historical Collector v1
 
-FIXED — Official FRED Series / Initial Release
+Official FRED Series / Initial Release
 Research-only — No Decision Engine
 
 Purpose:
@@ -18,12 +18,11 @@ Indicators:
     SOFR       - Secured Overnight Financing Rate
     EFFR       - Effective Federal Funds Rate
 
-Important:
-    - No liquidity score
-    - No trading signal
-    - No forecast
-    - No Decision Engine integration
-    - Research-only
+No:
+    - Liquidity score
+    - Trading signal
+    - Forecast
+    - Decision Engine
 """
 
 import os
@@ -37,7 +36,7 @@ import requests
 
 
 # ================================================================
-# Configuration
+# CONFIGURATION
 # ================================================================
 
 START_DATE = os.getenv(
@@ -56,6 +55,11 @@ FRED_ENDPOINT = (
     "https://api.stlouisfed.org/fred/series/observations"
 )
 
+# IMPORTANT:
+# Wide real-time period is required when using output_type=4.
+REALTIME_START = "1776-07-04"
+REALTIME_END = "9999-12-31"
+
 OUTPUT_FILE = Path(
     "liquidity_historical_records_input_v1.csv"
 )
@@ -66,7 +70,7 @@ SUMMARY_FILE = Path(
 
 
 # ================================================================
-# Official FRED series
+# OFFICIAL FRED SERIES
 # ================================================================
 
 SERIES = {
@@ -75,9 +79,7 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/WALCL"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/WALCL",
     },
 
     "WRESBAL": {
@@ -85,9 +87,7 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/WRESBAL"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/WRESBAL",
     },
 
     "WTREGEN": {
@@ -95,9 +95,7 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/WTREGEN"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/WTREGEN",
     },
 
     "WSHOTSL": {
@@ -105,9 +103,7 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/WSHOTSL"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/WSHOTSL",
     },
 
     "WSHOMCB": {
@@ -115,9 +111,7 @@ SERIES = {
         "unit": "Millions of U.S. Dollars",
         "frequency": "Weekly",
         "source": "Federal Reserve H.4.1 via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/WSHOMCB"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/WSHOMCB",
     },
 
     "RRPONTSYD": {
@@ -125,9 +119,7 @@ SERIES = {
         "unit": "Billions of U.S. Dollars",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/RRPONTSYD"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/RRPONTSYD",
     },
 
     "SOFR": {
@@ -135,9 +127,7 @@ SERIES = {
         "unit": "Percent",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/SOFR"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/SOFR",
     },
 
     "EFFR": {
@@ -145,15 +135,13 @@ SERIES = {
         "unit": "Percent",
         "frequency": "Daily",
         "source": "Federal Reserve Bank of New York via FRED",
-        "source_url": (
-            "https://fred.stlouisfed.org/series/EFFR"
-        ),
+        "source_url": "https://fred.stlouisfed.org/series/EFFR",
     },
 }
 
 
 # ================================================================
-# Required output schema
+# OUTPUT SCHEMA
 # ================================================================
 
 OUTPUT_COLUMNS = [
@@ -178,44 +166,52 @@ OUTPUT_COLUMNS = [
 
 
 # ================================================================
-# Utility
+# DATE VALIDATION
 # ================================================================
 
-def validate_date(value: str, name: str) -> datetime:
+def validate_date(value, name):
+
     try:
         return datetime.strptime(
             value,
             "%Y-%m-%d"
         )
+
     except ValueError as exc:
+
         raise RuntimeError(
             f"{name} must use YYYY-MM-DD format. "
             f"Received: {value}"
         ) from exc
 
 
+# ================================================================
+# CONFIGURATION VALIDATION
+# ================================================================
+
 def validate_configuration():
-    """
-    Validate API key and date configuration.
-    """
 
     if not FRED_API_KEY:
+
         raise RuntimeError(
             "FRED_API_KEY is missing. "
             "Configure it as a GitHub Actions secret."
         )
 
     if len(FRED_API_KEY) != 32:
+
         raise RuntimeError(
             "FRED_API_KEY must be exactly 32 characters."
         )
 
     if FRED_API_KEY != FRED_API_KEY.lower():
+
         raise RuntimeError(
             "FRED_API_KEY must use lowercase characters."
         )
 
     if not FRED_API_KEY.isalnum():
+
         raise RuntimeError(
             "FRED_API_KEY must contain only "
             "letters and numbers."
@@ -232,6 +228,7 @@ def validate_configuration():
     )
 
     if start_dt > end_dt:
+
         raise RuntimeError(
             f"Start date {START_DATE} is after "
             f"end date {END_DATE}."
@@ -241,32 +238,49 @@ def validate_configuration():
 
 
 # ================================================================
-# FRED API
+# FRED API REQUEST
 # ================================================================
 
 def fetch_fred_series(
-    series_id: str,
-    start_date: str,
-    end_date: str,
+    series_id,
+    start_date,
+    end_date
 ):
     """
-    Fetch FRED observations using output_type=4.
+    Fetch FRED observations.
 
     output_type=4:
-        Observations, Initial Release Only
+        Initial Release Only
+
+    A wide real-time period is explicitly supplied so FRED does
+    not default to today's date as the vintage period.
     """
 
     params = {
+
         "api_key": FRED_API_KEY,
+
         "file_type": "json",
+
         "series_id": series_id,
+
         "observation_start": start_date,
+
         "observation_end": end_date,
+
+        # Initial release only
         "output_type": 4,
+
+        # IMPORTANT FIX
+        "realtime_start": REALTIME_START,
+
+        "realtime_end": REALTIME_END,
+
         "sort_order": "asc",
     }
 
     try:
+
         response = requests.get(
             FRED_ENDPOINT,
             params=params,
@@ -274,6 +288,7 @@ def fetch_fred_series(
         )
 
     except requests.RequestException as exc:
+
         print("")
         print("=" * 70)
         print("FRED NETWORK ERROR")
@@ -288,7 +303,7 @@ def fetch_fred_series(
         ) from exc
 
     # ------------------------------------------------------------
-    # Explicit HTTP validation
+    # HTTP ERROR
     # ------------------------------------------------------------
 
     if response.status_code != 200:
@@ -309,18 +324,20 @@ def fetch_fred_series(
         print("")
 
         raise RuntimeError(
-            f"FRED API request failed for {series_id}: "
-            f"HTTP {response.status_code}"
+            f"FRED API request failed for "
+            f"{series_id}: HTTP {response.status_code}"
         )
 
     # ------------------------------------------------------------
-    # JSON parsing
+    # JSON
     # ------------------------------------------------------------
 
     try:
+
         data = response.json()
 
     except ValueError as exc:
+
         print("")
         print("=" * 70)
         print("FRED RESPONSE ERROR")
@@ -336,7 +353,7 @@ def fetch_fred_series(
         ) from exc
 
     # ------------------------------------------------------------
-    # FRED API error payload
+    # FRED ERROR PAYLOAD
     # ------------------------------------------------------------
 
     if "error_code" in data:
@@ -345,36 +362,42 @@ def fetch_fred_series(
         print("=" * 70)
         print("FRED API ERROR PAYLOAD")
         print("=" * 70)
-        print(f"Series:       {series_id}")
+        print(f"Series: {series_id}")
         print(
-            f"Error code:   {data.get('error_code')}"
+            f"Error code: "
+            f"{data.get('error_code')}"
         )
         print(
-            f"Error message:{data.get('error_message')}"
+            f"Error message: "
+            f"{data.get('error_message')}"
         )
         print("=" * 70)
         print("")
 
         raise RuntimeError(
-            f"FRED API error {data.get('error_code')}: "
+            f"FRED API error "
+            f"{data.get('error_code')}: "
             f"{data.get('error_message')}"
         )
 
     # ------------------------------------------------------------
-    # Observation validation
+    # OBSERVATIONS
     # ------------------------------------------------------------
 
     if "observations" not in data:
+
         raise RuntimeError(
             f"FRED response for {series_id} "
-            "does not contain 'observations'."
+            "does not contain observations."
         )
 
     observations = data["observations"]
 
     if not isinstance(observations, list):
+
         raise RuntimeError(
-            f"Invalid observations payload for {series_id}."
+            f"Invalid observations payload "
+            f"for {series_id}."
         )
 
     print(
@@ -386,16 +409,13 @@ def fetch_fred_series(
 
 
 # ================================================================
-# Convert FRED observations
+# CONVERT FRED OBSERVATIONS
 # ================================================================
 
 def convert_series(
-    series_id: str,
-    observations: list,
+    series_id,
+    observations
 ):
-    """
-    Convert raw FRED observations into the project schema.
-    """
 
     meta = SERIES[series_id]
 
@@ -404,12 +424,13 @@ def convert_series(
     for obs in observations:
 
         observation_date = obs.get("date")
+
         raw_value = obs.get("value")
 
         if not observation_date:
             continue
 
-        # FRED can use "." for missing observations.
+        # FRED uses "." for missing values.
         if raw_value in (
             None,
             "",
@@ -418,8 +439,11 @@ def convert_series(
             continue
 
         try:
+
             actual = float(raw_value)
+
         except (TypeError, ValueError):
+
             continue
 
         obs_dt = datetime.strptime(
@@ -431,7 +455,7 @@ def convert_series(
         # Conservative availability proxy
         # --------------------------------------------------------
         #
-        # This is intentionally labeled as a proxy.
+        # +1 calendar day is a research-safe proxy.
         # It is NOT claimed to be the exact historical
         # publication timestamp.
         #
@@ -442,27 +466,42 @@ def convert_series(
         rows.append(
             {
                 "indicator": meta["indicator"],
-                "observation_date": (
-                    obs_dt.strftime("%Y-%m-%d")
-                ),
-                "availability_date": availability_date,
+
+                "observation_date":
+                    obs_dt.strftime("%Y-%m-%d"),
+
+                "availability_date":
+                    availability_date,
+
                 "actual": actual,
+
                 "unit": meta["unit"],
+
                 "frequency": meta["frequency"],
+
                 "source": meta["source"],
+
                 "source_url": meta["source_url"],
+
                 "vintage": "initial_release",
+
                 "revision_flag": False,
+
                 "point_in_time_safe": True,
-                "availability_semantics": (
+
+                "availability_semantics":
                     "Conservative +1 calendar day "
                     "availability proxy; "
-                    "FRED output_type=4 initial release"
-                ),
+                    "FRED output_type=4 initial release",
+
                 "research_only": True,
+
                 "decision_engine_ready": False,
+
                 "trading_signal_generated": False,
+
                 "forecast_generated": False,
+
                 "liquidity_score_generated": False,
             }
         )
@@ -471,7 +510,7 @@ def convert_series(
 
 
 # ================================================================
-# Main collection
+# COLLECT ALL SERIES
 # ================================================================
 
 def collect_all_series():
@@ -481,12 +520,16 @@ def collect_all_series():
     print("")
     print("=" * 70)
     print("Liquidity Historical Collector v1")
-    print("FIXED — Official FRED Series / Initial Release")
+    print("Official FRED Series / Initial Release")
     print("Research-only — No Decision Engine")
     print("=" * 70)
     print(f"Start: {START_DATE}")
     print(f"End:   {END_DATE}")
     print(f"Required indicators: {len(SERIES)}")
+    print(
+        f"Real-time period: "
+        f"{REALTIME_START} → {REALTIME_END}"
+    )
     print("")
 
     for series_id, meta in SERIES.items():
@@ -494,7 +537,8 @@ def collect_all_series():
         print("-" * 70)
         print(
             f"Collecting "
-            f"{meta['indicator']} [{series_id}]"
+            f"{meta['indicator']} "
+            f"[{series_id}]"
         )
         print("-" * 70)
 
@@ -510,13 +554,15 @@ def collect_all_series():
         )
 
         if not rows:
+
             raise RuntimeError(
                 f"No usable observations returned "
                 f"for {series_id}."
             )
 
         print(
-            f"Usable observations: {len(rows):,}"
+            f"Usable observations: "
+            f"{len(rows):,}"
         )
 
         all_rows.extend(rows)
@@ -525,10 +571,10 @@ def collect_all_series():
 
 
 # ================================================================
-# Validation
+# OUTPUT VALIDATION
 # ================================================================
 
-def validate_output(df: pd.DataFrame):
+def validate_output(df):
 
     print("")
     print("=" * 70)
@@ -546,6 +592,7 @@ def validate_output(df: pd.DataFrame):
     ]
 
     if missing_columns:
+
         raise RuntimeError(
             f"Missing required columns: "
             f"{missing_columns}"
@@ -555,36 +602,36 @@ def validate_output(df: pd.DataFrame):
     # Indicators
     # ------------------------------------------------------------
 
-    expected_series = set(SERIES.keys())
-
-    indicator_to_series = {
-        meta["indicator"]: series_id
-        for series_id, meta in SERIES.items()
+    expected_indicators = {
+        meta["indicator"]
+        for meta in SERIES.values()
     }
 
-    expected_indicators = set(
-        indicator_to_series.keys()
-    )
-
     actual_indicators = set(
-        df["indicator"].dropna().unique()
+        df["indicator"]
+        .dropna()
+        .unique()
     )
 
     missing_indicators = (
-        expected_indicators - actual_indicators
+        expected_indicators -
+        actual_indicators
     )
 
     if missing_indicators:
+
         raise RuntimeError(
             f"Missing indicators: "
             f"{sorted(missing_indicators)}"
         )
 
     unexpected_indicators = (
-        actual_indicators - expected_indicators
+        actual_indicators -
+        expected_indicators
     )
 
     if unexpected_indicators:
+
         raise RuntimeError(
             f"Unexpected indicators: "
             f"{sorted(unexpected_indicators)}"
@@ -605,29 +652,40 @@ def validate_output(df: pd.DataFrame):
     )
 
     if df["observation_date"].isna().any():
+
         raise RuntimeError(
             "Invalid observation_date values detected."
         )
 
     if df["availability_date"].isna().any():
+
         raise RuntimeError(
             "Invalid availability_date values detected."
         )
 
-    start_dt = pd.Timestamp(START_DATE)
-    end_dt = pd.Timestamp(END_DATE)
+    start_dt = pd.Timestamp(
+        START_DATE
+    )
+
+    end_dt = pd.Timestamp(
+        END_DATE
+    )
 
     if (
-        df["observation_date"] < start_dt
+        df["observation_date"] <
+        start_dt
     ).any():
+
         raise RuntimeError(
             "Observation dates earlier than "
             "requested start date detected."
         )
 
     if (
-        df["observation_date"] > end_dt
+        df["observation_date"] >
+        end_dt
     ).any():
+
         raise RuntimeError(
             "Observation dates later than "
             "requested end date detected."
@@ -637,19 +695,18 @@ def validate_output(df: pd.DataFrame):
     # Availability date
     # ------------------------------------------------------------
 
-    invalid_availability = (
-        df["availability_date"]
-        < df["observation_date"]
-    )
+    if (
+        df["availability_date"] <
+        df["observation_date"]
+    ).any():
 
-    if invalid_availability.any():
         raise RuntimeError(
             "Availability date earlier than "
             "observation date detected."
         )
 
     # ------------------------------------------------------------
-    # Actual values
+    # Numeric values
     # ------------------------------------------------------------
 
     df["actual"] = pd.to_numeric(
@@ -658,11 +715,14 @@ def validate_output(df: pd.DataFrame):
     )
 
     if df["actual"].isna().any():
+
         raise RuntimeError(
-            "Missing or non-numeric actual values detected."
+            "Missing or non-numeric "
+            "actual values detected."
         )
 
     if np.isinf(df["actual"]).any():
+
         raise RuntimeError(
             "Infinite actual values detected."
         )
@@ -683,6 +743,7 @@ def validate_output(df: pd.DataFrame):
     ).sum()
 
     if duplicate_count > 0:
+
         raise RuntimeError(
             f"Duplicate records detected: "
             f"{duplicate_count}"
@@ -698,7 +759,10 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (pit_values == "true").all():
+    if not (
+        pit_values == "true"
+    ).all():
+
         raise RuntimeError(
             "point_in_time_safe is not True "
             "for all records."
@@ -714,14 +778,17 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (revision_values == "false").all():
+    if not (
+        revision_values == "false"
+    ).all():
+
         raise RuntimeError(
             "revision_flag is not False "
             "for all records."
         )
 
     # ------------------------------------------------------------
-    # Research-only
+    # Research only
     # ------------------------------------------------------------
 
     research_values = (
@@ -730,7 +797,10 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (research_values == "true").all():
+    if not (
+        research_values == "true"
+    ).all():
+
         raise RuntimeError(
             "research_only is not True "
             "for all records."
@@ -746,14 +816,17 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (decision_values == "false").all():
+    if not (
+        decision_values == "false"
+    ).all():
+
         raise RuntimeError(
             "decision_engine_ready is not False "
             "for all records."
         )
 
     # ------------------------------------------------------------
-    # Trading signals
+    # Trading signal
     # ------------------------------------------------------------
 
     signal_values = (
@@ -762,7 +835,10 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (signal_values == "false").all():
+    if not (
+        signal_values == "false"
+    ).all():
+
         raise RuntimeError(
             "Trading signals detected."
         )
@@ -777,7 +853,10 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (forecast_values == "false").all():
+    if not (
+        forecast_values == "false"
+    ).all():
+
         raise RuntimeError(
             "Forecast generation detected."
         )
@@ -792,20 +871,27 @@ def validate_output(df: pd.DataFrame):
         .str.lower()
     )
 
-    if not (score_values == "false").all():
+    if not (
+        score_values == "false"
+    ).all():
+
         raise RuntimeError(
             "Liquidity score generation detected."
         )
 
     # ------------------------------------------------------------
-    # Required vintage
+    # Vintage
     # ------------------------------------------------------------
 
-    if not (
+    vintage_values = (
         df["vintage"]
         .astype(str)
-        .eq("initial_release")
+    )
+
+    if not (
+        vintage_values == "initial_release"
     ).all():
+
         raise RuntimeError(
             "Unexpected vintage metadata detected."
         )
@@ -829,55 +915,84 @@ def validate_output(df: pd.DataFrame):
 
 
 # ================================================================
-# Summary
+# SUMMARY
 # ================================================================
 
-def build_summary(df: pd.DataFrame):
+def build_summary(df):
 
     summary_rows = []
 
     for indicator, group in (
-        df.groupby("indicator", sort=True)
+        df.groupby(
+            "indicator",
+            sort=True
+        )
     ):
+
+        latest = (
+            group
+            .sort_values("observation_date")
+            .iloc[-1]
+        )
 
         summary_rows.append(
             {
                 "indicator": indicator,
+
                 "rows": len(group),
-                "first_observation": (
+
+                "first_observation":
                     group["observation_date"]
                     .min()
-                    .strftime("%Y-%m-%d")
-                ),
-                "last_observation": (
+                    .strftime("%Y-%m-%d"),
+
+                "last_observation":
                     group["observation_date"]
                     .max()
-                    .strftime("%Y-%m-%d")
-                ),
-                "latest_actual": (
-                    group.sort_values(
-                        "observation_date"
-                    )
-                    .iloc[-1]["actual"]
-                ),
-                "unit": group["unit"].iloc[0],
-                "frequency": group["frequency"].iloc[0],
-                "source": group["source"].iloc[0],
-                "vintage": group["vintage"].iloc[0],
-                "point_in_time_safe": True,
-                "research_only": True,
-                "decision_engine_ready": False,
-                "trading_signal_generated": False,
-                "forecast_generated": False,
-                "liquidity_score_generated": False,
+                    .strftime("%Y-%m-%d"),
+
+                "latest_actual":
+                    latest["actual"],
+
+                "unit":
+                    group["unit"].iloc[0],
+
+                "frequency":
+                    group["frequency"].iloc[0],
+
+                "source":
+                    group["source"].iloc[0],
+
+                "vintage":
+                    group["vintage"].iloc[0],
+
+                "point_in_time_safe":
+                    True,
+
+                "research_only":
+                    True,
+
+                "decision_engine_ready":
+                    False,
+
+                "trading_signal_generated":
+                    False,
+
+                "forecast_generated":
+                    False,
+
+                "liquidity_score_generated":
+                    False,
             }
         )
 
-    return pd.DataFrame(summary_rows)
+    return pd.DataFrame(
+        summary_rows
+    )
 
 
 # ================================================================
-# Main
+# MAIN
 # ================================================================
 
 def main():
@@ -889,60 +1004,67 @@ def main():
         rows = collect_all_series()
 
         if not rows:
+
             raise RuntimeError(
                 "Collector returned zero records."
             )
 
         df = pd.DataFrame(rows)
 
-        # Ensure exact column order
-        df = df[OUTPUT_COLUMNS]
+        # Exact schema order
+        df = df[
+            OUTPUT_COLUMNS
+        ]
 
-        # Sort deterministically
-        df = df.sort_values(
-            [
-                "observation_date",
-                "indicator",
-            ]
-        ).reset_index(drop=True)
+        # Deterministic sorting
+        df = (
+            df
+            .sort_values(
+                [
+                    "observation_date",
+                    "indicator",
+                ]
+            )
+            .reset_index(drop=True)
+        )
 
+        # Validate
         validate_output(df)
 
+        # Build summary
         summary = build_summary(df)
 
-        # --------------------------------------------------------
         # Save records
-        # --------------------------------------------------------
-
         df.to_csv(
             OUTPUT_FILE,
             index=False,
         )
 
-        # --------------------------------------------------------
         # Save summary
-        # --------------------------------------------------------
-
         summary.to_csv(
             SUMMARY_FILE,
             index=False,
         )
 
         # --------------------------------------------------------
-        # Final console report
+        # Final report
         # --------------------------------------------------------
 
         print("")
         print("=" * 70)
         print("LIQUIDITY HISTORICAL COLLECTION COMPLETE")
         print("=" * 70)
+
         print(
-            f"Total rows: {len(df):,}"
+            f"Total rows: "
+            f"{len(df):,}"
         )
+
         print(
             f"Indicators: "
             f"{df['indicator'].nunique()}"
         )
+
         print(
             f"Observation range: "
             f"{df['observation_date'].min().date()} "
@@ -954,21 +1076,27 @@ def main():
         print("Rows by indicator:")
 
         counts = (
-            df.groupby("indicator")
+            df
+            .groupby("indicator")
             .size()
             .sort_index()
         )
 
         for indicator, count in counts.items():
+
             print(
-                f"  {indicator:30s} "
+                f"  {indicator:30s}"
                 f"{count:>8,}"
             )
 
         print("")
         print("Output files:")
-        print(f"  {OUTPUT_FILE}")
-        print(f"  {SUMMARY_FILE}")
+        print(
+            f"  {OUTPUT_FILE}"
+        )
+        print(
+            f"  {SUMMARY_FILE}"
+        )
 
         print("")
         print("Research-only: TRUE")
