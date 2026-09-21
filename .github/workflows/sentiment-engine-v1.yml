@@ -23,6 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          set -e
           python -m pip install --upgrade pip
           pip install pandas numpy
 
@@ -204,6 +205,21 @@ jobs:
           cp "$FILE" vix_sentiment_research_v1.csv
 
       # --------------------------------------------------------
+      # VERIFY ENGINE FILE
+      # --------------------------------------------------------
+
+      - name: Verify Sentiment Engine file
+        run: |
+          set -e
+
+          echo "Repository files:"
+          ls -la
+
+          test -f "sentiment-engine-v1.py"
+
+          echo "PASS: sentiment-engine-v1.py found."
+
+      # --------------------------------------------------------
       # RUN ENGINE
       # --------------------------------------------------------
 
@@ -211,7 +227,7 @@ jobs:
         run: |
           set -e
 
-          python sentiment_engine_v1.py
+          python sentiment-engine-v1.py
 
       # --------------------------------------------------------
       # VALIDATION
@@ -268,7 +284,8 @@ jobs:
           ]
 
           missing = [
-              c for c in required
+              c
+              for c in required
               if c not in df.columns
           ]
 
@@ -361,10 +378,12 @@ jobs:
           print("=" * 70)
 
           print(f"Rows: {len(df):,}")
+
           print(
               f"First as-of: "
               f"{df['asof_date'].min()}"
           )
+
           print(
               f"Last as-of: "
               f"{df['asof_date'].max()}"
@@ -372,14 +391,17 @@ jobs:
 
           print()
           print("Latest:")
+
           print(
               f"  Unified score: "
               f"{latest['unified_sentiment_score']}"
           )
+
           print(
               f"  Components: "
               f"{latest['available_component_count']}"
           )
+
           print(
               f"  Regime: "
               f"{latest['research_regime']}"
@@ -398,7 +420,7 @@ jobs:
           PY
 
       # --------------------------------------------------------
-      # UPLOAD
+      # UPLOAD ARTIFACT
       # --------------------------------------------------------
 
       - name: Upload Sentiment Engine artifact
@@ -410,6 +432,10 @@ jobs:
             sentiment_engine_research_summary_v1.csv
             sentiment_engine_extremes_v1.csv
           if-no-files-found: error
+
+      # --------------------------------------------------------
+      # FINAL STATUS
+      # --------------------------------------------------------
 
       - name: Final status
         run: |
