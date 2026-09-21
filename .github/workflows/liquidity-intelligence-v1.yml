@@ -25,31 +25,31 @@ jobs:
 
     steps:
 
-      # ---------------------------------------------------------
+      # =========================================================
       # 1. Checkout repository
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------------
-      # 2. Python
-      # ---------------------------------------------------------
+      # =========================================================
+      # 2. Set up Python
+      # =========================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ---------------------------------------------------------
+      # =========================================================
       # 3. Install dependencies
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy
 
-      # ---------------------------------------------------------
-      # 4. Download latest Liquidity Historical artifact
-      # ---------------------------------------------------------
+      # =========================================================
+      # 4. Download latest successful Liquidity Historical artifact
+      # =========================================================
       - name: Download Liquidity Historical artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,15 +75,16 @@ jobs:
           echo "Using Liquidity Historical run: $RUN_ID"
 
           gh run download "$RUN_ID" \
-            --name liquidity-historical-v1-artifact \
+            --name liquidity-historical-v1 \
             --dir liquidity_input
 
+          echo
           echo "Downloaded files:"
           find liquidity_input -maxdepth 3 -type f -print
 
-      # ---------------------------------------------------------
-      # 5. Validate input artifact exists
-      # ---------------------------------------------------------
+      # =========================================================
+      # 5. Validate historical input
+      # =========================================================
       - name: Validate Liquidity Historical input
         run: |
           set -e
@@ -103,18 +104,18 @@ jobs:
           echo "Input header:"
           head -n 1 "$FILE"
 
-      # ---------------------------------------------------------
-      # 6. Run Analyzer
-      # ---------------------------------------------------------
+      # =========================================================
+      # 6. Run Liquidity Intelligence Analyzer v1
+      # =========================================================
       - name: Run Liquidity Intelligence Analyzer v1
         run: |
           set -e
 
           python liquidity_intelligence_analyzer_v1.py
 
-      # ---------------------------------------------------------
+      # =========================================================
       # 7. Validate analyzer output
-      # ---------------------------------------------------------
+      # =========================================================
       - name: Validate Liquidity Intelligence output
         run: |
           python - <<'PY'
@@ -135,6 +136,10 @@ jobs:
               "EFFR",
           }
 
+          # -----------------------------------------------------
+          # Files
+          # -----------------------------------------------------
+
           if not os.path.exists(output_file):
               raise SystemExit(
                   f"ERROR: Missing output file: {output_file}"
@@ -145,6 +150,10 @@ jobs:
                   f"ERROR: Missing summary file: {summary_file}"
               )
 
+          # -----------------------------------------------------
+          # Load
+          # -----------------------------------------------------
+
           df = pd.read_csv(output_file)
 
           if df.empty:
@@ -152,8 +161,13 @@ jobs:
                   "ERROR: Analyzer output contains zero rows."
               )
 
+          # -----------------------------------------------------
+          # Required columns
+          # -----------------------------------------------------
+
           required_columns = {
               "asof_date",
+
               "FED_TOTAL_ASSETS",
               "RESERVE_BALANCES",
               "TREASURY_GENERAL_ACCOUNT",
@@ -162,13 +176,16 @@ jobs:
               "ON_RRP",
               "SOFR",
               "EFFR",
+
               "SOFR_EFFR_SPREAD_BPS",
               "NET_LIQUIDITY_PROXY_MILLIONS",
+
               "research_only",
               "decision_engine_ready",
               "trading_signal_generated",
               "forecast_generated",
               "liquidity_score_generated",
+
               "pit_rule",
               "availability_semantics",
               "point_in_time_safe",
@@ -178,7 +195,22 @@ jobs:
 
           if missing:
               raise SystemExit(
-                  f"ERROR: Missing output columns: {sorted(missing)}"
+                  "ERROR: Missing output columns: "
+                  f"{sorted(missing)}"
+              )
+
+          # -----------------------------------------------------
+          # Date validation
+          # -----------------------------------------------------
+
+          df["asof_date"] = pd.to_datetime(
+              df["asof_date"],
+              errors="coerce"
+          )
+
+          if df["asof_date"].isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid asof_date values detected."
               )
 
           if df["asof_date"].duplicated().any():
@@ -186,10 +218,28 @@ jobs:
                   "ERROR: Duplicate as-of dates detected."
               )
 
+          # -----------------------------------------------------
+          # PIT validation
+          # -----------------------------------------------------
+
           if not df["point_in_time_safe"].all():
               raise SystemExit(
                   "ERROR: point_in_time_safe contains False."
               )
+
+          if df["pit_rule"].isna().any():
+              raise SystemExit(
+                  "ERROR: Missing PIT rule metadata."
+              )
+
+          if df["availability_semantics"].isna().any():
+              raise SystemExit(
+                  "ERROR: Missing availability semantics."
+              )
+
+          # -----------------------------------------------------
+          # Research-only validation
+          # -----------------------------------------------------
 
           if not df["research_only"].all():
               raise SystemExit(
@@ -216,31 +266,48 @@ jobs:
                   "ERROR: Liquidity score detected."
               )
 
-          if df["pit_rule"].isna().any():
-              raise SystemExit(
-                  "ERROR: Missing PIT rule metadata."
-              )
+          # -----------------------------------------------------
+          # Indicator validation
+          # -----------------------------------------------------
 
-          if df["availability_semantics"].isna().any():
-              raise SystemExit(
-                  "ERROR: Missing availability semantics."
-              )
+          for indicator in sorted(expected_indicators):
 
+              if indicator not in df.columns:
+                  raise SystemExit(
+                      f"ERROR: Missing indicator column: {indicator}"
+                  )
+
+          # -----------------------------------------------------
+          # Output information
+          # -----------------------------------------------------
+
+          print("==============================================")
           print("PASS: Liquidity Intelligence output validation")
+          print("==============================================")
 
           print()
-          print("Rows:", len(df))
-          print("Date range:")
-          print(df["asof_date"].min(), "->", df["asof_date"].max())
+          print(f"Rows: {len(df):,}")
 
-          print()
-          print("Latest row:")
-          print(df.tail(1).T.to_string())
+          print(
+              "Date range: "
+              f"{df['asof_date'].min().date()} "
+              "-> "
+              f"{df['asof_date'].max().date()}"
+          )
 
           print()
           print("Indicators validated:")
+
           for indicator in sorted(expected_indicators):
-              print(" -", indicator)
+              print(f" - {indicator}")
+
+          print()
+          print("Latest row:")
+          print(
+              df.tail(1)
+                .T
+                .to_string()
+          )
 
           print()
           print("Research-only checks:")
@@ -252,27 +319,32 @@ jobs:
           print(" - Liquidity score: NONE")
           PY
 
-      # ---------------------------------------------------------
-      # 8. Show output files
-      # ---------------------------------------------------------
+      # =========================================================
+      # 8. Show generated files
+      # =========================================================
       - name: Show generated artifacts
         run: |
+          set -e
+
           echo "Generated files:"
+
           ls -lh \
             liquidity_intelligence_research_v1.csv \
             liquidity_intelligence_summary_v1.csv
 
           echo
           echo "Research output header:"
-          head -n 1 liquidity_intelligence_research_v1.csv
 
-      # ---------------------------------------------------------
-      # 9. Upload analyzer artifact
-      # ---------------------------------------------------------
+          head -n 1 \
+            liquidity_intelligence_research_v1.csv
+
+      # =========================================================
+      # 9. Upload Liquidity Intelligence artifact
+      # =========================================================
       - name: Upload Liquidity Intelligence artifact
         uses: actions/upload-artifact@v4
         with:
-          name: liquidity-intelligence-v1-artifact
+          name: liquidity-intelligence-v1
           path: |
             liquidity_intelligence_research_v1.csv
             liquidity_intelligence_summary_v1.csv
