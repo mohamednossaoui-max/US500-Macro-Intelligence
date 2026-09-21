@@ -1,0 +1,425 @@
+name: Sentiment Engine v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sentiment-engine:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      # --------------------------------------------------------
+      # FIND LATEST COT ARTIFACT
+      # --------------------------------------------------------
+
+      - name: Find latest COT artifact
+        id: cot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "cot-positioning-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
+
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            echo "ERROR: cot-positioning-v1 not found."
+            exit 1
+          fi
+
+          echo "artifact_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download COT artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.cot.outputs.artifact_id }}
+        run: |
+          set -e
+
+          mkdir -p inputs/cot
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ID}/zip" \
+            > inputs/cot/cot.zip
+
+          unzip -o \
+            inputs/cot/cot.zip \
+            -d inputs/cot/extracted
+
+          FILE=$(find inputs/cot/extracted \
+            -type f \
+            -name "cot_positioning_research_v1.csv" \
+            | head -n 1)
+
+          test -n "$FILE"
+
+          cp "$FILE" cot_positioning_research_v1.csv
+
+      # --------------------------------------------------------
+      # FIND LATEST AAII ARTIFACT
+      # --------------------------------------------------------
+
+      - name: Find latest AAII artifact
+        id: aaii
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "aaii-sentiment-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
+
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            echo "ERROR: aaii-sentiment-v1 not found."
+            exit 1
+          fi
+
+          echo "artifact_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download AAII artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.aaii.outputs.artifact_id }}
+        run: |
+          set -e
+
+          mkdir -p inputs/aaii
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ID}/zip" \
+            > inputs/aaii/aaii.zip
+
+          unzip -o \
+            inputs/aaii/aaii.zip \
+            -d inputs/aaii/extracted
+
+          FILE=$(find inputs/aaii/extracted \
+            -type f \
+            -name "aaii_sentiment_research_v1.csv" \
+            | head -n 1)
+
+          test -n "$FILE"
+
+          cp "$FILE" aaii_sentiment_research_v1.csv
+
+      # --------------------------------------------------------
+      # FIND LATEST VIX ARTIFACT
+      # --------------------------------------------------------
+
+      - name: Find latest VIX artifact
+        id: vix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "vix-sentiment-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
+
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            echo "ERROR: vix-sentiment-v1 not found."
+            exit 1
+          fi
+
+          echo "artifact_id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download VIX artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.vix.outputs.artifact_id }}
+        run: |
+          set -e
+
+          mkdir -p inputs/vix
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ID}/zip" \
+            > inputs/vix/vix.zip
+
+          unzip -o \
+            inputs/vix/vix.zip \
+            -d inputs/vix/extracted
+
+          FILE=$(find inputs/vix/extracted \
+            -type f \
+            -name "vix_sentiment_research_v1.csv" \
+            | head -n 1)
+
+          test -n "$FILE"
+
+          cp "$FILE" vix_sentiment_research_v1.csv
+
+      # --------------------------------------------------------
+      # RUN ENGINE
+      # --------------------------------------------------------
+
+      - name: Run Sentiment Engine v1
+        run: |
+          set -e
+
+          python sentiment_engine_v1.py
+
+      # --------------------------------------------------------
+      # VALIDATION
+      # --------------------------------------------------------
+
+      - name: Validate Sentiment Engine
+        run: |
+          set -e
+
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+
+          output = Path(
+              "sentiment_engine_research_v1.csv"
+          )
+
+          summary = Path(
+              "sentiment_engine_research_summary_v1.csv"
+          )
+
+          extremes = Path(
+              "sentiment_engine_extremes_v1.csv"
+          )
+
+          for path in [
+              output,
+              summary,
+              extremes,
+          ]:
+              if not path.exists():
+                  raise SystemExit(
+                      f"ERROR: Missing {path}"
+                  )
+
+          df = pd.read_csv(output)
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Sentiment Engine output is empty."
+              )
+
+          required = [
+              "asof_date",
+              "unified_sentiment_score",
+              "research_regime",
+              "available_component_count",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+              "trading_signal_generated",
+              "forecast_generated",
+          ]
+
+          missing = [
+              c for c in required
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing columns: {missing}"
+              )
+
+          if not df[
+              "point_in_time_safe"
+          ].all():
+              raise SystemExit(
+                  "ERROR: PIT-safe validation failed."
+              )
+
+          if not df[
+              "research_only"
+          ].all():
+              raise SystemExit(
+                  "ERROR: Research-only validation failed."
+              )
+
+          if df[
+              "decision_engine_ready"
+          ].any():
+              raise SystemExit(
+                  "ERROR: Decision Engine enabled."
+              )
+
+          if df[
+              "trading_signal_generated"
+          ].any():
+              raise SystemExit(
+                  "ERROR: Trading signal detected."
+              )
+
+          if df[
+              "forecast_generated"
+          ].any():
+              raise SystemExit(
+                  "ERROR: Forecast detected."
+              )
+
+          score = pd.to_numeric(
+              df["unified_sentiment_score"],
+              errors="coerce",
+          ).dropna()
+
+          if (
+              (score < 0)
+              | (score > 100)
+          ).any():
+              raise SystemExit(
+                  "ERROR: Score outside 0-100."
+              )
+
+          allowed = {
+              "EXTREME_BULLISH",
+              "BULLISH",
+              "NEUTRAL",
+              "BEARISH",
+              "EXTREME_BEARISH",
+              "INSUFFICIENT_DATA",
+          }
+
+          actual = set(
+              df["research_regime"]
+              .dropna()
+              .unique()
+          )
+
+          unexpected = actual - allowed
+
+          if unexpected:
+              raise SystemExit(
+                  f"ERROR: Unexpected regimes: {unexpected}"
+              )
+
+          if not df[
+              "asof_date"
+          ].is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: asof_date not sorted."
+              )
+
+          latest = df.iloc[-1]
+
+          print("=" * 70)
+          print("SENTIMENT ENGINE V1 — VALIDATION")
+          print("=" * 70)
+
+          print(f"Rows: {len(df):,}")
+          print(
+              f"First as-of: "
+              f"{df['asof_date'].min()}"
+          )
+          print(
+              f"Last as-of: "
+              f"{df['asof_date'].max()}"
+          )
+
+          print()
+          print("Latest:")
+          print(
+              f"  Unified score: "
+              f"{latest['unified_sentiment_score']}"
+          )
+          print(
+              f"  Components: "
+              f"{latest['available_component_count']}"
+          )
+          print(
+              f"  Regime: "
+              f"{latest['research_regime']}"
+          )
+
+          print()
+          print("Point-in-time safe: TRUE")
+          print("Research-only: TRUE")
+          print("Decision Engine: FALSE")
+          print("Trading signal: NONE")
+          print("Forecast: NONE")
+
+          print()
+          print("PASS: Sentiment Engine validated.")
+          print("=" * 70)
+          PY
+
+      # --------------------------------------------------------
+      # UPLOAD
+      # --------------------------------------------------------
+
+      - name: Upload Sentiment Engine artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentiment-engine-v1
+          path: |
+            sentiment_engine_research_v1.csv
+            sentiment_engine_research_summary_v1.csv
+            sentiment_engine_extremes_v1.csv
+          if-no-files-found: error
+
+      - name: Final status
+        run: |
+          echo "=================================================="
+          echo "SENTIMENT ENGINE V1 — PASS"
+          echo "=================================================="
+          echo "COT + AAII + VIX"
+          echo "Research-only: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Trading signal: NONE"
+          echo "Forecast: NONE"
+          echo "Artifact: sentiment-engine-v1"
+          echo "=================================================="
