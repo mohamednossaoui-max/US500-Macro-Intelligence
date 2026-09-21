@@ -1,0 +1,161 @@
+name: COT Historical Collector v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  cot-historical:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests
+
+      - name: Run COT Historical Collector v1
+        env:
+          COT_START_YEAR: "2006"
+          COT_END_YEAR: "2026"
+        run: |
+          python cot_historical_collector_v1.py
+
+      - name: Verify collector outputs
+        run: |
+          test -f cot_historical_records_input_v1.csv
+          test -f cot_historical_collection_summary_v1.csv
+
+          python - <<'PY'
+          import pandas as pd
+
+          records = pd.read_csv(
+              "cot_historical_records_input_v1.csv"
+          )
+
+          summary = pd.read_csv(
+              "cot_historical_collection_summary_v1.csv"
+          )
+
+          required = [
+              "contract_market_code",
+              "contract_name",
+              "observation_date",
+              "availability_date",
+              "open_interest",
+              "dealer_long",
+              "dealer_short",
+              "asset_manager_long",
+              "asset_manager_short",
+              "leveraged_money_long",
+              "leveraged_money_short",
+              "other_reportables_long",
+              "other_reportables_short",
+              "nonreportable_long",
+              "nonreportable_short",
+              "asset_manager_net",
+              "leveraged_money_net",
+              "dealer_net",
+              "point_in_time_safe",
+          ]
+
+          missing = [
+              c for c in required
+              if c not in records.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"Missing columns: {missing}"
+              )
+
+          if records.empty:
+              raise SystemExit(
+                  "COT records are empty."
+              )
+
+          if (
+              records["contract_market_code"]
+              .astype(str)
+              .ne("13874A")
+              .any()
+          ):
+              raise SystemExit(
+                  "Unexpected contract code detected."
+              )
+
+          obs = pd.to_datetime(
+              records["observation_date"]
+          )
+
+          avail = pd.to_datetime(
+              records["availability_date"]
+          )
+
+          if not (avail > obs).all():
+              raise SystemExit(
+                  "PIT validation failed."
+              )
+
+          if not records[
+              "point_in_time_safe"
+          ].all():
+              raise SystemExit(
+                  "point_in_time_safe validation failed."
+              )
+
+          duplicates = records.duplicated(
+              [
+                  "contract_market_code",
+                  "observation_date",
+              ]
+          ).sum()
+
+          if duplicates:
+              raise SystemExit(
+                  f"Duplicate rows detected: {duplicates}"
+              )
+
+          print("COT validation: PASS")
+          print(f"Records: {len(records)}")
+          print(
+              "First observation:",
+              records["observation_date"].min()
+          )
+          print(
+              "Last observation:",
+              records["observation_date"].max()
+          )
+          print(
+              "PIT safe:",
+              records["point_in_time_safe"].all()
+          )
+          print(
+              "Duplicates:",
+              duplicates
+          )
+
+          print("\nSummary:")
+          print(summary.to_string(index=False))
+          PY
+
+      - name: Upload COT artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cot-historical-v1
+          path: |
+            cot_historical_records_input_v1.csv
+            cot_historical_collection_summary_v1.csv
+          retention-days: 90
