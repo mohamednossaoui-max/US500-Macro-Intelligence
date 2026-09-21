@@ -1,0 +1,341 @@
+name: VIX Historical Collector v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect-vix-historical:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. INSTALL DEPENDENCIES
+      # ============================================================
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests
+
+
+      # ============================================================
+      # 4. RUN VIX HISTORICAL COLLECTOR
+      # ============================================================
+
+      - name: Run VIX Historical Collector v1
+        run: |
+          set -e
+
+          python vix_historical_collector_v1.py
+
+
+      # ============================================================
+      # 5. VALIDATE OUTPUT FILES
+      # ============================================================
+
+      - name: Validate VIX collector outputs
+        run: |
+          set -e
+
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+
+          output = Path(
+              "vix_historical_records_input_v1.csv"
+          )
+
+          summary = Path(
+              "vix_historical_collection_summary_v1.csv"
+          )
+
+          # --------------------------------------------------------
+          # Required files
+          # --------------------------------------------------------
+
+          if not output.exists():
+              raise SystemExit(
+                  "ERROR: Missing VIX records output."
+              )
+
+          if not summary.exists():
+              raise SystemExit(
+                  "ERROR: Missing VIX summary output."
+              )
+
+          # --------------------------------------------------------
+          # Load
+          # --------------------------------------------------------
+
+          df = pd.read_csv(output)
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: VIX output contains zero rows."
+              )
+
+          # --------------------------------------------------------
+          # Required schema
+          # --------------------------------------------------------
+
+          required_columns = [
+              "observation_date",
+              "availability_date",
+              "VIX",
+              "source",
+              "source_url",
+              "source_page_url",
+              "availability_semantics",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+          ]
+
+          missing = [
+              c for c in required_columns
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing columns: {missing}"
+              )
+
+          # --------------------------------------------------------
+          # Dates
+          # --------------------------------------------------------
+
+          observation = pd.to_datetime(
+              df["observation_date"],
+              errors="coerce",
+          )
+
+          availability = pd.to_datetime(
+              df["availability_date"],
+              errors="coerce",
+          )
+
+          if observation.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid observation dates."
+              )
+
+          if availability.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid availability dates."
+              )
+
+          # --------------------------------------------------------
+          # PIT validation
+          # --------------------------------------------------------
+
+          if not (
+              availability > observation
+          ).all():
+
+              raise SystemExit(
+                  "ERROR: PIT validation failed."
+              )
+
+          # --------------------------------------------------------
+          # Sorting
+          # --------------------------------------------------------
+
+          if not observation.is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: Observation dates are not sorted."
+              )
+
+          # --------------------------------------------------------
+          # Duplicate validation
+          # --------------------------------------------------------
+
+          if observation.duplicated().any():
+              raise SystemExit(
+                  "ERROR: Duplicate observation dates detected."
+              )
+
+          # --------------------------------------------------------
+          # VIX validation
+          # --------------------------------------------------------
+
+          df["VIX"] = pd.to_numeric(
+              df["VIX"],
+              errors="coerce",
+          )
+
+          if df["VIX"].isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid VIX values."
+              )
+
+          if (df["VIX"] <= 0).any():
+              raise SystemExit(
+                  "ERROR: VIX contains values <= 0."
+              )
+
+          # --------------------------------------------------------
+          # Research-only validation
+          # --------------------------------------------------------
+
+          if not df["point_in_time_safe"].all():
+              raise SystemExit(
+                  "ERROR: Non-PIT-safe rows detected."
+              )
+
+          if not df["research_only"].all():
+              raise SystemExit(
+                  "ERROR: Non-research rows detected."
+              )
+
+          if df["decision_engine_ready"].any():
+              raise SystemExit(
+                  "ERROR: Decision Engine flag detected."
+              )
+
+          if df["sentiment_score_generated"].any():
+              raise SystemExit(
+                  "ERROR: Sentiment score flag detected."
+              )
+
+          # --------------------------------------------------------
+          # Minimum history
+          # --------------------------------------------------------
+
+          minimum_records = 5000
+
+          if len(df) < minimum_records:
+              raise SystemExit(
+                  f"ERROR: Only {len(df):,} records found. "
+                  f"Expected at least {minimum_records:,}."
+              )
+
+          # --------------------------------------------------------
+          # Report
+          # --------------------------------------------------------
+
+          latest = df.iloc[-1]
+
+          print()
+          print("=" * 70)
+          print("VIX HISTORICAL COLLECTOR v1 — VALIDATION")
+          print("=" * 70)
+
+          print(
+              f"Records: {len(df):,}"
+          )
+
+          print(
+              f"First observation: "
+              f"{observation.min().date()}"
+          )
+
+          print(
+              f"Last observation: "
+              f"{observation.max().date()}"
+          )
+
+          print(
+              f"Minimum VIX: "
+              f"{df['VIX'].min():.4f}"
+          )
+
+          print(
+              f"Maximum VIX: "
+              f"{df['VIX'].max():.4f}"
+          )
+
+          print(
+              f"Mean VIX: "
+              f"{df['VIX'].mean():.4f}"
+          )
+
+          print()
+          print("Latest observation:")
+          print(
+              f"  Date: "
+              f"{latest['observation_date']}"
+          )
+
+          print(
+              f"  Availability: "
+              f"{latest['availability_date']}"
+          )
+
+          print(
+              f"  VIX: "
+              f"{latest['VIX']:.4f}"
+          )
+
+          print()
+          print("Point-in-time safe: TRUE")
+          print("Research-only: TRUE")
+          print("Decision Engine ready: FALSE")
+          print("Sentiment score generated: FALSE")
+          print("Trading signal: NONE")
+          print("Forecast: NONE")
+
+          print("=" * 70)
+          print()
+          print(
+              "PASS: VIX Historical Collector "
+              "outputs validated."
+          )
+          PY
+
+
+      # ============================================================
+      # 6. UPLOAD ARTIFACT
+      # ============================================================
+
+      - name: Upload VIX historical artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vix-historical-v1
+          path: |
+            vix_historical_records_input_v1.csv
+            vix_historical_collection_summary_v1.csv
+          if-no-files-found: error
+
+
+      # ============================================================
+      # 7. FINAL STATUS
+      # ============================================================
+
+      - name: Final status
+        run: |
+          echo "=================================================="
+          echo "VIX HISTORICAL COLLECTOR v1 — PASS"
+          echo "=================================================="
+          echo "Source: Cboe"
+          echo "Research-only: TRUE"
+          echo "Point-in-time safe: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Sentiment score: NOT GENERATED"
+          echo "Trading signal: NONE"
+          echo "Forecast: NONE"
+          echo "Artifact: vix-historical-v1"
+          echo "=================================================="
