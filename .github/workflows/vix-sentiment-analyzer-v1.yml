@@ -1,0 +1,489 @@
+name: VIX Sentiment Analyzer v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  analyze-vix-sentiment:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. INSTALL DEPENDENCIES
+      # ============================================================
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+
+      # ============================================================
+      # 4. FIND LATEST VIX HISTORICAL ARTIFACT
+      # ============================================================
+
+      - name: Find latest VIX historical artifact
+        id: find_artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "vix-historical-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: Could not find vix-historical-v1 artifact."
+            exit 1
+          fi
+
+          echo "Latest VIX historical artifact ID: $ARTIFACT_ID"
+
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ============================================================
+      # 5. DOWNLOAD ARTIFACT
+      # ============================================================
+
+      - name: Download VIX historical artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.find_artifact.outputs.artifact_id }}
+        run: |
+          set -e
+
+          mkdir -p vix_input
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > vix_input/vix_historical_artifact.zip
+
+          unzip -o \
+            vix_input/vix_historical_artifact.zip \
+            -d vix_input/extracted
+
+          echo "Downloaded VIX historical artifact."
+
+          find vix_input/extracted \
+            -maxdepth 3 \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 6. PREPARE ANALYZER INPUT
+      # ============================================================
+
+      - name: Prepare VIX analyzer input
+        run: |
+          set -e
+
+          INPUT_PATH=$(find vix_input/extracted \
+            -type f \
+            -name "vix_historical_records_input_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$INPUT_PATH" ]; then
+            echo "ERROR: vix_historical_records_input_v1.csv not found."
+            exit 1
+          fi
+
+          cp "$INPUT_PATH" \
+            ./vix_historical_records_input_v1.csv
+
+          echo "Input prepared:"
+          ls -lh vix_historical_records_input_v1.csv
+
+
+      # ============================================================
+      # 7. RUN ANALYZER
+      # ============================================================
+
+      - name: Run VIX Sentiment Analyzer v1
+        run: |
+          set -e
+
+          python vix_sentiment_analyzer_v1.py
+
+
+      # ============================================================
+      # 8. VALIDATE OUTPUTS
+      # ============================================================
+
+      - name: Validate VIX sentiment outputs
+        run: |
+          set -e
+
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+
+          output = Path(
+              "vix_sentiment_research_v1.csv"
+          )
+
+          summary = Path(
+              "vix_sentiment_research_summary_v1.csv"
+          )
+
+          extremes = Path(
+              "vix_sentiment_extremes_v1.csv"
+          )
+
+          # --------------------------------------------------------
+          # Required files
+          # --------------------------------------------------------
+
+          for file in [
+              output,
+              summary,
+              extremes,
+          ]:
+
+              if not file.exists():
+                  raise SystemExit(
+                      f"ERROR: Missing output file: {file}"
+                  )
+
+          # --------------------------------------------------------
+          # Load output
+          # --------------------------------------------------------
+
+          df = pd.read_csv(output)
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: VIX sentiment output contains zero rows."
+              )
+
+          # --------------------------------------------------------
+          # Required schema
+          # --------------------------------------------------------
+
+          required_columns = [
+              "observation_date",
+              "availability_date",
+              "VIX",
+              "VIX_change",
+              "VIX_change_pct",
+              "VIX_rolling_mean",
+              "VIX_rolling_std",
+              "VIX_z",
+              "VIX_percentile",
+              "research_regime",
+              "extreme_fear",
+              "extreme_low_fear",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+          ]
+
+          missing = [
+              c for c in required_columns
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing output columns: {missing}"
+              )
+
+          # --------------------------------------------------------
+          # Dates
+          # --------------------------------------------------------
+
+          observation = pd.to_datetime(
+              df["observation_date"],
+              errors="coerce",
+          )
+
+          availability = pd.to_datetime(
+              df["availability_date"],
+              errors="coerce",
+          )
+
+          if observation.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid observation dates."
+              )
+
+          if availability.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid availability dates."
+              )
+
+          # --------------------------------------------------------
+          # PIT validation
+          # --------------------------------------------------------
+
+          if not (
+              availability > observation
+          ).all():
+
+              raise SystemExit(
+                  "ERROR: PIT validation failed."
+              )
+
+          # --------------------------------------------------------
+          # Date ordering
+          # --------------------------------------------------------
+
+          if not observation.is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: Observation dates are not sorted."
+              )
+
+          # --------------------------------------------------------
+          # Duplicate validation
+          # --------------------------------------------------------
+
+          if observation.duplicated().any():
+              raise SystemExit(
+                  "ERROR: Duplicate observation dates detected."
+              )
+
+          # --------------------------------------------------------
+          # VIX validation
+          # --------------------------------------------------------
+
+          df["VIX"] = pd.to_numeric(
+              df["VIX"],
+              errors="coerce",
+          )
+
+          if df["VIX"].isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid VIX values."
+              )
+
+          if (df["VIX"] <= 0).any():
+              raise SystemExit(
+                  "ERROR: VIX contains values <= 0."
+              )
+
+          # --------------------------------------------------------
+          # Percentile validation
+          # --------------------------------------------------------
+
+          percentile = pd.to_numeric(
+              df["VIX_percentile"],
+              errors="coerce",
+          )
+
+          valid_percentiles = percentile.dropna()
+
+          if (
+              (valid_percentiles < 0)
+              | (valid_percentiles > 100)
+          ).any():
+
+              raise SystemExit(
+                  "ERROR: VIX percentile outside 0-100."
+              )
+
+          # --------------------------------------------------------
+          # Research-only validation
+          # --------------------------------------------------------
+
+          if not df[
+              "point_in_time_safe"
+          ].all():
+
+              raise SystemExit(
+                  "ERROR: Non-PIT-safe rows detected."
+              )
+
+          if not df[
+              "research_only"
+          ].all():
+
+              raise SystemExit(
+                  "ERROR: Non-research rows detected."
+              )
+
+          if df[
+              "decision_engine_ready"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Decision Engine flag detected."
+              )
+
+          if df[
+              "sentiment_score_generated"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Sentiment score generated."
+              )
+
+          # --------------------------------------------------------
+          # Required regime validation
+          # --------------------------------------------------------
+
+          allowed_regimes = {
+              "EXTREME_FEAR",
+              "HIGH_FEAR",
+              "NEUTRAL",
+              "LOW_FEAR",
+              "EXTREME_LOW_FEAR",
+              "INSUFFICIENT_DATA",
+          }
+
+          actual_regimes = set(
+              df["research_regime"].dropna().unique()
+          )
+
+          unexpected = (
+              actual_regimes - allowed_regimes
+          )
+
+          if unexpected:
+
+              raise SystemExit(
+                  "ERROR: Unexpected research regimes: "
+                  f"{sorted(unexpected)}"
+              )
+
+          # --------------------------------------------------------
+          # Report
+          # --------------------------------------------------------
+
+          latest = df.iloc[-1]
+
+          print()
+          print("=" * 70)
+          print("VIX SENTIMENT ANALYZER v1 — VALIDATION")
+          print("=" * 70)
+
+          print(
+              f"Rows: {len(df):,}"
+          )
+
+          print(
+              f"First observation: "
+              f"{observation.min().date()}"
+          )
+
+          print(
+              f"Last observation: "
+              f"{observation.max().date()}"
+          )
+
+          print()
+          print("Latest observation:")
+
+          print(
+              f"  VIX: "
+              f"{latest['VIX']:.4f}"
+          )
+
+          print(
+              f"  VIX percentile: "
+              f"{latest['VIX_percentile']}"
+          )
+
+          print(
+              f"  VIX z-score: "
+              f"{latest['VIX_z']}"
+          )
+
+          print(
+              f"  Research regime: "
+              f"{latest['research_regime']}"
+          )
+
+          print()
+          print("Research regime counts:")
+
+          print(
+              df["research_regime"]
+              .value_counts()
+              .to_string()
+          )
+
+          print()
+          print("Point-in-time safe: TRUE")
+          print("Research-only: TRUE")
+          print("Decision Engine ready: FALSE")
+          print("Sentiment score generated: FALSE")
+          print("Trading signal: NONE")
+          print("Forecast: NONE")
+
+          print("=" * 70)
+          print()
+          print(
+              "PASS: VIX Sentiment outputs validated."
+          )
+          PY
+
+
+      # ============================================================
+      # 9. UPLOAD FINAL ARTIFACT
+      # ============================================================
+
+      - name: Upload VIX sentiment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vix-sentiment-v1
+          path: |
+            vix_sentiment_research_v1.csv
+            vix_sentiment_research_summary_v1.csv
+            vix_sentiment_extremes_v1.csv
+          if-no-files-found: error
+
+
+      # ============================================================
+      # 10. FINAL STATUS
+      # ============================================================
+
+      - name: Final status
+        run: |
+          echo "=================================================="
+          echo "VIX SENTIMENT ANALYZER v1 — PASS"
+          echo "=================================================="
+          echo "Research-only: TRUE"
+          echo "Point-in-time safe: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Sentiment score: NOT GENERATED"
+          echo "Trading signal: NONE"
+          echo "Forecast: NONE"
+          echo "Artifact: vix-sentiment-v1"
+          echo "=================================================="
