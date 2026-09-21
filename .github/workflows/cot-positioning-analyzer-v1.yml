@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 jobs:
   cot-positioning-analyzer:
@@ -14,45 +14,48 @@ jobs:
 
     steps:
 
-      # ------------------------------------------------------
-      # Checkout
-      # ------------------------------------------------------
+      # =====================================================
+      # 1. Checkout repository
+      # =====================================================
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------
-      # Python
-      # ------------------------------------------------------
+      # =====================================================
+      # 2. Setup Python
+      # =====================================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ------------------------------------------------------
-      # Dependencies
-      # ------------------------------------------------------
+      # =====================================================
+      # 3. Install dependencies
+      # =====================================================
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas numpy
 
-      # ------------------------------------------------------
-      # Download COT Historical artifact
-      # ------------------------------------------------------
+      # =====================================================
+      # 4. Find latest COT historical artifact
+      # =====================================================
 
-      - name: Download COT historical artifact
+      - name: Find COT historical artifact
+        id: find_artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python - <<'PY'
+
+          set -e
+
+          ARTIFACT_ID=$(python - <<'PY'
           import json
           import os
           import urllib.request
-          import zipfile
-          import io
+          import sys
 
           repo = os.environ["GITHUB_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
@@ -77,96 +80,153 @@ jobs:
           artifacts = data.get("artifacts", [])
 
           candidates = [
-              a for a in artifacts
-              if a["name"] == "cot-historical-v1"
-              and not a["expired"]
+              artifact
+              for artifact in artifacts
+              if artifact.get("name") == "cot-historical-v1"
+              and not artifact.get("expired", True)
           ]
 
           if not candidates:
-              raise SystemExit(
-                  "No valid cot-historical-v1 artifact found."
+              print(
+                  "ERROR: No valid cot-historical-v1 artifact found.",
+                  file=sys.stderr
               )
+              sys.exit(1)
 
-          # Use the newest artifact
           artifact = max(
               candidates,
               key=lambda x: x["created_at"]
           )
 
           print(
-              "Using artifact:",
-              artifact["id"],
-              artifact["created_at"]
+              f"Selected artifact: "
+              f"{artifact['name']} | "
+              f"ID={artifact['id']} | "
+              f"created={artifact['created_at']}",
+              file=sys.stderr
           )
 
-          download_url = artifact["archive_download_url"]
-
-          request = urllib.request.Request(
-              download_url,
-              headers={
-                  "Authorization": f"Bearer {token}",
-                  "Accept": "application/vnd.github+json",
-              },
-          )
-
-          with urllib.request.urlopen(request) as response:
-              archive = response.read()
-
-          with zipfile.ZipFile(
-              io.BytesIO(archive)
-          ) as z:
-
-              z.extractall("cot_input")
-
-          print("Artifact extracted.")
-
+          print(artifact["id"])
           PY
+          )
 
-      # ------------------------------------------------------
-      # Locate and validate input
-      # ------------------------------------------------------
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+          echo "Selected COT artifact ID:"
+          echo "$ARTIFACT_ID"
+
+      # =====================================================
+      # 5. Download artifact using GitHub CLI
+      # =====================================================
+
+      - name: Download COT historical artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.find_artifact.outputs.artifact_id }}
+        run: |
+
+          set -e
+
+          mkdir -p cot_input
+
+          echo "Downloading artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > cot_input/cot-historical.zip
+
+          echo "Downloaded artifact:"
+          ls -lh cot_input/cot-historical.zip
+
+          # =================================================
+          # Validate ZIP
+          # =================================================
+
+          unzip -t cot_input/cot-historical.zip
+
+          # =================================================
+          # Extract
+          # =================================================
+
+          unzip -o \
+            cot_input/cot-historical.zip \
+            -d cot_input
+
+          echo ""
+          echo "Extracted files:"
+          find cot_input -maxdepth 3 -type f -print
+
+      # =====================================================
+      # 6. Prepare COT input
+      # =====================================================
 
       - name: Prepare COT input
         run: |
-          find cot_input -maxdepth 3 -type f -print
+
+          set -e
 
           RECORD_FILE=$(find cot_input \
+            -type f \
             -name "cot_historical_records_input_v1.csv" \
-            -type f | head -n 1)
+            | head -n 1)
 
           if [ -z "$RECORD_FILE" ]; then
-            echo "COT historical records file not found."
+            echo "ERROR:"
+            echo "cot_historical_records_input_v1.csv not found."
             exit 1
           fi
+
+          echo "Found COT records:"
+          echo "$RECORD_FILE"
 
           cp "$RECORD_FILE" \
             cot_historical_records_input_v1.csv
 
-          test -f cot_historical_records_input_v1.csv
-
-          echo "Input file:"
+          echo ""
+          echo "Prepared input:"
           ls -lh cot_historical_records_input_v1.csv
 
-      # ------------------------------------------------------
-      # Run analyzer
-      # ------------------------------------------------------
+      # =====================================================
+      # 7. Run COT Positioning Analyzer
+      # =====================================================
 
       - name: Run COT Positioning Analyzer v1
         run: |
+
+          set -e
+
+          test -f cot_positioning_analyzer_v1.py
+          test -f cot_historical_records_input_v1.csv
+
           python cot_positioning_analyzer_v1.py
 
-      # ------------------------------------------------------
-      # Validate outputs
-      # ------------------------------------------------------
+      # =====================================================
+      # 8. Validate analyzer outputs
+      # =====================================================
 
       - name: Validate analyzer outputs
         run: |
+
+          set -e
+
+          # -------------------------------------------------
+          # Required output files
+          # -------------------------------------------------
+
           test -f cot_positioning_research_v1.csv
           test -f cot_positioning_research_summary_v1.csv
           test -f cot_positioning_extremes_v1.csv
 
+          # -------------------------------------------------
+          # Python validation
+          # -------------------------------------------------
+
           python - <<'PY'
+
           import pandas as pd
+          import sys
 
           records = pd.read_csv(
               "cot_positioning_research_v1.csv"
@@ -176,11 +236,31 @@ jobs:
               "cot_positioning_research_summary_v1.csv"
           )
 
-          required = [
+          extremes = pd.read_csv(
+              "cot_positioning_extremes_v1.csv"
+          )
+
+          # =================================================
+          # Basic validation
+          # =================================================
+
+          if records.empty:
+              raise SystemExit(
+                  "FAIL: Analyzer output is empty."
+              )
+
+          # =================================================
+          # Required columns
+          # =================================================
+
+          required_columns = [
+
               "contract_market_code",
               "contract_name",
+
               "observation_date",
               "availability_date",
+
               "open_interest",
 
               "asset_manager_net",
@@ -208,187 +288,322 @@ jobs:
           ]
 
           missing = [
-              c for c in required
-              if c not in records.columns
+              column
+              for column in required_columns
+              if column not in records.columns
           ]
 
           if missing:
               raise SystemExit(
-                  "Missing columns: "
+                  "FAIL: Missing columns: "
                   + ", ".join(missing)
               )
 
-          if records.empty:
-              raise SystemExit(
-                  "Analyzer output is empty."
-              )
-
-          # --------------------------------------------------
+          # =================================================
           # Contract validation
-          # --------------------------------------------------
+          # =================================================
 
-          if not (
+          contract_codes = (
               records[
                   "contract_market_code"
               ]
               .astype(str)
-              .eq("13874A")
-              .all()
-          ):
+              .str.strip()
+              .unique()
+          )
+
+          if list(contract_codes) != ["13874A"]:
               raise SystemExit(
-                  "Unexpected contract code."
+                  "FAIL: Unexpected contract code(s): "
+                  + str(contract_codes)
               )
 
-          # --------------------------------------------------
+          # =================================================
           # Date validation
-          # --------------------------------------------------
+          # =================================================
 
-          observation = pd.to_datetime(
-              records["observation_date"]
+          records["observation_date"] = pd.to_datetime(
+              records["observation_date"],
+              errors="coerce"
           )
 
-          availability = pd.to_datetime(
-              records["availability_date"]
+          records["availability_date"] = pd.to_datetime(
+              records["availability_date"],
+              errors="coerce"
           )
+
+          if records[
+              "observation_date"
+          ].isna().any():
+              raise SystemExit(
+                  "FAIL: Invalid observation dates."
+              )
+
+          if records[
+              "availability_date"
+          ].isna().any():
+              raise SystemExit(
+                  "FAIL: Invalid availability dates."
+              )
+
+          # =================================================
+          # PIT validation
+          # =================================================
 
           if not (
-              availability > observation
+              records["availability_date"]
+              > records["observation_date"]
           ).all():
-              raise SystemExit(
-                  "PIT validation failed."
-              )
 
-          # --------------------------------------------------
-          # PIT flag
-          # --------------------------------------------------
+              raise SystemExit(
+                  "FAIL: Availability date must be "
+                  "after observation date."
+              )
 
           if not records[
               "point_in_time_safe"
-          ].all():
+          ].astype(bool).all():
+
               raise SystemExit(
-                  "point_in_time_safe is not TRUE."
+                  "FAIL: point_in_time_safe contains FALSE."
               )
 
-          # --------------------------------------------------
+          # =================================================
           # Research-only validation
-          # --------------------------------------------------
+          # =================================================
 
           if not records[
               "research_only"
-          ].all():
+          ].astype(bool).all():
+
               raise SystemExit(
-                  "research_only must remain TRUE."
+                  "FAIL: research_only contains FALSE."
               )
+
+          # =================================================
+          # Decision Engine must remain disabled
+          # =================================================
 
           if records[
               "decision_engine_ready"
-          ].any():
+          ].astype(bool).any():
+
               raise SystemExit(
-                  "Decision Engine must remain disabled."
+                  "FAIL: Decision Engine integration detected."
               )
+
+          # =================================================
+          # Sentiment score must not be generated here
+          # =================================================
 
           if records[
               "sentiment_score_generated"
-          ].any():
+          ].astype(bool).any():
+
               raise SystemExit(
-                  "Sentiment score must NOT be generated "
-                  "by this analyzer."
+                  "FAIL: Sentiment score generated by analyzer."
               )
 
-          # --------------------------------------------------
+          # =================================================
           # Duplicate validation
-          # --------------------------------------------------
+          # =================================================
 
           duplicates = records.duplicated(
-              [
+              subset=[
                   "contract_market_code",
-                  "observation_date",
+                  "observation_date"
               ]
           ).sum()
 
-          if duplicates:
+          if duplicates > 0:
               raise SystemExit(
-                  f"Duplicate observations: {duplicates}"
+                  f"FAIL: {duplicates} duplicate observations."
               )
 
-          # --------------------------------------------------
-          # Summary
-          # --------------------------------------------------
+          # =================================================
+          # Date ordering
+          # =================================================
 
-          print()
-          print("=" * 70)
-          print("COT POSITIONING ANALYZER V1 VALIDATION")
-          print("=" * 70)
+          if not records[
+              "observation_date"
+          ].is_monotonic_increasing:
 
-          print(
-              "Records:",
-              len(records)
-          )
-
-          print(
-              "First observation:",
-              records[
-                  "observation_date"
-              ].min()
-          )
-
-          print(
-              "Last observation:",
-              records[
-                  "observation_date"
-              ].max()
-          )
-
-          print(
-              "PIT safe:",
-              records[
-                  "point_in_time_safe"
-              ].all()
-          )
-
-          print(
-              "Research only:",
-              records[
-                  "research_only"
-              ].all()
-          )
-
-          print(
-              "Decision Engine:",
-              records[
-                  "decision_engine_ready"
-              ].any()
-          )
-
-          print(
-              "Sentiment score generated:",
-              records[
-                  "sentiment_score_generated"
-              ].any()
-          )
-
-          print(
-              "Duplicates:",
-              duplicates
-          )
-
-          print()
-          print("Summary:")
-          print(
-              summary.to_string(
-                  index=False
+              raise SystemExit(
+                  "FAIL: Observation dates are not sorted."
               )
+
+          # =================================================
+          # Net positioning validation
+          # =================================================
+
+          # Asset Manager
+          if not (
+              records["asset_manager_net"].round(8)
+              ==
+              (
+                  records["asset_manager_net"]
+              ).round(8)
+          ).all():
+
+              raise SystemExit(
+                  "FAIL: Asset Manager net contains invalid values."
+              )
+
+          # =================================================
+          # Percentile range validation
+          # =================================================
+
+          percentile_columns = [
+
+              "asset_manager_net_percentile",
+              "leveraged_money_net_percentile",
+              "dealer_net_percentile",
+
+          ]
+
+          for column in percentile_columns:
+
+              values = records[column].dropna()
+
+              if not values.empty:
+
+                  if (values < 0).any() or (
+                      values > 100
+                  ).any():
+
+                      raise SystemExit(
+                          f"FAIL: {column} "
+                          "outside 0-100 range."
+                      )
+
+          # =================================================
+          # Extreme output validation
+          # =================================================
+
+          if "observation_date" not in extremes.columns:
+              raise SystemExit(
+                  "FAIL: Extremes file missing observation_date."
+              )
+
+          # =================================================
+          # Print validation report
+          # =================================================
+
+          first_date = records[
+              "observation_date"
+          ].min()
+
+          last_date = records[
+              "observation_date"
+          ].max()
+
+          print()
+          print("=" * 72)
+          print("COT POSITIONING ANALYZER V1")
+          print("VALIDATION REPORT")
+          print("=" * 72)
+
+          print(
+              f"Records:                    {len(records):,}"
           )
 
-          print("=" * 70)
+          print(
+              f"First observation:          "
+              f"{first_date.date()}"
+          )
+
+          print(
+              f"Last observation:           "
+              f"{last_date.date()}"
+          )
+
+          print(
+              f"Contract:                   13874A"
+          )
+
+          print(
+              f"Duplicate observations:     {duplicates}"
+          )
+
+          print(
+              "Point-in-time safe:         "
+              f"{records['point_in_time_safe'].astype(bool).all()}"
+          )
+
+          print(
+              "Research only:              "
+              f"{records['research_only'].astype(bool).all()}"
+          )
+
+          print(
+              "Decision Engine ready:      "
+              f"{records['decision_engine_ready'].astype(bool).any()}"
+          )
+
+          print(
+              "Sentiment score generated:  "
+              f"{records['sentiment_score_generated'].astype(bool).any()}"
+          )
+
+          print(
+              f"Extreme observations:       {len(extremes):,}"
+          )
+
+          print()
+          print("Latest observation:")
+
+          latest = records.iloc[-1]
+
+          print(
+              "  Observation date:",
+              latest["observation_date"].date()
+          )
+
+          print(
+              "  Availability date:",
+              latest["availability_date"].date()
+          )
+
+          print(
+              "  Asset Manager net:",
+              latest["asset_manager_net"]
+          )
+
+          print(
+              "  Asset Manager percentile:",
+              latest["asset_manager_net_percentile"]
+          )
+
+          print(
+              "  Leveraged Money net:",
+              latest["leveraged_money_net"]
+          )
+
+          print(
+              "  Leveraged Money percentile:",
+              latest["leveraged_money_net_percentile"]
+          )
+
+          print(
+              "  Dealer net:",
+              latest["dealer_net"]
+          )
+
+          print(
+              "  Dealer percentile:",
+              latest["dealer_net_percentile"]
+          )
+
+          print()
+          print("=" * 72)
           print("VALIDATION: PASS")
-          print("=" * 70)
+          print("=" * 72)
 
           PY
 
-      # ------------------------------------------------------
-      # Upload artifact
-      # ------------------------------------------------------
+      # =====================================================
+      # 9. Upload final analyzer artifact
+      # =====================================================
 
       - name: Upload COT positioning artifact
         uses: actions/upload-artifact@v4
@@ -398,4 +613,23 @@ jobs:
             cot_positioning_research_v1.csv
             cot_positioning_research_summary_v1.csv
             cot_positioning_extremes_v1.csv
+          if-no-files-found: error
           retention-days: 90
+
+      # =====================================================
+      # 10. Final status
+      # =====================================================
+
+      - name: Final status
+        run: |
+
+          echo "=================================================="
+          echo "COT POSITIONING ANALYZER V1 COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "Research-only: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Sentiment score: NOT GENERATED"
+          echo "Artifact: cot-positioning-v1"
+          echo ""
+          echo "=================================================="
