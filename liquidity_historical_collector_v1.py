@@ -8,6 +8,10 @@ Purpose:
     Collect historical liquidity-related observations from official
     FRED series using output_type=4 (Initial Release Only).
 
+The FRED real-time period is requested in yearly chunks because
+FRED limits the number of vintage dates returned by a single
+request to 2000.
+
 Indicators:
     WALCL      - Federal Reserve Total Assets
     WRESBAL    - Reserve Balances
@@ -54,11 +58,6 @@ FRED_API_KEY = os.getenv("FRED_API_KEY")
 FRED_ENDPOINT = (
     "https://api.stlouisfed.org/fred/series/observations"
 )
-
-# IMPORTANT:
-# Wide real-time period is required when using output_type=4.
-REALTIME_START = "1776-07-04"
-REALTIME_END = "9999-12-31"
 
 OUTPUT_FILE = Path(
     "liquidity_historical_records_input_v1.csv"
@@ -166,7 +165,7 @@ OUTPUT_COLUMNS = [
 
 
 # ================================================================
-# DATE VALIDATION
+# DATE UTILITIES
 # ================================================================
 
 def validate_date(value, name):
@@ -183,6 +182,70 @@ def validate_date(value, name):
             f"{name} must use YYYY-MM-DD format. "
             f"Received: {value}"
         ) from exc
+
+
+def generate_realtime_chunks(
+    start_date,
+    end_date
+):
+    """
+    Generate yearly real-time periods.
+
+    This avoids FRED's maximum-vintage-date limitation.
+
+    Example:
+
+        2019-01-01 → 2019-12-31
+        2020-01-01 → 2020-12-31
+        ...
+        2026-01-01 → 2026-12-31
+    """
+
+    start_dt = datetime.strptime(
+        start_date,
+        "%Y-%m-%d"
+    )
+
+    end_dt = datetime.strptime(
+        end_date,
+        "%Y-%m-%d"
+    )
+
+    chunks = []
+
+    current_year = start_dt.year
+    final_year = end_dt.year
+
+    while current_year <= final_year:
+
+        chunk_start = datetime(
+            current_year,
+            1,
+            1
+        )
+
+        chunk_end = datetime(
+            current_year,
+            12,
+            31
+        )
+
+        if chunk_start < start_dt:
+            chunk_start = start_dt
+
+        if chunk_end > end_dt:
+            chunk_end = end_dt
+
+        chunks.append(
+            (
+                chunk_start.strftime("%Y-%m-%d"),
+                chunk_end.strftime("%Y-%m-%d")
+            )
+        )
+
+        current_year += 1
+
+    return chunks
 
 
 # ================================================================
@@ -234,26 +297,27 @@ def validate_configuration():
             f"end date {END_DATE}."
         )
 
-    print("Configuration validation: PASS")
+    print(
+        "Configuration validation: PASS"
+    )
 
 
 # ================================================================
-# FRED API REQUEST
+# FRED SINGLE REQUEST
 # ================================================================
 
-def fetch_fred_series(
+def fetch_fred_chunk(
     series_id,
-    start_date,
-    end_date
+    observation_start,
+    observation_end,
+    realtime_start,
+    realtime_end
 ):
     """
-    Fetch FRED observations.
+    Fetch one FRED real-time chunk.
 
     output_type=4:
         Initial Release Only
-
-    A wide real-time period is explicitly supplied so FRED does
-    not default to today's date as the vintage period.
     """
 
     params = {
@@ -264,17 +328,15 @@ def fetch_fred_series(
 
         "series_id": series_id,
 
-        "observation_start": start_date,
+        "observation_start": observation_start,
 
-        "observation_end": end_date,
+        "observation_end": observation_end,
 
-        # Initial release only
         "output_type": 4,
 
-        # IMPORTANT FIX
-        "realtime_start": REALTIME_START,
+        "realtime_start": realtime_start,
 
-        "realtime_end": REALTIME_END,
+        "realtime_end": realtime_end,
 
         "sort_order": "asc",
     }
@@ -289,22 +351,10 @@ def fetch_fred_series(
 
     except requests.RequestException as exc:
 
-        print("")
-        print("=" * 70)
-        print("FRED NETWORK ERROR")
-        print("=" * 70)
-        print(f"Series: {series_id}")
-        print(f"Error: {exc}")
-        print("=" * 70)
-        print("")
-
         raise RuntimeError(
-            f"FRED request failed for {series_id}"
+            f"FRED network error for {series_id}: "
+            f"{exc}"
         ) from exc
-
-    # ------------------------------------------------------------
-    # HTTP ERROR
-    # ------------------------------------------------------------
 
     if response.status_code != 200:
 
@@ -312,11 +362,18 @@ def fetch_fred_series(
         print("=" * 70)
         print("FRED API ERROR")
         print("=" * 70)
-        print(f"Series:       {series_id}")
-        print(f"HTTP status:  {response.status_code}")
-        print("")
-        print("Request URL:")
-        print(response.url)
+        print(f"Series: {series_id}")
+        print(
+            f"Observation period: "
+            f"{observation_start} → {observation_end}"
+        )
+        print(
+            f"Real-time period: "
+            f"{realtime_start} → {realtime_end}"
+        )
+        print(
+            f"HTTP status: {response.status_code}"
+        )
         print("")
         print("FRED response:")
         print(response.text)
@@ -325,12 +382,9 @@ def fetch_fred_series(
 
         raise RuntimeError(
             f"FRED API request failed for "
-            f"{series_id}: HTTP {response.status_code}"
+            f"{series_id}: HTTP "
+            f"{response.status_code}"
         )
-
-    # ------------------------------------------------------------
-    # JSON
-    # ------------------------------------------------------------
 
     try:
 
@@ -338,51 +392,18 @@ def fetch_fred_series(
 
     except ValueError as exc:
 
-        print("")
-        print("=" * 70)
-        print("FRED RESPONSE ERROR")
-        print("=" * 70)
-        print(f"Series: {series_id}")
-        print("Response was not valid JSON.")
-        print(response.text[:2000])
-        print("=" * 70)
-        print("")
-
         raise RuntimeError(
-            f"Invalid JSON response for {series_id}"
+            f"Invalid JSON response for "
+            f"{series_id}"
         ) from exc
 
-    # ------------------------------------------------------------
-    # FRED ERROR PAYLOAD
-    # ------------------------------------------------------------
-
     if "error_code" in data:
-
-        print("")
-        print("=" * 70)
-        print("FRED API ERROR PAYLOAD")
-        print("=" * 70)
-        print(f"Series: {series_id}")
-        print(
-            f"Error code: "
-            f"{data.get('error_code')}"
-        )
-        print(
-            f"Error message: "
-            f"{data.get('error_message')}"
-        )
-        print("=" * 70)
-        print("")
 
         raise RuntimeError(
             f"FRED API error "
             f"{data.get('error_code')}: "
             f"{data.get('error_message')}"
         )
-
-    # ------------------------------------------------------------
-    # OBSERVATIONS
-    # ------------------------------------------------------------
 
     if "observations" not in data:
 
@@ -391,21 +412,71 @@ def fetch_fred_series(
             "does not contain observations."
         )
 
-    observations = data["observations"]
+    return data["observations"]
 
-    if not isinstance(observations, list):
 
-        raise RuntimeError(
-            f"Invalid observations payload "
-            f"for {series_id}."
+# ================================================================
+# FETCH SERIES IN YEARLY REAL-TIME CHUNKS
+# ================================================================
+
+def fetch_fred_series(
+    series_id,
+    start_date,
+    end_date
+):
+    """
+    Fetch a complete series using yearly real-time chunks.
+
+    The chunks are deliberately smaller than FRED's
+    2000-vintage-date limit.
+    """
+
+    chunks = generate_realtime_chunks(
+        start_date,
+        end_date
+    )
+
+    all_observations = []
+
+    print(
+        f"Real-time chunks: {len(chunks)}"
+    )
+
+    for (
+        realtime_start,
+        realtime_end
+    ) in chunks:
+
+        print(
+            f"  Chunk: "
+            f"{realtime_start} → "
+            f"{realtime_end}"
+        )
+
+        observations = fetch_fred_chunk(
+            series_id=series_id,
+            observation_start=start_date,
+            observation_end=end_date,
+            realtime_start=realtime_start,
+            realtime_end=realtime_end,
+        )
+
+        print(
+            f"    Received: "
+            f"{len(observations):,}"
+        )
+
+        all_observations.extend(
+            observations
         )
 
     print(
-        f"Received {len(observations):,} "
-        f"observations for {series_id}"
+        f"Total raw observations collected "
+        f"for {series_id}: "
+        f"{len(all_observations):,}"
     )
 
-    return observations
+    return all_observations
 
 
 # ================================================================
@@ -423,14 +494,17 @@ def convert_series(
 
     for obs in observations:
 
-        observation_date = obs.get("date")
+        observation_date = obs.get(
+            "date"
+        )
 
-        raw_value = obs.get("value")
+        raw_value = obs.get(
+            "value"
+        )
 
         if not observation_date:
             continue
 
-        # FRED uses "." for missing values.
         if raw_value in (
             None,
             "",
@@ -440,69 +514,95 @@ def convert_series(
 
         try:
 
-            actual = float(raw_value)
+            actual = float(
+                raw_value
+            )
 
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError
+        ):
 
             continue
 
-        obs_dt = datetime.strptime(
-            observation_date,
-            "%Y-%m-%d"
-        )
+        try:
+
+            obs_dt = datetime.strptime(
+                observation_date,
+                "%Y-%m-%d"
+            )
+
+        except ValueError:
+
+            continue
 
         # --------------------------------------------------------
         # Conservative availability proxy
         # --------------------------------------------------------
-        #
-        # +1 calendar day is a research-safe proxy.
-        # It is NOT claimed to be the exact historical
-        # publication timestamp.
-        #
+
         availability_date = (
-            obs_dt + timedelta(days=1)
-        ).strftime("%Y-%m-%d")
+            obs_dt +
+            timedelta(days=1)
+        ).strftime(
+            "%Y-%m-%d"
+        )
 
         rows.append(
             {
-                "indicator": meta["indicator"],
+                "indicator":
+                    meta["indicator"],
 
                 "observation_date":
-                    obs_dt.strftime("%Y-%m-%d"),
+                    obs_dt.strftime(
+                        "%Y-%m-%d"
+                    ),
 
                 "availability_date":
                     availability_date,
 
-                "actual": actual,
+                "actual":
+                    actual,
 
-                "unit": meta["unit"],
+                "unit":
+                    meta["unit"],
 
-                "frequency": meta["frequency"],
+                "frequency":
+                    meta["frequency"],
 
-                "source": meta["source"],
+                "source":
+                    meta["source"],
 
-                "source_url": meta["source_url"],
+                "source_url":
+                    meta["source_url"],
 
-                "vintage": "initial_release",
+                "vintage":
+                    "initial_release",
 
-                "revision_flag": False,
+                "revision_flag":
+                    False,
 
-                "point_in_time_safe": True,
+                "point_in_time_safe":
+                    True,
 
                 "availability_semantics":
                     "Conservative +1 calendar day "
                     "availability proxy; "
                     "FRED output_type=4 initial release",
 
-                "research_only": True,
+                "research_only":
+                    True,
 
-                "decision_engine_ready": False,
+                "decision_engine_ready":
+                    False,
 
-                "trading_signal_generated": False,
+                "trading_signal_generated":
+                    False,
 
-                "forecast_generated": False,
+                "forecast_generated":
+                    False,
 
-                "liquidity_score_generated": False,
+                "liquidity_score_generated":
+                    False,
             }
         )
 
@@ -523,12 +623,15 @@ def collect_all_series():
     print("Official FRED Series / Initial Release")
     print("Research-only — No Decision Engine")
     print("=" * 70)
-    print(f"Start: {START_DATE}")
-    print(f"End:   {END_DATE}")
-    print(f"Required indicators: {len(SERIES)}")
     print(
-        f"Real-time period: "
-        f"{REALTIME_START} → {REALTIME_END}"
+        f"Start: {START_DATE}"
+    )
+    print(
+        f"End:   {END_DATE}"
+    )
+    print(
+        f"Required indicators: "
+        f"{len(SERIES)}"
     )
     print("")
 
@@ -565,7 +668,9 @@ def collect_all_series():
             f"{len(rows):,}"
         )
 
-        all_rows.extend(rows)
+        all_rows.extend(
+            rows
+        )
 
     return all_rows
 
@@ -586,9 +691,9 @@ def validate_output(df):
     # ------------------------------------------------------------
 
     missing_columns = [
-        col
-        for col in OUTPUT_COLUMNS
-        if col not in df.columns
+        column
+        for column in OUTPUT_COLUMNS
+        if column not in df.columns
     ]
 
     if missing_columns:
@@ -643,24 +748,24 @@ def validate_output(df):
 
     df["observation_date"] = pd.to_datetime(
         df["observation_date"],
-        errors="coerce",
+        errors="coerce"
     )
 
     df["availability_date"] = pd.to_datetime(
         df["availability_date"],
-        errors="coerce",
+        errors="coerce"
     )
 
     if df["observation_date"].isna().any():
 
         raise RuntimeError(
-            "Invalid observation_date values detected."
+            "Invalid observation_date values."
         )
 
     if df["availability_date"].isna().any():
 
         raise RuntimeError(
-            "Invalid availability_date values detected."
+            "Invalid availability_date values."
         )
 
     start_dt = pd.Timestamp(
@@ -677,8 +782,8 @@ def validate_output(df):
     ).any():
 
         raise RuntimeError(
-            "Observation dates earlier than "
-            "requested start date detected."
+            "Observation date earlier than "
+            "requested start date."
         )
 
     if (
@@ -687,12 +792,12 @@ def validate_output(df):
     ).any():
 
         raise RuntimeError(
-            "Observation dates later than "
-            "requested end date detected."
+            "Observation date later than "
+            "requested end date."
         )
 
     # ------------------------------------------------------------
-    # Availability date
+    # Availability
     # ------------------------------------------------------------
 
     if (
@@ -702,7 +807,7 @@ def validate_output(df):
 
         raise RuntimeError(
             "Availability date earlier than "
-            "observation date detected."
+            "observation date."
         )
 
     # ------------------------------------------------------------
@@ -711,17 +816,18 @@ def validate_output(df):
 
     df["actual"] = pd.to_numeric(
         df["actual"],
-        errors="coerce",
+        errors="coerce"
     )
 
     if df["actual"].isna().any():
 
         raise RuntimeError(
-            "Missing or non-numeric "
-            "actual values detected."
+            "Missing/non-numeric actual values."
         )
 
-    if np.isinf(df["actual"]).any():
+    if np.isinf(
+        df["actual"]
+    ).any():
 
         raise RuntimeError(
             "Infinite actual values detected."
@@ -738,29 +844,26 @@ def validate_output(df):
         "vintage",
     ]
 
-    duplicate_count = df.duplicated(
+    duplicates = df.duplicated(
         subset=duplicate_keys
     ).sum()
 
-    if duplicate_count > 0:
+    if duplicates > 0:
 
         raise RuntimeError(
             f"Duplicate records detected: "
-            f"{duplicate_count}"
+            f"{duplicates}"
         )
 
     # ------------------------------------------------------------
     # PIT
     # ------------------------------------------------------------
 
-    pit_values = (
+    if not (
         df["point_in_time_safe"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        pit_values == "true"
+        .eq("true")
     ).all():
 
         raise RuntimeError(
@@ -772,14 +875,11 @@ def validate_output(df):
     # Revision
     # ------------------------------------------------------------
 
-    revision_values = (
+    if not (
         df["revision_flag"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        revision_values == "false"
+        .eq("false")
     ).all():
 
         raise RuntimeError(
@@ -791,14 +891,11 @@ def validate_output(df):
     # Research only
     # ------------------------------------------------------------
 
-    research_values = (
+    if not (
         df["research_only"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        research_values == "true"
+        .eq("true")
     ).all():
 
         raise RuntimeError(
@@ -810,33 +907,26 @@ def validate_output(df):
     # Decision Engine
     # ------------------------------------------------------------
 
-    decision_values = (
+    if not (
         df["decision_engine_ready"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        decision_values == "false"
+        .eq("false")
     ).all():
 
         raise RuntimeError(
-            "decision_engine_ready is not False "
-            "for all records."
+            "decision_engine_ready is not False."
         )
 
     # ------------------------------------------------------------
-    # Trading signal
+    # Signals
     # ------------------------------------------------------------
 
-    signal_values = (
+    if not (
         df["trading_signal_generated"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        signal_values == "false"
+        .eq("false")
     ).all():
 
         raise RuntimeError(
@@ -847,14 +937,11 @@ def validate_output(df):
     # Forecast
     # ------------------------------------------------------------
 
-    forecast_values = (
+    if not (
         df["forecast_generated"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        forecast_values == "false"
+        .eq("false")
     ).all():
 
         raise RuntimeError(
@@ -865,14 +952,11 @@ def validate_output(df):
     # Liquidity score
     # ------------------------------------------------------------
 
-    score_values = (
+    if not (
         df["liquidity_score_generated"]
         .astype(str)
         .str.lower()
-    )
-
-    if not (
-        score_values == "false"
+        .eq("false")
     ).all():
 
         raise RuntimeError(
@@ -883,17 +967,14 @@ def validate_output(df):
     # Vintage
     # ------------------------------------------------------------
 
-    vintage_values = (
+    if not (
         df["vintage"]
         .astype(str)
-    )
-
-    if not (
-        vintage_values == "initial_release"
+        .eq("initial_release")
     ).all():
 
         raise RuntimeError(
-            "Unexpected vintage metadata detected."
+            "Unexpected vintage metadata."
         )
 
     print("Schema: PASS")
@@ -931,25 +1012,37 @@ def build_summary(df):
 
         latest = (
             group
-            .sort_values("observation_date")
+            .sort_values(
+                "observation_date"
+            )
             .iloc[-1]
         )
 
         summary_rows.append(
             {
-                "indicator": indicator,
+                "indicator":
+                    indicator,
 
-                "rows": len(group),
+                "rows":
+                    len(group),
 
                 "first_observation":
-                    group["observation_date"]
+                    group[
+                        "observation_date"
+                    ]
                     .min()
-                    .strftime("%Y-%m-%d"),
+                    .strftime(
+                        "%Y-%m-%d"
+                    ),
 
                 "last_observation":
-                    group["observation_date"]
+                    group[
+                        "observation_date"
+                    ]
                     .max()
-                    .strftime("%Y-%m-%d"),
+                    .strftime(
+                        "%Y-%m-%d"
+                    ),
 
                 "latest_actual":
                     latest["actual"],
@@ -1009,14 +1102,33 @@ def main():
                 "Collector returned zero records."
             )
 
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(
+            rows
+        )
 
-        # Exact schema order
+        # Exact schema
         df = df[
             OUTPUT_COLUMNS
         ]
 
-        # Deterministic sorting
+        # --------------------------------------------------------
+        # Remove duplicate observations created by chunk overlap
+        # --------------------------------------------------------
+
+        df = (
+            df
+            .drop_duplicates(
+                subset=[
+                    "indicator",
+                    "observation_date",
+                    "availability_date",
+                    "vintage",
+                ],
+                keep="first"
+            )
+        )
+
+        # Deterministic order
         df = (
             df
             .sort_values(
@@ -1025,25 +1137,31 @@ def main():
                     "indicator",
                 ]
             )
-            .reset_index(drop=True)
+            .reset_index(
+                drop=True
+            )
         )
 
         # Validate
-        validate_output(df)
+        validate_output(
+            df
+        )
 
-        # Build summary
-        summary = build_summary(df)
+        # Summary
+        summary = build_summary(
+            df
+        )
 
         # Save records
         df.to_csv(
             OUTPUT_FILE,
-            index=False,
+            index=False
         )
 
         # Save summary
         summary.to_csv(
             SUMMARY_FILE,
-            index=False,
+            index=False
         )
 
         # --------------------------------------------------------
@@ -1052,7 +1170,10 @@ def main():
 
         print("")
         print("=" * 70)
-        print("LIQUIDITY HISTORICAL COLLECTION COMPLETE")
+        print(
+            "LIQUIDITY HISTORICAL "
+            "COLLECTION COMPLETE"
+        )
         print("=" * 70)
 
         print(
@@ -1073,11 +1194,15 @@ def main():
         )
 
         print("")
-        print("Rows by indicator:")
+        print(
+            "Rows by indicator:"
+        )
 
         counts = (
             df
-            .groupby("indicator")
+            .groupby(
+                "indicator"
+            )
             .size()
             .sort_index()
         )
@@ -1090,20 +1215,38 @@ def main():
             )
 
         print("")
-        print("Output files:")
+        print(
+            "Output files:"
+        )
+
         print(
             f"  {OUTPUT_FILE}"
         )
+
         print(
             f"  {SUMMARY_FILE}"
         )
 
         print("")
-        print("Research-only: TRUE")
-        print("Decision Engine: FALSE")
-        print("Trading signal: FALSE")
-        print("Forecast: FALSE")
-        print("Liquidity score: FALSE")
+        print(
+            "Research-only: TRUE"
+        )
+
+        print(
+            "Decision Engine: FALSE"
+        )
+
+        print(
+            "Trading signal: FALSE"
+        )
+
+        print(
+            "Forecast: FALSE"
+        )
+
+        print(
+            "Liquidity score: FALSE"
+        )
 
         print("")
         print("=" * 70)
@@ -1114,9 +1257,14 @@ def main():
 
         print("")
         print("=" * 70)
-        print("LIQUIDITY HISTORICAL COLLECTOR FAILED")
+        print(
+            "LIQUIDITY HISTORICAL "
+            "COLLECTOR FAILED"
+        )
         print("=" * 70)
-        print(f"Error: {exc}")
+        print(
+            f"Error: {exc}"
+        )
         print("=" * 70)
         print("")
 
