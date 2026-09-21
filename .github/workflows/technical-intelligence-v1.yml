@@ -1,0 +1,416 @@
+name: Technical Intelligence v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  technical-intelligence:
+    name: Build Technical Intelligence v1
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ----------------------------------------------------
+      # Checkout repository
+      # ----------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------
+      # Python
+      # ----------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ----------------------------------------------------
+      # Dependencies
+      # ----------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance
+
+      # ----------------------------------------------------
+      # Verify source file
+      # ----------------------------------------------------
+      - name: Verify Technical Intelligence source
+        run: |
+          set -e
+
+          if [ ! -f "technical-intelligence-v1.py" ]; then
+            echo "ERROR: technical-intelligence-v1.py not found."
+            exit 1
+          fi
+
+          echo "Technical Intelligence source found."
+
+      # ----------------------------------------------------
+      # Run Technical Intelligence
+      # ----------------------------------------------------
+      - name: Run Technical Intelligence v1
+        env:
+          US500_TICKER: "^GSPC"
+          TECHNICAL_START_DATE: "2019-01-01"
+        run: |
+          set -e
+
+          python technical-intelligence-v1.py
+
+      # ----------------------------------------------------
+      # Validate output files
+      # ----------------------------------------------------
+      - name: Validate output files
+        run: |
+          set -e
+
+          test -f technical_intelligence_research_v1.csv
+          test -f technical_intelligence_research_summary_v1.csv
+          test -f technical_intelligence_extremes_v1.csv
+
+          echo "All required output files exist."
+
+      # ----------------------------------------------------
+      # Validate dataset
+      # ----------------------------------------------------
+      - name: Validate Technical Intelligence dataset
+        run: |
+          python - <<'PY'
+          import pandas as pd
+
+          research = pd.read_csv(
+              "technical_intelligence_research_v1.csv"
+          )
+
+          summary = pd.read_csv(
+              "technical_intelligence_research_summary_v1.csv"
+          )
+
+          extremes = pd.read_csv(
+              "technical_intelligence_extremes_v1.csv"
+          )
+
+          print("Research rows:", len(research))
+          print("Summary rows:", len(summary))
+          print("Extremes rows:", len(extremes))
+
+          if research.empty:
+              raise SystemExit(
+                  "ERROR: research dataset is empty."
+              )
+
+          # ------------------------------------------------
+          # Required columns
+          # ------------------------------------------------
+
+          required_columns = [
+              "observation_date",
+              "availability_date",
+              "ticker",
+
+              "Open",
+              "High",
+              "Low",
+              "Close",
+              "Volume",
+
+              "SMA20",
+              "SMA50",
+              "SMA200",
+              "EMA20",
+              "EMA50",
+
+              "RSI14",
+              "ROC20_pct",
+
+              "TR",
+              "ATR14",
+              "ATR14_pct",
+              "realized_volatility_20d_pct",
+
+              "drawdown_pct",
+
+              "prior_252d_high",
+              "prior_252d_low",
+
+              "prior_20d_high",
+              "prior_20d_low",
+
+              "breakout_above_prior_20d_high",
+              "breakdown_below_prior_20d_low",
+
+              "trend_structure",
+              "technical_regime",
+
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "technical_score_generated",
+          ]
+
+          missing = [
+              col
+              for col in required_columns
+              if col not in research.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing columns: {missing}"
+              )
+
+          # ------------------------------------------------
+          # Dates
+          # ------------------------------------------------
+
+          observation_dates = pd.to_datetime(
+              research["observation_date"]
+          )
+
+          availability_dates = pd.to_datetime(
+              research["availability_date"]
+          )
+
+          if not observation_dates.is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: observation dates are not sorted."
+              )
+
+          if observation_dates.duplicated().any():
+              raise SystemExit(
+                  "ERROR: duplicate observation dates."
+              )
+
+          if not (
+              availability_dates > observation_dates
+          ).all():
+              raise SystemExit(
+                  "ERROR: availability date is not after observation date."
+              )
+
+          # ------------------------------------------------
+          # PIT safety
+          # ------------------------------------------------
+
+          if not research[
+              "point_in_time_safe"
+          ].eq(True).all():
+              raise SystemExit(
+                  "ERROR: PIT safety validation failed."
+              )
+
+          # ------------------------------------------------
+          # Research-only safeguards
+          # ------------------------------------------------
+
+          if not research[
+              "research_only"
+          ].eq(True).all():
+              raise SystemExit(
+                  "ERROR: research_only must be True."
+              )
+
+          if not research[
+              "decision_engine_ready"
+          ].eq(False).all():
+              raise SystemExit(
+                  "ERROR: Decision Engine must remain disabled."
+              )
+
+          if not research[
+              "trading_signal_generated"
+          ].eq(False).all():
+              raise SystemExit(
+                  "ERROR: trading signals detected."
+              )
+
+          if not research[
+              "forecast_generated"
+          ].eq(False).all():
+              raise SystemExit(
+                  "ERROR: forecast generation detected."
+              )
+
+          if not research[
+              "technical_score_generated"
+          ].eq(False).all():
+              raise SystemExit(
+                  "ERROR: technical score generation detected."
+              )
+
+          # ------------------------------------------------
+          # RSI
+          # ------------------------------------------------
+
+          rsi = research["RSI14"].dropna()
+
+          if not rsi.empty:
+              if ((rsi < 0) | (rsi > 100)).any():
+                  raise SystemExit(
+                      "ERROR: RSI outside 0-100 range."
+                  )
+
+          # ------------------------------------------------
+          # ATR
+          # ------------------------------------------------
+
+          atr = research["ATR14"].dropna()
+
+          if not atr.empty:
+              if (atr < 0).any():
+                  raise SystemExit(
+                      "ERROR: negative ATR detected."
+                  )
+
+          # ------------------------------------------------
+          # Technical regimes
+          # ------------------------------------------------
+
+          allowed_regimes = {
+              "STRONG_BULLISH",
+              "BULLISH",
+              "NEUTRAL",
+              "BEARISH",
+              "STRONG_BEARISH",
+              "INSUFFICIENT_DATA",
+          }
+
+          actual_regimes = set(
+              research["technical_regime"]
+              .dropna()
+              .unique()
+          )
+
+          unexpected = (
+              actual_regimes
+              - allowed_regimes
+          )
+
+          if unexpected:
+              raise SystemExit(
+                  f"ERROR: unexpected regimes: {unexpected}"
+              )
+
+          # ------------------------------------------------
+          # Ticker
+          # ------------------------------------------------
+
+          tickers = set(
+              research["ticker"]
+              .dropna()
+              .unique()
+          )
+
+          if tickers != {"^GSPC"}:
+              raise SystemExit(
+                  f"ERROR: unexpected ticker values: {tickers}"
+              )
+
+          print()
+          print("=" * 70)
+          print("TECHNICAL INTELLIGENCE VALIDATION PASSED")
+          print("=" * 70)
+
+          print(
+              "Rows:",
+              len(research)
+          )
+
+          print(
+              "Date range:",
+              observation_dates.min().date(),
+              "->",
+              observation_dates.max().date()
+          )
+
+          print(
+              "Regimes:",
+              research[
+                  "technical_regime"
+              ].value_counts().to_dict()
+          )
+
+          latest = research.iloc[-1]
+
+          print()
+          print("Latest observation:")
+          print(
+              "Date:",
+              latest["observation_date"]
+          )
+          print(
+              "Close:",
+              latest["Close"]
+          )
+          print(
+              "RSI14:",
+              latest["RSI14"]
+          )
+          print(
+              "ATR14:",
+              latest["ATR14"]
+          )
+          print(
+              "ATR14 %:",
+              latest["ATR14_pct"]
+          )
+          print(
+              "ROC20 %:",
+              latest["ROC20_pct"]
+          )
+          print(
+              "Drawdown %:",
+              latest["drawdown_pct"]
+          )
+          print(
+              "Trend structure:",
+              latest["trend_structure"]
+          )
+          print(
+              "Technical regime:",
+              latest["technical_regime"]
+          )
+
+          print()
+          print("PIT safe: TRUE")
+          print("Research only: TRUE")
+          print("Decision Engine: FALSE")
+          print("Trading signal: FALSE")
+          print("Forecast: FALSE")
+          print("Technical score: FALSE")
+          PY
+
+      # ----------------------------------------------------
+      # Upload artifact
+      # ----------------------------------------------------
+      - name: Upload Technical Intelligence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: technical-intelligence-v1
+          path: |
+            technical_intelligence_research_v1.csv
+            technical_intelligence_research_summary_v1.csv
+            technical_intelligence_extremes_v1.csv
+          if-no-files-found: error
+          retention-days: 30
+
+      # ----------------------------------------------------
+      # Final status
+      # ----------------------------------------------------
+      - name: Final status
+        run: |
+          echo "=============================================="
+          echo "Technical Intelligence v1 PASSED"
+          echo "=============================================="
+          echo "Research-only: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Trading Signal: FALSE"
+          echo "Forecast: FALSE"
+          echo "Technical Score: FALSE"
+          echo "Artifact: technical-intelligence-v1"
