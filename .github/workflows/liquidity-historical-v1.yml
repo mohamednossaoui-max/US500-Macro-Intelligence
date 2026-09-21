@@ -1,0 +1,427 @@
+name: Liquidity Historical v1
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start date (YYYY-MM-DD)"
+        required: false
+        default: "2019-01-01"
+
+      end_date:
+        description: "End date (YYYY-MM-DD)"
+        required: false
+        default: "2026-09-21"
+
+permissions:
+  contents: read
+
+jobs:
+  liquidity-historical:
+    name: Liquidity Historical Collector v1
+    runs-on: ubuntu-latest
+
+    env:
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+
+      LIQUIDITY_START_DATE: ${{ github.event.inputs.start_date }}
+      LIQUIDITY_END_DATE: ${{ github.event.inputs.end_date }}
+
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+
+      # ---------------------------------------------------------
+      # 1. Checkout repository
+      # ---------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------
+      # 2. Setup Python
+      # ---------------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ---------------------------------------------------------
+      # 3. Install dependencies
+      # ---------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests
+
+      # ---------------------------------------------------------
+      # 4. Validate FRED API key
+      # ---------------------------------------------------------
+      - name: Validate FRED API configuration
+        run: |
+          if [ -z "$FRED_API_KEY" ]; then
+            echo "ERROR: FRED_API_KEY secret is not configured."
+            exit 1
+          fi
+
+          echo "FRED_API_KEY detected."
+
+      # ---------------------------------------------------------
+      # 5. Validate requested dates
+      # ---------------------------------------------------------
+      - name: Validate date configuration
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime
+
+          start = os.environ["LIQUIDITY_START_DATE"]
+          end = os.environ["LIQUIDITY_END_DATE"]
+
+          start_dt = datetime.strptime(start, "%Y-%m-%d")
+          end_dt = datetime.strptime(end, "%Y-%m-%d")
+
+          if start_dt > end_dt:
+              raise SystemExit(
+                  f"ERROR: start_date {start} is after end_date {end}"
+              )
+
+          print(f"Start date: {start}")
+          print(f"End date:   {end}")
+          print("Date configuration: PASS")
+          PY
+
+      # ---------------------------------------------------------
+      # 6. Run historical collector
+      # ---------------------------------------------------------
+      - name: Run Liquidity Historical Collector v1
+        run: |
+          python liquidity_historical_collector_v1.py
+
+      # ---------------------------------------------------------
+      # 7. Validate output files
+      # ---------------------------------------------------------
+      - name: Validate collector outputs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          import os
+
+          output_file = Path("liquidity_historical_records_input_v1.csv")
+          summary_file = Path("liquidity_historical_collection_summary_v1.csv")
+
+          if not output_file.exists():
+              raise SystemExit(
+                  "ERROR: liquidity_historical_records_input_v1.csv not found."
+              )
+
+          if not summary_file.exists():
+              raise SystemExit(
+                  "ERROR: liquidity_historical_collection_summary_v1.csv not found."
+              )
+
+          df = pd.read_csv(output_file)
+
+          required_columns = [
+              "indicator",
+              "observation_date",
+              "availability_date",
+              "actual",
+              "unit",
+              "frequency",
+              "source",
+              "source_url",
+              "vintage",
+              "revision_flag",
+              "point_in_time_safe",
+              "availability_semantics",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "liquidity_score_generated",
+          ]
+
+          missing = [
+              c for c in required_columns
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing required columns: {missing}"
+              )
+
+          expected_indicators = {
+              "WALCL",
+              "WRESBAL",
+              "WTREGEN",
+              "WSHOTSL",
+              "WSHOMCB",
+              "RRPONTSYD",
+              "SOFR",
+              "EFFR",
+          }
+
+          actual_indicators = set(df["indicator"].dropna().unique())
+
+          missing_indicators = expected_indicators - actual_indicators
+
+          if missing_indicators:
+              raise SystemExit(
+                  f"ERROR: Missing indicators: {sorted(missing_indicators)}"
+              )
+
+          unexpected = actual_indicators - expected_indicators
+
+          if unexpected:
+              raise SystemExit(
+                  f"ERROR: Unexpected indicators: {sorted(unexpected)}"
+              )
+
+          # -----------------------------------------------------
+          # Dates
+          # -----------------------------------------------------
+          df["observation_date"] = pd.to_datetime(
+              df["observation_date"]
+          )
+
+          df["availability_date"] = pd.to_datetime(
+              df["availability_date"]
+          )
+
+          start_date = pd.Timestamp(
+              os.environ["LIQUIDITY_START_DATE"]
+          )
+
+          end_date = pd.Timestamp(
+              os.environ["LIQUIDITY_END_DATE"]
+          )
+
+          if df["observation_date"].min() < start_date:
+              raise SystemExit(
+                  "ERROR: Observation date earlier than requested start date."
+              )
+
+          if df["observation_date"].max() > end_date:
+              raise SystemExit(
+                  "ERROR: Observation date exceeds requested end date."
+              )
+
+          # -----------------------------------------------------
+          # Numeric validation
+          # -----------------------------------------------------
+          df["actual"] = pd.to_numeric(
+              df["actual"],
+              errors="coerce"
+          )
+
+          if df["actual"].isna().any():
+              raise SystemExit(
+                  "ERROR: Missing/non-numeric actual values detected."
+              )
+
+          # -----------------------------------------------------
+          # Duplicate validation
+          # -----------------------------------------------------
+          duplicate_keys = [
+              "indicator",
+              "observation_date",
+              "availability_date",
+              "vintage",
+          ]
+
+          duplicates = df.duplicated(
+              subset=duplicate_keys
+          ).sum()
+
+          if duplicates > 0:
+              raise SystemExit(
+                  f"ERROR: Duplicate records detected: {duplicates}"
+              )
+
+          # -----------------------------------------------------
+          # PIT validation
+          # -----------------------------------------------------
+          pit_values = (
+              df["point_in_time_safe"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (pit_values == "true").all():
+              raise SystemExit(
+                  "ERROR: One or more records are not PIT-safe."
+              )
+
+          # -----------------------------------------------------
+          # Revision validation
+          # -----------------------------------------------------
+          revision_values = (
+              df["revision_flag"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (revision_values == "false").all():
+              raise SystemExit(
+                  "ERROR: Revision flags detected."
+              )
+
+          # -----------------------------------------------------
+          # Research-only validation
+          # -----------------------------------------------------
+          research_values = (
+              df["research_only"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (research_values == "true").all():
+              raise SystemExit(
+                  "ERROR: research_only is not True for all records."
+              )
+
+          # -----------------------------------------------------
+          # Decision Engine validation
+          # -----------------------------------------------------
+          decision_values = (
+              df["decision_engine_ready"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (decision_values == "false").all():
+              raise SystemExit(
+                  "ERROR: decision_engine_ready must be False."
+              )
+
+          # -----------------------------------------------------
+          # Trading signal validation
+          # -----------------------------------------------------
+          signal_values = (
+              df["trading_signal_generated"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (signal_values == "false").all():
+              raise SystemExit(
+                  "ERROR: Trading signals detected."
+              )
+
+          # -----------------------------------------------------
+          # Forecast validation
+          # -----------------------------------------------------
+          forecast_values = (
+              df["forecast_generated"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (forecast_values == "false").all():
+              raise SystemExit(
+                  "ERROR: Forecast generation detected."
+              )
+
+          # -----------------------------------------------------
+          # Liquidity score validation
+          # -----------------------------------------------------
+          score_values = (
+              df["liquidity_score_generated"]
+              .astype(str)
+              .str.lower()
+          )
+
+          if not (score_values == "false").all():
+              raise SystemExit(
+                  "ERROR: Liquidity score generation detected."
+              )
+
+          # -----------------------------------------------------
+          # Summary
+          # -----------------------------------------------------
+          print("")
+          print("==============================================")
+          print("LIQUIDITY HISTORICAL COLLECTOR VALIDATION")
+          print("==============================================")
+          print(f"Rows: {len(df):,}")
+          print(
+              f"Observation range: "
+              f"{df['observation_date'].min().date()} "
+              f"→ "
+              f"{df['observation_date'].max().date()}"
+          )
+          print(
+              f"Indicators: {len(actual_indicators)}"
+          )
+          print("")
+          print("Rows by indicator:")
+
+          counts = (
+              df.groupby("indicator")
+              .size()
+              .sort_index()
+          )
+
+          for indicator, count in counts.items():
+              print(f"  {indicator:12s} {count:>8,}")
+
+          print("")
+          print("PIT safe: PASS")
+          print("Revision flag: PASS")
+          print("Research only: PASS")
+          print("Decision Engine: FALSE")
+          print("Trading signal: FALSE")
+          print("Forecast: FALSE")
+          print("Liquidity score: FALSE")
+          print("")
+          print("VALIDATION: PASS")
+          print("==============================================")
+          PY
+
+      # ---------------------------------------------------------
+      # 8. Display summary
+      # ---------------------------------------------------------
+      - name: Display collection summary
+        run: |
+          echo "=============================================="
+          echo "Liquidity Collection Summary"
+          echo "=============================================="
+
+          if [ -f liquidity_historical_collection_summary_v1.csv ]; then
+            cat liquidity_historical_collection_summary_v1.csv
+          else
+            echo "Summary file not found."
+            exit 1
+          fi
+
+      # ---------------------------------------------------------
+      # 9. Upload artifact
+      # ---------------------------------------------------------
+      - name: Upload Liquidity Historical artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: liquidity-historical-v1
+          path: |
+            liquidity_historical_records_input_v1.csv
+            liquidity_historical_collection_summary_v1.csv
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
+
+      # ---------------------------------------------------------
+      # 10. Final status
+      # ---------------------------------------------------------
+      - name: Final status
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "Liquidity Historical v1: COMPLETE"
+          echo "=============================================="
+          echo "Research-only: TRUE"
+          echo "Decision Engine: FALSE"
+          echo "Trading signal: FALSE"
+          echo "Forecast: FALSE"
+          echo "Liquidity score: FALSE"
+          echo "=============================================="
