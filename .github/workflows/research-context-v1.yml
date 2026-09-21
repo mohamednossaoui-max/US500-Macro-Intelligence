@@ -14,31 +14,36 @@ jobs:
 
     steps:
 
-      # ----------------------------------------------------
+      # ====================================================
       # Checkout
-      # ----------------------------------------------------
+      # ====================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Python
-      # ----------------------------------------------------
+      # ====================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Dependencies
-      # ----------------------------------------------------
+      # ====================================================
       - name: Install dependencies
         run: |
+          set -e
+
           python -m pip install --upgrade pip
           pip install pandas numpy
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Verify source
-      # ----------------------------------------------------
+      # ====================================================
       - name: Verify Research Context source
         run: |
           set -e
@@ -50,9 +55,10 @@ jobs:
 
           echo "Research Context source found."
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Find latest Macro Context artifact
-      # ----------------------------------------------------
+      # ====================================================
       - name: Find latest Macro Context artifact
         id: macro
         env:
@@ -64,7 +70,12 @@ jobs:
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             --jq '
               .artifacts
-              | map(select(.name == "macro-context-v1" and .expired == false))
+              | map(
+                  select(
+                    .name == "macro-context-v1"
+                    and .expired == false
+                  )
+                )
               | sort_by(.created_at)
               | last
               | .id
@@ -78,9 +89,10 @@ jobs:
           echo "Macro artifact ID: $ARTIFACT_ID"
           echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Download Macro Context
-      # ----------------------------------------------------
+      # ====================================================
       - name: Download Macro Context artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -98,14 +110,18 @@ jobs:
           echo "Macro files:"
           find input/macro -maxdepth 2 -type f -print
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Locate Macro CSV
-      # ----------------------------------------------------
+      # ====================================================
       - name: Locate Macro Context CSV
         run: |
           set -e
 
-          MACRO_FILE=$(find input/macro -type f -name "*.csv" | head -n 1)
+          MACRO_FILE=$(find input/macro \
+            -type f \
+            -name "*.csv" \
+            | head -n 1)
 
           if [ -z "$MACRO_FILE" ]; then
             echo "ERROR: No CSV found in Macro Context artifact."
@@ -115,9 +131,10 @@ jobs:
           echo "Macro CSV: $MACRO_FILE"
           echo "MACRO_FILE=$MACRO_FILE" >> "$GITHUB_ENV"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Find latest Sentiment Engine artifact
-      # ----------------------------------------------------
+      # ====================================================
       - name: Find latest Sentiment Engine artifact
         id: sentiment
         env:
@@ -129,7 +146,12 @@ jobs:
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             --jq '
               .artifacts
-              | map(select(.name == "sentiment-engine-v1" and .expired == false))
+              | map(
+                  select(
+                    .name == "sentiment-engine-v1"
+                    and .expired == false
+                  )
+                )
               | sort_by(.created_at)
               | last
               | .id
@@ -143,9 +165,10 @@ jobs:
           echo "Sentiment artifact ID: $ARTIFACT_ID"
           echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Download Sentiment Engine
-      # ----------------------------------------------------
+      # ====================================================
       - name: Download Sentiment Engine artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -163,14 +186,18 @@ jobs:
           echo "Sentiment files:"
           find input/sentiment -maxdepth 2 -type f -print
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Locate Sentiment CSV
-      # ----------------------------------------------------
+      # ====================================================
       - name: Locate Sentiment Engine CSV
         run: |
           set -e
 
-          SENTIMENT_FILE=$(find input/sentiment -type f -name "sentiment_engine_research_v1.csv" | head -n 1)
+          SENTIMENT_FILE=$(find input/sentiment \
+            -type f \
+            -name "sentiment_engine_research_v1.csv" \
+            | head -n 1)
 
           if [ -z "$SENTIMENT_FILE" ]; then
             echo "ERROR: sentiment_engine_research_v1.csv not found."
@@ -180,9 +207,10 @@ jobs:
           echo "Sentiment CSV: $SENTIMENT_FILE"
           echo "SENTIMENT_FILE=$SENTIMENT_FILE" >> "$GITHUB_ENV"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Find latest Technical Intelligence artifact
-      # ----------------------------------------------------
+      # ====================================================
       - name: Find latest Technical Intelligence artifact
         id: technical
         env:
@@ -194,7 +222,12 @@ jobs:
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             --jq '
               .artifacts
-              | map(select(.name == "technical-intelligence-v1" and .expired == false))
+              | map(
+                  select(
+                    .name == "technical-intelligence-v1"
+                    and .expired == false
+                  )
+                )
               | sort_by(.created_at)
               | last
               | .id
@@ -208,9 +241,10 @@ jobs:
           echo "Technical artifact ID: $ARTIFACT_ID"
           echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Download Technical Intelligence
-      # ----------------------------------------------------
+      # ====================================================
       - name: Download Technical Intelligence artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -228,14 +262,18 @@ jobs:
           echo "Technical files:"
           find input/technical -maxdepth 2 -type f -print
 
-      # ----------------------------------------------------
-      # Locate Technical CSV
-      # ----------------------------------------------------
+
+      # ====================================================
+      # Locate Technical Intelligence CSV
+      # ====================================================
       - name: Locate Technical Intelligence CSV
         run: |
           set -e
 
-          TECHNICAL_FILE=$(find input/technical -type f -name "technical_intelligence_research_v1.csv" | head -n 1)
+          TECHNICAL_FILE=$(find input/technical \
+            -type f \
+            -name "technical_intelligence_research_v1.csv" \
+            | head -n 1)
 
           if [ -z "$TECHNICAL_FILE" ]; then
             echo "ERROR: technical_intelligence_research_v1.csv not found."
@@ -245,38 +283,54 @@ jobs:
           echo "Technical CSV: $TECHNICAL_FILE"
           echo "TECHNICAL_FILE=$TECHNICAL_FILE" >> "$GITHUB_ENV"
 
-      # ----------------------------------------------------
-      # Prepare input directory
-      # ----------------------------------------------------
+
+      # ====================================================
+      # Prepare Research Context inputs
+      # ====================================================
       - name: Prepare Research Context inputs
         run: |
           set -e
 
           mkdir -p context_input
 
-          cp "$MACRO_FILE" context_input/macro_context_v1.csv
-          cp "$SENTIMENT_FILE" context_input/sentiment_engine_research_v1.csv
-          cp "$TECHNICAL_FILE" context_input/technical_intelligence_research_v1.csv
+          cp "$MACRO_FILE" \
+            context_input/macro_context_v1.csv
+
+          cp "$SENTIMENT_FILE" \
+            context_input/sentiment_engine_research_v1.csv
+
+          cp "$TECHNICAL_FILE" \
+            context_input/technical_intelligence_research_v1.csv
 
           echo "Prepared files:"
           ls -lh context_input
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Run Research Context
-      # ----------------------------------------------------
+      # ====================================================
       - name: Run Research Context v1
         env:
           MACRO_CONTEXT_FILE: context_input/macro_context_v1.csv
           SENTIMENT_ENGINE_FILE: context_input/sentiment_engine_research_v1.csv
           TECHNICAL_INTELLIGENCE_FILE: context_input/technical_intelligence_research_v1.csv
+
+          # IMPORTANT:
+          # Prevent future rows such as 2026-09-22.
+          RESEARCH_CONTEXT_AS_OF_DATE: "2026-09-21"
+
         run: |
           set -e
 
+          echo "Research Context cutoff:"
+          echo "$RESEARCH_CONTEXT_AS_OF_DATE"
+
           python research-context-v1.py
 
-      # ----------------------------------------------------
-      # Validate outputs
-      # ----------------------------------------------------
+
+      # ====================================================
+      # Validate output files
+      # ====================================================
       - name: Validate Research Context outputs
         run: |
           set -e
@@ -287,22 +341,37 @@ jobs:
 
           echo "All Research Context outputs exist."
 
-      # ----------------------------------------------------
-      # Final validation
-      # ----------------------------------------------------
+
+      # ====================================================
+      # Final dataset validation
+      # ====================================================
       - name: Validate Research Context dataset
         run: |
+          set -e
+
           python - <<'PY'
+
           import pandas as pd
+
+
+          # ------------------------------------------------
+          # Load
+          # ------------------------------------------------
 
           df = pd.read_csv(
               "research_context_v1.csv"
           )
 
+
           if df.empty:
               raise SystemExit(
                   "ERROR: Research Context dataset is empty."
               )
+
+
+          # ------------------------------------------------
+          # Required columns
+          # ------------------------------------------------
 
           required = [
               "context_date",
@@ -318,89 +387,194 @@ jobs:
               "unified_decision_generated",
           ]
 
+
           missing = [
-              c for c in required
+              c
+              for c in required
               if c not in df.columns
           ]
+
 
           if missing:
               raise SystemExit(
                   f"ERROR: Missing columns: {missing}"
               )
 
+
+          # ------------------------------------------------
+          # Dates
+          # ------------------------------------------------
+
           dates = pd.to_datetime(
-              df["context_date"]
+              df["context_date"],
+              errors="coerce",
           )
+
+
+          if dates.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid context_date values."
+              )
+
 
           if not dates.is_monotonic_increasing:
               raise SystemExit(
                   "ERROR: Context dates are not sorted."
               )
 
+
           if dates.duplicated().any():
               raise SystemExit(
                   "ERROR: Duplicate context dates."
               )
 
+
+          # ------------------------------------------------
+          # Explicit cutoff validation
+          # ------------------------------------------------
+
+          cutoff = pd.Timestamp(
+              "2026-09-21"
+          )
+
+
+          if dates.max() > cutoff:
+
+              raise SystemExit(
+                  "ERROR: Future context date detected: "
+                  f"{dates.max().date()} > "
+                  f"{cutoff.date()}"
+              )
+
+
+          if dates.max() != cutoff:
+
+              raise SystemExit(
+                  "ERROR: Latest context date is "
+                  f"{dates.max().date()}, expected "
+                  f"{cutoff.date()}."
+              )
+
+
+          # ------------------------------------------------
+          # PIT
+          # ------------------------------------------------
+
           if not df[
               "point_in_time_safe"
           ].eq(True).all():
+
               raise SystemExit(
                   "ERROR: PIT validation failed."
               )
 
+
+          # ------------------------------------------------
+          # Research-only
+          # ------------------------------------------------
+
           if not df[
               "research_only"
           ].eq(True).all():
+
               raise SystemExit(
                   "ERROR: research_only must be TRUE."
               )
 
+
+          # ------------------------------------------------
+          # Decision Engine
+          # ------------------------------------------------
+
           if not df[
               "decision_engine_ready"
           ].eq(False).all():
+
               raise SystemExit(
                   "ERROR: Decision Engine must remain disabled."
               )
 
+
+          # ------------------------------------------------
+          # No trading signal
+          # ------------------------------------------------
+
           if not df[
               "trading_signal_generated"
           ].eq(False).all():
+
               raise SystemExit(
                   "ERROR: Trading signal detected."
               )
 
+
+          # ------------------------------------------------
+          # No forecast
+          # ------------------------------------------------
+
           if not df[
               "forecast_generated"
           ].eq(False).all():
+
               raise SystemExit(
                   "ERROR: Forecast detected."
               )
 
+
+          # ------------------------------------------------
+          # No unified decision
+          # ------------------------------------------------
+
           if not df[
               "unified_decision_generated"
           ].eq(False).all():
+
               raise SystemExit(
                   "ERROR: Unified decision detected."
               )
+
+
+          # ------------------------------------------------
+          # Layer count
+          # ------------------------------------------------
 
           if (
               (df["available_layer_count"] < 0)
               |
               (df["available_layer_count"] > 3)
           ).any():
+
               raise SystemExit(
                   "ERROR: Invalid available_layer_count."
               )
 
+
+          # ------------------------------------------------
+          # Latest row
+          # ------------------------------------------------
+
+          latest = df.iloc[-1]
+
+
+          # ------------------------------------------------
+          # Output
+          # ------------------------------------------------
+
           print()
           print("=" * 70)
-          print("RESEARCH CONTEXT VALIDATION PASSED")
+          print(
+              "RESEARCH CONTEXT VALIDATION PASSED"
+          )
           print("=" * 70)
 
           print(
               "Rows:",
               len(df)
+          )
+
+          print(
+              "Columns:",
+              len(df.columns)
           )
 
           print(
@@ -411,51 +585,79 @@ jobs:
           )
 
           print(
-              "All 3 layers:",
-              int(
-                  (
-                      df["available_layer_count"] == 3
-                  ).sum()
-              )
+              "Required cutoff:",
+              cutoff.date()
           )
 
-          latest = df.iloc[-1]
-
-          print()
-          print("Latest context:")
           print(
-              "Date:",
+              "Latest date:",
               latest["context_date"]
           )
+
           print(
               "Available layers:",
               latest["available_layer_count"],
               "/ 3"
           )
 
+
+          # ------------------------------------------------
+          # Optional regimes
+          # ------------------------------------------------
+
           for column in [
               "economic_regime",
               "sentiment_regime",
               "technical_regime",
+              "financial_stress_regime",
+              "trend_structure",
           ]:
+
               if column in df.columns:
+
                   print(
                       f"{column}:",
                       latest[column]
                   )
 
+
           print()
-          print("PIT safe: TRUE")
-          print("Research only: TRUE")
-          print("Decision Engine: FALSE")
-          print("Trading signal: FALSE")
-          print("Forecast: FALSE")
-          print("Unified decision: FALSE")
+          print(
+              "PIT safe: TRUE"
+          )
+
+          print(
+              "Research only: TRUE"
+          )
+
+          print(
+              "Decision Engine: FALSE"
+          )
+
+          print(
+              "Trading signal: FALSE"
+          )
+
+          print(
+              "Forecast: FALSE"
+          )
+
+          print(
+              "Unified decision: FALSE"
+          )
+
+          print(
+              "Future rows: 0"
+          )
+
+          print("=" * 70)
+
           PY
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Upload artifact
-      # ----------------------------------------------------
+      # ====================================================
       - name: Upload Research Context artifact
         uses: actions/upload-artifact@v4
         with:
@@ -467,9 +669,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ----------------------------------------------------
+
+      # ====================================================
       # Final status
-      # ----------------------------------------------------
+      # ====================================================
       - name: Final status
         run: |
           echo "=============================================="
@@ -483,4 +686,5 @@ jobs:
           echo "Trading Signal: FALSE"
           echo "Forecast: FALSE"
           echo "Unified Decision: FALSE"
+          echo "Cutoff: 2026-09-21"
           echo "Artifact: research-context-v1"
