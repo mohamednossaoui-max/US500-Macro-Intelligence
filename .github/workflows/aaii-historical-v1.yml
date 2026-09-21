@@ -1,0 +1,520 @@
+name: AAII Historical Collector v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aaii-historical:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # =====================================================
+      # 1. Checkout
+      # =====================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # =====================================================
+      # 2. Setup Python
+      # =====================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # =====================================================
+      # 3. Install dependencies
+      # =====================================================
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests xlrd
+
+      # =====================================================
+      # 4. Verify collector exists
+      # =====================================================
+
+      - name: Verify collector
+        run: |
+          test -f aaii_historical_collector_v1.py
+          echo "Collector found."
+          ls -lh aaii_historical_collector_v1.py
+
+      # =====================================================
+      # 5. Run AAII historical collector
+      # =====================================================
+
+      - name: Run AAII Historical Collector v1
+        run: |
+          python aaii_historical_collector_v1.py
+
+      # =====================================================
+      # 6. Validate output files
+      # =====================================================
+
+      - name: Validate output files
+        run: |
+
+          set -e
+
+          test -f aaii_historical_records_input_v1.csv
+          test -f aaii_historical_collection_summary_v1.csv
+
+          echo "Required output files found."
+
+          echo ""
+          echo "Output files:"
+          ls -lh \
+            aaii_historical_records_input_v1.csv \
+            aaii_historical_collection_summary_v1.csv
+
+      # =====================================================
+      # 7. Validate schema + PIT + research-only
+      # =====================================================
+
+      - name: Validate AAII dataset
+        run: |
+
+          python - <<'PY'
+
+          import pandas as pd
+          import sys
+
+          RECORD_FILE = (
+              "aaii_historical_records_input_v1.csv"
+          )
+
+          SUMMARY_FILE = (
+              "aaii_historical_collection_summary_v1.csv"
+          )
+
+          records = pd.read_csv(
+              RECORD_FILE
+          )
+
+          summary = pd.read_csv(
+              SUMMARY_FILE
+          )
+
+          # =================================================
+          # Basic validation
+          # =================================================
+
+          if records.empty:
+              raise SystemExit(
+                  "FAIL: AAII dataset is empty."
+              )
+
+          # =================================================
+          # Required schema
+          # =================================================
+
+          required_columns = [
+
+              "observation_date",
+              "availability_date",
+
+              "bullish_pct",
+              "neutral_pct",
+              "bearish_pct",
+
+              "bull_bear_spread_pp",
+
+              "source",
+              "source_url",
+              "source_page_url",
+
+              "availability_semantics",
+
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+          ]
+
+          missing = [
+              column
+              for column in required_columns
+              if column not in records.columns
+          ]
+
+          if missing:
+
+              raise SystemExit(
+                  "FAIL: Missing columns: "
+                  + ", ".join(missing)
+              )
+
+          # =================================================
+          # Date validation
+          # =================================================
+
+          records[
+              "observation_date"
+          ] = pd.to_datetime(
+              records[
+                  "observation_date"
+              ],
+              errors="coerce",
+          )
+
+          records[
+              "availability_date"
+          ] = pd.to_datetime(
+              records[
+                  "availability_date"
+              ],
+              errors="coerce",
+          )
+
+          if records[
+              "observation_date"
+          ].isna().any():
+
+              raise SystemExit(
+                  "FAIL: Invalid observation_date."
+              )
+
+          if records[
+              "availability_date"
+          ].isna().any():
+
+              raise SystemExit(
+                  "FAIL: Invalid availability_date."
+              )
+
+          # =================================================
+          # PIT validation
+          # =================================================
+
+          pit_invalid = (
+              records[
+                  "availability_date"
+              ]
+              <= records[
+                  "observation_date"
+              ]
+          )
+
+          if pit_invalid.any():
+
+              raise SystemExit(
+                  "FAIL: PIT validation failed. "
+                  f"Invalid rows={pit_invalid.sum()}"
+              )
+
+          # =================================================
+          # Explicit PIT flag
+          # =================================================
+
+          if not records[
+              "point_in_time_safe"
+          ].astype(bool).all():
+
+              raise SystemExit(
+                  "FAIL: point_in_time_safe != TRUE."
+              )
+
+          # =================================================
+          # Research-only
+          # =================================================
+
+          if not records[
+              "research_only"
+          ].astype(bool).all():
+
+              raise SystemExit(
+                  "FAIL: research_only != TRUE."
+              )
+
+          # =================================================
+          # Decision Engine must remain disabled
+          # =================================================
+
+          if records[
+              "decision_engine_ready"
+          ].astype(bool).any():
+
+              raise SystemExit(
+                  "FAIL: Decision Engine integration detected."
+              )
+
+          # =================================================
+          # No sentiment score in collector
+          # =================================================
+
+          if records[
+              "sentiment_score_generated"
+          ].astype(bool).any():
+
+              raise SystemExit(
+                  "FAIL: Sentiment score was generated "
+                  "by the collector."
+              )
+
+          # =================================================
+          # Duplicate validation
+          # =================================================
+
+          duplicates = records.duplicated(
+              subset=[
+                  "observation_date"
+              ]
+          ).sum()
+
+          if duplicates > 0:
+
+              raise SystemExit(
+                  "FAIL: Duplicate observation dates: "
+                  f"{duplicates}"
+              )
+
+          # =================================================
+          # Chronological order
+          # =================================================
+
+          if not records[
+              "observation_date"
+          ].is_monotonic_increasing:
+
+              raise SystemExit(
+                  "FAIL: Observation dates are not sorted."
+              )
+
+          # =================================================
+          # Percentage validation
+          # =================================================
+
+          percentage_columns = [
+
+              "bullish_pct",
+              "neutral_pct",
+              "bearish_pct",
+
+          ]
+
+          for column in percentage_columns:
+
+              values = records[
+                  column
+              ]
+
+              invalid = (
+                  values.isna()
+                  | (values < 0)
+                  | (values > 100)
+              )
+
+              if invalid.any():
+
+                  raise SystemExit(
+                      f"FAIL: Invalid values in {column}: "
+                      f"{invalid.sum()}"
+                  )
+
+          # =================================================
+          # Bull + Neutral + Bear validation
+          # =================================================
+
+          total = (
+              records["bullish_pct"]
+              + records["neutral_pct"]
+              + records["bearish_pct"]
+          )
+
+          sum_error = (
+              total - 100
+          ).abs()
+
+          invalid_sum = (
+              sum_error > 0.5
+          )
+
+          if invalid_sum.any():
+
+              raise SystemExit(
+                  "FAIL: Bullish + Neutral + Bearish "
+                  "does not equal approximately 100. "
+                  f"Invalid rows={invalid_sum.sum()}"
+              )
+
+          # =================================================
+          # Bull-Bear spread validation
+          # =================================================
+
+          expected_spread = (
+              records["bullish_pct"]
+              - records["bearish_pct"]
+          )
+
+          spread_error = (
+              records["bull_bear_spread_pp"]
+              - expected_spread
+          ).abs()
+
+          if (
+              spread_error > 0.0001
+          ).any():
+
+              raise SystemExit(
+                  "FAIL: Bull-bear spread calculation mismatch."
+              )
+
+          # =================================================
+          # Source validation
+          # =================================================
+
+          if not (
+              records["source"]
+              .astype(str)
+              .str.contains(
+                  "AAII",
+                  case=False,
+                  na=False,
+              )
+              .all()
+          ):
+
+              raise SystemExit(
+                  "FAIL: Unexpected source metadata."
+              )
+
+          # =================================================
+          # Summary validation
+          # =================================================
+
+          if summary.empty:
+
+              raise SystemExit(
+                  "FAIL: Collection summary is empty."
+              )
+
+          print()
+          print("=" * 72)
+          print("AAII HISTORICAL COLLECTOR V1")
+          print("WORKFLOW VALIDATION")
+          print("=" * 72)
+
+          print(
+              f"Records:                    {len(records):,}"
+          )
+
+          print(
+              "First observation:          "
+              f"{records['observation_date'].min().date()}"
+          )
+
+          print(
+              "Last observation:           "
+              f"{records['observation_date'].max().date()}"
+          )
+
+          print(
+              f"Duplicate observations:     {duplicates}"
+          )
+
+          print(
+              "PIT safe:                   "
+              f"{records['point_in_time_safe'].astype(bool).all()}"
+          )
+
+          print(
+              "Research only:              "
+              f"{records['research_only'].astype(bool).all()}"
+          )
+
+          print(
+              "Decision Engine ready:      "
+              f"{records['decision_engine_ready'].astype(bool).any()}"
+          )
+
+          print(
+              "Sentiment score generated:  "
+              f"{records['sentiment_score_generated'].astype(bool).any()}"
+          )
+
+          print()
+          print("Latest observation:")
+
+          latest = records.iloc[-1]
+
+          print(
+              "  Date:",
+              latest["observation_date"].date()
+          )
+
+          print(
+              "  Availability:",
+              latest["availability_date"].date()
+          )
+
+          print(
+              "  Bullish:",
+              latest["bullish_pct"]
+          )
+
+          print(
+              "  Neutral:",
+              latest["neutral_pct"]
+          )
+
+          print(
+              "  Bearish:",
+              latest["bearish_pct"]
+          )
+
+          print(
+              "  Bull-Bear spread:",
+              latest["bull_bear_spread_pp"]
+          )
+
+          print()
+          print("=" * 72)
+          print("VALIDATION: PASS")
+          print("=" * 72)
+
+          PY
+
+      # =====================================================
+      # 8. Upload artifact
+      # =====================================================
+
+      - name: Upload AAII historical artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaii-historical-v1
+          path: |
+            aaii_historical_records_input_v1.csv
+            aaii_historical_collection_summary_v1.csv
+          if-no-files-found: error
+          retention-days: 90
+
+      # =====================================================
+      # 9. Final status
+      # =====================================================
+
+      - name: Final status
+        run: |
+
+          echo "=================================================="
+          echo "AAII HISTORICAL COLLECTOR V1 COMPLETED"
+          echo "=================================================="
+          echo ""
+          echo "Research-only: TRUE"
+          echo "PIT validation: PASS"
+          echo "Schema validation: PASS"
+          echo "Decision Engine: DISABLED"
+          echo "Sentiment score: NOT GENERATED"
+          echo ""
+          echo "Artifact:"
+          echo "aaii-historical-v1"
+          echo ""
+          echo "=================================================="
