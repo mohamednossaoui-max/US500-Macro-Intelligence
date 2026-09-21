@@ -1,817 +1,408 @@
-"""
-AAII Sentiment Analyzer v1
-
-Research-only sentiment analysis layer.
-
-Input:
-    aaii_historical_records_input_v1.csv
-
-Outputs:
-    aaii_sentiment_research_v1.csv
-    aaii_sentiment_research_summary_v1.csv
-    aaii_sentiment_extremes_v1.csv
-
-Method:
-    - 52-observation rolling window
-    - Minimum 26 observations
-    - Bullish / Neutral / Bearish levels
-    - Bull-Bear spread
-    - Weekly changes
-    - Rolling mean / std
-    - Rolling z-score
-    - Rolling percentile
-    - Descriptive research regimes
-    - Extreme observations
-
-Important:
-    Research-only.
-    No trading signals.
-    No market forecast.
-    No Decision Engine integration.
-    No composite sentiment score.
-"""
-
-from pathlib import Path
-import sys
-
-import numpy as np
-import pandas as pd
-
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-INPUT_FILE = Path("aaii_historical_records_input_v1.csv")
-
-OUTPUT_FILE = Path("aaii_sentiment_research_v1.csv")
-SUMMARY_FILE = Path("aaii_sentiment_research_summary_v1.csv")
-EXTREMES_FILE = Path("aaii_sentiment_extremes_v1.csv")
-
-ROLLING_WINDOW = 52
-MIN_OBSERVATIONS = 26
-
-EXPECTED_COLUMNS = [
-    "observation_date",
-    "availability_date",
-    "bullish_pct",
-    "neutral_pct",
-    "bearish_pct",
-    "bull_bear_spread_pp",
-    "source",
-    "source_url",
-    "source_page_url",
-    "availability_semantics",
-    "point_in_time_safe",
-    "research_only",
-    "decision_engine_ready",
-    "sentiment_score_generated",
-]
+name: AAII Sentiment Analyzer v1
 
+on:
+  workflow_dispatch:
 
-# ============================================================
-# HELPERS
-# ============================================================
+permissions:
+  contents: read
+  actions: read
 
-def fail(message: str):
-    print(f"ERROR: {message}")
-    sys.exit(1)
+jobs:
+  analyze-aaii-sentiment:
+    runs-on: ubuntu-latest
 
+    steps:
 
-def validate_columns(df: pd.DataFrame):
-    missing = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
 
-    if missing:
-        fail(
-            f"Missing required columns: {missing}"
-        )
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
 
-def rolling_percentile(series: pd.Series) -> pd.Series:
-    """
-    Percentile rank of the current observation inside
-    the rolling window.
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
 
-    Returns percentage from 0 to 100.
-    """
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    def percentile_last(window):
-        values = pd.Series(window).dropna()
 
-        if len(values) < MIN_OBSERVATIONS:
-            return np.nan
+      # ============================================================
+      # 3. INSTALL DEPENDENCIES
+      # ============================================================
 
-        last_value = values.iloc[-1]
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
 
-        return (
-            (values <= last_value).sum()
-            / len(values)
-            * 100.0
-        )
 
-    return series.rolling(
-        ROLLING_WINDOW,
-        min_periods=MIN_OBSERVATIONS,
-    ).apply(
-        percentile_last,
-        raw=False,
-    )
+      # ============================================================
+      # 4. FIND LATEST AAII HISTORICAL ARTIFACT
+      # ============================================================
 
+      - name: Find latest AAII historical artifact
+        id: find_artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
 
-def rolling_zscore(series: pd.Series) -> pd.Series:
-    """
-    Rolling z-score using the current rolling window.
-    """
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "aaii-historical-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | reverse
+              | .[0].id
+            ')
 
-    rolling_mean = series.rolling(
-        ROLLING_WINDOW,
-        min_periods=MIN_OBSERVATIONS,
-    ).mean()
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: Could not find aaii-historical-v1 artifact."
+            exit 1
+          fi
 
-    rolling_std = series.rolling(
-        ROLLING_WINDOW,
-        min_periods=MIN_OBSERVATIONS,
-    ).std(ddof=0)
+          echo "Latest AAII historical artifact ID: $ARTIFACT_ID"
 
-    zscore = (
-        (series - rolling_mean)
-        / rolling_std.replace(0, np.nan)
-    )
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
 
-    return zscore
 
+      # ============================================================
+      # 5. DOWNLOAD ARTIFACT
+      # ============================================================
 
-def classify_regime(percentile):
-    if pd.isna(percentile):
-        return "INSUFFICIENT_DATA"
+      - name: Download AAII historical artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.find_artifact.outputs.artifact_id }}
+        run: |
+          set -e
 
-    if percentile >= 95:
-        return "EXTREME_BULLISH"
+          mkdir -p aaii_input
 
-    if percentile >= 75:
-        return "BULLISH"
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > aaii_input/aaii_historical_artifact.zip
 
-    if percentile <= 5:
-        return "EXTREME_BEARISH"
+          unzip -o \
+            aaii_input/aaii_historical_artifact.zip \
+            -d aaii_input/extracted
 
-    if percentile <= 25:
-        return "BEARISH"
+          echo "Downloaded AAII historical artifact."
+
+          find aaii_input/extracted -maxdepth 3 -type f -print
+
 
-    return "NEUTRAL"
+      # ============================================================
+      # 6. LOCATE INPUT CSV
+      # ============================================================
 
+      - name: Prepare analyzer input
+        run: |
+          set -e
 
-# ============================================================
-# LOAD
-# ============================================================
-
-if not INPUT_FILE.exists():
-    fail(
-        f"Input file not found: {INPUT_FILE}"
-    )
-
-print("Loading AAII historical data...")
-
-df = pd.read_csv(INPUT_FILE)
-
-print(f"Input rows: {len(df)}")
-
-
-# ============================================================
-# VALIDATION — INPUT SCHEMA
-# ============================================================
-
-validate_columns(df)
-
-
-# ============================================================
-# DATE VALIDATION
-# ============================================================
-
-df["observation_date"] = pd.to_datetime(
-    df["observation_date"],
-    errors="coerce",
-)
-
-df["availability_date"] = pd.to_datetime(
-    df["availability_date"],
-    errors="coerce",
-)
-
-if df["observation_date"].isna().any():
-    fail("Invalid observation_date values.")
-
-if df["availability_date"].isna().any():
-    fail("Invalid availability_date values.")
-
-
-# ============================================================
-# POINT-IN-TIME VALIDATION
-# ============================================================
-
-if not (
-    df["availability_date"]
-    > df["observation_date"]
-).all():
-
-    fail(
-        "Point-in-time validation failed: "
-        "availability_date must be after observation_date."
-    )
-
-
-if not df["point_in_time_safe"].astype(bool).all():
-    fail(
-        "Input contains records that are not marked "
-        "point_in_time_safe."
-    )
-
-
-# ============================================================
-# RESEARCH-ONLY VALIDATION
-# ============================================================
-
-if not df["research_only"].astype(bool).all():
-    fail(
-        "Input contains records that are not research-only."
-    )
-
-
-if df["decision_engine_ready"].astype(bool).any():
-    fail(
-        "Input contains Decision Engine ready records."
-    )
-
-
-if df["sentiment_score_generated"].astype(bool).any():
-    fail(
-        "Input already contains generated sentiment scores."
-    )
-
-
-# ============================================================
-# SORT / DUPLICATES
-# ============================================================
-
-df = df.sort_values(
-    "observation_date"
-).reset_index(drop=True)
-
-
-duplicate_count = (
-    df["observation_date"]
-    .duplicated()
-    .sum()
-)
-
-if duplicate_count:
-    fail(
-        f"Duplicate observation dates found: "
-        f"{duplicate_count}"
-    )
-
-
-# ============================================================
-# NUMERIC VALIDATION
-# ============================================================
-
-numeric_columns = [
-    "bullish_pct",
-    "neutral_pct",
-    "bearish_pct",
-    "bull_bear_spread_pp",
-]
-
-for column in numeric_columns:
-
-    df[column] = pd.to_numeric(
-        df[column],
-        errors="coerce",
-    )
-
-    if df[column].isna().any():
-        fail(
-            f"Invalid numeric values in {column}."
-        )
-
-
-for column in [
-    "bullish_pct",
-    "neutral_pct",
-    "bearish_pct",
-]:
-
-    if (
-        (df[column] < 0)
-        | (df[column] > 100)
-    ).any():
-
-        fail(
-            f"{column} contains values outside 0-100."
-        )
-
-
-# ============================================================
-# PERCENTAGE SUM VALIDATION
-# ============================================================
-
-sentiment_sum = (
-    df["bullish_pct"]
-    + df["neutral_pct"]
-    + df["bearish_pct"]
-)
-
-sum_error = (
-    sentiment_sum - 100.0
-).abs()
-
-if (sum_error > 0.5).any():
-    fail(
-        "Bullish + Neutral + Bearish "
-        "does not approximately equal 100."
-    )
-
-
-# ============================================================
-# BULL-BEAR SPREAD VALIDATION
-# ============================================================
-
-calculated_spread = (
-    df["bullish_pct"]
-    - df["bearish_pct"]
-)
-
-spread_error = (
-    calculated_spread
-    - df["bull_bear_spread_pp"]
-).abs()
-
-if (spread_error > 1e-6).any():
-    fail(
-        "Bull-Bear spread validation failed."
-    )
-
-
-# ============================================================
-# BASE DATA
-# ============================================================
-
-result = df.copy()
-
-
-# ============================================================
-# WEEKLY CHANGES
-# ============================================================
-
-result["bullish_change_pp"] = (
-    result["bullish_pct"].diff()
-)
-
-result["neutral_change_pp"] = (
-    result["neutral_pct"].diff()
-)
-
-result["bearish_change_pp"] = (
-    result["bearish_pct"].diff()
-)
-
-result["bull_bear_spread_change_pp"] = (
-    result["bull_bear_spread_pp"].diff()
-)
-
-
-# ============================================================
-# ROLLING STATISTICS
-# ============================================================
-
-sentiment_features = [
-    "bullish_pct",
-    "neutral_pct",
-    "bearish_pct",
-    "bull_bear_spread_pp",
-]
-
-
-for column in sentiment_features:
-
-    prefix = column.replace(
-        "_pct",
-        ""
-    ).replace(
-        "_pp",
-        ""
-    )
-
-    result[
-        f"{prefix}_rolling_mean"
-    ] = result[column].rolling(
-        ROLLING_WINDOW,
-        min_periods=MIN_OBSERVATIONS,
-    ).mean()
-
-    result[
-        f"{prefix}_rolling_std"
-    ] = result[column].rolling(
-        ROLLING_WINDOW,
-        min_periods=MIN_OBSERVATIONS,
-    ).std(ddof=0)
-
-    result[
-        f"{prefix}_z"
-    ] = rolling_zscore(
-        result[column]
-    )
-
-    result[
-        f"{prefix}_percentile"
-    ] = rolling_percentile(
-        result[column]
-    )
-
-
-# ============================================================
-# DESCRIPTIVE RESEARCH REGIME
-# ============================================================
-
-result["research_regime"] = (
-    result["bull_bear_spread_percentile"]
-    .apply(classify_regime)
-)
-
-
-# ============================================================
-# EXTREME FLAGS
-# ============================================================
-
-result["bullish_extreme"] = (
-    result["bullish_percentile"] >= 95
-)
-
-result["bullish_low_extreme"] = (
-    result["bullish_percentile"] <= 5
-)
-
-result["neutral_extreme"] = (
-    result["neutral_percentile"] >= 95
-)
-
-result["neutral_low_extreme"] = (
-    result["neutral_percentile"] <= 5
-)
-
-result["bearish_extreme"] = (
-    result["bearish_percentile"] >= 95
-)
-
-result["bearish_low_extreme"] = (
-    result["bearish_percentile"] <= 5
-)
-
-result["spread_extreme_bullish"] = (
-    result["bull_bear_spread_percentile"] >= 95
-)
-
-result["spread_extreme_bearish"] = (
-    result["bull_bear_spread_percentile"] <= 5
-)
-
-
-# ============================================================
-# METADATA
-# ============================================================
-
-result["rolling_window_observations"] = (
-    ROLLING_WINDOW
-)
-
-result["minimum_observations"] = (
-    MIN_OBSERVATIONS
-)
-
-result["point_in_time_safe"] = True
-result["research_only"] = True
-result["decision_engine_ready"] = False
-result["sentiment_score_generated"] = False
-
-
-# ============================================================
-# FINAL COLUMN ORDER
-# ============================================================
-
-preferred_columns = [
-    "observation_date",
-    "availability_date",
-
-    "bullish_pct",
-    "neutral_pct",
-    "bearish_pct",
-    "bull_bear_spread_pp",
-
-    "bullish_change_pp",
-    "neutral_change_pp",
-    "bearish_change_pp",
-    "bull_bear_spread_change_pp",
-
-    "bullish_rolling_mean",
-    "bullish_rolling_std",
-    "bullish_z",
-    "bullish_percentile",
-
-    "neutral_rolling_mean",
-    "neutral_rolling_std",
-    "neutral_z",
-    "neutral_percentile",
-
-    "bearish_rolling_mean",
-    "bearish_rolling_std",
-    "bearish_z",
-    "bearish_percentile",
-
-    "bull_bear_spread_rolling_mean",
-    "bull_bear_spread_rolling_std",
-    "bull_bear_spread_z",
-    "bull_bear_spread_percentile",
-
-    "research_regime",
-
-    "bullish_extreme",
-    "bullish_low_extreme",
-    "neutral_extreme",
-    "neutral_low_extreme",
-    "bearish_extreme",
-    "bearish_low_extreme",
-    "spread_extreme_bullish",
-    "spread_extreme_bearish",
-
-    "rolling_window_observations",
-    "minimum_observations",
-
-    "source",
-    "source_url",
-    "source_page_url",
-    "availability_semantics",
-
-    "point_in_time_safe",
-    "research_only",
-    "decision_engine_ready",
-    "sentiment_score_generated",
-]
-
-
-existing_columns = [
-    c for c in preferred_columns
-    if c in result.columns
-]
-
-result = result[existing_columns]
-
-
-# ============================================================
-# FINAL OUTPUT VALIDATION
-# ============================================================
-
-if result.empty:
-    fail("Analyzer produced zero rows.")
-
-
-if not result["point_in_time_safe"].all():
-    fail(
-        "Final output contains non-PIT-safe records."
-    )
-
-
-if not result["research_only"].all():
-    fail(
-        "Final output contains non-research records."
-    )
-
-
-if result["decision_engine_ready"].any():
-    fail(
-        "Final output contains Decision Engine ready records."
-    )
-
-
-if result["sentiment_score_generated"].any():
-    fail(
-        "Final output contains generated sentiment scores."
-    )
-
-
-# ============================================================
-# SUMMARY
-# ============================================================
-
-latest = result.iloc[-1]
-
-regime_counts = (
-    result["research_regime"]
-    .value_counts()
-    .rename_axis("research_regime")
-    .reset_index(name="observations")
-)
-
-
-summary_rows = [
-    {
-        "metric": "total_observations",
-        "value": len(result),
-    },
-    {
-        "metric": "first_observation_date",
-        "value": result["observation_date"]
-        .min()
-        .strftime("%Y-%m-%d"),
-    },
-    {
-        "metric": "last_observation_date",
-        "value": result["observation_date"]
-        .max()
-        .strftime("%Y-%m-%d"),
-    },
-    {
-        "metric": "rolling_window_observations",
-        "value": ROLLING_WINDOW,
-    },
-    {
-        "metric": "minimum_observations",
-        "value": MIN_OBSERVATIONS,
-    },
-    {
-        "metric": "latest_bullish_pct",
-        "value": latest["bullish_pct"],
-    },
-    {
-        "metric": "latest_neutral_pct",
-        "value": latest["neutral_pct"],
-    },
-    {
-        "metric": "latest_bearish_pct",
-        "value": latest["bearish_pct"],
-    },
-    {
-        "metric": "latest_bull_bear_spread_pp",
-        "value": latest["bull_bear_spread_pp"],
-    },
-    {
-        "metric": "latest_bull_bear_spread_percentile",
-        "value": latest[
-            "bull_bear_spread_percentile"
-        ],
-    },
-    {
-        "metric": "latest_research_regime",
-        "value": latest["research_regime"],
-    },
-    {
-        "metric": "point_in_time_safe",
-        "value": True,
-    },
-    {
-        "metric": "research_only",
-        "value": True,
-    },
-    {
-        "metric": "decision_engine_ready",
-        "value": False,
-    },
-    {
-        "metric": "sentiment_score_generated",
-        "value": False,
-    },
-]
-
-summary = pd.DataFrame(summary_rows)
-
-
-# ============================================================
-# EXTREMES
-# ============================================================
-
-extreme_mask = (
-    result["bullish_extreme"]
-    | result["bullish_low_extreme"]
-    | result["neutral_extreme"]
-    | result["neutral_low_extreme"]
-    | result["bearish_extreme"]
-    | result["bearish_low_extreme"]
-    | result["spread_extreme_bullish"]
-    | result["spread_extreme_bearish"]
-)
-
-extremes = result.loc[
-    extreme_mask
-].copy()
-
-
-# ============================================================
-# SAVE OUTPUTS
-# ============================================================
-
-result.to_csv(
-    OUTPUT_FILE,
-    index=False,
-)
-
-summary.to_csv(
-    SUMMARY_FILE,
-    index=False,
-)
-
-extremes.to_csv(
-    EXTREMES_FILE,
-    index=False,
-)
-
-
-# ============================================================
-# REPORT
-# ============================================================
-
-print()
-print("=" * 70)
-print("AAII SENTIMENT ANALYZER v1")
-print("=" * 70)
-
-print(
-    f"Observations: {len(result):,}"
-)
-
-print(
-    "Date range: "
-    f"{result['observation_date'].min().date()} "
-    f"→ "
-    f"{result['observation_date'].max().date()}"
-)
-
-print(
-    f"Rolling window: {ROLLING_WINDOW} observations"
-)
-
-print(
-    f"Minimum observations: {MIN_OBSERVATIONS}"
-)
-
-print()
-print("Latest observation:")
-print(
-    f"  Date: "
-    f"{latest['observation_date'].date()}"
-)
-
-print(
-    f"  Bullish: "
-    f"{latest['bullish_pct']:.4f}%"
-)
-
-print(
-    f"  Neutral: "
-    f"{latest['neutral_pct']:.4f}%"
-)
-
-print(
-    f"  Bearish: "
-    f"{latest['bearish_pct']:.4f}%"
-)
-
-print(
-    f"  Bull-Bear Spread: "
-    f"{latest['bull_bear_spread_pp']:.4f} pp"
-)
-
-print(
-    f"  Spread Percentile: "
-    f"{latest['bull_bear_spread_percentile']:.4f}"
-)
-
-print(
-    f"  Research Regime: "
-    f"{latest['research_regime']}"
-)
-
-print()
-print("Research regime counts:")
-
-for _, row in regime_counts.iterrows():
-    print(
-        f"  {row['research_regime']}: "
-        f"{int(row['observations']):,}"
-    )
-
-print()
-print(
-    f"Extreme observations: "
-    f"{len(extremes):,}"
-)
-
-print()
-print("Research-only: TRUE")
-print("Point-in-time safe: TRUE")
-print("Decision Engine ready: FALSE")
-print("Sentiment score generated: FALSE")
-print("Trading signal: NONE")
-print("Forecast: NONE")
-
-print("=" * 70)
-
-print()
-print("PASS: AAII Sentiment Analyzer v1 completed successfully.")
+          INPUT_PATH=$(find aaii_input/extracted \
+            -type f \
+            -name "aaii_historical_records_input_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$INPUT_PATH" ]; then
+            echo "ERROR: aaii_historical_records_input_v1.csv not found."
+            exit 1
+          fi
+
+          cp "$INPUT_PATH" ./aaii_historical_records_input_v1.csv
+
+          echo "Input prepared:"
+          ls -lh aaii_historical_records_input_v1.csv
+
+
+      # ============================================================
+      # 7. RUN ANALYZER
+      # ============================================================
+
+      - name: Run AAII Sentiment Analyzer v1
+        run: |
+          set -e
+
+          python aaii_sentiment_analyzer_v1.py
+
+
+      # ============================================================
+      # 8. VALIDATE OUTPUTS
+      # ============================================================
+
+      - name: Validate AAII sentiment outputs
+        run: |
+          set -e
+
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+
+          output = Path("aaii_sentiment_research_v1.csv")
+          summary = Path("aaii_sentiment_research_summary_v1.csv")
+          extremes = Path("aaii_sentiment_extremes_v1.csv")
+
+          required_files = [
+              output,
+              summary,
+              extremes,
+          ]
+
+          for file in required_files:
+              if not file.exists():
+                  raise SystemExit(
+                      f"ERROR: Missing output file: {file}"
+                  )
+
+          df = pd.read_csv(output)
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Analyzer output contains zero rows."
+              )
+
+          required_columns = [
+              "observation_date",
+              "availability_date",
+              "bullish_pct",
+              "neutral_pct",
+              "bearish_pct",
+              "bull_bear_spread_pp",
+              "bull_bear_spread_percentile",
+              "research_regime",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+          ]
+
+          missing = [
+              c for c in required_columns
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing output columns: {missing}"
+              )
+
+          # --------------------------------------------------------
+          # Point-in-time validation
+          # --------------------------------------------------------
+
+          observation = pd.to_datetime(
+              df["observation_date"]
+          )
+
+          availability = pd.to_datetime(
+              df["availability_date"]
+          )
+
+          if not (availability > observation).all():
+              raise SystemExit(
+                  "ERROR: Point-in-time validation failed."
+              )
+
+          # --------------------------------------------------------
+          # Research-only validation
+          # --------------------------------------------------------
+
+          if not df["point_in_time_safe"].all():
+              raise SystemExit(
+                  "ERROR: Non-PIT-safe records detected."
+              )
+
+          if not df["research_only"].all():
+              raise SystemExit(
+                  "ERROR: Non-research-only records detected."
+              )
+
+          if df["decision_engine_ready"].any():
+              raise SystemExit(
+                  "ERROR: Decision Engine ready flag detected."
+              )
+
+          if df["sentiment_score_generated"].any():
+              raise SystemExit(
+                  "ERROR: Sentiment score generated flag detected."
+              )
+
+          # --------------------------------------------------------
+          # Duplicate validation
+          # --------------------------------------------------------
+
+          if df["observation_date"].duplicated().any():
+              raise SystemExit(
+                  "ERROR: Duplicate observation dates detected."
+              )
+
+          # --------------------------------------------------------
+          # Percentage validation
+          # --------------------------------------------------------
+
+          for column in [
+              "bullish_pct",
+              "neutral_pct",
+              "bearish_pct",
+          ]:
+
+              if (
+                  (df[column] < 0)
+                  | (df[column] > 100)
+              ).any():
+
+                  raise SystemExit(
+                      f"ERROR: Invalid percentage values in {column}."
+                  )
+
+          sentiment_sum = (
+              df["bullish_pct"]
+              + df["neutral_pct"]
+              + df["bearish_pct"]
+          )
+
+          if (
+              (sentiment_sum - 100).abs() > 0.5
+          ).any():
+
+              raise SystemExit(
+                  "ERROR: Sentiment percentages do not sum to ~100."
+              )
+
+          # --------------------------------------------------------
+          # Spread validation
+          # --------------------------------------------------------
+
+          calculated_spread = (
+              df["bullish_pct"]
+              - df["bearish_pct"]
+          )
+
+          if (
+              calculated_spread
+              - df["bull_bear_spread_pp"]
+          ).abs().max() > 1e-6:
+
+              raise SystemExit(
+                  "ERROR: Bull-Bear spread validation failed."
+              )
+
+          # --------------------------------------------------------
+          # Date ordering
+          # --------------------------------------------------------
+
+          if not observation.is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: Observation dates are not sorted."
+              )
+
+          # --------------------------------------------------------
+          # Report
+          # --------------------------------------------------------
+
+          latest = df.iloc[-1]
+
+          print()
+          print("=" * 70)
+          print("AAII SENTIMENT ANALYZER v1 — VALIDATION")
+          print("=" * 70)
+
+          print(
+              f"Rows: {len(df):,}"
+          )
+
+          print(
+              f"First observation: "
+              f"{observation.min().date()}"
+          )
+
+          print(
+              f"Last observation: "
+              f"{observation.max().date()}"
+          )
+
+          print()
+          print("Latest observation:")
+          print(
+              f"  Bullish: "
+              f"{latest['bullish_pct']:.4f}%"
+          )
+
+          print(
+              f"  Neutral: "
+              f"{latest['neutral_pct']:.4f}%"
+          )
+
+          print(
+              f"  Bearish: "
+              f"{latest['bearish_pct']:.4f}%"
+          )
+
+          print(
+              f"  Bull-Bear Spread: "
+              f"{latest['bull_bear_spread_pp']:.4f} pp"
+          )
+
+          print(
+              f"  Research Regime: "
+              f"{latest['research_regime']}"
+          )
+
+          print()
+          print("Point-in-time safe: TRUE")
+          print("Research-only: TRUE")
+          print("Decision Engine ready: FALSE")
+          print("Sentiment score generated: FALSE")
+          print("Trading signal: NONE")
+          print("Forecast: NONE")
+
+          print("=" * 70)
+          print()
+          print("PASS: AAII Sentiment outputs validated.")
+          PY
+
+
+      # ============================================================
+      # 9. UPLOAD FINAL ARTIFACT
+      # ============================================================
+
+      - name: Upload AAII sentiment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaii-sentiment-v1
+          path: |
+            aaii_sentiment_research_v1.csv
+            aaii_sentiment_research_summary_v1.csv
+            aaii_sentiment_extremes_v1.csv
+          if-no-files-found: error
+
+
+      # ============================================================
+      # 10. FINAL STATUS
+      # ============================================================
+
+      - name: Final status
+        run: |
+          echo "=================================================="
+          echo "AAII SENTIMENT ANALYZER v1 — PASS"
+          echo "=================================================="
+          echo "Research-only: TRUE"
+          echo "Point-in-time safe: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Sentiment score: NOT GENERATED"
+          echo "Trading signal: NONE"
+          echo "Forecast: NONE"
+          echo "Artifact: aaii-sentiment-v1"
+          echo "=================================================="
