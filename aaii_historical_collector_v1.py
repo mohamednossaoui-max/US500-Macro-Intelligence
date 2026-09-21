@@ -1,47 +1,26 @@
 """
 AAII Historical Sentiment Collector v1
 
-Purpose
--------
-Collect the official AAII Investor Sentiment Survey historical dataset
-and transform it into a research-safe, point-in-time dataset.
+Research-only historical collector.
 
-Research-only:
-- No sentiment score
-- No trading signal
-- No forecast
-- No Decision Engine integration
+Source:
+    AAII Investor Sentiment Survey
 
-Source
-------
-AAII Investor Sentiment Survey
-Official historical spreadsheet:
-https://www.aaii.com/files/surveys/sentiment.xls
+Official historical dataset:
+    https://www.aaii.com/files/surveys/sentiment.xls
 
-Survey methodology:
-- Weekly survey
-- Bullish / Neutral / Bearish
-- Survey period ends Wednesday
-- Results published Thursday
+Design:
+    - Historical AAII Bullish / Neutral / Bearish
+    - Point-in-time safe research dataset
+    - Conservative availability-date proxy
+    - No sentiment score
+    - No trading signal
+    - No forecast
+    - No Decision Engine integration
 
-PIT methodology
----------------
-observation_date:
-    AAII reported / survey week-ending date
-
-availability_date:
-    observation_date + 1 calendar day
-
-This is a conservative publication-date proxy based on AAII's
-documented Thursday publication schedule.
-
-Important:
-This is a research-safe proxy, not an exact historical timestamp.
-
-Outputs
--------
-aaii_historical_records_input_v1.csv
-aaii_historical_collection_summary_v1.csv
+Outputs:
+    aaii_historical_records_input_v1.csv
+    aaii_historical_collection_summary_v1.csv
 """
 
 from __future__ import annotations
@@ -49,8 +28,9 @@ from __future__ import annotations
 import io
 import re
 import sys
-from datetime import timedelta
+
 from pathlib import Path
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -80,40 +60,51 @@ OUTPUT_SUMMARY = (
 MIN_EXPECTED_RECORDS = 1000
 
 RESEARCH_ONLY = True
+
 DECISION_ENGINE_READY = False
+
 SENTIMENT_SCORE_GENERATED = False
+
 POINT_IN_TIME_SAFE = True
 
 AVAILABILITY_SEMANTICS = (
-    "conservative_proxy_"
-    "publication_thursday_after_survey_week"
+    "conservative_proxy_publication_thursday_"
+    "after_survey_week"
 )
 
 
 # ============================================================
-# Helpers
+# Error helper
 # ============================================================
 
 def fail(message: str) -> None:
+
     print()
     print("=" * 72)
     print("AAII HISTORICAL COLLECTOR V1: FAIL")
     print("=" * 72)
     print(message)
     print("=" * 72)
+
     sys.exit(1)
 
 
+# ============================================================
+# Column-name normalization
+# ============================================================
+
 def clean_column_name(value) -> str:
-    """
-    Normalize spreadsheet column names.
-    """
+
     value = str(value).strip().lower()
 
     value = value.replace("\n", " ")
     value = value.replace("\r", " ")
 
-    value = re.sub(r"\s+", "_", value)
+    value = re.sub(
+        r"\s+",
+        "_",
+        value,
+    )
 
     value = re.sub(
         r"[^a-z0-9_]+",
@@ -124,22 +115,39 @@ def clean_column_name(value) -> str:
     return value
 
 
-def parse_percent_series(series: pd.Series) -> pd.Series:
+# ============================================================
+# Percentage parser
+# ============================================================
+
+def parse_percent_series(
+    series: pd.Series,
+) -> pd.Series:
     """
-    Convert percentage values such as:
-        37.5%
-        37.5
-        0.375
+    Convert values such as:
+
+        35.4%
+        35.4
+        0.354
 
     into percentage points:
-        37.5
+
+        35.4
     """
 
     cleaned = (
-        series.astype(str)
+        series
+        .astype(str)
         .str.strip()
-        .str.replace("%", "", regex=False)
-        .str.replace(",", "", regex=False)
+        .str.replace(
+            "%",
+            "",
+            regex=False,
+        )
+        .str.replace(
+            ",",
+            "",
+            regex=False,
+        )
     )
 
     numeric = pd.to_numeric(
@@ -147,8 +155,7 @@ def parse_percent_series(series: pd.Series) -> pd.Series:
         errors="coerce",
     )
 
-    # If values look like fractions, convert them
-    # to percentage points.
+    # Convert fractions to percentage points.
     fraction_mask = (
         numeric.notna()
         & (numeric >= 0)
@@ -162,23 +169,48 @@ def parse_percent_series(series: pd.Series) -> pd.Series:
     return numeric
 
 
-def detect_header_row(raw: pd.DataFrame) -> int:
+# ============================================================
+# Header detection
+# ============================================================
+
+def detect_header_row(
+    raw: pd.DataFrame,
+) -> int:
     """
-    Detect the header row containing
-    Date/Bullish/Neutral/Bearish.
+    Detect the AAII spreadsheet header row.
+
+    The spreadsheet may contain mixed cell types
+    including strings, floats and NaN values.
+
+    Therefore every cell is safely converted to
+    string before searching.
     """
 
     for i in range(
-        min(len(raw), 30)
+        min(len(raw), 50)
     ):
 
-        row = raw.iloc[i].astype(str).str.lower()
+        row = raw.iloc[i]
 
-        joined = " ".join(row.tolist())
+        values = [
+            str(value).strip().lower()
+            for value in row.tolist()
+            if pd.notna(value)
+        ]
 
-        has_bullish = "bullish" in joined
-        has_neutral = "neutral" in joined
-        has_bearish = "bearish" in joined
+        joined = " ".join(values)
+
+        has_bullish = (
+            "bullish" in joined
+        )
+
+        has_neutral = (
+            "neutral" in joined
+        )
+
+        has_bearish = (
+            "bearish" in joined
+        )
 
         if (
             has_bullish
@@ -188,62 +220,79 @@ def detect_header_row(raw: pd.DataFrame) -> int:
             return i
 
     fail(
-        "Could not detect the AAII spreadsheet header row."
+        "Could not detect the AAII spreadsheet "
+        "header row."
     )
 
+    return -1
+
+
+# ============================================================
+# Flexible column finder
+# ============================================================
 
 def find_column(
     columns,
     candidates,
     required=True,
 ):
-    """
-    Find a column using normalized candidate names.
-    """
 
     normalized = {
-        clean_column_name(c): c
-        for c in columns
+        clean_column_name(column): column
+        for column in columns
     }
 
+    # Exact normalized match
     for candidate in candidates:
 
-        key = clean_column_name(candidate)
+        key = clean_column_name(
+            candidate
+        )
 
         if key in normalized:
+
             return normalized[key]
 
-    # More flexible matching
+    # Flexible partial match
     for column in columns:
 
-        normalized_column = clean_column_name(
-            column
+        normalized_column = (
+            clean_column_name(column)
         )
 
         for candidate in candidates:
 
-            candidate_key = clean_column_name(
-                candidate
+            candidate_key = (
+                clean_column_name(candidate)
             )
 
             if (
-                candidate_key in normalized_column
-                or normalized_column in candidate_key
+                candidate_key
+                in normalized_column
             ):
+
+                return column
+
+            if (
+                normalized_column
+                in candidate_key
+            ):
+
                 return column
 
     if required:
+
         fail(
-            "Required column not found. "
-            f"Candidates={candidates}. "
-            f"Available={list(columns)}"
+            "Required column not found.\n"
+            f"Candidates: {candidates}\n"
+            f"Available columns: {list(columns)}"
         )
 
     return None
 
 
 # ============================================================
-# Download official AAII dataset
+# Download official AAII file
 # ============================================================
 
 def download_source() -> bytes:
@@ -283,7 +332,10 @@ def download_source() -> bytes:
 
     content_type = (
         response.headers
-        .get("Content-Type", "")
+        .get(
+            "Content-Type",
+            "",
+        )
         .lower()
     )
 
@@ -306,17 +358,48 @@ def download_source() -> bytes:
     if len(response.content) < 1000:
 
         fail(
-            "Downloaded file is unexpectedly small."
+            "Downloaded AAII file is "
+            "unexpectedly small."
+        )
+
+    # --------------------------------------------------------
+    # Verify XLS signature
+    # --------------------------------------------------------
+
+    # Traditional XLS files normally begin with
+    # OLE Compound File signature:
+    #
+    # D0 CF 11 E0 A1 B1 1A E1
+    #
+    # We don't hard-fail solely on the signature because
+    # servers may return a valid spreadsheet through
+    # different packaging.
+
+    if response.content[:8] == (
+        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+    ):
+
+        print(
+            "XLS file signature: detected"
+        )
+
+    else:
+
+        print(
+            "WARNING: Traditional XLS signature "
+            "not detected."
         )
 
     return response.content
 
 
 # ============================================================
-# Read AAII spreadsheet
+# Read XLS
 # ============================================================
 
-def read_source(content: bytes) -> pd.DataFrame:
+def read_source(
+    content: bytes,
+) -> pd.DataFrame:
 
     print()
     print("Reading AAII spreadsheet...")
@@ -326,14 +409,15 @@ def read_source(content: bytes) -> pd.DataFrame:
         raw = pd.read_excel(
             io.BytesIO(content),
             header=None,
+            engine="xlrd",
         )
 
     except Exception as exc:
 
         fail(
-            "Unable to read AAII XLS file. "
-            "Make sure xlrd is installed. "
-            f"Error={exc}"
+            "Unable to read AAII XLS file.\n"
+            "Required dependency: xlrd\n"
+            f"Error: {exc}"
         )
 
     if raw.empty:
@@ -341,6 +425,20 @@ def read_source(content: bytes) -> pd.DataFrame:
         fail(
             "AAII spreadsheet is empty."
         )
+
+    print(
+        "Spreadsheet rows:",
+        len(raw),
+    )
+
+    print(
+        "Spreadsheet columns:",
+        len(raw.columns),
+    )
+
+    # --------------------------------------------------------
+    # Detect header
+    # --------------------------------------------------------
 
     header_row = detect_header_row(
         raw
@@ -351,10 +449,27 @@ def read_source(content: bytes) -> pd.DataFrame:
         header_row,
     )
 
-    df = pd.read_excel(
-        io.BytesIO(content),
-        header=header_row,
-    )
+    try:
+
+        df = pd.read_excel(
+            io.BytesIO(content),
+            header=header_row,
+            engine="xlrd",
+        )
+
+    except Exception as exc:
+
+        fail(
+            "Unable to reload AAII spreadsheet "
+            f"using detected header row: {exc}"
+        )
+
+    if df.empty:
+
+        fail(
+            "AAII dataset after header parsing "
+            "is empty."
+        )
 
     return df
 
@@ -379,7 +494,9 @@ def normalize_source(
     )
 
     normalized_map = {
-        column: clean_column_name(column)
+        column: clean_column_name(
+            column
+        )
         for column in original_columns
     }
 
@@ -388,12 +505,15 @@ def normalize_source(
     )
 
     print(
-        "Detected columns:",
-        list(df.columns),
+        "Normalized columns:"
+    )
+
+    print(
+        list(df.columns)
     )
 
     # --------------------------------------------------------
-    # Find columns
+    # Find date column
     # --------------------------------------------------------
 
     date_column = find_column(
@@ -404,9 +524,14 @@ def normalize_source(
             "date",
             "week_ending",
             "week_end",
+            "survey_date",
             "reported",
         ],
     )
+
+    # --------------------------------------------------------
+    # Find sentiment columns
+    # --------------------------------------------------------
 
     bullish_column = find_column(
         df.columns,
@@ -431,8 +556,29 @@ def normalize_source(
         ],
     )
 
+    print()
+    print(
+        "Date column:",
+        date_column,
+    )
+
+    print(
+        "Bullish column:",
+        bullish_column,
+    )
+
+    print(
+        "Neutral column:",
+        neutral_column,
+    )
+
+    print(
+        "Bearish column:",
+        bearish_column,
+    )
+
     # --------------------------------------------------------
-    # Select
+    # Select relevant columns
     # --------------------------------------------------------
 
     data = df[
@@ -452,11 +598,15 @@ def normalize_source(
     ]
 
     # --------------------------------------------------------
-    # Parse date
+    # Parse dates
     # --------------------------------------------------------
 
-    data["observation_date"] = pd.to_datetime(
-        data["observation_date_raw"],
+    data[
+        "observation_date"
+    ] = pd.to_datetime(
+        data[
+            "observation_date_raw"
+        ],
         errors="coerce",
     )
 
@@ -464,25 +614,37 @@ def normalize_source(
     # Parse percentages
     # --------------------------------------------------------
 
-    data["bullish"] = parse_percent_series(
-        data["bullish"]
+    data["bullish"] = (
+        parse_percent_series(
+            data["bullish"]
+        )
     )
 
-    data["neutral"] = parse_percent_series(
-        data["neutral"]
+    data["neutral"] = (
+        parse_percent_series(
+            data["neutral"]
+        )
     )
 
-    data["bearish"] = parse_percent_series(
-        data["bearish"]
+    data["bearish"] = (
+        parse_percent_series(
+            data["bearish"]
+        )
     )
 
     # --------------------------------------------------------
-    # Remove invalid rows
+    # Remove rows without valid date
     # --------------------------------------------------------
 
     data = data[
-        data["observation_date"].notna()
+        data[
+            "observation_date"
+        ].notna()
     ].copy()
+
+    # --------------------------------------------------------
+    # Remove rows without sentiment data
+    # --------------------------------------------------------
 
     data = data[
         data["bullish"].notna()
@@ -491,7 +653,7 @@ def normalize_source(
     ].copy()
 
     # --------------------------------------------------------
-    # Keep realistic AAII percentage values
+    # Percentage bounds
     # --------------------------------------------------------
 
     data = data[
@@ -507,11 +669,22 @@ def normalize_source(
     # Sort
     # --------------------------------------------------------
 
-    data = data.sort_values(
-        "observation_date"
-    ).reset_index(
-        drop=True
+    data = (
+        data
+        .sort_values(
+            "observation_date"
+        )
+        .reset_index(
+            drop=True
+        )
     )
+
+    if data.empty:
+
+        fail(
+            "No valid AAII observations "
+            "remain after normalization."
+        )
 
     return data
 
@@ -525,9 +698,13 @@ def build_records(
 ) -> pd.DataFrame:
 
     print()
-    print("Building PIT-safe records...")
+    print("Building PIT-safe AAII records...")
 
     records = pd.DataFrame()
+
+    # --------------------------------------------------------
+    # Dates
+    # --------------------------------------------------------
 
     records[
         "observation_date"
@@ -535,45 +712,67 @@ def build_records(
         "observation_date"
     ]
 
+    # Conservative publication proxy:
+    # AAII publishes results Thursday after
+    # Wednesday survey close.
     records[
         "availability_date"
     ] = (
         records[
             "observation_date"
         ]
-        + pd.Timedelta(days=1)
+        + pd.Timedelta(
+            days=1
+        )
     )
+
+    # --------------------------------------------------------
+    # Sentiment
+    # --------------------------------------------------------
 
     records[
         "bullish_pct"
-    ] = data["bullish"]
+    ] = data[
+        "bullish"
+    ]
 
     records[
         "neutral_pct"
-    ] = data["neutral"]
+    ] = data[
+        "neutral"
+    ]
 
     records[
         "bearish_pct"
-    ] = data["bearish"]
+    ] = data[
+        "bearish"
+    ]
 
     # --------------------------------------------------------
-    # Derived descriptive fields
+    # Descriptive spread
     # --------------------------------------------------------
 
     records[
         "bull_bear_spread_pp"
     ] = (
-        records["bullish_pct"]
-        - records["bearish_pct"]
+        records[
+            "bullish_pct"
+        ]
+        -
+        records[
+            "bearish_pct"
+        ]
     )
 
     # --------------------------------------------------------
-    # Source metadata
+    # Metadata
     # --------------------------------------------------------
 
     records[
         "source"
-    ] = "AAII Investor Sentiment Survey"
+    ] = (
+        "AAII Investor Sentiment Survey"
+    )
 
     records[
         "source_url"
@@ -585,27 +784,29 @@ def build_records(
 
     records[
         "availability_semantics"
-    ] = AVAILABILITY_SEMANTICS
+    ] = (
+        AVAILABILITY_SEMANTICS
+    )
 
     # --------------------------------------------------------
-    # PIT metadata
+    # Research controls
     # --------------------------------------------------------
 
     records[
         "point_in_time_safe"
-    ] = POINT_IN_TIME_SAFE
+    ] = True
 
     records[
         "research_only"
-    ] = RESEARCH_ONLY
+    ] = True
 
     records[
         "decision_engine_ready"
-    ] = DECISION_ENGINE_READY
+    ] = False
 
     records[
         "sentiment_score_generated"
-    ] = SENTIMENT_SCORE_GENERATED
+    ] = False
 
     return records
 
@@ -653,17 +854,12 @@ def validate_schema(
     if missing:
 
         fail(
-            "Schema validation failed. "
-            f"Missing columns: {missing}"
-        )
-
-    if len(records.columns) != len(
-        required_columns
-    ):
-
-        print(
-            "WARNING: Output contains a different "
-            "number of columns than the minimum schema."
+            "Schema validation failed.\n"
+            "Missing columns:\n"
+            + "\n".join(
+                f"  - {column}"
+                for column in missing
+            )
         )
 
     print(
@@ -680,44 +876,56 @@ def validate_pit(
 ) -> None:
 
     print()
-    print("Validating point-in-time safety...")
+    print(
+        "Validating point-in-time safety..."
+    )
 
     observation = pd.to_datetime(
-        records["observation_date"],
+        records[
+            "observation_date"
+        ],
         errors="coerce",
     )
 
     availability = pd.to_datetime(
-        records["availability_date"],
+        records[
+            "availability_date"
+        ],
         errors="coerce",
     )
+
+    # --------------------------------------------------------
+    # Invalid dates
+    # --------------------------------------------------------
 
     if observation.isna().any():
 
         fail(
-            "Invalid observation_date detected."
+            "PIT validation failed: "
+            "invalid observation_date."
         )
 
     if availability.isna().any():
 
         fail(
-            "Invalid availability_date detected."
+            "PIT validation failed: "
+            "invalid availability_date."
         )
 
-    invalid_dates = (
+    # --------------------------------------------------------
+    # Availability must follow observation
+    # --------------------------------------------------------
+
+    invalid = (
         availability
         <= observation
     )
 
-    if invalid_dates.any():
-
-        count = int(
-            invalid_dates.sum()
-        )
+    if invalid.any():
 
         fail(
             "PIT validation failed: "
-            f"{count} records have "
+            f"{int(invalid.sum())} records have "
             "availability_date <= observation_date."
         )
 
@@ -731,11 +939,11 @@ def validate_pit(
 
         fail(
             "point_in_time_safe is not TRUE "
-            "for every record."
+            "for all records."
         )
 
     # --------------------------------------------------------
-    # Research-only flags
+    # Research-only
     # --------------------------------------------------------
 
     if not records[
@@ -743,16 +951,25 @@ def validate_pit(
     ].astype(bool).all():
 
         fail(
-            "research_only must be TRUE."
+            "research_only must be TRUE "
+            "for all records."
         )
+
+    # --------------------------------------------------------
+    # Decision Engine
+    # --------------------------------------------------------
 
     if records[
         "decision_engine_ready"
     ].astype(bool).any():
 
         fail(
-            "Decision Engine must remain disabled."
+            "Decision Engine integration detected."
         )
+
+    # --------------------------------------------------------
+    # Sentiment score
+    # --------------------------------------------------------
 
     if records[
         "sentiment_score_generated"
@@ -760,7 +977,7 @@ def validate_pit(
 
         fail(
             "Sentiment score must not be generated "
-            "by the historical collector."
+            "by the collector."
         )
 
     print(
@@ -777,10 +994,12 @@ def validate_integrity(
 ) -> None:
 
     print()
-    print("Validating data integrity...")
+    print(
+        "Validating data integrity..."
+    )
 
     # --------------------------------------------------------
-    # Minimum record count
+    # Minimum records
     # --------------------------------------------------------
 
     if len(records) < MIN_EXPECTED_RECORDS:
@@ -788,11 +1007,12 @@ def validate_integrity(
         fail(
             "Unexpectedly low AAII record count: "
             f"{len(records)}. "
-            f"Expected at least {MIN_EXPECTED_RECORDS}."
+            f"Expected at least "
+            f"{MIN_EXPECTED_RECORDS}."
         )
 
     # --------------------------------------------------------
-    # Duplicate dates
+    # Duplicate observations
     # --------------------------------------------------------
 
     duplicates = records.duplicated(
@@ -801,15 +1021,15 @@ def validate_integrity(
         ]
     ).sum()
 
-    if duplicates:
+    if duplicates > 0:
 
         fail(
-            f"Duplicate observation dates: "
+            "Duplicate observation dates: "
             f"{duplicates}"
         )
 
     # --------------------------------------------------------
-    # Chronological order
+    # Chronological ordering
     # --------------------------------------------------------
 
     if not records[
@@ -822,13 +1042,15 @@ def validate_integrity(
         )
 
     # --------------------------------------------------------
-    # Percentage validation
+    # Percentage ranges
     # --------------------------------------------------------
 
     percentage_columns = [
+
         "bullish_pct",
         "neutral_pct",
         "bearish_pct",
+
     ]
 
     for column in percentage_columns:
@@ -839,8 +1061,10 @@ def validate_integrity(
 
         invalid = (
             values.isna()
-            | (values < 0)
-            | (values > 100)
+            |
+            (values < 0)
+            |
+            (values > 100)
         )
 
         if invalid.any():
@@ -852,23 +1076,30 @@ def validate_integrity(
             )
 
     # --------------------------------------------------------
-    # Weekly sum validation
+    # Sentiment sum
     # --------------------------------------------------------
 
-    sentiment_sum = (
-        records["bullish_pct"]
-        + records["neutral_pct"]
-        + records["bearish_pct"]
+    total = (
+        records[
+            "bullish_pct"
+        ]
+        +
+        records[
+            "neutral_pct"
+        ]
+        +
+        records[
+            "bearish_pct"
+        ]
     )
 
-    # AAII values can have rounding differences.
-    # Allow a small tolerance.
-    sum_error = (
-        sentiment_sum - 100
+    error = (
+        total - 100
     ).abs()
 
+    # Allow rounding differences.
     invalid_sum = (
-        sum_error > 0.5
+        error > 0.5
     )
 
     if invalid_sum.any():
@@ -876,17 +1107,21 @@ def validate_integrity(
         fail(
             "Bullish + Neutral + Bearish "
             "does not approximately equal 100 "
-            "for "
-            f"{int(invalid_sum.sum())} records."
+            f"for {int(invalid_sum.sum())} rows."
         )
 
     # --------------------------------------------------------
-    # Spread validation
+    # Bull-Bear spread
     # --------------------------------------------------------
 
     expected_spread = (
-        records["bullish_pct"]
-        - records["bearish_pct"]
+        records[
+            "bullish_pct"
+        ]
+        -
+        records[
+            "bearish_pct"
+        ]
     )
 
     if not np.allclose(
@@ -901,13 +1136,34 @@ def validate_integrity(
             "Bull-bear spread calculation mismatch."
         )
 
+    # --------------------------------------------------------
+    # Source
+    # --------------------------------------------------------
+
+    if not (
+        records[
+            "source"
+        ]
+        .astype(str)
+        .str.contains(
+            "AAII",
+            case=False,
+            na=False,
+        )
+        .all()
+    ):
+
+        fail(
+            "Unexpected source metadata."
+        )
+
     print(
         "Data integrity: PASS"
     )
 
 
 # ============================================================
-# Summary
+# Create collection summary
 # ============================================================
 
 def create_summary(
@@ -975,69 +1231,103 @@ def create_summary(
 
 def main() -> None:
 
+    # --------------------------------------------------------
+    # Download
+    # --------------------------------------------------------
+
     content = download_source()
+
+    # --------------------------------------------------------
+    # Read
+    # --------------------------------------------------------
 
     raw = read_source(
         content
     )
 
+    # --------------------------------------------------------
+    # Normalize
+    # --------------------------------------------------------
+
     data = normalize_source(
         raw
     )
 
-    if data.empty:
-
-        fail(
-            "No valid AAII observations "
-            "were extracted."
-        )
+    # --------------------------------------------------------
+    # Build records
+    # --------------------------------------------------------
 
     records = build_records(
         data
     )
 
+    # --------------------------------------------------------
+    # Validate schema
+    # --------------------------------------------------------
+
     validate_schema(
         records
     )
+
+    # --------------------------------------------------------
+    # Validate PIT
+    # --------------------------------------------------------
 
     validate_pit(
         records
     )
 
+    # --------------------------------------------------------
+    # Validate integrity
+    # --------------------------------------------------------
+
     validate_integrity(
         records
     )
+
+    # --------------------------------------------------------
+    # Summary
+    # --------------------------------------------------------
 
     summary = create_summary(
         records
     )
 
-    # ========================================================
+    # --------------------------------------------------------
     # Save records
-    # ========================================================
+    # --------------------------------------------------------
 
     records.to_csv(
         OUTPUT_RECORDS,
         index=False,
     )
 
+    # --------------------------------------------------------
+    # Save summary
+    # --------------------------------------------------------
+
     summary.to_csv(
         OUTPUT_SUMMARY,
         index=False,
     )
 
-    # ========================================================
-    # Final report
-    # ========================================================
+    # --------------------------------------------------------
+    # Final validation report
+    # --------------------------------------------------------
 
     print()
     print("=" * 72)
-    print("AAII HISTORICAL COLLECTOR V1")
-    print("VALIDATION REPORT")
+    print(
+        "AAII HISTORICAL COLLECTOR V1"
+    )
+    print(
+        "FINAL VALIDATION REPORT"
+    )
     print("=" * 72)
 
     print(
-        f"Records:                    {len(records):,}"
+        f"Records:                    "
+        f"{len(records):,}"
     )
 
     print(
@@ -1071,11 +1361,21 @@ def main() -> None:
     )
 
     print(
-        "Source:                     AAII"
+        "Schema validation:          PASS"
+    )
+
+    print(
+        "PIT validation:             PASS"
+    )
+
+    print(
+        "Data integrity:             PASS"
     )
 
     print()
-    print("Output files:")
+    print(
+        "Output files:"
+    )
 
     print(
         f"  - {OUTPUT_RECORDS}"
@@ -1087,9 +1387,15 @@ def main() -> None:
 
     print()
     print("=" * 72)
-    print("VALIDATION: PASS")
+    print(
+        "VALIDATION: PASS"
+    )
     print("=" * 72)
 
+
+# ============================================================
+# Entry point
+# ============================================================
 
 if __name__ == "__main__":
     main()
