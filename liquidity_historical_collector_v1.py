@@ -8,14 +8,33 @@ Purpose:
     Collect historical liquidity-related observations from official
     FRED series using output_type=4 (Initial Release Only).
 
+Important historical unit normalization:
+    WRESBAL and WTREGEN changed their published H.4.1 units.
+
+    Through the 2025-11-12 release:
+        Billions of U.S. Dollars
+
+    Beginning with the 2025-11-13 release:
+        Millions of U.S. Dollars
+
+    The project canonical balance-sheet unit is:
+        Millions of U.S. Dollars
+
+    Therefore historical WRESBAL and WTREGEN observations released
+    before 2025-11-13 are multiplied by 1000.
+
+    This normalization is vintage/release-date aware and does NOT
+    use a numeric-value heuristic.
+
 Method:
-    1. Retrieve the actual FRED vintage dates for each series.
+    1. Retrieve actual FRED vintage dates for each series.
     2. Restrict vintage dates to the requested historical period.
-    3. Request observations using vintage_dates in small batches.
-    4. Use output_type=4 so the returned observations represent
-       Initial Release Only.
-    5. Deduplicate observations while preserving the earliest
-       initial-release vintage metadata.
+    3. Request observations using vintage_dates in safe batches.
+    4. Use output_type=4 so observations represent Initial Release Only.
+    5. Normalize historical H.4.1 units where required.
+    6. Deduplicate observations.
+    7. Validate PIT/research-only metadata.
+    8. Write the historical research dataset and summary.
 
 Indicators:
     WALCL      - Federal Reserve Total Assets
@@ -36,7 +55,7 @@ Research-only:
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -78,9 +97,35 @@ SUMMARY_FILE = Path(
     "liquidity_historical_collection_summary_v1.csv"
 )
 
-# Keep this comfortably below FRED's documented
-# maximum vintage-date limit.
+# Keep comfortably below FRED's vintage-date limit.
 VINTAGE_BATCH_SIZE = 500
+
+
+# ================================================================
+# HISTORICAL UNIT TRANSITION
+# ================================================================
+
+# Official ALFRED H.4.1 metadata shows:
+#
+# WRESBAL:
+#   Billions of U.S. Dollars through 2025-11-12
+#   Millions of U.S. Dollars from 2025-11-13
+#
+# WTREGEN:
+#   Billions of U.S. Dollars through 2025-11-12
+#   Millions of U.S. Dollars from 2025-11-13
+#
+# The comparison is made against the INITIAL RELEASE / VINTAGE DATE,
+# not against observation_date.
+
+H41_UNIT_TRANSITION_DATE = pd.Timestamp(
+    "2025-11-13"
+)
+
+H41_BILLIONS_SERIES = {
+    "WRESBAL",
+    "WTREGEN",
+}
 
 
 # ================================================================
@@ -186,6 +231,10 @@ OUTPUT_COLUMNS = [
     "actual",
 
     "unit",
+
+    "source_unit",
+
+    "unit_conversion_factor",
 
     "frequency",
 
@@ -302,7 +351,7 @@ def fred_get(
     purpose
 ):
     """
-    Generic FRED API GET helper with detailed diagnostics.
+    Generic FRED API GET helper with diagnostics.
     """
 
     try:
@@ -389,10 +438,8 @@ def fetch_vintage_dates(
     """
     Retrieve actual FRED vintage dates for a series.
 
-    The /series/vintagedates endpoint returns dates in history
-    when observations were released or revised.
-
-    We restrict them to the requested historical period.
+    These dates are used as the release/vintage dimension for
+    output_type=4 Initial Release Only observations.
     """
 
     print("")
@@ -439,7 +486,6 @@ def fetch_vintage_dates(
             f"{start_date} and {end_date}."
         )
 
-    # Defensive filtering.
     filtered = [
         date
         for date in vintage_dates
@@ -548,8 +594,8 @@ def fetch_fred_series(
         1. Get actual vintage dates.
         2. Split them into safe batches.
         3. Request output_type=4 for each batch.
-        4. Combine all observations.
-        5. Deduplicate later during normalization.
+        4. Combine observations.
+        5. Normalize and deduplicate later.
     """
 
     vintage_dates = fetch_vintage_dates(
@@ -625,6 +671,81 @@ def fetch_fred_series(
 
 
 # ================================================================
+# VINTAGE-AWARE UNIT NORMALIZATION
+# ================================================================
+
+def normalize_h41_value(
+    series_id,
+    actual,
+    fred_release_date
+):
+    """
+    Normalize historical H.4.1 balance-sheet values.
+
+    Canonical project unit:
+        Millions of U.S. Dollars
+
+    WRESBAL and WTREGEN:
+
+        release < 2025-11-13
+            source unit = Billions of U.S. Dollars
+            conversion factor = 1000
+
+        release >= 2025-11-13
+            source unit = Millions of U.S. Dollars
+            conversion factor = 1
+
+    This intentionally uses the release/vintage date instead of
+    a numeric-value heuristic.
+    """
+
+    if series_id not in H41_BILLIONS_SERIES:
+
+        return (
+            actual,
+            SERIES[series_id]["unit"],
+            1.0,
+        )
+
+    if not fred_release_date:
+
+        raise RuntimeError(
+            f"Missing FRED initial-release date "
+            f"for {series_id}. "
+            f"Cannot perform vintage-aware "
+            f"unit normalization."
+        )
+
+    try:
+
+        release_dt = pd.Timestamp(
+            fred_release_date
+        )
+
+    except Exception as exc:
+
+        raise RuntimeError(
+            f"Invalid FRED initial-release date "
+            f"for {series_id}: "
+            f"{fred_release_date}"
+        ) from exc
+
+    if release_dt < H41_UNIT_TRANSITION_DATE:
+
+        return (
+            actual * 1000.0,
+            "Billions of U.S. Dollars",
+            1000.0,
+        )
+
+    return (
+        actual,
+        "Millions of U.S. Dollars",
+        1.0,
+    )
+
+
+# ================================================================
 # CONVERT FRED OBSERVATIONS
 # ================================================================
 
@@ -633,8 +754,8 @@ def convert_series(
     observations
 ):
     """
-    Convert raw FRED observations into the
-    project's standardized research schema.
+    Convert raw FRED observations into the project's
+    standardized research schema.
     """
 
     meta = SERIES[
@@ -690,7 +811,7 @@ def convert_series(
             continue
 
         # --------------------------------------------------------
-        # FRED Initial Release Date
+        # FRED Initial Release / Vintage Date
         # --------------------------------------------------------
 
         fred_release_date = obs.get(
@@ -713,15 +834,16 @@ def convert_series(
                 )
 
                 availability_semantics = (
-                    "FRED realtime_start; "
-                    "output_type=4 Initial Release"
+                    "FRED realtime_start release/vintage "
+                    "date; output_type=4 Initial Release; "
+                    "exact publication timestamp not represented"
                 )
 
             except ValueError:
 
                 availability_date = (
                     obs_dt +
-                    timedelta(days=1)
+                    pd.Timedelta(days=1)
                 ).strftime(
                     "%Y-%m-%d"
                 )
@@ -729,14 +851,15 @@ def convert_series(
                 availability_semantics = (
                     "Fallback conservative +1 "
                     "calendar-day availability proxy; "
-                    "FRED output_type=4 Initial Release"
+                    "FRED output_type=4 Initial Release; "
+                    "exact publication timestamp not represented"
                 )
 
         else:
 
             availability_date = (
                 obs_dt +
-                timedelta(days=1)
+                pd.Timedelta(days=1)
             ).strftime(
                 "%Y-%m-%d"
             )
@@ -744,8 +867,23 @@ def convert_series(
             availability_semantics = (
                 "Fallback conservative +1 "
                 "calendar-day availability proxy; "
-                "FRED output_type=4 Initial Release"
+                "FRED output_type=4 Initial Release; "
+                "exact publication timestamp not represented"
             )
+
+        # --------------------------------------------------------
+        # Vintage-aware unit normalization
+        # --------------------------------------------------------
+
+        (
+            actual_normalized,
+            source_unit,
+            unit_conversion_factor,
+        ) = normalize_h41_value(
+            series_id=series_id,
+            actual=actual,
+            fred_release_date=fred_release_date,
+        )
 
         # --------------------------------------------------------
         # PIT sanity
@@ -766,6 +904,10 @@ def convert_series(
                 f"{availability_date}"
             )
 
+        # --------------------------------------------------------
+        # Append normalized record
+        # --------------------------------------------------------
+
         rows.append(
             {
                 "indicator":
@@ -778,10 +920,20 @@ def convert_series(
                     availability_date,
 
                 "actual":
-                    actual,
+                    actual_normalized,
 
                 "unit":
-                    meta["unit"],
+                    (
+                        "Millions of U.S. Dollars"
+                        if series_id in H41_BILLIONS_SERIES
+                        else meta["unit"]
+                    ),
+
+                "source_unit":
+                    source_unit,
+
+                "unit_conversion_factor":
+                    unit_conversion_factor,
 
                 "frequency":
                     meta["frequency"],
@@ -1062,6 +1214,139 @@ def validate_output(df):
         )
 
     # ------------------------------------------------------------
+    # Unit metadata
+    # ------------------------------------------------------------
+
+    if df["source_unit"].isna().any():
+
+        raise RuntimeError(
+            "Missing source_unit metadata."
+        )
+
+    df["unit_conversion_factor"] = pd.to_numeric(
+        df["unit_conversion_factor"],
+        errors="coerce"
+    )
+
+    if df["unit_conversion_factor"].isna().any():
+
+        raise RuntimeError(
+            "Missing unit_conversion_factor metadata."
+        )
+
+    if (
+        df["unit_conversion_factor"] <= 0
+    ).any():
+
+        raise RuntimeError(
+            "Invalid unit_conversion_factor detected."
+        )
+
+    # ------------------------------------------------------------
+    # Canonical H.4.1 units
+    # ------------------------------------------------------------
+
+    h41_indicators = {
+        "FED_TOTAL_ASSETS",
+        "RESERVE_BALANCES",
+        "TREASURY_GENERAL_ACCOUNT",
+        "TREASURY_SECURITIES",
+        "MBS",
+    }
+
+    for indicator in sorted(
+        h41_indicators
+    ):
+
+        group = df.loc[
+            df["indicator"] == indicator
+        ]
+
+        if group.empty:
+
+            continue
+
+        if not (
+            group["unit"]
+            .eq("Millions of U.S. Dollars")
+        ).all():
+
+            raise RuntimeError(
+                f"{indicator} is not normalized "
+                "to Millions of U.S. Dollars."
+            )
+
+    # ------------------------------------------------------------
+    # WRESBAL / WTREGEN transition validation
+    # ------------------------------------------------------------
+
+    for series_id in [
+        "WRESBAL",
+        "WTREGEN",
+    ]:
+
+        indicator = SERIES[
+            series_id
+        ]["indicator"]
+
+        group = df.loc[
+            df["indicator"] == indicator
+        ].copy()
+
+        if group.empty:
+
+            raise RuntimeError(
+                f"No records found for {indicator}."
+            )
+
+        group["availability_date"] = (
+            pd.to_datetime(
+                group["availability_date"]
+            )
+        )
+
+        before = group.loc[
+            group["availability_date"]
+            <
+            H41_UNIT_TRANSITION_DATE
+        ]
+
+        after = group.loc[
+            group["availability_date"]
+            >=
+            H41_UNIT_TRANSITION_DATE
+        ]
+
+        if not before.empty:
+
+            if not (
+                before[
+                    "unit_conversion_factor"
+                ]
+                .eq(1000.0)
+            ).all():
+
+                raise RuntimeError(
+                    f"{indicator}: historical "
+                    "pre-transition records "
+                    "must use conversion factor 1000."
+                )
+
+        if not after.empty:
+
+            if not (
+                after[
+                    "unit_conversion_factor"
+                ]
+                .eq(1.0)
+            ).all():
+
+                raise RuntimeError(
+                    f"{indicator}: post-transition "
+                    "records must use conversion factor 1."
+                )
+
+    # ------------------------------------------------------------
     # Duplicates
     # ------------------------------------------------------------
 
@@ -1226,6 +1511,10 @@ def validate_output(df):
     )
 
     print(
+        "Unit normalization: PASS"
+    )
+
+    print(
         "Duplicates: PASS"
     )
 
@@ -1320,6 +1609,14 @@ def build_summary(df):
                 "unit":
                     group["unit"].iloc[0],
 
+                "source_unit":
+                    latest["source_unit"],
+
+                "unit_conversion_factor":
+                    latest[
+                        "unit_conversion_factor"
+                    ],
+
                 "frequency":
                     group["frequency"].iloc[0],
 
@@ -1393,7 +1690,7 @@ def main():
         ]
 
         # --------------------------------------------------------
-        # Convert date fields before deduplication
+        # Convert date fields
         # --------------------------------------------------------
 
         df["observation_date"] = pd.to_datetime(
@@ -1405,10 +1702,7 @@ def main():
         )
 
         # --------------------------------------------------------
-        # Deduplicate observations created by multiple
-        # vintage batches.
-        #
-        # Keep the earliest known initial-release metadata.
+        # Deterministic sorting before deduplication
         # --------------------------------------------------------
 
         df = (
@@ -1420,44 +1714,31 @@ def main():
                     "availability_date",
                 ]
             )
-            .drop_duplicates(
-                subset=[
-                    "indicator",
-                    "observation_date",
-                ],
-                keep="first"
+            .reset_index(
+                drop=True
             )
         )
 
         # --------------------------------------------------------
-        # Convert dates back to ISO strings
-        # --------------------------------------------------------
-
-        df["observation_date"] = (
-            df["observation_date"]
-            .dt.strftime(
-                "%Y-%m-%d"
-            )
-        )
-
-        df["availability_date"] = (
-            df["availability_date"]
-            .dt.strftime(
-                "%Y-%m-%d"
-            )
-        )
-
-        # --------------------------------------------------------
-        # Deterministic order
+        # Deduplicate initial-release observations
+        #
+        # The same initial-release observation can appear more
+        # than once when the observation request spans multiple
+        # vintage batches.
+        #
+        # Since output_type=4 selects Initial Release Only,
+        # preserve the earliest available initial-release metadata.
         # --------------------------------------------------------
 
         df = (
             df
-            .sort_values(
-                [
-                    "observation_date",
+            .drop_duplicates(
+                subset=[
                     "indicator",
-                ]
+                    "observation_date",
+                    "vintage",
+                ],
+                keep="first"
             )
             .reset_index(
                 drop=True
@@ -1484,14 +1765,55 @@ def main():
         # Save records
         # --------------------------------------------------------
 
+        df["observation_date"] = (
+            df["observation_date"]
+            .dt.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+        df["availability_date"] = (
+            df["availability_date"]
+            .dt.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+        # --------------------------------------------------------
+        # Final deterministic order
+        # --------------------------------------------------------
+
+        df = (
+            df
+            .sort_values(
+                [
+                    "observation_date",
+                    "indicator",
+                ]
+            )
+            .reset_index(
+                drop=True
+            )
+        )
+
+        summary = (
+            summary
+            .sort_values(
+                "indicator"
+            )
+            .reset_index(
+                drop=True
+            )
+        )
+
+        # --------------------------------------------------------
+        # Write outputs
+        # --------------------------------------------------------
+
         df.to_csv(
             OUTPUT_FILE,
             index=False
         )
-
-        # --------------------------------------------------------
-        # Save summary
-        # --------------------------------------------------------
 
         summary.to_csv(
             SUMMARY_FILE,
@@ -1549,6 +1871,31 @@ def main():
                 f"  {indicator:30s}"
                 f"{count:>8,}"
             )
+
+        print("")
+        print(
+            "Unit normalization:"
+        )
+
+        print(
+            "  WRESBAL pre-2025-11-13: "
+            "Billions -> Millions x1000"
+        )
+
+        print(
+            "  WTREGEN pre-2025-11-13: "
+            "Billions -> Millions x1000"
+        )
+
+        print(
+            "  WRESBAL post-2025-11-13: "
+            "Millions x1"
+        )
+
+        print(
+            "  WTREGEN post-2025-11-13: "
+            "Millions x1"
+        )
 
         print("")
         print(
@@ -1610,9 +1957,11 @@ def main():
 
         print("")
         print("=" * 80)
+
         print(
             "STATUS: PASS"
         )
+
         print("=" * 80)
 
     except Exception as exc:
