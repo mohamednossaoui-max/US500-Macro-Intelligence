@@ -1,0 +1,401 @@
+name: COT Positioning Analyzer v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  cot-positioning-analyzer:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------
+      # Python
+      # ------------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ------------------------------------------------------
+      # Dependencies
+      # ------------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      # ------------------------------------------------------
+      # Download COT Historical artifact
+      # ------------------------------------------------------
+
+      - name: Download COT historical artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import zipfile
+          import io
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+
+          url = (
+              f"https://api.github.com/repos/{repo}/"
+              "actions/artifacts?per_page=100"
+          )
+
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+
+          with urllib.request.urlopen(request) as response:
+              data = json.load(response)
+
+          artifacts = data.get("artifacts", [])
+
+          candidates = [
+              a for a in artifacts
+              if a["name"] == "cot-historical-v1"
+              and not a["expired"]
+          ]
+
+          if not candidates:
+              raise SystemExit(
+                  "No valid cot-historical-v1 artifact found."
+              )
+
+          # Use the newest artifact
+          artifact = max(
+              candidates,
+              key=lambda x: x["created_at"]
+          )
+
+          print(
+              "Using artifact:",
+              artifact["id"],
+              artifact["created_at"]
+          )
+
+          download_url = artifact["archive_download_url"]
+
+          request = urllib.request.Request(
+              download_url,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+              },
+          )
+
+          with urllib.request.urlopen(request) as response:
+              archive = response.read()
+
+          with zipfile.ZipFile(
+              io.BytesIO(archive)
+          ) as z:
+
+              z.extractall("cot_input")
+
+          print("Artifact extracted.")
+
+          PY
+
+      # ------------------------------------------------------
+      # Locate and validate input
+      # ------------------------------------------------------
+
+      - name: Prepare COT input
+        run: |
+          find cot_input -maxdepth 3 -type f -print
+
+          RECORD_FILE=$(find cot_input \
+            -name "cot_historical_records_input_v1.csv" \
+            -type f | head -n 1)
+
+          if [ -z "$RECORD_FILE" ]; then
+            echo "COT historical records file not found."
+            exit 1
+          fi
+
+          cp "$RECORD_FILE" \
+            cot_historical_records_input_v1.csv
+
+          test -f cot_historical_records_input_v1.csv
+
+          echo "Input file:"
+          ls -lh cot_historical_records_input_v1.csv
+
+      # ------------------------------------------------------
+      # Run analyzer
+      # ------------------------------------------------------
+
+      - name: Run COT Positioning Analyzer v1
+        run: |
+          python cot_positioning_analyzer_v1.py
+
+      # ------------------------------------------------------
+      # Validate outputs
+      # ------------------------------------------------------
+
+      - name: Validate analyzer outputs
+        run: |
+          test -f cot_positioning_research_v1.csv
+          test -f cot_positioning_research_summary_v1.csv
+          test -f cot_positioning_extremes_v1.csv
+
+          python - <<'PY'
+          import pandas as pd
+
+          records = pd.read_csv(
+              "cot_positioning_research_v1.csv"
+          )
+
+          summary = pd.read_csv(
+              "cot_positioning_research_summary_v1.csv"
+          )
+
+          required = [
+              "contract_market_code",
+              "contract_name",
+              "observation_date",
+              "availability_date",
+              "open_interest",
+
+              "asset_manager_net",
+              "asset_manager_net_oi_pct",
+              "asset_manager_net_change",
+              "asset_manager_net_z",
+              "asset_manager_net_percentile",
+
+              "leveraged_money_net",
+              "leveraged_money_net_oi_pct",
+              "leveraged_money_net_change",
+              "leveraged_money_net_z",
+              "leveraged_money_net_percentile",
+
+              "dealer_net",
+              "dealer_net_oi_pct",
+              "dealer_net_change",
+              "dealer_net_z",
+              "dealer_net_percentile",
+
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "sentiment_score_generated",
+          ]
+
+          missing = [
+              c for c in required
+              if c not in records.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  "Missing columns: "
+                  + ", ".join(missing)
+              )
+
+          if records.empty:
+              raise SystemExit(
+                  "Analyzer output is empty."
+              )
+
+          # --------------------------------------------------
+          # Contract validation
+          # --------------------------------------------------
+
+          if not (
+              records[
+                  "contract_market_code"
+              ]
+              .astype(str)
+              .eq("13874A")
+              .all()
+          ):
+              raise SystemExit(
+                  "Unexpected contract code."
+              )
+
+          # --------------------------------------------------
+          # Date validation
+          # --------------------------------------------------
+
+          observation = pd.to_datetime(
+              records["observation_date"]
+          )
+
+          availability = pd.to_datetime(
+              records["availability_date"]
+          )
+
+          if not (
+              availability > observation
+          ).all():
+              raise SystemExit(
+                  "PIT validation failed."
+              )
+
+          # --------------------------------------------------
+          # PIT flag
+          # --------------------------------------------------
+
+          if not records[
+              "point_in_time_safe"
+          ].all():
+              raise SystemExit(
+                  "point_in_time_safe is not TRUE."
+              )
+
+          # --------------------------------------------------
+          # Research-only validation
+          # --------------------------------------------------
+
+          if not records[
+              "research_only"
+          ].all():
+              raise SystemExit(
+                  "research_only must remain TRUE."
+              )
+
+          if records[
+              "decision_engine_ready"
+          ].any():
+              raise SystemExit(
+                  "Decision Engine must remain disabled."
+              )
+
+          if records[
+              "sentiment_score_generated"
+          ].any():
+              raise SystemExit(
+                  "Sentiment score must NOT be generated "
+                  "by this analyzer."
+              )
+
+          # --------------------------------------------------
+          # Duplicate validation
+          # --------------------------------------------------
+
+          duplicates = records.duplicated(
+              [
+                  "contract_market_code",
+                  "observation_date",
+              ]
+          ).sum()
+
+          if duplicates:
+              raise SystemExit(
+                  f"Duplicate observations: {duplicates}"
+              )
+
+          # --------------------------------------------------
+          # Summary
+          # --------------------------------------------------
+
+          print()
+          print("=" * 70)
+          print("COT POSITIONING ANALYZER V1 VALIDATION")
+          print("=" * 70)
+
+          print(
+              "Records:",
+              len(records)
+          )
+
+          print(
+              "First observation:",
+              records[
+                  "observation_date"
+              ].min()
+          )
+
+          print(
+              "Last observation:",
+              records[
+                  "observation_date"
+              ].max()
+          )
+
+          print(
+              "PIT safe:",
+              records[
+                  "point_in_time_safe"
+              ].all()
+          )
+
+          print(
+              "Research only:",
+              records[
+                  "research_only"
+              ].all()
+          )
+
+          print(
+              "Decision Engine:",
+              records[
+                  "decision_engine_ready"
+              ].any()
+          )
+
+          print(
+              "Sentiment score generated:",
+              records[
+                  "sentiment_score_generated"
+              ].any()
+          )
+
+          print(
+              "Duplicates:",
+              duplicates
+          )
+
+          print()
+          print("Summary:")
+          print(
+              summary.to_string(
+                  index=False
+              )
+          )
+
+          print("=" * 70)
+          print("VALIDATION: PASS")
+          print("=" * 70)
+
+          PY
+
+      # ------------------------------------------------------
+      # Upload artifact
+      # ------------------------------------------------------
+
+      - name: Upload COT positioning artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cot-positioning-v1
+          path: |
+            cot_positioning_research_v1.csv
+            cot_positioning_research_summary_v1.csv
+            cot_positioning_extremes_v1.csv
+          retention-days: 90
