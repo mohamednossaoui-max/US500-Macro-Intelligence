@@ -5,9 +5,9 @@ E-mini S&P 500.
 
 Design:
 - Source: CFTC Public Reporting Environment / TFF Futures-Only.
-- Observation date: CFTC report date (normally Tuesday).
+- Target: E-mini S&P 500 (CFTC code 13874A).
+- Observation date: CFTC report date.
 - Availability date: conservative 7-calendar-day proxy.
-  This intentionally avoids look-ahead in historical research.
 - No sentiment score.
 - No trading signal.
 - No Decision Engine integration.
@@ -32,11 +32,18 @@ import requests
 # ============================================================
 
 REPORT_NAME = "TFF Futures Only"
+
 TARGET_CONTRACT = "E-MINI S&P 500"
+
 TARGET_CODE = "13874A"
 
-START_YEAR = int(os.getenv("COT_START_YEAR", "2006"))
-END_YEAR = int(os.getenv("COT_END_YEAR", "2026"))
+START_YEAR = int(
+    os.getenv("COT_START_YEAR", "2006")
+)
+
+END_YEAR = int(
+    os.getenv("COT_END_YEAR", "2026")
+)
 
 BASE_URL = (
     "https://publicreporting.cftc.gov/"
@@ -49,16 +56,18 @@ SOURCE_URL = (
 )
 
 OUTPUT = "cot_historical_records_input_v1.csv"
+
 SUMMARY = "cot_historical_collection_summary_v1.csv"
 
 
 # ============================================================
-# Helpers
+# Fetch one year
 # ============================================================
 
 def fetch_year(year: int) -> pd.DataFrame:
     """
-    Fetch one calendar year from the CFTC TFF Futures-Only dataset.
+    Fetch one calendar year of CFTC TFF Futures-Only data
+    for the target E-mini S&P 500 contract.
     """
 
     where = (
@@ -87,15 +96,21 @@ def fetch_year(year: int) -> pd.DataFrame:
     if not text.strip():
         return pd.DataFrame()
 
-    return pd.read_csv(io.StringIO(text))
+    return pd.read_csv(
+        io.StringIO(text)
+    )
 
+
+# ============================================================
+# Safe numeric conversion
+# ============================================================
 
 def numeric_column(
     df: pd.DataFrame,
     column: str,
 ) -> pd.Series:
     """
-    Safely convert a source column to numeric.
+    Convert a source column to numeric safely.
     """
 
     if column not in df.columns:
@@ -112,15 +127,13 @@ def numeric_column(
 
 
 # ============================================================
-# Main collector
+# Main
 # ============================================================
 
 def main() -> int:
 
-    frames = []
-
     print(
-        f"Collecting CFTC TFF Futures-Only "
+        "Collecting CFTC TFF Futures-Only "
         f"{TARGET_CONTRACT} ({TARGET_CODE})"
     )
 
@@ -128,11 +141,16 @@ def main() -> int:
         f"Period: {START_YEAR}-{END_YEAR}"
     )
 
+    frames = []
+
     # --------------------------------------------------------
-    # Download year by year
+    # Download data year by year
     # --------------------------------------------------------
 
-    for year in range(START_YEAR, END_YEAR + 1):
+    for year in range(
+        START_YEAR,
+        END_YEAR + 1,
+    ):
 
         try:
 
@@ -154,7 +172,12 @@ def main() -> int:
 
             return 1
 
+    # --------------------------------------------------------
+    # Ensure data exists
+    # --------------------------------------------------------
+
     if not frames:
+
         raise RuntimeError(
             "No CFTC TFF Futures-Only records returned."
         )
@@ -165,22 +188,45 @@ def main() -> int:
     )
 
     # --------------------------------------------------------
-    # Validate required source columns
+    # Required CFTC columns
+    #
+    # IMPORTANT:
+    # Current CFTC API uses:
+    #
+    # lev_money_positions_long
+    # lev_money_positions_short
+    # other_rept_positions_long
+    # other_rept_positions_short
+    #
+    # NOT the older *_all variants.
     # --------------------------------------------------------
 
     required_columns = [
+
         "report_date_as_yyyy_mm_dd",
+
         "cftc_contract_market_code",
+
         "open_interest_all",
+
         "dealer_positions_long_all",
+
         "dealer_positions_short_all",
+
         "asset_mgr_positions_long",
+
         "asset_mgr_positions_short",
-        "lev_money_positions_long_all",
-        "lev_money_positions_short_all",
-        "other_rept_positions_long_all",
-        "other_rept_positions_short_all",
+
+        "lev_money_positions_long",
+
+        "lev_money_positions_short",
+
+        "other_rept_positions_long",
+
+        "other_rept_positions_short",
+
         "nonrept_positions_long_all",
+
         "nonrept_positions_short_all",
     ]
 
@@ -191,40 +237,61 @@ def main() -> int:
     ]
 
     if missing:
+
         raise RuntimeError(
-            "CFTC schema changed. Missing columns: "
+            "CFTC schema changed. "
+            "Missing columns: "
             + ", ".join(missing)
         )
 
     # --------------------------------------------------------
-    # Target contract
+    # Normalize contract code
     # --------------------------------------------------------
 
-    raw["cftc_contract_market_code"] = (
-        raw["cftc_contract_market_code"]
+    raw[
+        "cftc_contract_market_code"
+    ] = (
+        raw[
+            "cftc_contract_market_code"
+        ]
         .astype(str)
         .str.strip()
     )
 
+    # --------------------------------------------------------
+    # Keep only E-mini S&P 500
+    # --------------------------------------------------------
+
     raw = raw[
-        raw["cftc_contract_market_code"] == TARGET_CODE
+        raw[
+            "cftc_contract_market_code"
+        ] == TARGET_CODE
     ].copy()
 
     if raw.empty:
+
         raise RuntimeError(
-            f"No records found for CFTC code {TARGET_CODE}."
+            "No records found for "
+            f"CFTC contract code {TARGET_CODE}."
         )
 
     # --------------------------------------------------------
     # Observation date
     # --------------------------------------------------------
 
-    raw["observation_date"] = pd.to_datetime(
-        raw["report_date_as_yyyy_mm_dd"],
+    raw[
+        "observation_date"
+    ] = pd.to_datetime(
+        raw[
+            "report_date_as_yyyy_mm_dd"
+        ],
         errors="coerce",
     )
 
-    if raw["observation_date"].isna().any():
+    if raw[
+        "observation_date"
+    ].isna().any():
+
         raise RuntimeError(
             "Invalid observation dates found."
         )
@@ -233,39 +300,60 @@ def main() -> int:
     # Conservative availability date
     # --------------------------------------------------------
 
-    raw["availability_date"] = (
-        raw["observation_date"]
-        + pd.to_timedelta(7, unit="D")
+    raw[
+        "availability_date"
+    ] = (
+        raw[
+            "observation_date"
+        ]
+        + pd.to_timedelta(
+            7,
+            unit="D",
+        )
     )
+
+    # --------------------------------------------------------
+    # Contract name
+    # --------------------------------------------------------
+
+    if "contract_market_name" in raw.columns:
+
+        contract_name = (
+            raw["contract_market_name"]
+        )
+
+    else:
+
+        contract_name = pd.Series(
+            [TARGET_CONTRACT] * len(raw),
+            index=raw.index,
+        )
 
     # --------------------------------------------------------
     # Build canonical output
     # --------------------------------------------------------
 
-    contract_name = (
-        raw["contract_market_name"]
-        if "contract_market_name" in raw.columns
-        else pd.Series(
-            [TARGET_CONTRACT] * len(raw),
-            index=raw.index,
-        )
-    )
-
     out = pd.DataFrame({
 
         "contract_market_code":
-            raw["cftc_contract_market_code"],
+            raw[
+                "cftc_contract_market_code"
+            ],
 
         "contract_name":
             contract_name.astype(str),
 
         "observation_date":
-            raw["observation_date"].dt.strftime(
+            raw[
+                "observation_date"
+            ].dt.strftime(
                 "%Y-%m-%d"
             ),
 
         "availability_date":
-            raw["availability_date"].dt.strftime(
+            raw[
+                "availability_date"
+            ].dt.strftime(
                 "%Y-%m-%d"
             ),
 
@@ -302,25 +390,25 @@ def main() -> int:
         "leveraged_money_long":
             numeric_column(
                 raw,
-                "lev_money_positions_long_all",
+                "lev_money_positions_long",
             ),
 
         "leveraged_money_short":
             numeric_column(
                 raw,
-                "lev_money_positions_short_all",
+                "lev_money_positions_short",
             ),
 
         "other_reportables_long":
             numeric_column(
                 raw,
-                "other_rept_positions_long_all",
+                "other_rept_positions_long",
             ),
 
         "other_reportables_short":
             numeric_column(
                 raw,
-                "other_rept_positions_short_all",
+                "other_rept_positions_short",
             ),
 
         "nonreportable_long":
@@ -348,76 +436,62 @@ def main() -> int:
             True,
     })
 
-    # --------------------------------------------------------
-    # Derived positioning fields
-    # --------------------------------------------------------
+    # ========================================================
+    # Derived positioning metrics
+    # ========================================================
 
-    out["asset_manager_net"] = (
-        out["asset_manager_long"]
-        - out["asset_manager_short"]
+    out[
+        "asset_manager_net"
+    ] = (
+        out[
+            "asset_manager_long"
+        ]
+        - out[
+            "asset_manager_short"
+        ]
     )
 
-    out["leveraged_money_net"] = (
-        out["leveraged_money_long"]
-        - out["leveraged_money_short"]
+    out[
+        "leveraged_money_net"
+    ] = (
+        out[
+            "leveraged_money_long"
+        ]
+        - out[
+            "leveraged_money_short"
+        ]
     )
 
-    out["dealer_net"] = (
-        out["dealer_long"]
-        - out["dealer_short"]
+    out[
+        "dealer_net"
+    ] = (
+        out[
+            "dealer_long"
+        ]
+        - out[
+            "dealer_short"
+        ]
     )
 
-    # --------------------------------------------------------
-    # Sort + deduplicate
-    # --------------------------------------------------------
+    # ========================================================
+    # Sort
+    # ========================================================
 
     out = (
         out
-        .sort_values("observation_date")
-        .drop_duplicates(
-            subset=[
-                "contract_market_code",
-                "observation_date",
-            ],
-            keep="last",
+        .sort_values(
+            "observation_date"
         )
         .reset_index(drop=True)
     )
 
-    # --------------------------------------------------------
-    # PIT validation
-    # --------------------------------------------------------
-
-    observation_dates = pd.to_datetime(
-        out["observation_date"]
-    )
-
-    availability_dates = pd.to_datetime(
-        out["availability_date"]
-    )
-
-    if not bool(
-        (availability_dates > observation_dates).all()
-    ):
-        raise AssertionError(
-            "PIT validation failed: "
-            "availability_date <= observation_date"
-        )
-
-    if not bool(
-        out["point_in_time_safe"].all()
-    ):
-        raise AssertionError(
-            "PIT validation failed."
-        )
-
-    # --------------------------------------------------------
-    # Duplicate validation
-    # --------------------------------------------------------
+    # ========================================================
+    # Duplicate check
+    # ========================================================
 
     duplicate_count = int(
         out.duplicated(
-            [
+            subset=[
                 "contract_market_code",
                 "observation_date",
             ]
@@ -425,22 +499,95 @@ def main() -> int:
     )
 
     if duplicate_count != 0:
+
         raise AssertionError(
-            "Duplicate contract/observation rows remain."
+            "Duplicate contract/observation "
+            f"rows detected: {duplicate_count}"
         )
 
-    # --------------------------------------------------------
-    # Save records
-    # --------------------------------------------------------
+    # ========================================================
+    # PIT validation
+    # ========================================================
+
+    observation_dates = pd.to_datetime(
+        out[
+            "observation_date"
+        ]
+    )
+
+    availability_dates = pd.to_datetime(
+        out[
+            "availability_date"
+        ]
+    )
+
+    if not bool(
+        (
+            availability_dates
+            > observation_dates
+        ).all()
+    ):
+
+        raise AssertionError(
+            "PIT validation failed: "
+            "availability_date must be "
+            "later than observation_date."
+        )
+
+    # ========================================================
+    # PIT flag validation
+    # ========================================================
+
+    if not bool(
+        out[
+            "point_in_time_safe"
+        ].all()
+    ):
+
+        raise AssertionError(
+            "point_in_time_safe validation failed."
+        )
+
+    # ========================================================
+    # Target contract validation
+    # ========================================================
+
+    if not bool(
+        out[
+            "contract_market_code"
+        ]
+        .astype(str)
+        .eq(TARGET_CODE)
+        .all()
+    ):
+
+        raise AssertionError(
+            "Unexpected contract code detected."
+        )
+
+    # ========================================================
+    # Date ordering validation
+    # ========================================================
+
+    if not observation_dates.is_monotonic_increasing:
+
+        raise AssertionError(
+            "Observation dates are not "
+            "monotonically increasing."
+        )
+
+    # ========================================================
+    # Save historical records
+    # ========================================================
 
     out.to_csv(
         OUTPUT,
         index=False,
     )
 
-    # --------------------------------------------------------
-    # Summary
-    # --------------------------------------------------------
+    # ========================================================
+    # Build summary
+    # ========================================================
 
     summary = pd.DataFrame([{
 
@@ -463,22 +610,30 @@ def main() -> int:
             len(out),
 
         "first_observation_date":
-            out["observation_date"].min(),
+            out[
+                "observation_date"
+            ].min(),
 
         "last_observation_date":
-            out["observation_date"].max(),
+            out[
+                "observation_date"
+            ].max(),
 
         "duplicate_contract_observation_rows":
             duplicate_count,
 
         "missing_open_interest":
             int(
-                out["open_interest"].isna().sum()
+                out[
+                    "open_interest"
+                ].isna().sum()
             ),
 
         "point_in_time_safe_all":
             bool(
-                out["point_in_time_safe"].all()
+                out[
+                    "point_in_time_safe"
+                ].all()
             ),
 
         "research_only":
@@ -491,20 +646,68 @@ def main() -> int:
             False,
     }])
 
+    # ========================================================
+    # Save summary
+    # ========================================================
+
     summary.to_csv(
         SUMMARY,
         index=False,
     )
 
+    # ========================================================
+    # Final console output
+    # ========================================================
+
     print()
     print("=" * 70)
     print("COT HISTORICAL COLLECTOR V1")
     print("=" * 70)
-    print(summary.to_string(index=False))
+
+    print(
+        summary.to_string(
+            index=False
+        )
+    )
+
     print("=" * 70)
+
+    print(
+        f"Output: {OUTPUT}"
+    )
+
+    print(
+        f"Summary: {SUMMARY}"
+    )
+
+    print(
+        "PIT validation: PASS"
+    )
+
+    print(
+        "Duplicate validation: PASS"
+    )
+
+    print(
+        "Target contract validation: PASS"
+    )
+
+    print(
+        "Research-only: TRUE"
+    )
+
+    print(
+        "Decision Engine ready: FALSE"
+    )
 
     return 0
 
 
+# ============================================================
+# Entry point
+# ============================================================
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(
+        main()
+    )
