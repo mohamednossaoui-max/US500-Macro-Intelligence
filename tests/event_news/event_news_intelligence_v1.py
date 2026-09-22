@@ -23,13 +23,13 @@ SEC_UNIVERSE = {
 }
 
 GDELT_QUERIES = {
-    "fed": '"Federal Reserve" OR FOMC OR Powell OR "interest rates"',
-    "inflation": 'inflation OR CPI OR PPI OR "consumer prices" OR "producer prices"',
-    "labor": '"nonfarm payrolls" OR employment OR unemployment OR "jobless claims"',
-    "growth": 'GDP OR recession OR "economic growth" OR PMI OR ISM',
-    "market": '"S&P 500" OR SP500 OR equities OR stocks OR volatility',
-    "geopolitical": 'war OR sanctions OR tariff OR tariffs OR conflict OR ceasefire',
-    "energy": 'oil OR "crude oil" OR OPEC OR gasoline OR energy',
+    "fed": '("Federal Reserve" OR FOMC OR "Fed Chair" OR Powell) (rates OR policy OR inflation OR meeting)',
+    "inflation": '(CPI OR "consumer price index" OR PPI OR "producer price index") (inflation OR prices OR Federal Reserve)',
+    "labor": '("nonfarm payrolls" OR "jobless claims" OR unemployment OR employment) (US OR U.S. OR "United States")',
+    "growth": '(GDP OR "economic growth" OR PMI OR ISM OR recession) ("United States" OR US OR U.S.)',
+    "market": '("S&P 500" OR SP500 OR "US stocks" OR equities) (market OR index OR trading OR earnings)',
+    "geopolitical": '(tariff OR tariffs OR sanctions OR "trade war" OR conflict OR ceasefire) (US OR U.S. OR America)',
+    "energy": '(oil OR crude OR OPEC OR gasoline OR energy) (US OR U.S. OR prices OR supply)',
 }
 
 TOPIC_TERMS = {
@@ -49,9 +49,17 @@ def http_json(url, headers=None):
     }
     if headers:
         h.update(headers)
-    req = Request(url, headers=h)
-    with urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode("utf-8"))
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            req = Request(url, headers=h)
+            with urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))
+    raise last_exc
 
 def gdelt_articles(topic, query):
     params = {
