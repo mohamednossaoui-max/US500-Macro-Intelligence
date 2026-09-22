@@ -1,0 +1,159 @@
+name: News Source Connectivity Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-news-sources:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Test GNews and TheNewsAPI
+        env:
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          THE_NEWS_API_TOKEN: ${{ secrets.THE_NEWS_API_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          def request_json(name, url, headers=None):
+              print(f"\n=== {name} ===")
+              print("URL:", url.split("?")[0])
+
+              try:
+                  req = urllib.request.Request(
+                      url,
+                      headers=headers or {
+                          "User-Agent": "US500-Macro-Intelligence/1.0 research-only"
+                      },
+                  )
+
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      status = response.status
+                      raw = response.read().decode("utf-8")
+
+                  print("HTTP_STATUS:", status)
+
+                  data = json.loads(raw)
+                  print("JSON_VALID: true")
+
+                  return data
+
+              except Exception as exc:
+                  print("STATUS: FAIL")
+                  print("ERROR:", repr(exc))
+                  return None
+
+          results = {}
+
+          # ---------------------------------------------------------
+          # GNEWS
+          # ---------------------------------------------------------
+
+          gnews_key = os.getenv("GNEWS_API_KEY")
+
+          if not gnews_key:
+              print("GNEWS_API_KEY is missing")
+              results["gnews"] = {"status": "MISSING_SECRET"}
+          else:
+              params = urllib.parse.urlencode({
+                  "q": '"Federal Reserve"',
+                  "lang": "en",
+                  "max": 3,
+                  "apikey": gnews_key,
+              })
+
+              data = request_json(
+                  "GNews",
+                  "https://gnews.io/api/v4/search?" + params
+              )
+
+              if data is not None:
+                  articles = data.get("articles", [])
+                  results["gnews"] = {
+                      "status": "PASS",
+                      "articles": len(articles),
+                      "has_articles": len(articles) > 0,
+                  }
+
+                  print("ARTICLES:", len(articles))
+
+                  if articles:
+                      article = articles[0]
+                      print("TITLE:", article.get("title"))
+                      print("PUBLISHED_AT:", article.get("publishedAt"))
+                      print("URL_VALID:", bool(article.get("url")))
+
+          # ---------------------------------------------------------
+          # THE NEWS API
+          # ---------------------------------------------------------
+
+          news_token = os.getenv("THE_NEWS_API_TOKEN")
+
+          if not news_token:
+              print("THE_NEWS_API_TOKEN is missing")
+              results["thenewsapi"] = {"status": "MISSING_SECRET"}
+          else:
+              params = urllib.parse.urlencode({
+                  "api_token": news_token,
+                  "search": "Federal Reserve",
+                  "language": "en",
+                  "limit": 3,
+              })
+
+              data = request_json(
+                  "TheNewsAPI",
+                  "https://api.thenewsapi.com/v1/news/all?" + params
+              )
+
+              if data is not None:
+                  articles = data.get("data", [])
+                  results["thenewsapi"] = {
+                      "status": "PASS",
+                      "articles": len(articles),
+                      "has_articles": len(articles) > 0,
+                  }
+
+                  print("ARTICLES:", len(articles))
+
+                  if articles:
+                      article = articles[0]
+                      print("TITLE:", article.get("title"))
+                      print(
+                          "PUBLISHED_AT:",
+                          article.get("published_at")
+                      )
+                      print("URL_VALID:", bool(article.get("url")))
+
+          # ---------------------------------------------------------
+          # FINAL RESULT
+          # ---------------------------------------------------------
+
+          print("\n=== FINAL RESULT ===")
+          print(json.dumps(results, indent=2))
+
+          passed = [
+              value
+              for value in results.values()
+              if value.get("status") == "PASS"
+              and value.get("has_articles") is True
+          ]
+
+          if not passed:
+              print("\nNO NEWS SOURCE PASSED CONNECTIVITY TEST")
+              sys.exit(1)
+
+          print("\nAT LEAST ONE NEWS SOURCE PASSED")
+          PY
