@@ -1,0 +1,53 @@
+name: Cross-Asset Intelligence v1
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/cross-asset-intelligence-v1.yml"
+      - "tests/cross_asset/cross_asset_intelligence_v1.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-asset-intelligence-v1
+  cancel-in-progress: false
+
+jobs:
+  cross-asset-intelligence:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance
+
+      - name: Compile
+        run: |
+          python -m py_compile tests/cross_asset/cross_asset_intelligence_v1.py
+
+      - name: Run Cross-Asset Intelligence v1
+        run: |
+          python tests/cross_asset/cross_asset_intelligence_v1.py \
+            --output cross_asset_intelligence_v1
+
+      - name: Show validation
+        run: |
+          cat cross_asset_intelligence_v1/cross_asset_validation_v1.json
+
+      - name: Upload Cross-Asset Intelligence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-asset-intelligence-v1
+          path: cross_asset_intelligence_v1/
+          if-no-files-found: error
