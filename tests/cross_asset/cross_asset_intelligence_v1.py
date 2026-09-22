@@ -1,382 +1,222 @@
-#!/usr/bin/env python3
-"""
-Cross-Asset Intelligence v1
-Research-only. No trading signals, forecasts, scores, or Decision Engine integration.
-
-Free/public-data implementation using yfinance for:
-^GSPC, DX-Y.NYB, ^IRX, ^TNX, GC=F, CL=F, BTC-USD
-
-Notes:
-- yfinance is used only for historical market observations.
-- Availability is conservatively represented as the observation date + 1 calendar day.
-- This is NOT PIT-perfect because vendor history can be revised.
-- Cross-asset diagnostics are descriptive, not predictive or causal.
-"""
-
-from __future__ import annotations
-import argparse
-import json
+import json, os, time, hashlib
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
-import numpy as np
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 import pandas as pd
-import yfinance as yf
 
-TICKERS = {
-    "US500": "^GSPC",
-    "DXY": "DX-Y.NYB",
-    "US2Y_PROXY": "^IRX",
-    "US10Y": "^TNX",
-    "GOLD": "GC=F",
-    "OIL": "CL=F",
-    "BITCOIN": "BTC-USD",
+API_URL = "https://gnews.io/api/v4/search"
+API_KEY = os.getenv("GNEWS_API_KEY", "").strip()
+LOOKBACK_DAYS = 30
+MAX_ARTICLES = 10
+RETRIES = 5
+RETRY_BASE_SECONDS = 2
+BETWEEN_QUERIES_SECONDS = 2
+AVAILABILITY_DELAY_HOURS = 12
+
+QUERIES = {
+    "fed": '"Federal Reserve" OR FOMC OR "Fed Chair" OR Powell',
+    "inflation": 'CPI OR "consumer price index" OR PPI OR "producer price index"',
+    "labor": '"nonfarm payrolls" OR "jobless claims" OR unemployment OR employment',
+    "growth": 'GDP OR "economic growth" OR PMI OR ISM OR recession',
+    "market": '"S&P 500" OR SP500 OR "US stocks" OR equities',
+    "geopolitical": 'tariff OR tariffs OR sanctions OR "trade war" OR conflict OR ceasefire',
+    "energy": 'oil OR crude OR OPEC OR gasoline OR energy',
 }
 
-START_DATE = "2019-01-01"
-ROLLING_WINDOW = 60
-MIN_VALID_ROLLING = 30
-HORIZONS = [1, 5, 20]
+TERMS = {
+    "fed": ["federal reserve","fomc","fed chair","powell","interest rate"],
+    "inflation": ["cpi","consumer price","ppi","producer price","inflation"],
+    "labor": ["nonfarm payroll","jobless claim","unemployment","employment","jobs"],
+    "growth": ["gdp","economic growth","pmi","ism","recession"],
+    "market": ["s&p 500","sp500","us stocks","equities","stock market"],
+    "geopolitical": ["tariff","sanction","trade war","conflict","ceasefire","geopolitical"],
+    "energy": ["oil","crude","opec","gasoline","energy","fuel"],
+}
 
+def now():
+    return datetime.now(timezone.utc)
 
-def normalize_index(idx):
-    d = pd.to_datetime(idx, errors="coerce", utc=True)
-    return d.tz_convert(None).normalize()
+def iso(dt):
+    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z")
 
+def parse_dt(x):
+    try:
+        return datetime.fromisoformat(str(x).replace("Z","+00:00")).astimezone(timezone.utc)
+    except Exception:
+        return None
 
-def download_prices():
-    frames = []
-    errors = []
-    for name, ticker in TICKERS.items():
+def get_json(params):
+    if not API_KEY:
+        return None, {"ok":False,"status":None,"error":"GNEWS_API_KEY is missing"}
+    q = dict(params); q["token"] = API_KEY
+    url = API_URL + "?" + urlencode(q)
+    last = ""
+    for attempt in range(RETRIES):
         try:
-            raw = yf.download(
-                ticker,
-                start=START_DATE,
-                auto_adjust=False,
-                progress=False,
-                actions=False,
-                group_by="column",
-            )
-            if raw.empty:
-                errors.append(f"{name}: empty download")
-                continue
+            req = Request(url, headers={
+                "Accept":"application/json",
+                "User-Agent":"US500-Macro-Intelligence/1.0 research-only"
+            })
+            with urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode("utf-8")), {
+                    "ok":True, "status":getattr(r,"status",200), "error":None
+                }
+        except HTTPError as e:
+            last = f"HTTP {e.code}: {e.reason}"
+            if e.code not in (429,500,502,503,504):
+                return None, {"ok":False,"status":e.code,"error":last}
+        except (URLError, TimeoutError, json.JSONDecodeError) as e:
+            last = str(e)
+        if attempt < RETRIES-1:
+            time.sleep(RETRY_BASE_SECONDS * (2 ** attempt))
+    return None, {"ok":False,"status":None,"error":last or "request failed"}
 
-            if isinstance(raw.columns, pd.MultiIndex):
-                if "Close" in raw.columns.get_level_values(0):
-                    s = raw["Close"]
-                    if isinstance(s, pd.DataFrame):
-                        s = s.iloc[:, 0]
-                else:
-                    errors.append(f"{name}: Close column missing")
-                    continue
-            else:
-                if "Close" not in raw.columns:
-                    errors.append(f"{name}: Close column missing")
-                    continue
-                s = raw["Close"]
+def relevant(topic, article):
+    blob = " ".join(str(article.get(k) or "") for k in
+                    ("title","description","content")).lower()
+    return any(t in blob for t in TERMS[topic])
 
-            s = pd.to_numeric(s, errors="coerce")
-            # Treat infinities from vendor data as missing observations.
-            s = s.replace([np.inf, -np.inf], np.nan)
-            s.index = normalize_index(s.index)
-            s = s[~s.index.duplicated(keep="last")].sort_index()
-            s.name = name
-            frames.append(s)
-        except Exception as exc:
-            errors.append(f"{name}: {type(exc).__name__}: {exc}")
+def make_id(topic, article):
+    raw = "|".join([
+        topic, str(article.get("url") or ""),
+        str(article.get("publishedAt") or ""),
+        str(article.get("title") or "")
+    ])
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
-    if not frames:
-        raise RuntimeError("No cross-asset series were downloaded: " + "; ".join(errors))
+def fetch(topic, query, start, end):
+    data, status = get_json({
+        "q":query, "lang":"en", "country":"us", "max":MAX_ARTICLES,
+        "from":iso(start), "to":iso(end), "sortby":"publishedAt"
+    })
+    if not status["ok"]:
+        return [], status
 
-    prices = pd.concat(frames, axis=1, sort=False).sort_index()
-    prices.index.name = "asof_date"
-    return prices, errors
-
-
-def add_returns(prices):
-    out = prices.copy()
-    for h in HORIZONS:
-        for col in prices.columns:
-            out[f"{col}_RET_{h}D_PCT"] = prices[col].pct_change(h) * 100.0
-    return out
-
-
-def add_availability(out):
-    out = out.copy()
-    out["availability_date"] = out.index + pd.Timedelta(days=1)
-    out["point_in_time_reconstructed"] = True
-    out["pit_perfect"] = False
-    return out
-
-
-def rolling_correlations(df):
-    ret_cols = {c: f"{c}_RET_1D_PCT" for c in TICKERS if f"{c}_RET_1D_PCT" in df}
+    articles = data.get("articles", []) if isinstance(data,dict) else []
     rows = []
-    us = ret_cols.get("US500")
-    if not us:
-        return pd.DataFrame(columns=[
-            "asof_date", "asset", "window_days", "rolling_corr_with_us500"
-        ])
+    for a in articles:
+        published = parse_dt(a.get("publishedAt"))
+        url = str(a.get("url") or "").strip()
+        if not published or not url.startswith(("http://","https://")):
+            continue
 
-    for asset, col in ret_cols.items():
-        if asset == "US500":
-            continue
-        corr = df[us].rolling(ROLLING_WINDOW, min_periods=MIN_VALID_ROLLING).corr(df[col])
-        tmp = pd.DataFrame({
-            "asof_date": df.index,
-            "asset": asset,
-            "window_days": ROLLING_WINDOW,
-            "rolling_corr_with_us500": corr.values,
-        })
-        rows.append(tmp)
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-
-
-def divergence_diagnostics(df):
-    # Descriptive divergence: US500 20D return and asset 20D return have opposite signs.
-    rows = []
-    for asset in TICKERS:
-        if asset == "US500":
-            continue
-        a = f"{asset}_RET_20D_PCT"
-        u = "US500_RET_20D_PCT"
-        if a not in df or u not in df:
-            continue
-        x = df[[u, a]].dropna()
-        if x.empty:
-            continue
-        opposite = (np.sign(x[u]) * np.sign(x[a]) < 0)
+        available = published + timedelta(hours=AVAILABILITY_DELAY_HOURS)
         rows.append({
-            "asset": asset,
-            "observations": int(len(x)),
-            "opposite_sign_20d_count": int(opposite.sum()),
-            "opposite_sign_20d_pct": float(opposite.mean() * 100),
+            "event_id":make_id(topic,a),
+            "published_at":iso(published),
+            "available_at":iso(available),
+            "availability_date":available.date().isoformat(),
+            "source":"GNEWS",
+            "topic":topic,
+            "language":"en",
+            "country":"US",
+            "title":str(a.get("title") or "").strip(),
+            "description":str(a.get("description") or "").strip(),
+            "url":url,
+            "source_name":str((a.get("source") or {}).get("name") or "").strip(),
+            "query":query,
+            "topic_relevant":relevant(topic,a),
+            "pit_safe":available <= now(),
+            "research_only":True,
+            "decision_engine_ready":False,
+            "trading_signal":False,
+            "forecast":False,
         })
-    return pd.DataFrame(rows)
+    status["articles"] = len(articles)
+    return rows, status
 
+def validate(df, statuses):
+    checks, warnings = [], []
 
-def pairwise_correlations(df):
-    cols = [f"{a}_RET_1D_PCT" for a in TICKERS if f"{a}_RET_1D_PCT" in df]
-    if len(cols) < 2:
-        return pd.DataFrame()
-    c = df[cols].corr()
-    c.index = [x.replace("_RET_1D_PCT", "") for x in c.index]
-    c.columns = [x.replace("_RET_1D_PCT", "") for x in c.columns]
-    return c
-
-
-def validate(prices, research, rolling, divergence, errors):
-    checks = []
-    def check(name, ok, detail=""):
-        checks.append({"check": name, "pass": bool(ok), "detail": detail})
-
-    check("us500_available", "US500" in prices.columns)
-    check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
-    check("unique_dates", not prices.index.duplicated().any())
-    check("sorted_dates", prices.index.is_monotonic_increasing)
-    # Validate observed values only. Missing values are expected on non-trading
-    # dates because the common calendar includes weekends/crypto dates.
-    # Infinities from the vendor are normalized to NaN during download, so they
-    # are treated as missing observations rather than invalid observed prices.
-    positive_price_cols = [
-        c for c in ["US500", "DXY", "GOLD", "BITCOIN"]
-        if c in prices.columns
-    ]
-    yield_cols = [c for c in ["US2Y_PROXY", "US10Y"] if c in prices.columns]
-
-    market_bad_by_col = {}
-    market_all_valid = True
-    market_observed = 0
-    for col in positive_price_cols:
-        raw = pd.to_numeric(prices[col], errors="coerce")
-        observed = raw.dropna().to_numpy(dtype=float)
-        nonfinite = int((~np.isfinite(observed)).sum()) if len(observed) else 0
-        nonpositive = int((observed <= 0).sum()) if len(observed) else 0
-        market_observed += len(observed)
-        market_bad_by_col[col] = {
-            "observed": int(len(observed)),
-            "nonfinite": nonfinite,
-            "nonpositive": nonpositive,
-        }
-        market_all_valid = market_all_valid and len(observed) > 0 and nonfinite == 0 and nonpositive == 0
-
-    oil_observed = (
-        pd.to_numeric(prices["OIL"], errors="coerce").dropna().to_numpy(dtype=float)
-        if "OIL" in prices.columns else np.array([], dtype=float)
-    )
-    oil_nonfinite = int((~np.isfinite(oil_observed)).sum()) if len(oil_observed) else 0
-    oil_finite = len(oil_observed) > 0 and oil_nonfinite == 0
-
-    yield_bad_by_col = {}
-    yield_all_finite = True
-    yield_observed = 0
-    for col in yield_cols:
-        raw = pd.to_numeric(prices[col], errors="coerce")
-        observed = raw.dropna().to_numpy(dtype=float)
-        nonfinite = int((~np.isfinite(observed)).sum()) if len(observed) else 0
-        yield_observed += len(observed)
-        yield_bad_by_col[col] = {
-            "observed": int(len(observed)),
-            "nonfinite": nonfinite,
-        }
-        yield_all_finite = yield_all_finite and len(observed) > 0 and nonfinite == 0
-
-    check(
-        "positive_market_prices",
-        market_all_valid,
-        json.dumps({
-            "observed_values": market_observed,
-            "by_column": market_bad_by_col,
-            "missing_values_allowed": True,
-        }, sort_keys=True)
-    )
-    check(
-        "oil_series_finite",
-        oil_finite,
-        json.dumps({
-            "observed_values": int(len(oil_observed)),
-            "nonfinite": oil_nonfinite,
-            "negative_values_allowed": True,
-            "missing_values_allowed": True,
-        }, sort_keys=True)
-    )
-    check(
-        "yield_series_finite",
-        yield_all_finite,
-        json.dumps({
-            "observed_values": yield_observed,
-            "by_column": yield_bad_by_col,
-            "negative_values_allowed": True,
-            "missing_values_allowed": True,
-        }, sort_keys=True)
-    )
-    check("returns_present", any(c.endswith("_RET_20D_PCT") for c in research.columns))
-    check("rolling_output", len(rolling) > 0)
-    check("divergence_output", len(divergence) > 0)
-    check("research_only", bool(research["research_only"].eq(True).all()))
-    check("decision_engine_ready_false", bool(research["decision_engine_ready"].eq(False).all()))
-    check("trading_signal_false", bool(research["trading_signal"].eq(False).all()))
-    check("forecast_false", bool(research["forecast"].eq(False).all()))
-    check("pit_perfect_false", bool(research["pit_perfect"].eq(False).all()))
-
-    # Measure traditional-market coverage against the US500 observation
-    # calendar, not the union calendar (which includes weekends/crypto dates).
-    if "US500" in prices.columns:
-        reference_dates = prices.index[prices["US500"].notna()]
+    if df.empty:
+        checks.append({"check":"non_empty_events","pass":False,
+                       "detail":"No GNews events collected."})
     else:
-        reference_dates = prices.index
+        checks += [
+            {"check":"unique_event_ids","pass":bool(df.event_id.is_unique),
+             "detail":f"rows={len(df)} unique={df.event_id.nunique()}"},
+            {"check":"published_timestamps_parse",
+             "pass":pd.to_datetime(df.published_at,utc=True,errors="coerce").notna().all(),
+             "detail":""},
+            {"check":"urls_valid",
+             "pass":df.url.astype(str).str.match(r"^https?://",na=False).all(),
+             "detail":""},
+        ]
+        pub = pd.to_datetime(df.published_at,utc=True,errors="coerce")
+        av = pd.to_datetime(df.available_at,utc=True,errors="coerce")
+        pit = av.notna().all() and (av >= pub + pd.Timedelta(hours=12)).all() and df.pit_safe.all()
+        checks.append({"check":"point_in_time_safe","pass":bool(pit),
+                       "detail":"published_at + 12h conservative availability"})
+        checks.append({"check":"research_only_guards",
+                       "pass":bool(df.research_only.all() and
+                                   (~df.decision_engine_ready).all() and
+                                   (~df.trading_signal).all() and
+                                   (~df.forecast).all()),
+                       "detail":"research_only=true; no signal/forecast/Decision Engine"})
 
-    coverage = {}
-    for col in prices.columns:
-        if col == "BITCOIN":
-            denom = int(prices[col].notna().sum())
-            coverage[col] = 100.0 if denom else 0.0
-        else:
-            denom = max(len(reference_dates), 1)
-            coverage[col] = round(
-                float(prices.loc[reference_dates, col].notna().sum() / denom * 100),
-                3
-            )
+    counts = df.topic.value_counts().to_dict() if not df.empty else {}
+    successful = sum(bool(v.get("ok")) for v in statuses.values())
+    checks.append({"check":"gnews_topics_covered","pass":successful >= 5,
+                   "detail":json.dumps(counts,sort_keys=True)})
+    rel = float(df.topic_relevant.mean()*100) if not df.empty else 0.0
+    checks.append({"check":"gnews_topic_relevance","pass":rel >= 50,
+                   "detail":f"relevant_pct={rel:.2f}"})
+    checks.append({"check":"query_execution_visible",
+                   "pass":len(statuses)==len(QUERIES) and all("ok" in x for x in statuses.values()),
+                   "detail":json.dumps(statuses,sort_keys=True)})
 
-    check("coverage_nonzero", all(v > 0 for v in coverage.values()), str(coverage))
-
-    status = "PASS" if all(x["pass"] for x in checks) else "FAIL"
-    warnings = [f"download: {e}" for e in errors]
-    if any(v < 80 for v in coverage.values()):
-        warnings.append("At least one series has <80% coverage versus the US500 observation calendar.")
-
+    warnings += [
+        "GNews free-tier news history is limited; this is not a complete historical archive.",
+        "Availability is conservatively delayed by 12 hours to avoid look-ahead.",
+        "Topic labels are query-derived research categories, not trading signals."
+    ]
+    failed = [x for x in checks if not x["pass"]]
     return {
-        "validator": "Cross-Asset Intelligence v1",
-        "status": status,
-        "validation_pass": status == "PASS",
-        "errors": [x for x in checks if not x["pass"]],
-        "warnings": warnings,
-        "rows": int(len(prices)),
-        "date_start": str(prices.index.min().date()) if len(prices) else None,
-        "date_end": str(prices.index.max().date()) if len(prices) else None,
-        "coverage_pct": coverage,
-        "rolling_window_days": ROLLING_WINDOW,
-        "research_only": True,
-        "decision_engine_ready": False,
-        "trading_signal": False,
-        "forecast": False,
-        "pit_perfect": False,
-        "point_in_time_reconstructed": True,
-        "interpretation": (
-            "PASS is structural/data-quality validation only. "
-            "Correlations and divergences are descriptive and do not establish causality, "
-            "predictiveness, trading usefulness, or preference for any asset."
-        ),
-        "checks": checks,
-        "tickers": TICKERS,
+        "status":"FAIL" if failed else "PASS",
+        "errors":failed,
+        "checks":checks,
+        "warnings":warnings,
+        "rows":int(len(df)),
+        "date_start":None if df.empty else str(df.published_at.min()),
+        "date_end":None if df.empty else str(df.published_at.max()),
+        "source_counts":{} if df.empty else df.source.value_counts().to_dict(),
+        "topic_counts":counts,
+        "query_status":statuses,
+        "research_only":True,
+        "decision_engine_ready":False,
+        "trading_signal":False,
+        "forecast":False,
+        "pit_perfect":False,
+        "point_in_time_reconstructed":False,
+        "availability_method":"published_at_plus_12h",
     }
 
-
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--output", default="cross_asset_intelligence_v1")
-    args = ap.parse_args()
-    out = Path(args.output)
-    out.mkdir(parents=True, exist_ok=True)
+    end = now()
+    start = end - timedelta(days=LOOKBACK_DAYS)
+    rows, statuses = [], {}
 
-    prices, download_errors = download_prices()
-    research = add_returns(prices)
-    research = add_availability(research)
+    for i,(topic,query) in enumerate(QUERIES.items()):
+        if i: time.sleep(BETWEEN_QUERIES_SECONDS)
+        r,s = fetch(topic,query,start,end)
+        rows.extend(r); statuses[topic] = s
 
-    # Explicit research-only metadata on every row.
-    research["research_only"] = True
-    research["decision_engine_ready"] = False
-    research["trading_signal"] = False
-    research["forecast"] = False
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.drop_duplicates("event_id").sort_values(
+            ["published_at","topic"],ascending=[False,True]
+        ).reset_index(drop=True)
 
-    research = research.reset_index()
-    research["record_id"] = (
-        "CROSS_ASSET_" + research["asof_date"].dt.strftime("%Y%m%d")
+    validation = validate(df,statuses)
+    df.to_csv("event_news_events_v1.csv",index=False)
+    Path("event_news_validation_v1.json").write_text(
+        json.dumps(validation,indent=2,ensure_ascii=False),encoding="utf-8"
     )
-
-    rolling = rolling_correlations(research.set_index("asof_date"))
-    divergence = divergence_diagnostics(research.set_index("asof_date"))
-    corr = pairwise_correlations(research.set_index("asof_date"))
-
-    summary_rows = []
-    for asset in TICKERS:
-        if asset == "US500":
-            continue
-        for h in HORIZONS:
-            c = f"{asset}_RET_{h}D_PCT"
-            u = f"US500_RET_{h}D_PCT"
-            if c not in research or u not in research:
-                continue
-            x = research[[c, u]].dropna()
-            summary_rows.append({
-                "asset": asset,
-                "horizon": f"{h}D",
-                "observations": int(len(x)),
-                "mean_asset_return_pct": float(x[c].mean()) if len(x) else np.nan,
-                "mean_us500_return_pct": float(x[u].mean()) if len(x) else np.nan,
-                "pearson_corr_with_us500": float(x[c].corr(x[u])) if len(x) >= 2 else np.nan,
-            })
-    summary = pd.DataFrame(summary_rows)
-
-    validation = validate(
-        prices,
-        research,
-        rolling,
-        divergence,
-        download_errors,
-    )
-
-    research.to_csv(out / "cross_asset_research_v1.csv", index=False)
-    summary.to_csv(out / "cross_asset_summary_v1.csv", index=False)
-    rolling.to_csv(out / "cross_asset_rolling_correlation_v1.csv", index=False)
-    divergence.to_csv(out / "cross_asset_divergence_v1.csv", index=False)
-    corr.to_csv(out / "cross_asset_correlation_matrix_v1.csv")
-    with open(out / "cross_asset_validation_v1.json", "w", encoding="utf-8") as f:
-        json.dump(validation, f, indent=2)
-
-    print(json.dumps(validation, indent=2))
-    if not validation["validation_pass"]:
+    print(json.dumps(validation,indent=2,ensure_ascii=False))
+    if validation["status"] == "FAIL":
         raise SystemExit(1)
-
 
 if __name__ == "__main__":
     main()
