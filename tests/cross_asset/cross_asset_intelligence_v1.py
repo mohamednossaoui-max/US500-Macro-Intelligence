@@ -75,6 +75,8 @@ def download_prices():
                 s = raw["Close"]
 
             s = pd.to_numeric(s, errors="coerce")
+            # Treat infinities from vendor data as missing observations.
+            s = s.replace([np.inf, -np.inf], np.nan)
             s.index = normalize_index(s.index)
             s = s[~s.index.duplicated(keep="last")].sort_index()
             s.name = name
@@ -171,25 +173,32 @@ def validate(prices, research, rolling, divergence, errors):
     check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
     check("unique_dates", not prices.index.duplicated().any())
     check("sorted_dates", prices.index.is_monotonic_increasing)
-    # Market prices must be finite and strictly positive. Yield series
-    # (^IRX / ^TNX) are rates and are allowed to be zero/negative, so they
-    # are validated separately as finite numeric observations.
-    market_price_cols = [
-        c for c in ["US500", "DXY", "GOLD", "OIL", "BITCOIN"]
+    # Validate each economic series according to its type.
+    # Oil is intentionally allowed to be <= 0 because CL=F contains the
+    # documented negative settlement period in April 2020.
+    positive_price_cols = [
+        c for c in ["US500", "DXY", "GOLD", "BITCOIN"]
         if c in prices.columns
     ]
+    oil_values = prices["OIL"].dropna() if "OIL" in prices.columns else pd.Series(dtype=float)
     yield_cols = [c for c in ["US2Y_PROXY", "US10Y"] if c in prices.columns]
 
-    market_values = prices[market_price_cols].stack()
+    positive_values = prices[positive_price_cols].stack()
+    positive_finite = bool(np.isfinite(positive_values.to_numpy()).all()) if len(positive_values) else False
+    positive_prices = bool((positive_values > 0).all()) if len(positive_values) else False
+    oil_finite = bool(np.isfinite(oil_values.to_numpy()).all()) if len(oil_values) else False
     yield_values = prices[yield_cols].stack()
-
-    market_positive = bool((market_values > 0).all()) if len(market_values) else False
     yield_finite = bool(np.isfinite(yield_values.to_numpy()).all()) if len(yield_values) else False
 
     check(
-        "market_prices_positive",
-        market_positive,
-        f"non_null_values={len(market_values)}"
+        "positive_market_prices",
+        positive_finite and positive_prices,
+        f"non_null_values={len(positive_values)}"
+    )
+    check(
+        "oil_series_finite",
+        oil_finite,
+        f"non_null_values={len(oil_values)}"
     )
     check(
         "yield_series_finite",
