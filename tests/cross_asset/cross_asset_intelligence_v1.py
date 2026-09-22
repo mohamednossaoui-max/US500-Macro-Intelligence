@@ -171,7 +171,7 @@ def validate(prices, research, rolling, divergence, errors):
     check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
     check("unique_dates", not prices.index.duplicated().any())
     check("sorted_dates", prices.index.is_monotonic_increasing)
-    positive_values = prices.stack(dropna=True)
+    positive_values = prices.stack()
     check(
         "positive_prices",
         bool((positive_values > 0).all()) if len(positive_values) else False,
