@@ -256,7 +256,10 @@ def numeric_available(df, candidates, min_valid=30):
 
         if numeric.notna().sum() >= min_valid:
             df[actual] = numeric
-            available.append(actual)
+            # One physical column must be returned only once, even when
+            # multiple candidate aliases resolve to the same column.
+            if actual not in available:
+                available.append(actual)
 
     return available
 
@@ -366,8 +369,13 @@ def main():
     available_breadth = numeric_available(merged, BREADTH_FEATURES)
     available_base = numeric_available(merged, BASE_CANDIDATES)
 
-    # Remove duplicate semantic columns if suffixing occurred.
-    available_base = [c for c in available_base if c not in available_breadth]
+    # Remove duplicate semantic columns if suffixing occurred and enforce
+    # uniqueness after alias resolution.
+    available_breadth = list(dict.fromkeys(available_breadth))
+    available_base = [
+        c for c in dict.fromkeys(available_base)
+        if c not in available_breadth
+    ]
 
     if len(available_breadth) < 3:
         raise ValueError(
@@ -454,6 +462,7 @@ def main():
         "breadth_features_used": available_breadth,
         "base_features_available": available_base,
         "base_feature_count": len(available_base),
+        "base_features_unique": len(set(available_base)),
         "common_sample_rows_all_coverage": len(sample_defs["ALL_COVERAGE"]),
         "common_sample_rows_ge90": len(sample_defs["BREADTH_COVERAGE_GE_90"]),
         "forward_return_outcomes": list(OUTCOME_HORIZONS),
@@ -514,7 +523,7 @@ def main():
     print(f"Common sample: {len(merged):,}")
     print(f"Date range: {merged['study_date'].min().date()} -> {merged['study_date'].max().date()}")
     print(f"Breadth features: {len(available_breadth)}")
-    print(f"Base features available: {len(available_base)}")
+    print(f"Base features available (unique): {len(available_base)}")
     print(f"Coverage >=90% sample: {len(sample_defs['BREADTH_COVERAGE_GE_90']):,}")
     print(f"Errors: {len(errors)}")
     print(f"Warnings: {len(warnings)}")
