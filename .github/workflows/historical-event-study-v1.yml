@@ -1,58 +1,504 @@
 name: Historical Event Study v1
+
 on:
   workflow_dispatch:
+
+  push:
+    paths:
+      - ".github/workflows/historical-event-study-v1.yml"
+      - "tests/historical_event_study/**"
+
 permissions:
   contents: read
   actions: read
+
+concurrency:
+  group: historical-event-study-v1
+  cancel-in-progress: false
+
 jobs:
+
   historical-event-study:
+
+    name: US500 Historical Event Study v1
+
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
-      - name: Install dependencies
-        run: pip install pandas numpy yfinance
-      - name: Verify script
-        run: python -m py_compile tests/historical_event_study/historical_event_study_v1.py
-      - name: Download latest Research Context
-        env: {GH_TOKEN: ${{ github.token }}}
-        run: |
-          set -e; mkdir -p input/research_context
-          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
-          test -n "$ID"; test "$ID" != null
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/context.zip
-          unzip -o /tmp/context.zip -d input/research_context
-      - name: Download latest Liquidity
-        env: {GH_TOKEN: ${{ github.token }}}
-        run: |
-          set -e; mkdir -p input/liquidity
-          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
-          test -n "$ID"; test "$ID" != null
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/liquidity.zip
-          unzip -o /tmp/liquidity.zip -d input/liquidity
-      - name: Download latest Market Breadth
-        env: {GH_TOKEN: ${{ github.token }}}
-        run: |
-          set -e; mkdir -p input/breadth
-          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
-          test -n "$ID"; test "$ID" != null
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/breadth.zip
-          unzip -o /tmp/breadth.zip -d input/breadth
-      - name: Locate inputs
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
+
+      - name: Install Python dependencies
         run: |
           set -e
-          C=$(find input/research_context -type f -name research_context_v1.csv | head -1)
-          L=$(find input/liquidity -type f -name liquidity_intelligence_research_v1.csv | head -1)
-          B=$(find input/breadth -type f -name market_breadth_analysis_v1.csv | head -1)
-          test -n "$C"; test -n "$L"; test -n "$B"
-          echo "C=$C" >> $GITHUB_ENV; echo "L=$L" >> $GITHUB_ENV; echo "B=$B" >> $GITHUB_ENV
-      - name: Run Historical Event Study
-        run: python tests/historical_event_study/historical_event_study_v1.py --research-context "$C" --liquidity "$L" --breadth "$B" --output historical_event_study_v1
-      - name: Display validation
+
+          python -m pip install --upgrade pip
+
+          pip install \
+            pandas \
+            numpy \
+            yfinance
+
+
+      # ============================================================
+      # 4. VERIFY EVENT STUDY SCRIPT
+      # ============================================================
+
+      - name: Verify Historical Event Study script
+        run: |
+          set -e
+
+          test -f \
+            tests/historical_event_study/historical_event_study_v1.py
+
+          python -m py_compile \
+            tests/historical_event_study/historical_event_study_v1.py
+
+          echo "Historical Event Study script:"
+          echo "OK"
+
+
+      # ============================================================
+      # 5. PREPARE INPUT DIRECTORIES
+      # ============================================================
+
+      - name: Prepare input directories
+        run: |
+          set -e
+
+          rm -rf input
+          rm -rf historical_event_study_v1
+
+          mkdir -p input/research_context
+          mkdir -p input/liquidity
+          mkdir -p input/breadth
+
+          echo "Input directories prepared."
+
+
+      # ============================================================
+      # 6. DOWNLOAD LATEST RESEARCH CONTEXT ARTIFACT
+      # ============================================================
+
+      - name: Download latest Research Context artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "Searching for latest Research Context artifact..."
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: research-context-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Research Context artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/research_context.zip
+
+          unzip -o \
+            /tmp/research_context.zip \
+            -d input/research_context
+
+          echo "Research Context artifact downloaded."
+
+          find input/research_context \
+            -maxdepth 4 \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 7. DOWNLOAD LATEST LIQUIDITY ARTIFACT
+      # ============================================================
+
+      - name: Download latest Liquidity Intelligence artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "Searching for latest Liquidity Intelligence artifact..."
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: liquidity-intelligence-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Liquidity artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/liquidity.zip
+
+          unzip -o \
+            /tmp/liquidity.zip \
+            -d input/liquidity
+
+          echo "Liquidity artifact downloaded."
+
+          find input/liquidity \
+            -maxdepth 4 \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 8. DOWNLOAD LATEST MARKET BREADTH ARTIFACT
+      # ============================================================
+
+      - name: Download latest Market Breadth artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "Searching for latest Market Breadth artifact..."
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: market-breadth-full-validation-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Market Breadth artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/breadth.zip
+
+          unzip -o \
+            /tmp/breadth.zip \
+            -d input/breadth
+
+          echo "Market Breadth artifact downloaded."
+
+          find input/breadth \
+            -maxdepth 4 \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 9. LOCATE INPUT FILES
+      # ============================================================
+
+      - name: Locate research input CSV files
+        shell: bash
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "LOCATING INPUT FILES"
+          echo "=============================================="
+
+
+          # --------------------------------------------------------
+          # Research Context
+          # --------------------------------------------------------
+
+          RESEARCH_CONTEXT_FILE=""
+
+          for f in \
+            $(find input/research_context \
+              -type f \
+              -name "*.csv" \
+              -print)
+          do
+            if grep -q "study_date" "$f" 2>/dev/null && \
+               grep -q "macro_" "$f" 2>/dev/null && \
+               grep -q "technical_" "$f" 2>/dev/null; then
+
+              RESEARCH_CONTEXT_FILE="$f"
+              break
+            fi
+          done
+
+
+          # --------------------------------------------------------
+          # Liquidity
+          # --------------------------------------------------------
+
+          LIQUIDITY_FILE=""
+
+          for f in \
+            $(find input/liquidity \
+              -type f \
+              -name "*.csv" \
+              -print)
+          do
+            if grep -q "NET_LIQUIDITY_PROXY_MILLIONS" "$f" 2>/dev/null; then
+
+              LIQUIDITY_FILE="$f"
+              break
+            fi
+          done
+
+
+          # --------------------------------------------------------
+          # Market Breadth
+          # --------------------------------------------------------
+
+          BREADTH_FILE=""
+
+          for f in \
+            $(find input/breadth \
+              -type f \
+              -name "*.csv" \
+              -print)
+          do
+            if grep -q "breadth_research_state" "$f" 2>/dev/null; then
+
+              BREADTH_FILE="$f"
+              break
+            fi
+          done
+
+
+          # --------------------------------------------------------
+          # Validation
+          # --------------------------------------------------------
+
+          echo ""
+          echo "Research Context:"
+          echo "$RESEARCH_CONTEXT_FILE"
+
+          echo ""
+          echo "Liquidity:"
+          echo "$LIQUIDITY_FILE"
+
+          echo ""
+          echo "Market Breadth:"
+          echo "$BREADTH_FILE"
+
+
+          if [ -z "$RESEARCH_CONTEXT_FILE" ]; then
+            echo ""
+            echo "ERROR: Research Context CSV not found."
+            exit 1
+          fi
+
+
+          if [ -z "$LIQUIDITY_FILE" ]; then
+            echo ""
+            echo "ERROR: Liquidity CSV not found."
+            exit 1
+          fi
+
+
+          if [ -z "$BREADTH_FILE" ]; then
+            echo ""
+            echo "ERROR: Market Breadth CSV not found."
+            exit 1
+          fi
+
+
+          echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE" \
+            >> "$GITHUB_ENV"
+
+          echo "LIQUIDITY_FILE=$LIQUIDITY_FILE" \
+            >> "$GITHUB_ENV"
+
+          echo "BREADTH_FILE=$BREADTH_FILE" \
+            >> "$GITHUB_ENV"
+
+
+          echo ""
+          echo "All required input files located successfully."
+
+
+      # ============================================================
+      # 10. INPUT PREVIEW
+      # ============================================================
+
+      - name: Validate input files
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "INPUT VALIDATION"
+          echo "=============================================="
+
+
+          echo ""
+          echo "Research Context:"
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          p = os.environ["RESEARCH_CONTEXT_FILE"]
+          df = pd.read_csv(p, low_memory=False)
+
+          print("File:", p)
+          print("Rows:", len(df))
+          print("Columns:", len(df.columns))
+          print("First columns:", list(df.columns[:20]))
+          PY
+
+
+          echo ""
+          echo "Liquidity:"
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          p = os.environ["LIQUIDITY_FILE"]
+          df = pd.read_csv(p, low_memory=False)
+
+          print("File:", p)
+          print("Rows:", len(df))
+          print("Columns:", len(df.columns))
+          print("First columns:", list(df.columns[:20]))
+          PY
+
+
+          echo ""
+          echo "Market Breadth:"
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          p = os.environ["BREADTH_FILE"]
+          df = pd.read_csv(p, low_memory=False)
+
+          print("File:", p)
+          print("Rows:", len(df))
+          print("Columns:", len(df.columns))
+          print("First columns:", list(df.columns[:20]))
+          PY
+
+
+      # ============================================================
+      # 11. RUN HISTORICAL EVENT STUDY
+      # ============================================================
+
+      - name: Run Historical Event Study v1
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "RUNNING HISTORICAL EVENT STUDY v1"
+          echo "=============================================="
+
+          python \
+            tests/historical_event_study/historical_event_study_v1.py \
+            --research-context "$RESEARCH_CONTEXT_FILE" \
+            --liquidity "$LIQUIDITY_FILE" \
+            --breadth "$BREADTH_FILE" \
+            --output historical_event_study_v1
+
+
+      # ============================================================
+      # 12. DISPLAY RESULTS
+      # ============================================================
+
+      - name: Display Historical Event Study results
         if: always()
-        run: cat historical_event_study_v1/historical_event_study_validation_v1.json || true
-      - name: Upload artifact
+        run: |
+          echo "=============================================="
+          echo "HISTORICAL EVENT STUDY RESULTS"
+          echo "=============================================="
+
+
+          if [ -f \
+            "historical_event_study_v1/historical_event_study_validation_v1.json"
+          ]; then
+
+            cat \
+              historical_event_study_v1/historical_event_study_validation_v1.json
+
+          else
+
+            echo "Validation report was not generated."
+
+          fi
+
+
+          echo ""
+          echo "=============================================="
+          echo "OUTPUT FILES"
+          echo "=============================================="
+
+          if [ -d "historical_event_study_v1" ]; then
+
+            find historical_event_study_v1 \
+              -maxdepth 2 \
+              -type f \
+              -print
+
+          else
+
+            echo "Output directory does not exist."
+
+          fi
+
+
+      # ============================================================
+      # 13. UPLOAD RESULTS
+      # ============================================================
+
+      - name: Upload Historical Event Study artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
