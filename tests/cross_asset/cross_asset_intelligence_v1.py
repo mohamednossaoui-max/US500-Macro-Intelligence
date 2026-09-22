@@ -171,11 +171,30 @@ def validate(prices, research, rolling, divergence, errors):
     check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
     check("unique_dates", not prices.index.duplicated().any())
     check("sorted_dates", prices.index.is_monotonic_increasing)
-    positive_values = prices.stack()
+    # Market prices must be finite and strictly positive. Yield series
+    # (^IRX / ^TNX) are rates and are allowed to be zero/negative, so they
+    # are validated separately as finite numeric observations.
+    market_price_cols = [
+        c for c in ["US500", "DXY", "GOLD", "OIL", "BITCOIN"]
+        if c in prices.columns
+    ]
+    yield_cols = [c for c in ["US2Y_PROXY", "US10Y"] if c in prices.columns]
+
+    market_values = prices[market_price_cols].stack()
+    yield_values = prices[yield_cols].stack()
+
+    market_positive = bool((market_values > 0).all()) if len(market_values) else False
+    yield_finite = bool(np.isfinite(yield_values.to_numpy()).all()) if len(yield_values) else False
+
     check(
-        "positive_prices",
-        bool((positive_values > 0).all()) if len(positive_values) else False,
-        f"non_null_values={len(positive_values)}"
+        "market_prices_positive",
+        market_positive,
+        f"non_null_values={len(market_values)}"
+    )
+    check(
+        "yield_series_finite",
+        yield_finite,
+        f"non_null_values={len(yield_values)}"
     )
     check("returns_present", any(c.endswith("_RET_20D_PCT") for c in research.columns))
     check("rolling_output", len(rolling) > 0)
