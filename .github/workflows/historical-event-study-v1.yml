@@ -74,6 +74,7 @@ jobs:
           python -m py_compile \
             tests/historical_event_study/historical_event_study_v1.py
 
+          echo ""
           echo "Historical Event Study script:"
           echo "OK"
 
@@ -107,7 +108,9 @@ jobs:
         run: |
           set -e
 
-          echo "Searching for latest Research Context artifact..."
+          echo "=============================================="
+          echo "RESEARCH CONTEXT ARTIFACT"
+          echo "=============================================="
 
           ARTIFACT_ID=$(
             gh api \
@@ -136,10 +139,11 @@ jobs:
             /tmp/research_context.zip \
             -d input/research_context
 
+          echo ""
           echo "Research Context artifact downloaded."
 
           find input/research_context \
-            -maxdepth 4 \
+            -maxdepth 5 \
             -type f \
             -print
 
@@ -155,7 +159,9 @@ jobs:
         run: |
           set -e
 
-          echo "Searching for latest Liquidity Intelligence artifact..."
+          echo "=============================================="
+          echo "LIQUIDITY ARTIFACT"
+          echo "=============================================="
 
           ARTIFACT_ID=$(
             gh api \
@@ -184,10 +190,11 @@ jobs:
             /tmp/liquidity.zip \
             -d input/liquidity
 
+          echo ""
           echo "Liquidity artifact downloaded."
 
           find input/liquidity \
-            -maxdepth 4 \
+            -maxdepth 5 \
             -type f \
             -print
 
@@ -203,7 +210,9 @@ jobs:
         run: |
           set -e
 
-          echo "Searching for latest Market Breadth artifact..."
+          echo "=============================================="
+          echo "MARKET BREADTH ARTIFACT"
+          echo "=============================================="
 
           ARTIFACT_ID=$(
             gh api \
@@ -232,10 +241,11 @@ jobs:
             /tmp/breadth.zip \
             -d input/breadth
 
+          echo ""
           echo "Market Breadth artifact downloaded."
 
           find input/breadth \
-            -maxdepth 4 \
+            -maxdepth 5 \
             -type f \
             -print
 
@@ -253,72 +263,174 @@ jobs:
           echo "LOCATING INPUT FILES"
           echo "=============================================="
 
+          echo ""
+          echo "Research Context files:"
+          find input/research_context \
+            -type f \
+            -name "*.csv" \
+            -print
 
-          # --------------------------------------------------------
-          # Research Context
-          # --------------------------------------------------------
+          echo ""
+          echo "Liquidity files:"
+          find input/liquidity \
+            -type f \
+            -name "*.csv" \
+            -print
+
+          echo ""
+          echo "Market Breadth files:"
+          find input/breadth \
+            -type f \
+            -name "*.csv" \
+            -print
+
+
+          # ========================================================
+          # RESEARCH CONTEXT
+          # ========================================================
 
           RESEARCH_CONTEXT_FILE=""
 
-          for f in \
-            $(find input/research_context \
+          # First try the canonical filename.
+          EXACT_RC=$(
+            find input/research_context \
               -type f \
-              -name "*.csv" \
-              -print)
-          do
-            if grep -q "study_date" "$f" 2>/dev/null && \
-               grep -q "macro_" "$f" 2>/dev/null && \
-               grep -q "technical_" "$f" 2>/dev/null; then
+              -name "research_context_v1.csv" \
+              -print \
+              -quit
+          )
 
-              RESEARCH_CONTEXT_FILE="$f"
-              break
-            fi
-          done
+          if [ -n "$EXACT_RC" ]; then
+
+            RESEARCH_CONTEXT_FILE="$EXACT_RC"
+
+          else
+
+            echo ""
+            echo "Canonical Research Context filename not found."
+            echo "Using structural CSV detection..."
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | grep -qi "study_date"; then
+
+                RESEARCH_CONTEXT_FILE="$f"
+                break
+
+              fi
+
+            done < <(
+              find input/research_context \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
 
 
-          # --------------------------------------------------------
-          # Liquidity
-          # --------------------------------------------------------
+          # ========================================================
+          # LIQUIDITY
+          # ========================================================
 
           LIQUIDITY_FILE=""
 
-          for f in \
-            $(find input/liquidity \
+          EXACT_LIQ=$(
+            find input/liquidity \
               -type f \
-              -name "*.csv" \
-              -print)
-          do
-            if grep -q "NET_LIQUIDITY_PROXY_MILLIONS" "$f" 2>/dev/null; then
+              -name "liquidity_intelligence_research_v1.csv" \
+              -print \
+              -quit
+          )
 
-              LIQUIDITY_FILE="$f"
-              break
-            fi
-          done
+          if [ -n "$EXACT_LIQ" ]; then
+
+            LIQUIDITY_FILE="$EXACT_LIQ"
+
+          else
+
+            echo ""
+            echo "Canonical Liquidity filename not found."
+            echo "Using structural CSV detection..."
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | \
+                grep -qi "NET_LIQUIDITY_PROXY_MILLIONS"; then
+
+                LIQUIDITY_FILE="$f"
+                break
+
+              fi
+
+            done < <(
+              find input/liquidity \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
 
 
-          # --------------------------------------------------------
-          # Market Breadth
-          # --------------------------------------------------------
+          # ========================================================
+          # MARKET BREADTH
+          # ========================================================
 
           BREADTH_FILE=""
 
-          for f in \
-            $(find input/breadth \
+          EXACT_BREADTH=$(
+            find input/breadth \
               -type f \
-              -name "*.csv" \
-              -print)
-          do
-            if grep -q "breadth_research_state" "$f" 2>/dev/null; then
+              -name "market_breadth_analysis_v1.csv" \
+              -print \
+              -quit
+          )
 
-              BREADTH_FILE="$f"
-              break
-            fi
-          done
+          if [ -n "$EXACT_BREADTH" ]; then
+
+            BREADTH_FILE="$EXACT_BREADTH"
+
+          else
+
+            echo ""
+            echo "Canonical Market Breadth filename not found."
+            echo "Using structural CSV detection..."
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | \
+                grep -qi "breadth_research_state"; then
+
+                BREADTH_FILE="$f"
+                break
+
+              fi
+
+            done < <(
+              find input/breadth \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
 
 
-          # --------------------------------------------------------
-          # Validation
-          # --------------------------------------------------------
+          # ========================================================
+          # DISPLAY RESOLVED FILES
+          # ========================================================
+
+          echo ""
+          echo "=============================================="
+          echo "RESOLVED INPUT FILES"
+          echo "=============================================="
 
           echo ""
           echo "Research Context:"
@@ -333,43 +445,74 @@ jobs:
           echo "$BREADTH_FILE"
 
 
+          # ========================================================
+          # VALIDATION
+          # ========================================================
+
           if [ -z "$RESEARCH_CONTEXT_FILE" ]; then
+
             echo ""
             echo "ERROR: Research Context CSV not found."
+            echo ""
+            echo "Available Research Context files:"
+            find input/research_context \
+              -type f \
+              -print
+
             exit 1
+
           fi
 
 
           if [ -z "$LIQUIDITY_FILE" ]; then
+
             echo ""
             echo "ERROR: Liquidity CSV not found."
+            echo ""
+            echo "Available Liquidity files:"
+            find input/liquidity \
+              -type f \
+              -print
+
             exit 1
+
           fi
 
 
           if [ -z "$BREADTH_FILE" ]; then
+
             echo ""
             echo "ERROR: Market Breadth CSV not found."
+            echo ""
+            echo "Available Market Breadth files:"
+            find input/breadth \
+              -type f \
+              -print
+
             exit 1
+
           fi
 
 
-          echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE" \
-            >> "$GITHUB_ENV"
+          # ========================================================
+          # EXPORT VARIABLES TO FOLLOWING STEPS
+          # ========================================================
 
-          echo "LIQUIDITY_FILE=$LIQUIDITY_FILE" \
-            >> "$GITHUB_ENV"
-
-          echo "BREADTH_FILE=$BREADTH_FILE" \
-            >> "$GITHUB_ENV"
+          {
+            echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE"
+            echo "LIQUIDITY_FILE=$LIQUIDITY_FILE"
+            echo "BREADTH_FILE=$BREADTH_FILE"
+          } >> "$GITHUB_ENV"
 
 
           echo ""
-          echo "All required input files located successfully."
+          echo "=============================================="
+          echo "ALL REQUIRED INPUT FILES FOUND"
+          echo "=============================================="
 
 
       # ============================================================
-      # 10. INPUT PREVIEW
+      # 10. VALIDATE INPUT FILES
       # ============================================================
 
       - name: Validate input files
@@ -382,51 +525,96 @@ jobs:
 
 
           echo ""
-          echo "Research Context:"
+          echo "----------------------------------------------"
+          echo "Research Context"
+          echo "----------------------------------------------"
+
           python - <<'PY'
           import os
           import pandas as pd
 
-          p = os.environ["RESEARCH_CONTEXT_FILE"]
-          df = pd.read_csv(p, low_memory=False)
+          path = os.environ["RESEARCH_CONTEXT_FILE"]
 
-          print("File:", p)
+          df = pd.read_csv(
+              path,
+              low_memory=False
+          )
+
+          print("File:", path)
           print("Rows:", len(df))
           print("Columns:", len(df.columns))
-          print("First columns:", list(df.columns[:20]))
+          print("First columns:")
+          print(list(df.columns[:25]))
+
+          if len(df) == 0:
+              raise SystemExit(
+                  "ERROR: Research Context CSV contains zero rows."
+              )
           PY
 
 
           echo ""
-          echo "Liquidity:"
+          echo "----------------------------------------------"
+          echo "Liquidity"
+          echo "----------------------------------------------"
+
           python - <<'PY'
           import os
           import pandas as pd
 
-          p = os.environ["LIQUIDITY_FILE"]
-          df = pd.read_csv(p, low_memory=False)
+          path = os.environ["LIQUIDITY_FILE"]
 
-          print("File:", p)
+          df = pd.read_csv(
+              path,
+              low_memory=False
+          )
+
+          print("File:", path)
           print("Rows:", len(df))
           print("Columns:", len(df.columns))
-          print("First columns:", list(df.columns[:20]))
+          print("First columns:")
+          print(list(df.columns[:25]))
+
+          if len(df) == 0:
+              raise SystemExit(
+                  "ERROR: Liquidity CSV contains zero rows."
+              )
           PY
 
 
           echo ""
-          echo "Market Breadth:"
+          echo "----------------------------------------------"
+          echo "Market Breadth"
+          echo "----------------------------------------------"
+
           python - <<'PY'
           import os
           import pandas as pd
 
-          p = os.environ["BREADTH_FILE"]
-          df = pd.read_csv(p, low_memory=False)
+          path = os.environ["BREADTH_FILE"]
 
-          print("File:", p)
+          df = pd.read_csv(
+              path,
+              low_memory=False
+          )
+
+          print("File:", path)
           print("Rows:", len(df))
           print("Columns:", len(df.columns))
-          print("First columns:", list(df.columns[:20]))
+          print("First columns:")
+          print(list(df.columns[:25]))
+
+          if len(df) == 0:
+              raise SystemExit(
+                  "ERROR: Market Breadth CSV contains zero rows."
+              )
           PY
+
+
+          echo ""
+          echo "=============================================="
+          echo "INPUT VALIDATION COMPLETED"
+          echo "=============================================="
 
 
       # ============================================================
@@ -440,6 +628,20 @@ jobs:
           echo "=============================================="
           echo "RUNNING HISTORICAL EVENT STUDY v1"
           echo "=============================================="
+
+          echo ""
+          echo "Research Context:"
+          echo "$RESEARCH_CONTEXT_FILE"
+
+          echo ""
+          echo "Liquidity:"
+          echo "$LIQUIDITY_FILE"
+
+          echo ""
+          echo "Market Breadth:"
+          echo "$BREADTH_FILE"
+
+          echo ""
 
           python \
             tests/historical_event_study/historical_event_study_v1.py \
@@ -456,6 +658,7 @@ jobs:
       - name: Display Historical Event Study results
         if: always()
         run: |
+
           echo "=============================================="
           echo "HISTORICAL EVENT STUDY RESULTS"
           echo "=============================================="
@@ -465,11 +668,16 @@ jobs:
             "historical_event_study_v1/historical_event_study_validation_v1.json"
           ]; then
 
+            echo ""
+            echo "FINAL VALIDATION REPORT:"
+            echo ""
+
             cat \
               historical_event_study_v1/historical_event_study_validation_v1.json
 
           else
 
+            echo ""
             echo "Validation report was not generated."
 
           fi
@@ -479,6 +687,7 @@ jobs:
           echo "=============================================="
           echo "OUTPUT FILES"
           echo "=============================================="
+
 
           if [ -d "historical_event_study_v1" ]; then
 
