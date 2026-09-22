@@ -1,56 +1,78 @@
+#!/usr/bin/env python3
 """
-Market Breadth — S&P 500 Membership Cross-Validation v1
+Market Breadth — S&P 500 Membership Cross-Validation v2
 
 Purpose
 -------
-Research-only validation of historical S&P 500 membership using
-multiple free public sources.
+Research-only validation of reconstructed historical S&P 500 membership.
 
 Sources
 -------
 1. fja05680/sp500
+   Primary historical reference.
+
 2. hanshof/sp500_constituents
-3. pitindex
+   Independent historical reconstruction.
 
-Scope
------
-2019-01-01 -> latest common available date
+3. chinobing/historical_sp500_constituents
+   Current/auto-renewed reconstruction.
 
-Important
----------
-This test does NOT claim PIT-perfect historical membership.
+4. pitindex
+   Historical validation support only.
+   IMPORTANT: pitindex uses fja05680 as a primary historical seed,
+   therefore it is NOT treated as an independent source.
 
-It measures:
-- source availability
-- snapshot size
-- constituent overlap
-- symmetric differences
-- source agreement
-- unresolved conflicts
+Classification
+--------------
+MATCH
+    All direct sources agree.
 
-No:
-- trading signals
-- forecasts
-- Decision Engine integration
-- paid data
+EXPLAINABLE
+    Small difference that is explainable by constituent-count/ticker
+    representation differences.
+
+PIT_SUPPORTED_DISAGREEMENT
+    Direct sources disagree, but pitindex supports one of them.
+
+UNRESOLVED_CONFLICT
+    Direct sources disagree and pitindex does not support either
+    side sufficiently.
+
+Research status
+---------------
+This test does NOT claim PIT-perfect membership.
+
+point_in_time_reconstructed = TRUE
+membership_source = FREE_PUBLIC_RECONSTRUCTION
+membership_quality = RESEARCH_GRADE
+research_only = TRUE
+decision_engine_ready = FALSE
 """
 
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import sys
-import urllib.request
-from dataclasses import dataclass
-from datetime import date
+import warnings
 from pathlib import Path
-from typing import Iterable
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import pandas as pd
 
+# ---------------------------------------------------------------------
+# Optional pitindex import
+# ---------------------------------------------------------------------
 
-DEFAULT_START = "2019-01-01"
+try:
+    import pitindex
+except ImportError:
+    pitindex = None
+
+
+# ---------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------
 
 FJA_URL = (
     "https://raw.githubusercontent.com/fja05680/sp500/master/"
@@ -62,72 +84,57 @@ HANS_URL = (
     "sp_500_historical_components.csv"
 )
 
+CHINOBING_URL = (
+    "https://raw.githubusercontent.com/chinobing/"
+    "historical_sp500_constituents/main/"
+    "sp_500_historical_components.csv"
+)
 
-@dataclass
-class SnapshotComparison:
-    asof_date: str
-    fja_count: int
-    hans_count: int
-    pit_count: int
-
-    fja_hans_intersection: int
-    fja_hans_union: int
-
-    fja_only: int
-    hans_only: int
-
-    fja_hans_jaccard: float
-    fja_hans_overlap_pct: float
-
-    pit_fja_intersection: int
-    pit_hans_intersection: int
-
-    classification: str
+DEFAULT_START = "2019-01-01"
 
 
-def download_csv(url: str) -> pd.DataFrame:
+# ---------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------
+
+def normalize_ticker(value: str) -> str:
     """
-    Download a public CSV without requiring credentials.
+    Normalize ticker representation only where the difference is clearly
+    a formatting convention.
+
+    Examples:
+        BRK.B -> BRK-B
+        BF.B  -> BF-B
     """
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "US500-Macro-Intelligence/"
-                "market-breadth-cross-validation-v1"
-            )
-        },
-    )
 
-    with urllib.request.urlopen(request, timeout=60) as response:
-        raw = response.read()
+    value = str(value).strip().upper()
 
-    return pd.read_csv(io.BytesIO(raw))
-
-
-def normalize_ticker(value: object) -> str:
-    """
-    Normalize ticker representation while preserving the actual symbol.
-
-    We intentionally do NOT perform aggressive corporate-action mapping here.
-    A ticker rename must remain visible as a research discrepancy.
-    """
-    if pd.isna(value):
+    if value in {"NAN", "NONE", ""}:
         return ""
 
-    ticker = str(value).strip().upper()
+    # Normalize common Yahoo/Wikipedia separator differences.
+    value = value.replace(".", "-")
 
-    # Remove accidental surrounding whitespace.
-    ticker = ticker.strip()
-
-    # Normalize common Yahoo-style class notation only.
-    # Example: BRK.B -> BRK-B
-    ticker = ticker.replace(".", "-")
-
-    return ticker
+    return value
 
 
-def parse_ticker_list(value: object) -> set[str]:
+def normalize_ticker_set(values: Iterable[str]) -> Set[str]:
+    result = set()
+
+    for value in values:
+        ticker = normalize_ticker(value)
+
+        if ticker:
+            result.add(ticker)
+
+    return result
+
+
+def parse_ticker_list(value) -> Set[str]:
+    """
+    Parse a cell containing a comma-separated ticker list.
+    """
+
     if pd.isna(value):
         return set()
 
@@ -136,17 +143,49 @@ def parse_ticker_list(value: object) -> set[str]:
     if not text:
         return set()
 
-    return {
-        normalize_ticker(x)
-        for x in text.split(",")
-        if normalize_ticker(x)
-    }
+    # Some files may use comma-separated values.
+    parts = [x.strip() for x in text.split(",")]
+
+    return normalize_ticker_set(parts)
 
 
-def find_column(df: pd.DataFrame, candidates: Iterable[str]) -> str:
+def jaccard(a: Set[str], b: Set[str]) -> float:
+    if not a and not b:
+        return 1.0
+
+    union = a | b
+
+    if not union:
+        return 1.0
+
+    return len(a & b) / len(union)
+
+
+def overlap_pct(a: Set[str], b: Set[str]) -> float:
+    """
+    Symmetric overlap percentage based on the larger universe.
+    """
+
+    denominator = max(len(a), len(b))
+
+    if denominator == 0:
+        return 100.0
+
+    return 100.0 * len(a & b) / denominator
+
+
+def symmetric_difference_count(a: Set[str], b: Set[str]) -> int:
+    return len(a ^ b)
+
+
+# ---------------------------------------------------------------------
+# Generic source loaders
+# ---------------------------------------------------------------------
+
+def find_column(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
     normalized = {
-        str(c).strip().lower(): c
-        for c in df.columns
+        str(column).strip().lower(): column
+        for column in df.columns
     }
 
     for candidate in candidates:
@@ -155,38 +194,46 @@ def find_column(df: pd.DataFrame, candidates: Iterable[str]) -> str:
         if key in normalized:
             return normalized[key]
 
-    raise ValueError(
-        f"Could not find any of columns {list(candidates)} "
-        f"in {list(df.columns)}"
-    )
+    return None
 
 
-def load_fja(start_date: str) -> dict[str, set[str]]:
-    print("Loading fja05680/sp500...")
+def load_generic_snapshot_csv(
+    url: str,
+    source_name: str,
+) -> Dict[pd.Timestamp, Set[str]]:
+    """
+    Load a historical constituent CSV.
 
-    df = download_csv(FJA_URL)
+    Supports common formats:
+        date,tickers
+        date,components
+        date,constituents
+
+    Also supports wide-ish formats where each row has date + ticker.
+    """
+
+    print(f"Loading {source_name}...")
+    print(f"URL: {url}")
+
+    df = pd.read_csv(url)
+
+    if df.empty:
+        raise RuntimeError(f"{source_name}: CSV is empty")
 
     date_col = find_column(
         df,
-        ["date", "Date"],
+        [
+            "date",
+            "asof_date",
+            "effective_date",
+            "as_of_date",
+        ],
     )
 
-    ticker_col = None
-
-    for candidate in [
-        "tickers",
-        "Ticker",
-        "tickers_list",
-        "constituents",
-    ]:
-        if candidate in df.columns:
-            ticker_col = candidate
-            break
-
-    if ticker_col is None:
-        raise ValueError(
-            "Could not identify ticker-list column in fja dataset. "
-            f"Columns: {list(df.columns)}"
+    if date_col is None:
+        raise RuntimeError(
+            f"{source_name}: unable to identify date column. "
+            f"Columns={list(df.columns)}"
         )
 
     df[date_col] = pd.to_datetime(
@@ -194,369 +241,341 @@ def load_fja(start_date: str) -> dict[str, set[str]]:
         errors="coerce",
     )
 
-    start = pd.Timestamp(start_date)
+    df = df.dropna(subset=[date_col])
 
-    df = df[
-        df[date_col].notna()
-        & (df[date_col] >= start)
-    ].copy()
-
-    df = df.sort_values(date_col)
-
-    snapshots: dict[str, set[str]] = {}
-
-    for _, row in df.iterrows():
-        d = row[date_col].date().isoformat()
-
-        tickers = parse_ticker_list(
-            row[ticker_col]
-        )
-
-        if tickers:
-            snapshots[d] = tickers
-
-    return snapshots
-
-
-def load_hanshof(start_date: str) -> dict[str, set[str]]:
-    print("Loading hanshof/sp500_constituents...")
-
-    df = download_csv(HANS_URL)
-
-    date_col = find_column(
+    ticker_list_col = find_column(
         df,
-        ["date", "Date"],
+        [
+            "tickers",
+            "ticker",
+            "symbols",
+            "constituents",
+            "components",
+            "members",
+        ],
     )
 
-    ticker_col = None
+    snapshots: Dict[pd.Timestamp, Set[str]] = {}
 
-    for candidate in [
-        "tickers",
-        "Ticker",
-        "tickers_list",
-        "constituents",
-    ]:
-        if candidate in df.columns:
-            ticker_col = candidate
-            break
+    # -------------------------------------------------------------
+    # Format A: date + comma-separated ticker list
+    # -------------------------------------------------------------
 
-    if ticker_col is None:
-        raise ValueError(
-            "Could not identify ticker-list column in hanshof dataset. "
-            f"Columns: {list(df.columns)}"
-        )
+    if ticker_list_col is not None:
 
-    df[date_col] = pd.to_datetime(
-        df[date_col],
-        errors="coerce",
-    )
+        for date, group in df.groupby(date_col):
 
-    start = pd.Timestamp(start_date)
+            members = set()
 
-    df = df[
-        df[date_col].notna()
-        & (df[date_col] >= start)
-    ].copy()
+            for value in group[ticker_list_col]:
+                members.update(parse_ticker_list(value))
 
-    df = df.sort_values(date_col)
+            if members:
+                snapshots[date.normalize()] = members
 
-    snapshots: dict[str, set[str]] = {}
+        if snapshots:
+            return snapshots
+
+    # -------------------------------------------------------------
+    # Format B: date + many ticker columns
+    # -------------------------------------------------------------
+
+    excluded_columns = {
+        date_col,
+        "security",
+        "gics sector",
+        "gics sub-industry",
+        "headquarters location",
+        "date added",
+        "cik",
+        "founded",
+    }
+
+    candidate_columns = [
+        c for c in df.columns
+        if c not in excluded_columns
+    ]
 
     for _, row in df.iterrows():
-        d = row[date_col].date().isoformat()
 
-        tickers = parse_ticker_list(
-            row[ticker_col]
+        date = row[date_col]
+
+        if pd.isna(date):
+            continue
+
+        members = set()
+
+        for column in candidate_columns:
+
+            value = row[column]
+
+            if pd.isna(value):
+                continue
+
+            text = str(value).strip()
+
+            if not text:
+                continue
+
+            # Ignore obvious non-ticker metadata.
+            if text.lower() in {
+                "nan",
+                "none",
+                "date",
+                "security",
+            }:
+                continue
+
+            # If comma-separated, split.
+            if "," in text:
+                members.update(parse_ticker_list(text))
+            else:
+                ticker = normalize_ticker(text)
+
+                if ticker:
+                    members.add(ticker)
+
+        if members:
+            snapshots[pd.Timestamp(date).normalize()] = members
+
+    if not snapshots:
+        raise RuntimeError(
+            f"{source_name}: no membership snapshots could be parsed"
         )
-
-        if tickers:
-            snapshots[d] = tickers
 
     return snapshots
 
 
-def load_pitindex(
-    dates: list[str],
-) -> dict[str, set[str]]:
-    """
-    Load PIT snapshots through pitindex.
+# ---------------------------------------------------------------------
+# pitindex loader
+# ---------------------------------------------------------------------
 
-    pitindex ships its own dataset, so runtime use does not
-    require network access after installation.
+def load_pitindex_snapshots(
+    dates: Iterable[pd.Timestamp],
+) -> Dict[pd.Timestamp, Set[str]]:
     """
+    Query pitindex for the exact comparison dates.
+
+    pitindex is treated only as historical supporting evidence.
+    """
+
+    snapshots: Dict[pd.Timestamp, Set[str]] = {}
+
+    if pitindex is None:
+        warnings.warn(
+            "pitindex is not installed. "
+            "PIT-supported classification will be unavailable."
+        )
+        return snapshots
+
+    unique_dates = sorted(
+        set(pd.Timestamp(d).normalize() for d in dates)
+    )
 
     print("Loading pitindex...")
 
+    # Suppress noisy stale-data warning in the test output.
     try:
-        import pitindex
-    except ImportError as exc:
-        raise RuntimeError(
-            "pitindex is not installed.\n\n"
-            "Install with:\n"
-            "    pip install pitindex\n"
-        ) from exc
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
 
-    snapshots: dict[str, set[str]] = {}
+            for date in unique_dates:
 
-    for d in dates:
-        try:
-            df = pitindex.get_constituents(
-                d,
-                index="sp500",
-            )
-        except Exception as exc:
-            print(
-                f"WARNING: pitindex failed for {d}: {exc}",
-                file=sys.stderr,
-            )
-            continue
+                try:
+                    members = pitindex.get_constituents(
+                        date.strftime("%Y-%m-%d")
+                    )
 
-        if df is None or df.empty:
-            continue
+                except TypeError:
 
-        if "ticker" not in df.columns:
-            raise ValueError(
-                "pitindex output does not contain 'ticker'. "
-                f"Columns: {list(df.columns)}"
-            )
+                    try:
+                        members = pitindex.get_constituents(
+                            date
+                        )
 
-        tickers = {
-            normalize_ticker(x)
-            for x in df["ticker"]
-            if normalize_ticker(x)
-        }
+                    except Exception:
+                        continue
 
-        if tickers:
-            snapshots[d] = tickers
+                except Exception:
+                    continue
+
+                if members is None:
+                    continue
+
+                parsed = normalize_ticker_set(members)
+
+                if parsed:
+                    snapshots[date] = parsed
+
+    except Exception as exc:
+        warnings.warn(
+            f"pitindex loading failed: {exc}"
+        )
 
     return snapshots
 
 
-def classify(
-    fja: set[str],
-    hans: set[str],
-    pit: set[str],
-) -> str:
+# ---------------------------------------------------------------------
+# Classification
+# ---------------------------------------------------------------------
 
-    if not fja or not hans:
-        return "MISSING_SOURCE"
+def classify_snapshot(
+    fja: Set[str],
+    hans: Set[str],
+    chinobing: Set[str],
+    pit: Set[str],
+) -> Tuple[str, str]:
+    """
+    Return:
+        classification, reason
+    """
 
-    fja_hans_union = fja | hans
+    # -------------------------------------------------------------
+    # All direct sources agree
+    # -------------------------------------------------------------
 
-    if not fja_hans_union:
-        return "MISSING_SOURCE"
+    if fja == hans == chinobing:
 
-    jaccard = len(fja & hans) / len(fja_hans_union)
-
-    fja_hans_diff = fja ^ hans
-
-    # Very high agreement.
-    if jaccard >= 0.995:
-        return "MATCH"
-
-    # Small discrepancy.
-    if jaccard >= 0.985:
-        return "EXPLAINABLE_OR_MINOR"
-
-    # If PIT agrees strongly with one source, flag the
-    # disagreement rather than automatically selecting a winner.
-    if pit:
-        pit_fja = len(pit & fja) / max(len(pit | fja), 1)
-        pit_hans = len(pit & hans) / max(len(pit | hans), 1)
-
-        if max(pit_fja, pit_hans) >= 0.995:
-            return "SOURCE_CONFLICT_WITH_PIT_SUPPORT"
-
-    if fja_hans_diff:
-        return "CONFLICT"
-
-    return "UNRESOLVED"
-
-
-def compare_snapshots(
-    fja: dict[str, set[str]],
-    hans: dict[str, set[str]],
-    pit: dict[str, set[str]],
-) -> pd.DataFrame:
-
-    common_dates = sorted(
-        set(fja)
-        & set(hans)
-    )
-
-    rows: list[dict] = []
-
-    for d in common_dates:
-        f = fja[d]
-        h = hans[d]
-        p = pit.get(d, set())
-
-        intersection = f & h
-        union = f | h
-
-        fja_only = f - h
-        hans_only = h - f
-
-        jaccard = (
-            len(intersection) / len(union)
-            if union
-            else 0.0
+        return (
+            "MATCH",
+            "All three direct public reconstructions agree."
         )
 
-        overlap = (
-            len(intersection)
-            / max(min(len(f), len(h)), 1)
-        )
+    # -------------------------------------------------------------
+    # Determine direct-source pair agreement
+    # -------------------------------------------------------------
 
-        classification = classify(
-            f,
-            h,
-            p,
-        )
-
-        rows.append(
-            {
-                "asof_date": d,
-
-                "fja_count": len(f),
-                "hans_count": len(h),
-                "pit_count": len(p),
-
-                "fja_hans_intersection": len(intersection),
-                "fja_hans_union": len(union),
-
-                "fja_only": len(fja_only),
-                "hans_only": len(hans_only),
-
-                "fja_hans_jaccard": jaccard,
-                "fja_hans_overlap_pct": overlap * 100.0,
-
-                "pit_fja_intersection": len(p & f),
-                "pit_hans_intersection": len(p & h),
-
-                "classification": classification,
-            }
-        )
-
-    return pd.DataFrame(rows)
-
-
-def build_discrepancy_table(
-    fja: dict[str, set[str]],
-    hans: dict[str, set[str]],
-) -> pd.DataFrame:
-
-    common_dates = sorted(
-        set(fja) & set(hans)
-    )
-
-    rows = []
-
-    for d in common_dates:
-        f = fja[d]
-        h = hans[d]
-
-        fja_only = sorted(f - h)
-        hans_only = sorted(h - f)
-
-        if not fja_only and not hans_only:
-            continue
-
-        rows.append(
-            {
-                "asof_date": d,
-                "fja_only": ",".join(fja_only),
-                "hans_only": ",".join(hans_only),
-                "fja_only_count": len(fja_only),
-                "hans_only_count": len(hans_only),
-            }
-        )
-
-    return pd.DataFrame(rows)
-
-
-def summarize(
-    comparison: pd.DataFrame,
-) -> dict:
-
-    if comparison.empty:
-        return {
-            "status": "FAIL",
-            "reason": "No common dates available.",
-        }
-
-    counts = (
-        comparison["classification"]
-        .value_counts()
-        .to_dict()
-    )
-
-    summary = {
-        "status": "PASS_WITH_REVIEW",
-        "common_snapshot_dates": int(
-            len(comparison)
-        ),
-
-        "first_common_date": str(
-            comparison["asof_date"].min()
-        ),
-
-        "last_common_date": str(
-            comparison["asof_date"].max()
-        ),
-
-        "mean_jaccard": float(
-            comparison["fja_hans_jaccard"].mean()
-        ),
-
-        "median_jaccard": float(
-            comparison["fja_hans_jaccard"].median()
-        ),
-
-        "minimum_jaccard": float(
-            comparison["fja_hans_jaccard"].min()
-        ),
-
-        "mean_overlap_pct": float(
-            comparison["fja_hans_overlap_pct"].mean()
-        ),
-
-        "classification_counts": counts,
-
-        "research_only": True,
-
-        "point_in_time_perfect": False,
-
-        "decision_engine_ready": False,
+    direct_sets = {
+        "fja": fja,
+        "hans": hans,
+        "chinobing": chinobing,
     }
 
-    # Hard failure condition:
-    # too many genuine conflicts.
-    conflict_count = (
-        comparison["classification"]
-        .isin(
-            [
-                "CONFLICT",
-                "UNRESOLVED",
-            ]
+    pairwise = [
+        ("fja", "hans", fja, hans),
+        ("fja", "chinobing", fja, chinobing),
+        ("hans", "chinobing", hans, chinobing),
+    ]
+
+    best_pair = None
+    best_jaccard = -1.0
+
+    for name_a, name_b, set_a, set_b in pairwise:
+
+        score = jaccard(set_a, set_b)
+
+        if score > best_jaccard:
+            best_jaccard = score
+            best_pair = (
+                name_a,
+                name_b,
+                set_a,
+                set_b,
+            )
+
+    # -------------------------------------------------------------
+    # Direct source agreement on two of three sources
+    # -------------------------------------------------------------
+
+    if best_pair is not None:
+
+        name_a, name_b, set_a, set_b = best_pair
+
+        if set_a == set_b:
+
+            third_name = next(
+                name
+                for name in direct_sets
+                if name not in {name_a, name_b}
+            )
+
+            third_set = direct_sets[third_name]
+
+            # Check whether PIT supports the two agreeing sources.
+            if pit and third_set != set_a:
+
+                pit_score_agree = jaccard(pit, set_a)
+                pit_score_third = jaccard(pit, third_set)
+
+                if pit_score_agree > pit_score_third:
+                    return (
+                        "PIT_SUPPORTED_DISAGREEMENT",
+                        (
+                            f"{name_a} and {name_b} agree while "
+                            f"{third_name} differs; pitindex supports "
+                            f"the {name_a}/{name_b} membership."
+                        ),
+                    )
+
+            # Difference may simply reflect ticker representation/count.
+            if (
+                symmetric_difference_count(
+                    set_a,
+                    third_set
+                ) <= 10
+            ):
+                return (
+                    "EXPLAINABLE",
+                    (
+                        f"{name_a} and {name_b} agree; "
+                        f"{third_name} differs by "
+                        f"{symmetric_difference_count(set_a, third_set)} "
+                        f"members."
+                    ),
+                )
+
+    # -------------------------------------------------------------
+    # PIT support
+    # -------------------------------------------------------------
+
+    if pit:
+
+        direct_scores = {
+            name: jaccard(members, pit)
+            for name, members in direct_sets.items()
+        }
+
+        best_direct_name = max(
+            direct_scores,
+            key=direct_scores.get,
         )
-        .sum()
+
+        worst_direct_name = min(
+            direct_scores,
+            key=direct_scores.get,
+        )
+
+        best_score = direct_scores[best_direct_name]
+        worst_score = direct_scores[worst_direct_name]
+
+        # PIT clearly supports one direct source.
+        if best_score >= 0.99 and best_score - worst_score >= 0.005:
+
+            return (
+                "PIT_SUPPORTED_DISAGREEMENT",
+                (
+                    f"pitindex supports {best_direct_name}; "
+                    f"best_jaccard={best_score:.6f}, "
+                    f"worst_jaccard={worst_score:.6f}."
+                ),
+            )
+
+    # -------------------------------------------------------------
+    # No sufficient evidence
+    # -------------------------------------------------------------
+
+    return (
+        "UNRESOLVED_CONFLICT",
+        (
+            "Direct sources disagree and no sufficient PIT evidence "
+            "resolves the disagreement."
+        ),
     )
 
-    conflict_ratio = (
-        conflict_count
-        / len(comparison)
-    )
 
-    summary["conflict_ratio"] = float(
-        conflict_ratio
-    )
-
-    if conflict_ratio > 0.05:
-        summary["status"] = "FAIL_REVIEW_REQUIRED"
-
-    return summary
-
+# ---------------------------------------------------------------------
+# Main validation
+# ---------------------------------------------------------------------
 
 def main() -> int:
 
@@ -565,16 +584,30 @@ def main() -> int:
     parser.add_argument(
         "--start",
         default=DEFAULT_START,
-        help="Start date, YYYY-MM-DD",
+        help="Start date, e.g. 2019-01-01",
+    )
+
+    parser.add_argument(
+        "--end",
+        default=None,
+        help="Optional end date",
     )
 
     parser.add_argument(
         "--output",
-        default="market_breadth_cross_validation_v1",
+        default="market_breadth_cross_validation_v2",
         help="Output directory",
     )
 
     args = parser.parse_args()
+
+    start_date = pd.Timestamp(args.start).normalize()
+
+    end_date = (
+        pd.Timestamp(args.end).normalize()
+        if args.end
+        else None
+    )
 
     output_dir = Path(args.output)
     output_dir.mkdir(
@@ -585,74 +618,469 @@ def main() -> int:
     print("=" * 72)
     print(
         "Market Breadth — S&P 500 Membership "
-        "Cross-Validation v1"
+        "Cross-Validation v2"
     )
     print("=" * 72)
 
-    print(f"Start date: {args.start}")
+    print(f"Start date: {start_date.date()}")
+
+    if end_date:
+        print(f"End date:   {end_date.date()}")
+
     print("Research-only: TRUE")
     print("PIT-perfect: FALSE")
-    print()
+    print(
+        "Membership source: FREE_PUBLIC_RECONSTRUCTION"
+    )
+    print(
+        "Membership quality: RESEARCH_GRADE"
+    )
 
-    # ---------------------------------------------------------
-    # Load sources
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------
+    # Load direct sources
+    # -------------------------------------------------------------
 
-    fja = load_fja(args.start)
+    fja = load_generic_snapshot_csv(
+        FJA_URL,
+        "fja05680/sp500",
+    )
 
-    hans = load_hanshof(args.start)
+    hans = load_generic_snapshot_csv(
+        HANS_URL,
+        "hanshof/sp500_constituents",
+    )
+
+    chinobing = load_generic_snapshot_csv(
+        CHINOBING_URL,
+        "chinobing/historical_sp500_constituents",
+    )
+
+    # -------------------------------------------------------------
+    # Restrict dates
+    # -------------------------------------------------------------
+
+    def filter_dates(
+        source: Dict[pd.Timestamp, Set[str]]
+    ) -> Dict[pd.Timestamp, Set[str]]:
+
+        result = {}
+
+        for date, members in source.items():
+
+            if date < start_date:
+                continue
+
+            if end_date is not None and date > end_date:
+                continue
+
+            result[date] = members
+
+        return result
+
+    fja = filter_dates(fja)
+    hans = filter_dates(hans)
+    chinobing = filter_dates(chinobing)
+
+    # -------------------------------------------------------------
+    # Only dates shared by all direct sources
+    # -------------------------------------------------------------
 
     common_dates = sorted(
-        set(fja) & set(hans)
+        set(fja)
+        & set(hans)
+        & set(chinobing)
     )
 
     if not common_dates:
         print(
-            "ERROR: no common dates between fja and hanshof.",
-            file=sys.stderr,
+            "ERROR: No common dates across the three "
+            "direct sources."
         )
         return 1
 
-    # To avoid unnecessary pitindex calls, use only dates
-    # where the two primary sources actually provide snapshots.
-    pit = load_pitindex(common_dates)
+    print()
+    print("=" * 72)
+    print("DIRECT SOURCE COVERAGE")
+    print("=" * 72)
 
-    # ---------------------------------------------------------
+    print(
+        f"fja snapshots:       {len(fja):,}"
+    )
+    print(
+        f"hans snapshots:      {len(hans):,}"
+    )
+    print(
+        f"chinobing snapshots: {len(chinobing):,}"
+    )
+
+    print(
+        f"Common snapshots:    {len(common_dates):,}"
+    )
+
+    print(
+        f"Common date range:   "
+        f"{common_dates[0].date()} → "
+        f"{common_dates[-1].date()}"
+    )
+
+    # -------------------------------------------------------------
+    # PIT validation
+    # -------------------------------------------------------------
+
+    pit = load_pitindex_snapshots(
+        common_dates
+    )
+
+    print(
+        f"pitindex snapshots:   {len(pit):,}"
+    )
+
+    # -------------------------------------------------------------
     # Compare
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------
 
-    comparison = compare_snapshots(
-        fja,
-        hans,
-        pit,
+    rows = []
+
+    for date in common_dates:
+
+        fja_set = fja[date]
+        hans_set = hans[date]
+        chinobing_set = chinobing[date]
+
+        pit_set = pit.get(
+            date,
+            set(),
+        )
+
+        classification, reason = classify_snapshot(
+            fja_set,
+            hans_set,
+            chinobing_set,
+            pit_set,
+        )
+
+        row = {
+            "asof_date": date.date().isoformat(),
+
+            "fja_count": len(fja_set),
+            "hans_count": len(hans_set),
+            "chinobing_count": len(chinobing_set),
+            "pit_count": len(pit_set),
+
+            "fja_hans_jaccard": jaccard(
+                fja_set,
+                hans_set,
+            ),
+
+            "fja_chinobing_jaccard": jaccard(
+                fja_set,
+                chinobing_set,
+            ),
+
+            "hans_chinobing_jaccard": jaccard(
+                hans_set,
+                chinobing_set,
+            ),
+
+            "fja_hans_overlap_pct": overlap_pct(
+                fja_set,
+                hans_set,
+            ),
+
+            "fja_chinobing_overlap_pct": overlap_pct(
+                fja_set,
+                chinobing_set,
+            ),
+
+            "hans_chinobing_overlap_pct": overlap_pct(
+                hans_set,
+                chinobing_set,
+            ),
+
+            "fja_only_vs_hans": len(
+                fja_set - hans_set
+            ),
+
+            "hans_only_vs_fja": len(
+                hans_set - fja_set
+            ),
+
+            "fja_only_vs_chinobing": len(
+                fja_set - chinobing_set
+            ),
+
+            "chinobing_only_vs_fja": len(
+                chinobing_set - fja_set
+            ),
+
+            "pit_available": bool(pit_set),
+
+            "classification": classification,
+            "classification_reason": reason,
+
+            "point_in_time_reconstructed": True,
+            "membership_source":
+                "FREE_PUBLIC_RECONSTRUCTION",
+            "membership_quality": "RESEARCH_GRADE",
+            "cross_validated": True,
+            "research_only": True,
+            "decision_engine_ready": False,
+        }
+
+        # ---------------------------------------------------------
+        # PIT scores
+        # ---------------------------------------------------------
+
+        if pit_set:
+
+            row["fja_pit_jaccard"] = jaccard(
+                fja_set,
+                pit_set,
+            )
+
+            row["hans_pit_jaccard"] = jaccard(
+                hans_set,
+                pit_set,
+            )
+
+            row["chinobing_pit_jaccard"] = jaccard(
+                chinobing_set,
+                pit_set,
+            )
+
+        else:
+
+            row["fja_pit_jaccard"] = None
+            row["hans_pit_jaccard"] = None
+            row["chinobing_pit_jaccard"] = None
+
+        rows.append(row)
+
+    comparison = pd.DataFrame(rows)
+
+    # -------------------------------------------------------------
+    # Statistics
+    # -------------------------------------------------------------
+
+    classification_counts = (
+        comparison["classification"]
+        .value_counts()
+        .to_dict()
     )
 
-    discrepancies = build_discrepancy_table(
-        fja,
-        hans,
+    total = len(comparison)
+
+    direct_conflict_count = int(
+        (
+            comparison["classification"]
+            == "UNRESOLVED_CONFLICT"
+        ).sum()
     )
 
-    summary = summarize(
-        comparison,
+    pit_supported_count = int(
+        (
+            comparison["classification"]
+            == "PIT_SUPPORTED_DISAGREEMENT"
+        ).sum()
     )
 
-    # ---------------------------------------------------------
-    # Output
-    # ---------------------------------------------------------
+    explainable_count = int(
+        (
+            comparison["classification"]
+            == "EXPLAINABLE"
+        ).sum()
+    )
+
+    match_count = int(
+        (
+            comparison["classification"]
+            == "MATCH"
+        ).sum()
+    )
+
+    direct_source_conflict_ratio = (
+        direct_conflict_count / total
+        if total
+        else 0.0
+    )
+
+    pit_supported_disagreement_ratio = (
+        pit_supported_count / total
+        if total
+        else 0.0
+    )
+
+    unresolved_ratio = (
+        direct_conflict_count / total
+        if total
+        else 0.0
+    )
+
+    summary = {
+
+        "validation_version": "v2",
+
+        "start_date":
+            start_date.date().isoformat(),
+
+        "end_date":
+            (
+                end_date.date().isoformat()
+                if end_date is not None
+                else None
+            ),
+
+        "common_snapshot_count": total,
+
+        "common_date_start":
+            common_dates[0].date().isoformat(),
+
+        "common_date_end":
+            common_dates[-1].date().isoformat(),
+
+        # ---------------------------------------------------------
+        # Agreement statistics
+        # ---------------------------------------------------------
+
+        "mean_fja_hans_jaccard":
+            float(
+                comparison[
+                    "fja_hans_jaccard"
+                ].mean()
+            ),
+
+        "median_fja_hans_jaccard":
+            float(
+                comparison[
+                    "fja_hans_jaccard"
+                ].median()
+            ),
+
+        "minimum_fja_hans_jaccard":
+            float(
+                comparison[
+                    "fja_hans_jaccard"
+                ].min()
+            ),
+
+        "mean_fja_chinobing_jaccard":
+            float(
+                comparison[
+                    "fja_chinobing_jaccard"
+                ].mean()
+            ),
+
+        "mean_hans_chinobing_jaccard":
+            float(
+                comparison[
+                    "hans_chinobing_jaccard"
+                ].mean()
+            ),
+
+        "mean_fja_hans_overlap_pct":
+            float(
+                comparison[
+                    "fja_hans_overlap_pct"
+                ].mean()
+            ),
+
+        "mean_fja_chinobing_overlap_pct":
+            float(
+                comparison[
+                    "fja_chinobing_overlap_pct"
+                ].mean()
+            ),
+
+        "mean_hans_chinobing_overlap_pct":
+            float(
+                comparison[
+                    "hans_chinobing_overlap_pct"
+                ].mean()
+            ),
+
+        # ---------------------------------------------------------
+        # Corrected classification statistics
+        # ---------------------------------------------------------
+
+        "match_count": match_count,
+
+        "explainable_count":
+            explainable_count,
+
+        "pit_supported_disagreement_count":
+            pit_supported_count,
+
+        "unresolved_conflict_count":
+            direct_conflict_count,
+
+        "direct_source_conflict_ratio":
+            direct_source_conflict_ratio,
+
+        "pit_supported_disagreement_ratio":
+            pit_supported_disagreement_ratio,
+
+        "unresolved_ratio":
+            unresolved_ratio,
+
+        "classification_counts":
+            classification_counts,
+
+        # ---------------------------------------------------------
+        # Data-quality metadata
+        # ---------------------------------------------------------
+
+        "fja_snapshot_count":
+            len(fja),
+
+        "hans_snapshot_count":
+            len(hans),
+
+        "chinobing_snapshot_count":
+            len(chinobing),
+
+        "pitindex_snapshot_count":
+            len(pit),
+
+        "point_in_time_reconstructed": True,
+
+        "membership_source":
+            "FREE_PUBLIC_RECONSTRUCTION",
+
+        "membership_quality":
+            "RESEARCH_GRADE",
+
+        "cross_validated": True,
+
+        "pit_perfect": False,
+
+        "research_only": True,
+
+        "decision_engine_ready": False,
+
+        "trading_signal": False,
+
+        "forecast": False,
+
+        # ---------------------------------------------------------
+        # Gate status
+        # ---------------------------------------------------------
+
+        "final_status": (
+            "PASS"
+            if direct_conflict_count == 0
+            else "PASS_WITH_REVIEW"
+            if unresolved_ratio <= 0.01
+            else "REVIEW_REQUIRED"
+        ),
+    }
+
+    # -------------------------------------------------------------
+    # Save comparison
+    # -------------------------------------------------------------
 
     comparison_path = (
         output_dir
-        / "membership_snapshot_comparison_v1.csv"
-    )
-
-    discrepancies_path = (
-        output_dir
-        / "membership_discrepancies_v1.csv"
-    )
-
-    summary_path = (
-        output_dir
-        / "membership_cross_validation_summary_v1.json"
+        / "membership_snapshot_comparison_v2.csv"
     )
 
     comparison.to_csv(
@@ -660,25 +1088,69 @@ def main() -> int:
         index=False,
     )
 
+    # -------------------------------------------------------------
+    # Save discrepancies
+    # -------------------------------------------------------------
+
+    discrepancies = comparison[
+        comparison["classification"]
+        != "MATCH"
+    ].copy()
+
+    discrepancies_path = (
+        output_dir
+        / "membership_discrepancies_v2.csv"
+    )
+
     discrepancies.to_csv(
         discrepancies_path,
         index=False,
+    )
+
+    # -------------------------------------------------------------
+    # Save unresolved only
+    # -------------------------------------------------------------
+
+    unresolved = comparison[
+        comparison["classification"]
+        == "UNRESOLVED_CONFLICT"
+    ].copy()
+
+    unresolved_path = (
+        output_dir
+        / "membership_unresolved_conflicts_v2.csv"
+    )
+
+    unresolved.to_csv(
+        unresolved_path,
+        index=False,
+    )
+
+    # -------------------------------------------------------------
+    # Save summary
+    # -------------------------------------------------------------
+
+    summary_path = (
+        output_dir
+        / "membership_cross_validation_summary_v2.json"
     )
 
     with open(
         summary_path,
         "w",
         encoding="utf-8",
-    ) as f:
+    ) as handle:
+
         json.dump(
             summary,
-            f,
+            handle,
             indent=2,
+            ensure_ascii=False,
         )
 
-    # ---------------------------------------------------------
-    # Console report
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------
+    # Console output
+    # -------------------------------------------------------------
 
     print()
     print("=" * 72)
@@ -687,108 +1159,183 @@ def main() -> int:
 
     print(
         f"Common snapshots: "
-        f"{summary['common_snapshot_dates']}"
+        f"{total:,}"
     )
 
     print(
         f"Date range: "
-        f"{summary['first_common_date']} "
-        f"→ "
-        f"{summary['last_common_date']}"
-    )
-
-    print(
-        f"Mean Jaccard: "
-        f"{summary['mean_jaccard']:.6f}"
-    )
-
-    print(
-        f"Median Jaccard: "
-        f"{summary['median_jaccard']:.6f}"
-    )
-
-    print(
-        f"Minimum Jaccard: "
-        f"{summary['minimum_jaccard']:.6f}"
-    )
-
-    print(
-        f"Mean overlap: "
-        f"{summary['mean_overlap_pct']:.4f}%"
-    )
-
-    print(
-        f"Conflict ratio: "
-        f"{summary['conflict_ratio']:.4%}"
+        f"{common_dates[0].date()} → "
+        f"{common_dates[-1].date()}"
     )
 
     print()
-    print("Classification:")
-    for key, value in (
-        summary["classification_counts"]
-        .items()
-    ):
+
+    print(
+        f"Mean FJA/HANS Jaccard: "
+        f"{summary['mean_fja_hans_jaccard']:.6f}"
+    )
+
+    print(
+        f"Median FJA/HANS Jaccard: "
+        f"{summary['median_fja_hans_jaccard']:.6f}"
+    )
+
+    print(
+        f"Minimum FJA/HANS Jaccard: "
+        f"{summary['minimum_fja_hans_jaccard']:.6f}"
+    )
+
+    print()
+
+    print(
+        f"Mean FJA/Chinobing Jaccard: "
+        f"{summary['mean_fja_chinobing_jaccard']:.6f}"
+    )
+
+    print(
+        f"Mean HANS/Chinobing Jaccard: "
+        f"{summary['mean_hans_chinobing_jaccard']:.6f}"
+    )
+
+    print()
+
+    print(
+        "Classification:"
+    )
+
+    for key in [
+        "MATCH",
+        "EXPLAINABLE",
+        "PIT_SUPPORTED_DISAGREEMENT",
+        "UNRESOLVED_CONFLICT",
+    ]:
+
         print(
-            f"  {key}: {value}"
+            f"  {key}: "
+            f"{classification_counts.get(key, 0)}"
         )
 
     print()
-    print("Artifacts:")
+
+    print(
+        f"Direct source conflict ratio: "
+        f"{direct_source_conflict_ratio:.4%}"
+    )
+
+    print(
+        f"PIT-supported disagreement ratio: "
+        f"{pit_supported_disagreement_ratio:.4%}"
+    )
+
+    print(
+        f"Unresolved ratio: "
+        f"{unresolved_ratio:.4%}"
+    )
+
+    print()
+
+    print(
+        "Coverage:"
+    )
+
+    print(
+        f"  FJA:       {len(fja):,}"
+    )
+
+    print(
+        f"  HANS:      {len(hans):,}"
+    )
+
+    print(
+        f"  Chinobing: {len(chinobing):,}"
+    )
+
+    print(
+        f"  PIT:       {len(pit):,}"
+    )
+
+    print()
+
+    print(
+        "Classification:"
+    )
+
+    print(
+        f"  FINAL STATUS: "
+        f"{summary['final_status']}"
+    )
+
+    print()
+
+    print(
+        "Artifacts:"
+    )
+
     print(
         f"  {comparison_path}"
     )
+
     print(
         f"  {discrepancies_path}"
     )
+
+    print(
+        f"  {unresolved_path}"
+    )
+
     print(
         f"  {summary_path}"
     )
 
     print()
+    print("=" * 72)
+    print("WORST SNAPSHOT AGREEMENTS")
+    print("=" * 72)
+
+    display_columns = [
+        "asof_date",
+        "fja_count",
+        "hans_count",
+        "chinobing_count",
+        "pit_count",
+        "fja_hans_jaccard",
+        "fja_chinobing_jaccard",
+        "hans_chinobing_jaccard",
+        "classification",
+    ]
+
     print(
-        f"FINAL STATUS: {summary['status']}"
+        comparison
+        .sort_values(
+            "fja_hans_jaccard",
+            ascending=True,
+        )
+        [display_columns]
+        .head(20)
+        .to_string(index=False)
     )
 
-    # ---------------------------------------------------------
-    # Show worst discrepancies
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------
+    # Exit code
+    # -------------------------------------------------------------
 
-    if not comparison.empty:
-        worst = (
-            comparison
-            .sort_values(
-                "fja_hans_jaccard",
-                ascending=True,
-            )
-            .head(20)
-        )
-
+    # We do NOT fail merely because PIT-supported disagreements exist.
+    # We fail only when unresolved conflicts exceed 1%.
+    if unresolved_ratio > 0.01:
         print()
-        print("=" * 72)
-        print("WORST 20 SNAPSHOT AGREEMENTS")
-        print("=" * 72)
-
         print(
-            worst[
-                [
-                    "asof_date",
-                    "fja_count",
-                    "hans_count",
-                    "pit_count",
-                    "fja_hans_jaccard",
-                    "fja_only",
-                    "hans_only",
-                    "classification",
-                ]
-            ].to_string(
-                index=False
-            )
+            "FINAL STATUS: REVIEW_REQUIRED"
         )
+        return 1
+
+    print()
+    print(
+        "FINAL STATUS: "
+        f"{summary['final_status']}"
+    )
 
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(
-        main()
-    )
+    sys.exit(main())
