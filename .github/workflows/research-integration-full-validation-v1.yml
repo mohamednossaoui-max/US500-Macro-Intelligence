@@ -1,0 +1,144 @@
+name: Research Integration - Full Validation v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  research-integration:
+    name: US500 Research Integration Full Validation v1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance
+
+      - name: Verify integration script
+        run: |
+          test -f tests/research_integration/research_integration_full_validation_v1.py
+          echo "Integration script found."
+
+      - name: Download latest Research Context artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p input/research_context
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" \
+            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/research_context.zip
+
+          unzip -o /tmp/research_context.zip -d input/research_context
+
+      - name: Download latest Liquidity artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p input/liquidity
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" \
+            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/liquidity.zip
+
+          unzip -o /tmp/liquidity.zip -d input/liquidity
+
+      - name: Download latest Market Breadth Full Validation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p input/breadth
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" \
+            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/breadth.zip
+
+          unzip -o /tmp/breadth.zip -d input/breadth
+
+      - name: Locate input files
+        run: |
+          set -e
+
+          RESEARCH_CONTEXT_FILE=$(find input/research_context -type f -name "research_context_v1.csv" | head -n 1)
+          LIQUIDITY_FILE=$(find input/liquidity -type f -name "liquidity_intelligence_research_v1.csv" | head -n 1)
+          BREADTH_FILE=$(find input/breadth -type f -name "market_breadth_analysis_v1.csv" | head -n 1)
+
+          test -n "$RESEARCH_CONTEXT_FILE"
+          test -n "$LIQUIDITY_FILE"
+          test -n "$BREADTH_FILE"
+
+          echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE" >> "$GITHUB_ENV"
+          echo "LIQUIDITY_FILE=$LIQUIDITY_FILE" >> "$GITHUB_ENV"
+          echo "BREADTH_FILE=$BREADTH_FILE" >> "$GITHUB_ENV"
+
+          echo "Research Context: $RESEARCH_CONTEXT_FILE"
+          echo "Liquidity: $LIQUIDITY_FILE"
+          echo "Breadth: $BREADTH_FILE"
+
+      - name: Run Research Integration Full Validation
+        run: |
+          set -e
+
+          python tests/research_integration/research_integration_full_validation_v1.py \
+            --research-context "$RESEARCH_CONTEXT_FILE" \
+            --liquidity "$LIQUIDITY_FILE" \
+            --breadth "$BREADTH_FILE" \
+            --output research_integration_full_validation_v1
+
+      - name: Display final report
+        if: always()
+        run: |
+          echo "=============================================="
+          echo "RESEARCH INTEGRATION FULL VALIDATION v1"
+          echo "=============================================="
+
+          if [ -f "research_integration_full_validation_v1/research_integration_full_validation_summary_v1.json" ]; then
+            cat research_integration_full_validation_v1/research_integration_full_validation_summary_v1.json
+          else
+            echo "Final report was not generated."
+          fi
+
+      - name: Upload unified integration artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-integration-full-validation-v1
+          path: research_integration_full_validation_v1/
+          if-no-files-found: warn
+          retention-days: 30
