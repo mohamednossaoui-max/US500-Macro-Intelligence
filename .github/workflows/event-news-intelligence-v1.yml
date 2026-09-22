@@ -10,36 +10,141 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: event-news-intelligence-v1
-  cancel-in-progress: false
-
 jobs:
-  event-news-intelligence:
+  event-news:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install pandas
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
 
-      - name: Compile
-        run: python -m py_compile tests/event_news/event_news_intelligence_v1.py
+      - name: Compile Event News Intelligence
+        run: |
+          python -m py_compile tests/event_news/event_news_intelligence_v1.py
 
       - name: Run Event / News Intelligence v1
+        env:
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
         run: |
-          python tests/event_news/event_news_intelligence_v1.py \
-            --output event_news_intelligence_v1
+          set -euo pipefail
+          python tests/event_news/event_news_intelligence_v1.py
 
-      - name: Show validation
-        run: cat event_news_intelligence_v1/event_news_validation_v1.json
+      - name: Research-only safety guard
+        run: |
+          set -euo pipefail
 
-      - name: Upload artifact
+          test -f event_news_validation_v1.json
+          test -f event_news_events_v1.csv
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("event_news_validation_v1.json")
+
+          with path.open("r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          required = {
+              "research_only": True,
+              "decision_engine_ready": False,
+              "trading_signal": False,
+              "forecast": False,
+          }
+
+          errors = []
+
+          for key, expected in required.items():
+              actual = data.get(key)
+
+              if actual != expected:
+                  errors.append(
+                      f"{key}: expected {expected}, got {actual}"
+                  )
+
+          if errors:
+              print("Research-only guard FAILED:")
+              for error in errors:
+                  print(f" - {error}")
+              raise SystemExit(1)
+
+          print("Research-only guard: PASS")
+          PY
+
+      - name: Display validation report
+        if: always()
+        run: |
+          echo "===== Event News Validation ====="
+
+          if [ -f event_news_validation_v1.json ]; then
+            cat event_news_validation_v1.json
+          else
+            echo "event_news_validation_v1.json not found"
+          fi
+
+      - name: Display event dataset summary
+        if: always()
+        run: |
+          echo "===== Event Dataset ====="
+
+          if [ -f event_news_events_v1.csv ]; then
+            echo "Rows:"
+            python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv("event_news_events_v1.csv")
+
+          print(len(df))
+
+          if len(df) > 0:
+              print("\nColumns:")
+              print(list(df.columns))
+
+              print("\nSource counts:")
+              if "source" in df.columns:
+                  print(df["source"].value_counts(dropna=False).to_string())
+
+              print("\nTopic counts:")
+              if "topic" in df.columns:
+                  print(df["topic"].value_counts(dropna=False).to_string())
+
+              print("\nDate range:")
+
+              if "published_at" in df.columns:
+                  dates = pd.to_datetime(
+                      df["published_at"],
+                      errors="coerce",
+                      utc=True
+                  )
+
+                  print(
+                      f"start={dates.min()}"
+                  )
+
+                  print(
+                      f"end={dates.max()}"
+                  )
+          PY
+          else
+            echo "event_news_events_v1.csv not found"
+          fi
+
+      - name: Upload Event News artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: event-news-intelligence-v1
-          path: event_news_intelligence_v1/
+          path: |
+            event_news_events_v1.csv
+            event_news_validation_v1.json
+          if-no-files-found: warn
