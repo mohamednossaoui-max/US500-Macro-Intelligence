@@ -1,0 +1,82 @@
+name: Market Breadth - Validation & Robustness v1
+
+on:
+  workflow_run:
+    workflows:
+      - "Market Breadth - Analyzer v1"
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  validation:
+    name: Market Breadth Validation & Robustness v1
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Verify validator
+        run: |
+          test -f tests/market_breadth/market_breadth_validation_robustness_v1.py
+          echo "Validator found."
+
+      - name: Download Analyzer artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: market-breadth-analysis-v1
+          path: market_breadth_analysis_v1
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate Analyzer CSV
+        run: |
+          find market_breadth_analysis_v1 -maxdepth 3 -type f -print
+          test -f market_breadth_analysis_v1/market_breadth_analysis_v1.csv
+
+      - name: Run Validation & Robustness
+        run: |
+          echo "=============================================="
+          echo "MARKET BREADTH VALIDATION & ROBUSTNESS v1"
+          echo "=============================================="
+
+          python tests/market_breadth/market_breadth_validation_robustness_v1.py \
+            --input market_breadth_analysis_v1/market_breadth_analysis_v1.csv \
+            --output market_breadth_validation_robustness_v1
+
+      - name: Display validation
+        if: always()
+        run: |
+          echo "=============================================="
+          echo "VALIDATION RESULT"
+          echo "=============================================="
+
+          if [ -f "market_breadth_validation_robustness_v1/market_breadth_robustness_validation_v1.json" ]; then
+            cat market_breadth_validation_robustness_v1/market_breadth_robustness_validation_v1.json
+          else
+            echo "Validation file was not generated."
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-breadth-validation-robustness-v1
+          path: market_breadth_validation_robustness_v1/
+          if-no-files-found: warn
+          retention-days: 30
