@@ -1,0 +1,452 @@
+name: Market Breadth - Membership Cross Validation v2
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths:
+      - "tests/market_breadth/test_membership_cross_validation_v1.py"
+      - "tests/market_breadth/test_membership_cross_validation_v2.py"
+      - ".github/workflows/market-breadth-membership-cross-validation-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cross-validation:
+    name: S&P 500 Membership Cross Validation v2
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pitindex
+
+
+      # ============================================================
+      # 4. VERIFY TEST SCRIPT
+      # ============================================================
+
+      - name: Verify cross-validation script
+        shell: bash
+        run: |
+          set -e
+
+          if [ -f "tests/market_breadth/test_membership_cross_validation_v2.py" ]; then
+            TEST_SCRIPT="tests/market_breadth/test_membership_cross_validation_v2.py"
+          elif [ -f "tests/market_breadth/test_membership_cross_validation_v1.py" ]; then
+            TEST_SCRIPT="tests/market_breadth/test_membership_cross_validation_v1.py"
+          else
+            echo "ERROR: Cross-validation test script not found."
+            echo ""
+            echo "Expected one of:"
+            echo "  tests/market_breadth/test_membership_cross_validation_v2.py"
+            echo "  tests/market_breadth/test_membership_cross_validation_v1.py"
+            exit 1
+          fi
+
+          echo "Using test script:"
+          echo "$TEST_SCRIPT"
+
+          echo "TEST_SCRIPT=$TEST_SCRIPT" >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 5. RUN CROSS-VALIDATION
+      # ============================================================
+
+      - name: Run membership cross-validation v2
+        shell: bash
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "RUNNING MARKET BREADTH MEMBERSHIP CV v2"
+          echo "=============================================="
+
+          python "$TEST_SCRIPT" \
+            --start 2019-01-01 \
+            --output market_breadth_cross_validation_v2
+
+
+      # ============================================================
+      # 6. VERIFY OUTPUT DIRECTORY
+      # ============================================================
+
+      - name: Inspect generated artifacts
+        if: always()
+        shell: bash
+        run: |
+          echo "=============================================="
+          echo "GENERATED FILES"
+          echo "=============================================="
+
+          if [ -d "market_breadth_cross_validation_v2" ]; then
+            find market_breadth_cross_validation_v2 \
+              -maxdepth 2 \
+              -type f \
+              -print
+          else
+            echo "ERROR: Output directory does not exist."
+            exit 1
+          fi
+
+
+      # ============================================================
+      # 7. VALIDATE SUMMARY
+      # ============================================================
+
+      - name: Validate summary artifact
+        shell: bash
+        run: |
+          set -e
+
+          OUTPUT="market_breadth_cross_validation_v2"
+
+          echo "Checking required artifacts..."
+
+          test -f "$OUTPUT/membership_cross_validation_summary_v2.json"
+          test -f "$OUTPUT/membership_snapshot_comparison_v2.csv"
+          test -f "$OUTPUT/membership_discrepancies_v2.csv"
+          test -f "$OUTPUT/membership_unresolved_conflicts_v2.csv"
+
+          echo ""
+          echo "All required artifacts exist."
+
+
+      # ============================================================
+      # 8. VALIDATE JSON
+      # ============================================================
+
+      - name: Validate summary JSON
+        shell: bash
+        run: |
+          set -e
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(
+              "market_breadth_cross_validation_v2/"
+              "membership_cross_validation_summary_v2.json"
+          )
+
+          with path.open(
+              "r",
+              encoding="utf-8"
+          ) as f:
+              data = json.load(f)
+
+          required = [
+              "validation_version",
+              "common_snapshot_count",
+              "common_date_start",
+              "common_date_end",
+              "mean_fja_hans_jaccard",
+              "mean_fja_chinobing_jaccard",
+              "mean_hans_chinobing_jaccard",
+              "direct_source_conflict_ratio",
+              "pit_supported_disagreement_ratio",
+              "unresolved_ratio",
+              "final_status",
+              "point_in_time_reconstructed",
+              "membership_source",
+              "membership_quality",
+              "cross_validated",
+              "research_only",
+              "decision_engine_ready",
+          ]
+
+          missing = [
+              key
+              for key in required
+              if key not in data
+          ]
+
+          if missing:
+              print("ERROR: Missing JSON fields:")
+              for key in missing:
+                  print(f"  - {key}")
+              raise SystemExit(1)
+
+          print("JSON schema validation: PASS")
+          print()
+          print("Validation version:", data["validation_version"])
+          print("Final status:", data["final_status"])
+          print(
+              "Common snapshots:",
+              data["common_snapshot_count"]
+          )
+          print(
+              "Date range:",
+              data["common_date_start"],
+              "->",
+              data["common_date_end"]
+          )
+          PY
+
+
+      # ============================================================
+      # 9. DISPLAY RESULT
+      # ============================================================
+
+      - name: Display validation summary
+        if: always()
+        shell: bash
+        run: |
+          echo ""
+          echo "================================================"
+          echo "MARKET BREADTH MEMBERSHIP CROSS-VALIDATION v2"
+          echo "================================================"
+          echo ""
+
+          cat \
+            market_breadth_cross_validation_v2/\
+membership_cross_validation_summary_v2.json
+
+
+      # ============================================================
+      # 10. DISPLAY CLASSIFICATION COUNTS
+      # ============================================================
+
+      - name: Display classification statistics
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+
+          path = (
+              "market_breadth_cross_validation_v2/"
+              "membership_cross_validation_summary_v2.json"
+          )
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as f:
+              data = json.load(f)
+
+          print("")
+          print("================================================")
+          print("CLASSIFICATION")
+          print("================================================")
+
+          counts = data.get(
+              "classification_counts",
+              {}
+          )
+
+          for key in [
+              "MATCH",
+              "EXPLAINABLE",
+              "PIT_SUPPORTED_DISAGREEMENT",
+              "UNRESOLVED_CONFLICT",
+          ]:
+              print(
+                  f"{key}: "
+                  f"{counts.get(key, 0)}"
+              )
+
+          print("")
+          print(
+              "Direct source conflict ratio:",
+              f"{data.get('direct_source_conflict_ratio', 0):.4%}"
+          )
+
+          print(
+              "PIT-supported disagreement ratio:",
+              f"{data.get('pit_supported_disagreement_ratio', 0):.4%}"
+          )
+
+          print(
+              "Unresolved ratio:",
+              f"{data.get('unresolved_ratio', 0):.4%}"
+          )
+
+          print("")
+          print(
+              "FINAL STATUS:",
+              data.get("final_status")
+          )
+          PY
+
+
+      # ============================================================
+      # 11. DISPLAY UNRESOLVED CONFLICTS
+      # ============================================================
+
+      - name: Display unresolved conflicts
+        if: always()
+        shell: bash
+        run: |
+          echo ""
+          echo "================================================"
+          echo "UNRESOLVED CONFLICTS"
+          echo "================================================"
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = (
+              "market_breadth_cross_validation_v2/"
+              "membership_unresolved_conflicts_v2.csv"
+          )
+
+          try:
+              df = pd.read_csv(path)
+          except Exception as exc:
+              print(
+                  "Unable to read unresolved conflicts:",
+                  exc
+              )
+              raise SystemExit(0)
+
+          if df.empty:
+              print("No unresolved conflicts.")
+          else:
+              print(
+                  df.to_string(index=False)
+              )
+          PY
+
+
+      # ============================================================
+      # 12. DISPLAY WORST AGREEMENTS
+      # ============================================================
+
+      - name: Display worst snapshot agreements
+        if: always()
+        shell: bash
+        run: |
+          echo ""
+          echo "================================================"
+          echo "WORST SNAPSHOT AGREEMENTS"
+          echo "================================================"
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = (
+              "market_breadth_cross_validation_v2/"
+              "membership_snapshot_comparison_v2.csv"
+          )
+
+          df = pd.read_csv(path)
+
+          cols = [
+              "asof_date",
+              "fja_count",
+              "hans_count",
+              "chinobing_count",
+              "pit_count",
+              "fja_hans_jaccard",
+              "fja_chinobing_jaccard",
+              "hans_chinobing_jaccard",
+              "classification",
+          ]
+
+          available = [
+              c for c in cols
+              if c in df.columns
+          ]
+
+          print(
+              df.sort_values(
+                  "fja_hans_jaccard",
+                  ascending=True
+              )[available]
+              .head(20)
+              .to_string(index=False)
+          )
+          PY
+
+
+      # ============================================================
+      # 13. RESEARCH-ONLY SAFETY CHECK
+      # ============================================================
+
+      - name: Verify research-only constraints
+        shell: bash
+        run: |
+          set -e
+
+          python - <<'PY'
+          import json
+
+          path = (
+              "market_breadth_cross_validation_v2/"
+              "membership_cross_validation_summary_v2.json"
+          )
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as f:
+              data = json.load(f)
+
+          checks = {
+              "research_only": True,
+              "decision_engine_ready": False,
+          }
+
+          for key, expected in checks.items():
+
+              actual = data.get(key)
+
+              if actual != expected:
+                  raise SystemExit(
+                      f"SAFETY CHECK FAILED: "
+                      f"{key}={actual}, "
+                      f"expected={expected}"
+                  )
+
+          print(
+              "Research-only safety checks: PASS"
+          )
+          print(
+              "Decision Engine integration: FALSE"
+          )
+          PY
+
+
+      # ============================================================
+      # 14. UPLOAD ARTIFACTS
+      # ============================================================
+
+      - name: Upload cross-validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-breadth-membership-cross-validation-v2
+          path: market_breadth_cross_validation_v2/
+          if-no-files-found: error
+          retention-days: 30
