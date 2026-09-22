@@ -1,0 +1,90 @@
+name: Market Breadth - Analyzer v1
+
+on:
+  workflow_run:
+    workflows: ["Market Breadth - Historical Collector v1"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  analyzer:
+    name: Market Breadth Analyzer v1
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Verify analyzer
+        run: |
+          echo "Checking Market Breadth analyzer..."
+
+          test -f tests/market_breadth/market_breadth_analyzer_v1.py
+
+          echo "Analyzer found."
+
+      - name: Download collector artifact from completed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          echo "Downloading Market Breadth collector artifact..."
+          gh run download "$RUN_ID"             --repo "$GITHUB_REPOSITORY"             --name market-breadth-historical-v1             --dir market_breadth_historical_v1
+
+          test -f market_breadth_historical_v1/market_breadth_records_v1.csv
+
+          echo "Collector artifact found."
+
+      - name: Run Market Breadth Analyzer
+        run: |
+          echo "=============================================="
+          echo "MARKET BREADTH ANALYZER v1"
+          echo "=============================================="
+
+          python tests/market_breadth/market_breadth_analyzer_v1.py             --input market_breadth_historical_v1/market_breadth_records_v1.csv             --output market_breadth_analysis_v1
+
+      - name: Validate artifacts
+        run: |
+          echo "Checking generated artifacts..."
+
+          test -f market_breadth_analysis_v1/market_breadth_analysis_v1.csv
+          test -f market_breadth_analysis_v1/market_breadth_analysis_summary_v1.json
+          test -f market_breadth_analysis_v1/market_breadth_analysis_validation_v1.json
+
+          echo "All artifacts found."
+
+      - name: Display validation
+        if: always()
+        run: |
+          echo "=============================================="
+          echo "VALIDATION"
+          echo "=============================================="
+
+          if [ -f "market_breadth_analysis_v1/market_breadth_analysis_validation_v1.json" ]; then
+            cat market_breadth_analysis_v1/market_breadth_analysis_validation_v1.json
+          else
+            echo "Validation file was not generated."
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-breadth-analysis-v1
+          path: market_breadth_analysis_v1/
+          if-no-files-found: warn
+          retention-days: 30
