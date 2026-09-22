@@ -1,0 +1,93 @@
+name: Market Breadth - Membership Cross Validation v1
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tests/market_breadth/test_membership_cross_validation_v1.py"
+      - ".github/workflows/market-breadth-membership-cross-validation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cross-validation:
+    name: S&P 500 Membership Cross Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas pitindex
+
+      - name: Run membership cross-validation
+        run: |
+          python tests/market_breadth/test_membership_cross_validation_v1.py \
+            --start 2019-01-01 \
+            --output market_breadth_cross_validation_v1
+
+      - name: Validate summary artifact
+        run: |
+          test -f market_breadth_cross_validation_v1/membership_cross_validation_summary_v1.json
+          test -f market_breadth_cross_validation_v1/membership_snapshot_comparison_v1.csv
+          test -f market_breadth_cross_validation_v1/membership_discrepancies_v1.csv
+
+      - name: Upload cross-validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-breadth-membership-cross-validation-v1
+          path: market_breadth_cross_validation_v1/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Display validation summary
+        run: |
+          echo "=============================================="
+          echo "MARKET BREADTH MEMBERSHIP CROSS-VALIDATION v1"
+          echo "=============================================="
+          cat market_breadth_cross_validation_v1/membership_cross_validation_summary_v1.json
+
+      - name: Display worst discrepancies
+        run: |
+          echo "=============================================="
+          echo "WORST SNAPSHOT AGREEMENTS"
+          echo "=============================================="
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = (
+              "market_breadth_cross_validation_v1/"
+              "membership_snapshot_comparison_v1.csv"
+          )
+
+          df = pd.read_csv(path)
+
+          cols = [
+              "asof_date",
+              "fja_count",
+              "hans_count",
+              "pit_count",
+              "fja_hans_jaccard",
+              "fja_only",
+              "hans_only",
+              "classification",
+          ]
+
+          print(
+              df.sort_values(
+                  "fja_hans_jaccard",
+                  ascending=True
+              )[cols].head(20).to_string(index=False)
+          )
+          PY
