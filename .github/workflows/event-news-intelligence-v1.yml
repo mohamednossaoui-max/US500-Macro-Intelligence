@@ -30,20 +30,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install pandas
-      # ======================================================
-      # Verify API secret
-      # ======================================================
-      - name: Verify GNews API key is configured
-        env:
-          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "${GNEWS_API_KEY}" ]; then
-            echo "ERROR: GNEWS_API_KEY secret is missing."
-            exit 1
-          fi
-          echo "GNEWS_API_KEY: configured"
+          pip install \
+            pandas \
+            numpy
       # ======================================================
       # Compile
       # ======================================================
@@ -53,15 +42,19 @@ jobs:
           python -m py_compile \
             tests/event_news/event_news_intelligence_v1.py
       # ======================================================
-      # Run collector + validator
+      # Run Event / News Intelligence
       # ======================================================
       - name: Run Event / News Intelligence v1
         env:
-          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          # Optional but recommended for SEC compliance.
+          # If absent, the Python collector uses a fallback
+          # research-only User-Agent.
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: |
           set -euo pipefail
           python \
-            tests/event_news/event_news_intelligence_v1.py
+            tests/event_news/event_news_intelligence_v1.py \
+            --output event_news_intelligence_v1
       # ======================================================
       # Research-only safety guard
       # ======================================================
@@ -69,11 +62,15 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          test -f event_news_validation_v1.json
+          VALIDATION_FILE="event_news_intelligence_v1/event_news_validation_v1.json"
+          DATA_FILE="event_news_intelligence_v1/event_news_research_v1.csv"
+          test -f "${VALIDATION_FILE}"
+          test -f "${DATA_FILE}"
           python - <<'PY'
           import json
           from pathlib import Path
           path = Path(
+              "event_news_intelligence_v1/"
               "event_news_validation_v1.json"
           )
           with path.open(
@@ -86,6 +83,8 @@ jobs:
               "decision_engine_ready": False,
               "trading_signal": False,
               "forecast": False,
+              "pit_perfect": False,
+              "point_in_time_reconstructed": False,
           }
           errors = []
           for key, expected in required.items():
@@ -109,47 +108,77 @@ jobs:
           )
           PY
       # ======================================================
-      # Display validation
+      # Display validation report
       # ======================================================
       - name: Display validation report
         if: always()
         run: |
           echo "===== Event News Validation ====="
-          if [ -f event_news_validation_v1.json ]; then
-            cat event_news_validation_v1.json
+          if [ -f \
+            event_news_intelligence_v1/event_news_validation_v1.json
+          ]; then
+            cat \
+              event_news_intelligence_v1/event_news_validation_v1.json
           else
             echo \
-              "event_news_validation_v1.json not found"
+              "Validation report not found."
           fi
       # ======================================================
-      # Display dataset summary
+      # Display GDELT / SEC execution summary
+      # ======================================================
+      - name: Display execution summary
+        if: always()
+        run: |
+          echo "===== Event News Execution Summary ====="
+          if [ -f \
+            event_news_intelligence_v1/event_news_research_summary_v1.json
+          ]; then
+            cat \
+              event_news_intelligence_v1/event_news_research_summary_v1.json
+          else
+            echo \
+              "Research summary not found."
+          fi
+      # ======================================================
+      # Dataset summary
       # ======================================================
       - name: Display event dataset summary
         if: always()
         run: |
-          echo "===== Event Dataset ====="
-          if [ -f event_news_events_v1.csv ]; then
-            echo "Rows:"
+          echo "===== Event News Dataset ====="
+          if [ -f \
+            event_news_intelligence_v1/event_news_research_v1.csv
+          ]; then
             python - <<'PY'
           import pandas as pd
-          df = pd.read_csv(
-              "event_news_events_v1.csv"
+          path = (
+              "event_news_intelligence_v1/"
+              "event_news_research_v1.csv"
           )
-          print(len(df))
+          df = pd.read_csv(path)
+          print(
+              f"Rows: {len(df)}"
+          )
+          print("\nColumns:")
+          print(
+              list(df.columns)
+          )
           if len(df) > 0:
-              print("\nColumns:")
-              print(list(df.columns))
-              print("\nSource counts:")
-              if "source" in df.columns:
+              if "source_type" in df.columns:
                   print(
-                      df["source"]
+                      "\nSource counts:"
+                  )
+                  print(
+                      df["source_type"]
                       .value_counts(
                           dropna=False
                       )
                       .to_string()
                   )
-              print("\nTopic counts:")
               if "topic" in df.columns:
+                  print(
+                      "\nTopic counts:"
+                  )
                   print(
                       df["topic"]
                       .value_counts(
@@ -157,12 +186,14 @@ jobs:
                       )
                       .to_string()
                   )
-              print("\nDate range:")
               if "published_at" in df.columns:
                   dates = pd.to_datetime(
                       df["published_at"],
                       errors="coerce",
                       utc=True,
+                  )
+                  print(
+                      "\nDate range:"
                   )
                   print(
                       f"start={dates.min()}"
@@ -173,7 +204,7 @@ jobs:
           PY
           else
             echo \
-              "event_news_events_v1.csv not found"
+              "Research dataset not found."
           fi
       # ======================================================
       # Upload artifacts
@@ -184,6 +215,7 @@ jobs:
         with:
           name: event-news-intelligence-v1
           path: |
-            event_news_events_v1.csv
-            event_news_validation_v1.json
+            event_news_intelligence_v1/event_news_research_v1.csv
+            event_news_intelligence_v1/event_news_research_summary_v1.json
+            event_news_intelligence_v1/event_news_validation_v1.json
           if-no-files-found: warn
