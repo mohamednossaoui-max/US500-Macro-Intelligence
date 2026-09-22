@@ -222,8 +222,43 @@ def add_forward_returns(df: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
     return out.merge(future, on="study_date", how="left")
 
 
-def numeric_available(df, candidates):
-    return [c for c in candidates if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
+def numeric_available(df, candidates, min_valid=30):
+    """
+    Resolve candidate features robustly.
+
+    A feature is considered available when:
+    - its name exists exactly or case-insensitively;
+    - values can be converted to numeric;
+    - at least min_valid observations are numeric.
+
+    This only improves input-schema compatibility. It does not alter
+    the research methodology or create any trading/forecast output.
+    """
+    normalized = {
+        str(c).strip().lower(): c
+        for c in df.columns
+    }
+
+    available = []
+
+    for candidate in candidates:
+        key = str(candidate).strip().lower()
+        actual = normalized.get(key)
+
+        # Liquidity columns are prefixed with "liq_" during integration.
+        if actual is None:
+            actual = normalized.get(f"liq_{key}")
+
+        if actual is None:
+            continue
+
+        numeric = pd.to_numeric(df[actual], errors="coerce")
+
+        if numeric.notna().sum() >= min_valid:
+            df[actual] = numeric
+            available.append(actual)
+
+    return available
 
 
 def standardized(df, cols):
@@ -339,8 +374,12 @@ def main():
             f"Too few Breadth features available for integration test: {available_breadth}"
         )
     if len(available_base) < 3:
+        available_columns = sorted(
+            [str(c) for c in merged.columns if not str(c).startswith("forward_return_")]
+        )
         raise ValueError(
-            f"Too few base features available for integration test: {available_base}"
+            "Too few base features available for integration test: "
+            f"{available_base}. Available integration columns: {available_columns}"
         )
 
     # Coverage sensitivity: all rows and >=90%.
