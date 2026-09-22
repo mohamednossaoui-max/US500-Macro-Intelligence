@@ -173,72 +173,80 @@ def validate(prices, research, rolling, divergence, errors):
     check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
     check("unique_dates", not prices.index.duplicated().any())
     check("sorted_dates", prices.index.is_monotonic_increasing)
-    # Validate each economic series according to its type.
-    # Oil is intentionally allowed to be <= 0 because CL=F contains the
-    # documented negative settlement period in April 2020.
+    # Validate observed values only. Missing values are expected on non-trading
+    # dates because the common calendar includes weekends/crypto dates.
+    # Infinities from the vendor are normalized to NaN during download, so they
+    # are treated as missing observations rather than invalid observed prices.
     positive_price_cols = [
         c for c in ["US500", "DXY", "GOLD", "BITCOIN"]
         if c in prices.columns
     ]
-    oil_values = prices["OIL"].dropna() if "OIL" in prices.columns else pd.Series(dtype=float)
     yield_cols = [c for c in ["US2Y_PROXY", "US10Y"] if c in prices.columns]
 
-    positive_values = prices[positive_price_cols].stack()
-    positive_arr = pd.to_numeric(positive_values, errors="coerce").to_numpy(dtype=float)
-    positive_nonfinite = int((~np.isfinite(positive_arr)).sum()) if len(positive_arr) else 0
-    positive_nonpositive = int((positive_arr <= 0).sum()) if len(positive_arr) else 0
-    positive_finite = positive_nonfinite == 0 if len(positive_arr) else False
-    positive_prices = positive_nonpositive == 0 if len(positive_arr) else False
-
-    oil_arr = pd.to_numeric(oil_values, errors="coerce").to_numpy(dtype=float)
-    oil_nonfinite = int((~np.isfinite(oil_arr)).sum()) if len(oil_arr) else 0
-    oil_finite = oil_nonfinite == 0 if len(oil_arr) else False
-
-    yield_values = prices[yield_cols].stack()
-    yield_arr = pd.to_numeric(yield_values, errors="coerce").to_numpy(dtype=float)
-    yield_nonfinite = int((~np.isfinite(yield_arr)).sum()) if len(yield_arr) else 0
-    yield_finite = yield_nonfinite == 0 if len(yield_arr) else False
-
     market_bad_by_col = {}
+    market_all_valid = True
+    market_observed = 0
     for col in positive_price_cols:
-        arr = pd.to_numeric(prices[col], errors="coerce").to_numpy(dtype=float)
+        raw = pd.to_numeric(prices[col], errors="coerce")
+        observed = raw.dropna().to_numpy(dtype=float)
+        nonfinite = int((~np.isfinite(observed)).sum()) if len(observed) else 0
+        nonpositive = int((observed <= 0).sum()) if len(observed) else 0
+        market_observed += len(observed)
         market_bad_by_col[col] = {
-            "nonfinite": int((~np.isfinite(arr)).sum()),
-            "nonpositive": int((arr <= 0).sum()),
+            "observed": int(len(observed)),
+            "nonfinite": nonfinite,
+            "nonpositive": nonpositive,
         }
+        market_all_valid = market_all_valid and len(observed) > 0 and nonfinite == 0 and nonpositive == 0
+
+    oil_observed = (
+        pd.to_numeric(prices["OIL"], errors="coerce").dropna().to_numpy(dtype=float)
+        if "OIL" in prices.columns else np.array([], dtype=float)
+    )
+    oil_nonfinite = int((~np.isfinite(oil_observed)).sum()) if len(oil_observed) else 0
+    oil_finite = len(oil_observed) > 0 and oil_nonfinite == 0
 
     yield_bad_by_col = {}
+    yield_all_finite = True
+    yield_observed = 0
     for col in yield_cols:
-        arr = pd.to_numeric(prices[col], errors="coerce").to_numpy(dtype=float)
+        raw = pd.to_numeric(prices[col], errors="coerce")
+        observed = raw.dropna().to_numpy(dtype=float)
+        nonfinite = int((~np.isfinite(observed)).sum()) if len(observed) else 0
+        yield_observed += len(observed)
         yield_bad_by_col[col] = {
-            "nonfinite": int((~np.isfinite(arr)).sum()),
+            "observed": int(len(observed)),
+            "nonfinite": nonfinite,
         }
+        yield_all_finite = yield_all_finite and len(observed) > 0 and nonfinite == 0
 
     check(
         "positive_market_prices",
-        positive_finite and positive_prices,
+        market_all_valid,
         json.dumps({
-            "non_null_values": len(positive_values),
-            "nonfinite": positive_nonfinite,
-            "nonpositive": positive_nonpositive,
+            "observed_values": market_observed,
             "by_column": market_bad_by_col,
+            "missing_values_allowed": True,
         }, sort_keys=True)
     )
     check(
         "oil_series_finite",
         oil_finite,
         json.dumps({
-            "non_null_values": len(oil_values),
+            "observed_values": int(len(oil_observed)),
             "nonfinite": oil_nonfinite,
+            "negative_values_allowed": True,
+            "missing_values_allowed": True,
         }, sort_keys=True)
     )
     check(
         "yield_series_finite",
-        yield_finite,
+        yield_all_finite,
         json.dumps({
-            "non_null_values": len(yield_values),
-            "nonfinite": yield_nonfinite,
+            "observed_values": yield_observed,
             "by_column": yield_bad_by_col,
+            "negative_values_allowed": True,
+            "missing_values_allowed": True,
         }, sort_keys=True)
     )
     check("returns_present", any(c.endswith("_RET_20D_PCT") for c in research.columns))
