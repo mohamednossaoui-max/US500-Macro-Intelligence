@@ -184,26 +184,62 @@ def validate(prices, research, rolling, divergence, errors):
     yield_cols = [c for c in ["US2Y_PROXY", "US10Y"] if c in prices.columns]
 
     positive_values = prices[positive_price_cols].stack()
-    positive_finite = bool(np.isfinite(positive_values.to_numpy()).all()) if len(positive_values) else False
-    positive_prices = bool((positive_values > 0).all()) if len(positive_values) else False
-    oil_finite = bool(np.isfinite(oil_values.to_numpy()).all()) if len(oil_values) else False
+    positive_arr = pd.to_numeric(positive_values, errors="coerce").to_numpy(dtype=float)
+    positive_nonfinite = int((~np.isfinite(positive_arr)).sum()) if len(positive_arr) else 0
+    positive_nonpositive = int((positive_arr <= 0).sum()) if len(positive_arr) else 0
+    positive_finite = positive_nonfinite == 0 if len(positive_arr) else False
+    positive_prices = positive_nonpositive == 0 if len(positive_arr) else False
+
+    oil_arr = pd.to_numeric(oil_values, errors="coerce").to_numpy(dtype=float)
+    oil_nonfinite = int((~np.isfinite(oil_arr)).sum()) if len(oil_arr) else 0
+    oil_finite = oil_nonfinite == 0 if len(oil_arr) else False
+
     yield_values = prices[yield_cols].stack()
-    yield_finite = bool(np.isfinite(yield_values.to_numpy()).all()) if len(yield_values) else False
+    yield_arr = pd.to_numeric(yield_values, errors="coerce").to_numpy(dtype=float)
+    yield_nonfinite = int((~np.isfinite(yield_arr)).sum()) if len(yield_arr) else 0
+    yield_finite = yield_nonfinite == 0 if len(yield_arr) else False
+
+    market_bad_by_col = {}
+    for col in positive_price_cols:
+        arr = pd.to_numeric(prices[col], errors="coerce").to_numpy(dtype=float)
+        market_bad_by_col[col] = {
+            "nonfinite": int((~np.isfinite(arr)).sum()),
+            "nonpositive": int((arr <= 0).sum()),
+        }
+
+    yield_bad_by_col = {}
+    for col in yield_cols:
+        arr = pd.to_numeric(prices[col], errors="coerce").to_numpy(dtype=float)
+        yield_bad_by_col[col] = {
+            "nonfinite": int((~np.isfinite(arr)).sum()),
+        }
 
     check(
         "positive_market_prices",
         positive_finite and positive_prices,
-        f"non_null_values={len(positive_values)}"
+        json.dumps({
+            "non_null_values": len(positive_values),
+            "nonfinite": positive_nonfinite,
+            "nonpositive": positive_nonpositive,
+            "by_column": market_bad_by_col,
+        }, sort_keys=True)
     )
     check(
         "oil_series_finite",
         oil_finite,
-        f"non_null_values={len(oil_values)}"
+        json.dumps({
+            "non_null_values": len(oil_values),
+            "nonfinite": oil_nonfinite,
+        }, sort_keys=True)
     )
     check(
         "yield_series_finite",
         yield_finite,
-        f"non_null_values={len(yield_values)}"
+        json.dumps({
+            "non_null_values": len(yield_values),
+            "nonfinite": yield_nonfinite,
+            "by_column": yield_bad_by_col,
+        }, sort_keys=True)
     )
     check("returns_present", any(c.endswith("_RET_20D_PCT") for c in research.columns))
     check("rolling_output", len(rolling) > 0)
