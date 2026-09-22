@@ -1,0 +1,269 @@
+name: Historical Event Study v2
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths:
+      - ".github/workflows/historical-event-study-v2.yml"
+      - "tests/historical_event_study/historical_event_study_v2.py"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: historical-event-study-v2
+  cancel-in-progress: false
+
+jobs:
+
+  historical-event-study-v2:
+
+    name: US500 Historical Event Study v2
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          set -e
+          python -m pip install --upgrade pip
+          pip install pandas numpy yfinance
+
+      - name: Verify Historical Event Study v2 script
+        run: |
+          set -e
+          test -f tests/historical_event_study/historical_event_study_v2.py
+          python -m py_compile tests/historical_event_study/historical_event_study_v2.py
+
+      - name: Prepare input directories
+        run: |
+          set -e
+          rm -rf input
+          rm -rf historical_event_study_v2
+          mkdir -p input/research_context
+          mkdir -p input/liquidity
+          mkdir -p input/breadth
+
+      - name: Download latest Research Context artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/research_context.zip
+
+          unzip -o /tmp/research_context.zip -d input/research_context
+
+          find input/research_context -type f -print
+
+      - name: Download latest Liquidity Intelligence artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/liquidity.zip
+
+          unzip -o /tmp/liquidity.zip -d input/liquidity
+
+          find input/liquidity -type f -print
+
+      - name: Download latest Market Breadth artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          test -n "$ARTIFACT_ID"
+          test "$ARTIFACT_ID" != "null"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/breadth.zip
+
+          unzip -o /tmp/breadth.zip -d input/breadth
+
+          find input/breadth -type f -print
+
+      - name: Locate research input CSV files
+        shell: bash
+        run: |
+          set -e
+
+          find input -type f -name "*.csv" -print
+
+          RESEARCH_CONTEXT_FILE=""
+          LIQUIDITY_FILE=""
+          BREADTH_FILE=""
+
+          EXACT_RC=$(find input/research_context -type f -name "research_context_v1.csv" -print -quit)
+
+          if [ -n "$EXACT_RC" ]; then
+            RESEARCH_CONTEXT_FILE="$EXACT_RC"
+          else
+            while IFS= read -r f; do
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+              if echo "$HEADER" | grep -qi "study_date"; then
+                RESEARCH_CONTEXT_FILE="$f"
+                break
+              fi
+            done < <(find input/research_context -type f -name "*.csv" -print)
+          fi
+
+          EXACT_LIQ=$(find input/liquidity -type f -name "liquidity_intelligence_research_v1.csv" -print -quit)
+
+          if [ -n "$EXACT_LIQ" ]; then
+            LIQUIDITY_FILE="$EXACT_LIQ"
+          else
+            while IFS= read -r f; do
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+              if echo "$HEADER" | grep -qi "NET_LIQUIDITY_PROXY_MILLIONS"; then
+                LIQUIDITY_FILE="$f"
+                break
+              fi
+            done < <(find input/liquidity -type f -name "*.csv" -print)
+          fi
+
+          EXACT_BREADTH=$(find input/breadth -type f -name "market_breadth_analysis_v1.csv" -print -quit)
+
+          if [ -n "$EXACT_BREADTH" ]; then
+            BREADTH_FILE="$EXACT_BREADTH"
+          else
+            while IFS= read -r f; do
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+              if echo "$HEADER" | grep -qi "breadth_research_state"; then
+                BREADTH_FILE="$f"
+                break
+              fi
+            done < <(find input/breadth -type f -name "*.csv" -print)
+          fi
+
+          echo "Research Context: $RESEARCH_CONTEXT_FILE"
+          echo "Liquidity: $LIQUIDITY_FILE"
+          echo "Market Breadth: $BREADTH_FILE"
+
+          test -n "$RESEARCH_CONTEXT_FILE"
+          test -n "$LIQUIDITY_FILE"
+          test -n "$BREADTH_FILE"
+
+          {
+            echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE"
+            echo "LIQUIDITY_FILE=$LIQUIDITY_FILE"
+            echo "BREADTH_FILE=$BREADTH_FILE"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate input files
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          for key in [
+              "RESEARCH_CONTEXT_FILE",
+              "LIQUIDITY_FILE",
+              "BREADTH_FILE",
+          ]:
+              path = os.environ[key]
+              df = pd.read_csv(path, low_memory=False)
+              print(key, "=", path)
+              print("rows =", len(df))
+              print("columns =", len(df.columns))
+              if df.empty:
+                  raise SystemExit(f"Empty input: {path}")
+          PY
+
+      - name: Run Historical Event Study v2
+        run: |
+          set -e
+
+          python \
+            tests/historical_event_study/historical_event_study_v2.py \
+            --research-context "$RESEARCH_CONTEXT_FILE" \
+            --liquidity "$LIQUIDITY_FILE" \
+            --breadth "$BREADTH_FILE" \
+            --output historical_event_study_v2
+
+      - name: Display final validation
+        if: always()
+        run: |
+          echo "=============================================="
+          echo "HISTORICAL EVENT STUDY v2"
+          echo "=============================================="
+
+          if [ -f "historical_event_study_v2/historical_event_study_validation_v2.json" ]; then
+            cat historical_event_study_v2/historical_event_study_validation_v2.json
+          else
+            echo "Validation report was not generated."
+          fi
+
+          echo ""
+          echo "OUTPUT FILES:"
+          find historical_event_study_v2 -maxdepth 2 -type f -print 2>/dev/null || true
+
+      - name: Upload Historical Event Study v2 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-event-study-v2
+          path: historical_event_study_v2/
+          if-no-files-found: warn
+          retention-days: 30
