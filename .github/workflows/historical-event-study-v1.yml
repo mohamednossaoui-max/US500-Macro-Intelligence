@@ -1,0 +1,62 @@
+name: Historical Event Study v1
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  historical-event-study:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Install dependencies
+        run: pip install pandas numpy yfinance
+      - name: Verify script
+        run: python -m py_compile tests/historical_event_study/historical_event_study_v1.py
+      - name: Download latest Research Context
+        env: {GH_TOKEN: ${{ github.token }}}
+        run: |
+          set -e; mkdir -p input/research_context
+          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+          test -n "$ID"; test "$ID" != null
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/context.zip
+          unzip -o /tmp/context.zip -d input/research_context
+      - name: Download latest Liquidity
+        env: {GH_TOKEN: ${{ github.token }}}
+        run: |
+          set -e; mkdir -p input/liquidity
+          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+          test -n "$ID"; test "$ID" != null
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/liquidity.zip
+          unzip -o /tmp/liquidity.zip -d input/liquidity
+      - name: Download latest Market Breadth
+        env: {GH_TOKEN: ${{ github.token }}}
+        run: |
+          set -e; mkdir -p input/breadth
+          ID=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+          test -n "$ID"; test "$ID" != null
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/$ID/zip" > /tmp/breadth.zip
+          unzip -o /tmp/breadth.zip -d input/breadth
+      - name: Locate inputs
+        run: |
+          set -e
+          C=$(find input/research_context -type f -name research_context_v1.csv | head -1)
+          L=$(find input/liquidity -type f -name liquidity_intelligence_research_v1.csv | head -1)
+          B=$(find input/breadth -type f -name market_breadth_analysis_v1.csv | head -1)
+          test -n "$C"; test -n "$L"; test -n "$B"
+          echo "C=$C" >> $GITHUB_ENV; echo "L=$L" >> $GITHUB_ENV; echo "B=$B" >> $GITHUB_ENV
+      - name: Run Historical Event Study
+        run: python tests/historical_event_study/historical_event_study_v1.py --research-context "$C" --liquidity "$L" --breadth "$B" --output historical_event_study_v1
+      - name: Display validation
+        if: always()
+        run: cat historical_event_study_v1/historical_event_study_validation_v1.json || true
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-event-study-v1
+          path: historical_event_study_v1/
+          if-no-files-found: warn
+          retention-days: 30
