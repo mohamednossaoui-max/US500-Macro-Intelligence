@@ -67,37 +67,33 @@ BREADTH_FEATURES = [
 ]
 
 BASE_CANDIDATES = [
-    # Economic
-    "inflation_score",
-    "labor_score",
-    "growth_score",
-    # Fed
-    "fed_score",
-    # Financial stress
-    "composite_stress_score",
-    "financial_stress_composite",
-    "yield_curve_stress_z",
-    "VIX",
-    "NFCI",
-    "ANFCI",
-    # Sentiment
-    "unified_sentiment_score",
-    "cot_component",
-    "aaii_component",
-    "vix_component",
-    # Technical
-    "RSI14",
-    "ROC20_pct",
-    "ATR14_pct",
-    "drawdown_pct",
-    "distance_SMA20_pct",
-    "distance_SMA50_pct",
-    "distance_SMA200_pct",
-    # Liquidity
+    # Research Context — Economic / Fed / Financial Stress
+    "macro_inflation_score",
+    "macro_labor_score",
+    "macro_growth_score",
+    "macro_fed_score",
+    "macro_financial_stress_composite",
+    "macro_yield_curve_stress_z",
+    "macro_vix",
+    "macro_treasury_2y",
+    "macro_treasury_10y",
+    "macro_yield_10y_2y_spread",
+    # Research Context — Sentiment
+    "sentiment_unified_sentiment_score",
+    "sentiment_cot_sentiment_score",
+    "sentiment_aaii_sentiment_score",
+    "sentiment_vix_sentiment_score",
+    # Research Context — Technical
+    "technical_RSI14",
+    "technical_ROC20_pct",
+    "technical_ATR14_pct",
+    "technical_drawdown_pct",
+    "technical_close_vs_SMA20_pct",
+    "technical_close_vs_SMA50_pct",
+    "technical_close_vs_SMA200_pct",
+    # Liquidity Intelligence
     "NET_LIQUIDITY_PROXY_MILLIONS",
-    "net_liquidity_proxy_millions",
     "SOFR_EFFR_SPREAD_BPS",
-    "sofr_effr_spread_bps",
 ]
 
 DATE_CANDIDATES = ["context_date", "asof_date", "observation_date"]
