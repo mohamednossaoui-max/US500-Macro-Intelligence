@@ -1,144 +1,183 @@
 name: Event News Intelligence v1
-
 on:
   workflow_dispatch:
   push:
     paths:
       - ".github/workflows/event-news-intelligence-v1.yml"
       - "tests/event_news/event_news_intelligence_v1.py"
-
 permissions:
   contents: read
-
 jobs:
   event-news:
     runs-on: ubuntu-latest
-
     steps:
+      # ======================================================
+      # Checkout
+      # ======================================================
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      # ======================================================
+      # Python
+      # ======================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
+      # ======================================================
+      # Dependencies
+      # ======================================================
       - name: Install dependencies
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
           pip install pandas
-
+      # ======================================================
+      # Verify API secret
+      # ======================================================
+      - name: Verify GNews API key is configured
+        env:
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GNEWS_API_KEY}" ]; then
+            echo "ERROR: GNEWS_API_KEY secret is missing."
+            exit 1
+          fi
+          echo "GNEWS_API_KEY: configured"
+      # ======================================================
+      # Compile
+      # ======================================================
       - name: Compile Event News Intelligence
         run: |
-          python -m py_compile tests/event_news/event_news_intelligence_v1.py
-
+          set -euo pipefail
+          python -m py_compile \
+            tests/event_news/event_news_intelligence_v1.py
+      # ======================================================
+      # Run collector + validator
+      # ======================================================
       - name: Run Event / News Intelligence v1
         env:
           GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
         run: |
           set -euo pipefail
-          python tests/event_news/event_news_intelligence_v1.py
-
+          python \
+            tests/event_news/event_news_intelligence_v1.py
+      # ======================================================
+      # Research-only safety guard
+      # ======================================================
       - name: Research-only safety guard
+        if: always()
         run: |
           set -euo pipefail
-
           test -f event_news_validation_v1.json
-          test -f event_news_events_v1.csv
-
           python - <<'PY'
           import json
           from pathlib import Path
-
-          path = Path("event_news_validation_v1.json")
-
-          with path.open("r", encoding="utf-8") as f:
+          path = Path(
+              "event_news_validation_v1.json"
+          )
+          with path.open(
+              "r",
+              encoding="utf-8"
+          ) as f:
               data = json.load(f)
-
           required = {
               "research_only": True,
               "decision_engine_ready": False,
               "trading_signal": False,
               "forecast": False,
           }
-
           errors = []
-
           for key, expected in required.items():
               actual = data.get(key)
-
               if actual != expected:
                   errors.append(
-                      f"{key}: expected {expected}, got {actual}"
+                      f"{key}: expected "
+                      f"{expected}, got {actual}"
                   )
-
           if errors:
-              print("Research-only guard FAILED:")
+              print(
+                  "Research-only guard FAILED:"
+              )
               for error in errors:
-                  print(f" - {error}")
+                  print(
+                      f" - {error}"
+                  )
               raise SystemExit(1)
-
-          print("Research-only guard: PASS")
+          print(
+              "Research-only guard: PASS"
+          )
           PY
-
+      # ======================================================
+      # Display validation
+      # ======================================================
       - name: Display validation report
         if: always()
         run: |
           echo "===== Event News Validation ====="
-
           if [ -f event_news_validation_v1.json ]; then
             cat event_news_validation_v1.json
           else
-            echo "event_news_validation_v1.json not found"
+            echo \
+              "event_news_validation_v1.json not found"
           fi
-
+      # ======================================================
+      # Display dataset summary
+      # ======================================================
       - name: Display event dataset summary
         if: always()
         run: |
           echo "===== Event Dataset ====="
-
           if [ -f event_news_events_v1.csv ]; then
             echo "Rows:"
             python - <<'PY'
           import pandas as pd
-
-          df = pd.read_csv("event_news_events_v1.csv")
-
+          df = pd.read_csv(
+              "event_news_events_v1.csv"
+          )
           print(len(df))
-
           if len(df) > 0:
               print("\nColumns:")
               print(list(df.columns))
-
               print("\nSource counts:")
               if "source" in df.columns:
-                  print(df["source"].value_counts(dropna=False).to_string())
-
+                  print(
+                      df["source"]
+                      .value_counts(
+                          dropna=False
+                      )
+                      .to_string()
+                  )
               print("\nTopic counts:")
               if "topic" in df.columns:
-                  print(df["topic"].value_counts(dropna=False).to_string())
-
+                  print(
+                      df["topic"]
+                      .value_counts(
+                          dropna=False
+                      )
+                      .to_string()
+                  )
               print("\nDate range:")
-
               if "published_at" in df.columns:
                   dates = pd.to_datetime(
                       df["published_at"],
                       errors="coerce",
-                      utc=True
+                      utc=True,
                   )
-
                   print(
                       f"start={dates.min()}"
                   )
-
                   print(
                       f"end={dates.max()}"
                   )
           PY
           else
-            echo "event_news_events_v1.csv not found"
+            echo \
+              "event_news_events_v1.csv not found"
           fi
-
+      # ======================================================
+      # Upload artifacts
+      # ======================================================
       - name: Upload Event News artifacts
         if: always()
         uses: actions/upload-artifact@v4
