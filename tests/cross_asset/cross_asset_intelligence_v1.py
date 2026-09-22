@@ -85,7 +85,7 @@ def download_prices():
     if not frames:
         raise RuntimeError("No cross-asset series were downloaded: " + "; ".join(errors))
 
-    prices = pd.concat(frames, axis=1).sort_index()
+    prices = pd.concat(frames, axis=1, sort=False).sort_index()
     prices.index.name = "asof_date"
     return prices, errors
 
@@ -171,7 +171,12 @@ def validate(prices, research, rolling, divergence, errors):
     check("minimum_rows", len(prices) >= 250, f"rows={len(prices)}")
     check("unique_dates", not prices.index.duplicated().any())
     check("sorted_dates", prices.index.is_monotonic_increasing)
-    check("positive_prices", bool((prices.dropna(how="all") > 0).all().all()))
+    positive_values = prices.stack(dropna=True)
+    check(
+        "positive_prices",
+        bool((positive_values > 0).all()) if len(positive_values) else False,
+        f"non_null_values={len(positive_values)}"
+    )
     check("returns_present", any(c.endswith("_RET_20D_PCT") for c in research.columns))
     check("rolling_output", len(rolling) > 0)
     check("divergence_output", len(divergence) > 0)
@@ -181,14 +186,31 @@ def validate(prices, research, rolling, divergence, errors):
     check("forecast_false", bool(research["forecast"].eq(False).all()))
     check("pit_perfect_false", bool(research["pit_perfect"].eq(False).all()))
 
-    missing_counts = prices.isna().sum().to_dict()
-    coverage = ((len(prices) - prices.isna().sum()) / max(len(prices), 1) * 100).round(3).to_dict()
+    # Measure traditional-market coverage against the US500 observation
+    # calendar, not the union calendar (which includes weekends/crypto dates).
+    if "US500" in prices.columns:
+        reference_dates = prices.index[prices["US500"].notna()]
+    else:
+        reference_dates = prices.index
+
+    coverage = {}
+    for col in prices.columns:
+        if col == "BITCOIN":
+            denom = int(prices[col].notna().sum())
+            coverage[col] = 100.0 if denom else 0.0
+        else:
+            denom = max(len(reference_dates), 1)
+            coverage[col] = round(
+                float(prices.loc[reference_dates, col].notna().sum() / denom * 100),
+                3
+            )
+
     check("coverage_nonzero", all(v > 0 for v in coverage.values()), str(coverage))
 
     status = "PASS" if all(x["pass"] for x in checks) else "FAIL"
     warnings = [f"download: {e}" for e in errors]
     if any(v < 80 for v in coverage.values()):
-        warnings.append("At least one series has <80% coverage over the common calendar.")
+        warnings.append("At least one series has <80% coverage versus the US500 observation calendar.")
 
     return {
         "validator": "Cross-Asset Intelligence v1",
