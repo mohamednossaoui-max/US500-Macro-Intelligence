@@ -25,10 +25,19 @@ Optional environment variable:
 
 Example:
 
-    RESEARCH_CONTEXT_AS_OF_DATE=2026-09-21
+    RESEARCH_CONTEXT_AS_OF_DATE=2026-09-20
 
-This prevents the final research context from containing
-future context dates.
+The as-of date limits the final unified research context.
+
+IMPORTANT PIT RULE:
+
+    Technical Intelligence is synchronized using
+    technical_availability_date, NOT merely
+    technical_observation_date.
+
+This prevents technical observations from being used
+before they are considered available to the unified
+research layer.
 """
 
 from __future__ import annotations
@@ -112,6 +121,7 @@ def parse_dates(
     )
 
     if result.isna().any():
+
         bad = int(result.isna().sum())
 
         fail(
@@ -137,6 +147,7 @@ def get_as_of_date() -> pd.Timestamp | None:
     )
 
     if pd.isna(parsed):
+
         fail(
             "Invalid RESEARCH_CONTEXT_AS_OF_DATE. "
             "Expected YYYY-MM-DD."
@@ -155,32 +166,13 @@ def ensure_unique_columns(
     ].tolist()
 
     if duplicated:
+
         fail(
             f"{label} contains duplicate column labels: "
             f"{duplicated}"
         )
 
     return df
-
-
-def rename_if_exists(
-    df: pd.DataFrame,
-    old: str,
-    new: str,
-) -> pd.DataFrame:
-
-    if old not in df.columns:
-        return df
-
-    if new in df.columns:
-        fail(
-            f"Cannot rename '{old}' to '{new}' because "
-            f"'{new}' already exists."
-        )
-
-    return df.rename(
-        columns={old: new}
-    )
 
 
 # ============================================================
@@ -293,12 +285,6 @@ technical["_source_date"] = parse_dates(
 # MACRO CONTEXT PREPARATION
 # ============================================================
 
-# Preserve the original Macro Context date separately.
-#
-# The Macro Context artifact already has "context_date".
-# We must not keep that column under the same name because
-# the unified layer will create its own context_date.
-
 if "context_date" in macro.columns:
 
     macro["macro_original_context_date"] = parse_dates(
@@ -310,12 +296,16 @@ if "context_date" in macro.columns:
         columns=["context_date"]
     )
 
+else:
 
-# Macro availability date.
-#
-# Macro Context is an already aggregated research layer.
-# Its context date is treated as the conservative availability
-# date unless an explicit availability_date exists.
+    macro["macro_original_context_date"] = (
+        macro["_source_date"]
+    )
+
+
+# ------------------------------------------------------------
+# Macro availability date
+# ------------------------------------------------------------
 
 if "availability_date" in macro.columns:
 
@@ -352,6 +342,7 @@ for column in macro.columns:
     new_name = f"macro_{column}"
 
     if new_name in macro.columns:
+
         fail(
             f"Macro column collision: "
             f"{new_name}"
@@ -365,7 +356,7 @@ macro = macro.rename(
 )
 
 
-# Keep one row per availability date.
+# One row per availability date.
 macro = (
     macro
     .sort_values("macro_availability_date")
@@ -386,14 +377,6 @@ ensure_unique_columns(
 # ============================================================
 # SENTIMENT ENGINE PREPARATION
 # ============================================================
-
-# IMPORTANT:
-#
-# The Sentiment Engine uses "asof_date".
-# We create the canonical "sentiment_asof_date".
-#
-# We do NOT rename that column again.
-# This prevents the duplicate-label error that occurred before.
 
 if "asof_date" in sentiment.columns:
 
@@ -423,13 +406,9 @@ else:
     )
 
 
-# Sentiment availability date.
-#
-# The existing Sentiment Engine artifact is already
-# reconstructed using its own PIT logic.
-#
-# We preserve its as-of date as the research-context
-# synchronization date.
+# ------------------------------------------------------------
+# Sentiment availability date
+# ------------------------------------------------------------
 
 if "availability_date" in sentiment.columns:
 
@@ -452,8 +431,7 @@ sentiment = sentiment.drop(
 )
 
 
-# Remove source date columns that would collide with the
-# canonical columns we just created.
+# Remove source date columns that could collide.
 for column in [
     "asof_date",
     "observation_date",
@@ -462,12 +440,13 @@ for column in [
 ]:
 
     if column in sentiment.columns:
+
         sentiment = sentiment.drop(
             columns=[column]
         )
 
 
-# Prefix ALL remaining source-specific columns.
+# Prefix remaining source-specific columns.
 sentiment_rename = {}
 
 for column in sentiment.columns:
@@ -481,6 +460,7 @@ for column in sentiment.columns:
     new_name = f"sentiment_{column}"
 
     if new_name in sentiment.columns:
+
         fail(
             f"Sentiment column collision: "
             f"{new_name}"
@@ -516,8 +496,6 @@ ensure_unique_columns(
 # TECHNICAL INTELLIGENCE PREPARATION
 # ============================================================
 
-# Technical observation date.
-
 if "observation_date" in technical.columns:
 
     technical["technical_observation_date"] = parse_dates(
@@ -539,7 +517,9 @@ else:
     )
 
 
-# Technical availability date.
+# ------------------------------------------------------------
+# Technical availability date
+# ------------------------------------------------------------
 
 if "availability_date" in technical.columns:
 
@@ -556,7 +536,29 @@ else:
     )
 
 
-# Remove temporary/source dates.
+# ------------------------------------------------------------
+# Technical PIT validation
+# ------------------------------------------------------------
+
+technical_pit_invalid = (
+    technical["technical_availability_date"]
+    < technical["technical_observation_date"]
+)
+
+if technical_pit_invalid.any():
+
+    bad_count = int(
+        technical_pit_invalid.sum()
+    )
+
+    fail(
+        "Technical Intelligence contains "
+        f"{bad_count} rows where availability_date "
+        "is earlier than observation_date."
+    )
+
+
+# Remove temporary/source date.
 technical = technical.drop(
     columns=["_source_date"],
     errors="ignore",
@@ -572,6 +574,7 @@ for column in [
 ]:
 
     if column in technical.columns:
+
         technical = technical.drop(
             columns=[column]
         )
@@ -591,6 +594,7 @@ for column in technical.columns:
     new_name = f"technical_{column}"
 
     if new_name in technical.columns:
+
         fail(
             f"Technical column collision: "
             f"{new_name}"
@@ -604,10 +608,15 @@ technical = technical.rename(
 )
 
 
-# One row per technical observation date.
+# One row per observation date.
 technical = (
     technical
-    .sort_values("technical_observation_date")
+    .sort_values(
+        [
+            "technical_observation_date",
+            "technical_availability_date",
+        ]
+    )
     .drop_duplicates(
         subset=["technical_observation_date"],
         keep="last",
@@ -625,17 +634,28 @@ ensure_unique_columns(
 # ============================================================
 # Build unified calendar
 # ============================================================
+#
+# IMPORTANT:
+#
+# Technical dates enter the unified calendar using their
+# availability date, not their observation date.
+#
+# This ensures a technical observation cannot become visible
+# to the unified context before its availability date.
+# ============================================================
 
 calendar_parts = [
     macro["macro_availability_date"],
     sentiment["sentiment_asof_date"],
-    technical["technical_observation_date"],
+    technical["technical_availability_date"],
 ]
+
 
 calendar = pd.concat(
     calendar_parts,
     ignore_index=True,
 )
+
 
 calendar = (
     pd.to_datetime(
@@ -670,6 +690,7 @@ if as_of_date is not None:
     ].copy()
 
     if context.empty:
+
         fail(
             "RESEARCH_CONTEXT_AS_OF_DATE removed "
             "all available context dates."
@@ -684,9 +705,11 @@ context = context.sort_values(
     "context_date"
 ).reset_index(drop=True)
 
+
 macro = macro.sort_values(
     "macro_availability_date"
 ).reset_index(drop=True)
+
 
 context = pd.merge_asof(
     context,
@@ -706,9 +729,11 @@ context = context.sort_values(
     "context_date"
 ).reset_index(drop=True)
 
+
 sentiment = sentiment.sort_values(
     "sentiment_asof_date"
 ).reset_index(drop=True)
+
 
 context = pd.merge_asof(
     context,
@@ -723,20 +748,29 @@ context = pd.merge_asof(
 # ============================================================
 # Point-in-time merge: Technical
 # ============================================================
+#
+# CRITICAL:
+#
+# Use technical_availability_date.
+#
+# Do NOT use technical_observation_date here.
+# ============================================================
 
 context = context.sort_values(
     "context_date"
 ).reset_index(drop=True)
 
+
 technical = technical.sort_values(
-    "technical_observation_date"
+    "technical_availability_date"
 ).reset_index(drop=True)
+
 
 context = pd.merge_asof(
     context,
     technical,
     left_on="context_date",
-    right_on="technical_observation_date",
+    right_on="technical_availability_date",
     direction="backward",
     allow_exact_matches=True,
 )
@@ -765,9 +799,9 @@ context["sentiment_available"] = (
 
 
 context["technical_available"] = (
-    context["technical_observation_date"].notna()
+    context["technical_availability_date"].notna()
     & (
-        context["technical_observation_date"]
+        context["technical_availability_date"]
         <= context["context_date"]
     )
 )
@@ -810,7 +844,10 @@ context["unified_decision_generated"] = False
 pit_failures = []
 
 
+# ------------------------------------------------------------
 # Macro lookahead
+# ------------------------------------------------------------
+
 macro_mask = (
     context["macro_availability_date"].notna()
     & (
@@ -818,6 +855,7 @@ macro_mask = (
         > context["context_date"]
     )
 )
+
 
 if macro_mask.any():
 
@@ -831,7 +869,10 @@ if macro_mask.any():
     )
 
 
+# ------------------------------------------------------------
 # Sentiment lookahead
+# ------------------------------------------------------------
+
 sentiment_mask = (
     context["sentiment_asof_date"].notna()
     & (
@@ -839,6 +880,7 @@ sentiment_mask = (
         > context["context_date"]
     )
 )
+
 
 if sentiment_mask.any():
 
@@ -852,14 +894,23 @@ if sentiment_mask.any():
     )
 
 
+# ------------------------------------------------------------
 # Technical lookahead
+# ------------------------------------------------------------
+#
+# IMPORTANT:
+#
+# Validate availability date, not observation date.
+# ------------------------------------------------------------
+
 technical_mask = (
-    context["technical_observation_date"].notna()
+    context["technical_availability_date"].notna()
     & (
-        context["technical_observation_date"]
+        context["technical_availability_date"]
         > context["context_date"]
     )
 )
+
 
 if technical_mask.any():
 
@@ -869,7 +920,35 @@ if technical_mask.any():
     ].dt.strftime("%Y-%m-%d").tolist()
 
     pit_failures.append(
-        f"Technical lookahead rows: {bad_dates[:10]}"
+        f"Technical availability lookahead rows: "
+        f"{bad_dates[:10]}"
+    )
+
+
+# ------------------------------------------------------------
+# Technical internal PIT validation
+# ------------------------------------------------------------
+
+technical_internal_mask = (
+    context["technical_observation_date"].notna()
+    & context["technical_availability_date"].notna()
+    & (
+        context["technical_availability_date"]
+        < context["technical_observation_date"]
+    )
+)
+
+
+if technical_internal_mask.any():
+
+    bad_dates = context.loc[
+        technical_internal_mask,
+        "context_date",
+    ].dt.strftime("%Y-%m-%d").tolist()
+
+    pit_failures.append(
+        "Technical availability earlier than observation "
+        f"rows: {bad_dates[:10]}"
     )
 
 
@@ -1215,7 +1294,6 @@ summary["vix_score"] = first_existing(
     ],
 )
 
-
 summary["VIX"] = first_existing(
     latest,
     [
@@ -1309,7 +1387,10 @@ extreme_mask = pd.Series(
 )
 
 
+# ------------------------------------------------------------
 # Sentiment extremes
+# ------------------------------------------------------------
+
 if "sentiment_research_regime" in context.columns:
 
     extreme_mask |= context[
@@ -1322,7 +1403,10 @@ if "sentiment_research_regime" in context.columns:
     )
 
 
+# ------------------------------------------------------------
 # Technical extremes
+# ------------------------------------------------------------
+
 if "technical_technical_regime" in context.columns:
 
     extreme_mask |= context[
@@ -1335,7 +1419,10 @@ if "technical_technical_regime" in context.columns:
     )
 
 
+# ------------------------------------------------------------
 # Financial stress extremes
+# ------------------------------------------------------------
+
 if "macro_financial_stress_regime" in context.columns:
 
     extreme_mask |= context[
