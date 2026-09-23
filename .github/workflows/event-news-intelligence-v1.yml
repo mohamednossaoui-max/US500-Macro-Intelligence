@@ -1,140 +1,224 @@
-Run set -euo pipefail
+name: Event News Intelligence v1
 
-========================================================================
-EVENT / NEWS INTELLIGENCE v2
-========================================================================
-Research-only: YES
-Decision Engine: DISABLED
-Trading signals: DISABLED
-Forecasting: DISABLED
+on:
+  workflow_dispatch:
 
-========================================================================
-GDELT COLLECTION
-========================================================================
-GDELT JSON parse failure: JSONDecodeError('Expecting value: line 1 column 1 (char 0)')
+  push:
+    paths:
+      - ".github/workflows/event-news-intelligence-v1.yml"
+      - "tests/event_news/event_news_intelligence_v1.py"
 
-========================================================================
-OFFICIAL RSS FALLBACK
-========================================================================
-fed_monetary_policy: OK rows=15
-fed_all_press: OK rows=20
-bls_employment: FAILED HTTP 403
-bls_cpi: FAILED HTTP 403
-bls_ppi: FAILED HTTP 403
-bls_productivity: FAILED HTTP 403
+permissions:
+  contents: read
 
-========================================================================
-SEC COLLECTION
-========================================================================
-SEC_USER_AGENT is missing; SEC collection skipped intentionally.
+jobs:
+  event-news:
 
-========================================================================
-VALIDATION RESULT
-========================================================================
-{
-  "validator": "Event / News Intelligence v2",
-  "version": "2.0",
-  "status": "FAIL",
-  "validation_pass": false,
-  "generated_at": "2026-09-23T00:00:43.597340+00:00",
-  "rows": 35,
-  "topic_counts": {
-    "fed": 35
-  },
-  "gdelt": {
-    "ok": false,
-    "rows": 0,
-    "error": "JSONDecodeError('Expecting value: line 1 column 1 (char 0)')",
-    "query_requests": 1,
-    "fallback_required": true
-  },
-  "official_rss": {
-    "ok": true,
-    "rows": 35,
-    "feeds": {
-      "fed_monetary_policy": {
-        "ok": true,
-        "rows": 15,
-        "error": null
-      },
-      "fed_all_press": {
-        "ok": true,
-        "rows": 20,
-        "error": null
-      },
-      "bls_employment": {
-        "ok": false,
-        "rows": 0,
-        "error": "HTTP 403"
-      },
-      "bls_cpi": {
-        "ok": false,
-        "rows": 0,
-        "error": "HTTP 403"
-      },
-      "bls_ppi": {
-        "ok": false,
-        "rows": 0,
-        "error": "HTTP 403"
-      },
-      "bls_productivity": {
-        "ok": false,
-        "rows": 0,
-        "error": "HTTP 403"
-      }
-    }
-  },
-      "pass": true,
-      "detail": "not_applicable_gdelt_unavailable"
-    }
-  ],
-  "errors": [
-    {
-      "check": "core_topic_coverage",
-      "pass": false,
-      "detail": "covered=['fed']; minimum=3"
-    }
-  ],
-  "warnings": [
-    {
-      "check": "gdelt_collection",
-      "detail": "GDELT unavailable or rate-limited; official RSS fallback used."
-    },
-    {
-      "check": "sec_collection",
-      "detail": "SEC skipped because SEC_USER_AGENT was not configured."
-    }
-  ],
-  "research_only": true,
-  "decision_engine_ready": false,
-  "trading_signal": false,
-  "forecast": false,
-  "pit_perfect": false,
-  "point_in_time_reconstructed": false,
-  "interpretation": "PASS is structural/data-quality validation only. Event and news coverage is descriptive and does not establish causality, predictiveness, trading usefulness, or investment preference."
-}
+    runs-on: ubuntu-latest
 
-========================================================================
-DATASET SUMMARY
-========================================================================
-rows=35
-source_counts={"OFFICIAL_RSS": 35}
-topic_counts={"fed": 35}
-dataset=event_news_intelligence_v1/event_news_research_v2.csv
-validation=event_news_intelligence_v1/event_news_validation_v2.json
-summary=event_news_intelligence_v1/event_news_research_summary_v2.json
+    timeout-minutes: 10
 
-========================================================================
-EXECUTION SUMMARY
-========================================================================
-GDELT rows: 0
-Official RSS rows: 35
-SEC rows: 0
-Total rows: 35
-Research-only: TRUE
-Decision Engine: FALSE
-Trading Signal: FALSE
-Forecast: FALSE
+    steps:
 
-EVENT / NEWS INTELLIGENCE v2 VALIDATION: FAIL
-Error: Process completed with exit code 1.
+      # ======================================================
+      # CHECKOUT
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ======================================================
+      # PYTHON
+      # ======================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ======================================================
+      # DEPENDENCIES
+      # ======================================================
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+
+          python -m pip install --upgrade pip
+
+          pip install \
+            pandas
+
+
+      # ======================================================
+      # VERIFY FILES
+      # ======================================================
+
+      - name: Verify Event News files
+        run: |
+          set -euo pipefail
+
+          test -f tests/event_news/event_news_intelligence_v1.py
+
+          test -f .github/workflows/event-news-intelligence-v1.yml
+
+          echo "Event News Python file:"
+          ls -lh tests/event_news/event_news_intelligence_v1.py
+
+          echo "Workflow file:"
+          ls -lh .github/workflows/event-news-intelligence-v1.yml
+
+
+      # ======================================================
+      # PYTHON COMPILE CHECK
+      # ======================================================
+
+      - name: Compile Event News Intelligence
+        run: |
+          set -euo pipefail
+
+          python -m py_compile \
+            tests/event_news/event_news_intelligence_v1.py
+
+
+      # ======================================================
+      # RUN EVENT / NEWS INTELLIGENCE
+      # ======================================================
+
+      - name: Run Event / News Intelligence v2.1
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          set -euo pipefail
+
+          python tests/event_news/event_news_intelligence_v1.py \
+            --output event_news_intelligence_v1
+
+
+      # ======================================================
+      # RESEARCH-ONLY SAFETY CHECK
+      # ======================================================
+
+      - name: Verify research-only output
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(
+              "event_news_intelligence_v1/event_news_validation_v2.json"
+          )
+
+          if not path.exists():
+              raise SystemExit(
+                  "Validation JSON was not created."
+              )
+
+          data = json.loads(
+              path.read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          required_flags = {
+              "research_only": True,
+              "decision_engine_ready": False,
+              "trading_signal": False,
+              "forecast": False,
+          }
+
+          for key, expected in required_flags.items():
+
+              actual = data.get(key)
+
+              if actual != expected:
+
+                  raise SystemExit(
+                      f"Safety check failed: "
+                      f"{key}={actual}, "
+                      f"expected={expected}"
+                  )
+
+          print(
+              "Research-only safety check: PASS"
+          )
+          PY
+
+
+      # ======================================================
+      # DISPLAY VALIDATION
+      # ======================================================
+
+      - name: Display validation
+        if: always()
+        run: |
+          echo "=================================================="
+          echo "VALIDATION"
+          echo "=================================================="
+
+          cat \
+            event_news_intelligence_v1/event_news_validation_v2.json \
+            2>/dev/null || true
+
+
+      # ======================================================
+      # DISPLAY SUMMARY
+      # ======================================================
+
+      - name: Display summary
+        if: always()
+        run: |
+          echo "=================================================="
+          echo "SUMMARY"
+          echo "=================================================="
+
+          cat \
+            event_news_intelligence_v1/event_news_research_summary_v2.json \
+            2>/dev/null || true
+
+
+      # ======================================================
+      # DISPLAY DATASET INFO
+      # ======================================================
+
+      - name: Display dataset information
+        if: always()
+        run: |
+          echo "=================================================="
+          echo "DATASET"
+          echo "=================================================="
+
+          if [ -f event_news_intelligence_v1/event_news_research_v2.csv ]; then
+
+            echo "Dataset exists."
+
+            wc -l \
+              event_news_intelligence_v1/event_news_research_v2.csv
+
+            echo ""
+            echo "Header:"
+            head -n 1 \
+              event_news_intelligence_v1/event_news_research_v2.csv
+
+          else
+
+            echo "Dataset not found."
+
+          fi
+
+
+      # ======================================================
+      # UPLOAD ARTIFACTS
+      # ======================================================
+
+      - name: Upload Event News artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-news-intelligence-v2.1
+          path: event_news_intelligence_v1/
+          if-no-files-found: warn
