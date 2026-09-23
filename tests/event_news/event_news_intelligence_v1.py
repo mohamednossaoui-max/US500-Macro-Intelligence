@@ -59,8 +59,6 @@ GDELT_TIMESPAN = "3days"
 
 MIN_TOTAL_ROWS = 10
 
-# Core topics are used for descriptive coverage only.
-# Coverage shortage MUST NOT fail the pipeline.
 CORE_TOPICS = {
     "fed",
     "inflation",
@@ -110,7 +108,9 @@ REQUIRED_COLUMNS = [
 # GDELT
 # ============================================================
 
-GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+GDELT_URL = (
+    "https://api.gdeltproject.org/api/v2/doc/doc"
+)
 
 GDELT_QUERY = """
 (
@@ -157,25 +157,36 @@ GDELT_QUERY = """
 
 OFFICIAL_RSS_FEEDS = {
     "fed_monetary_policy": {
-        "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+        "url": (
+            "https://www.federalreserve.gov/"
+            "feeds/press_monetary.xml"
+        ),
         "source": "Federal Reserve",
         "fallback_topic": "fed",
     },
 
     "fed_all_press": {
-        "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+        "url": (
+            "https://www.federalreserve.gov/"
+            "feeds/press_all.xml"
+        ),
         "source": "Federal Reserve",
         "fallback_topic": "fed",
     },
 
     "bea_news": {
-        "url": "https://apps.bea.gov/rss/rss.xml",
+        "url": (
+            "https://apps.bea.gov/rss/rss.xml"
+        ),
         "source": "BEA",
         "fallback_topic": "growth",
     },
 
     "census_economic_indicators": {
-        "url": "https://www.census.gov/economic-indicators/indicator.xml",
+        "url": (
+            "https://www.census.gov/"
+            "economic-indicators/indicator.xml"
+        ),
         "source": "U.S. Census Bureau",
         "fallback_topic": "growth",
     },
@@ -227,18 +238,73 @@ def clean(value: Any) -> str:
 
     text = str(value)
     text = re.sub(r"\s+", " ", text)
+
     return text.strip()
 
 
+def normalize_url(url: Any) -> str:
+    """
+    Normalize URLs coming from RSS/XML feeds.
+
+    Handles:
+    - https://example.com
+    - http://example.com
+    - //example.com
+    - www.example.com
+    - example.com/path
+
+    This is a structural normalization only.
+    It does NOT fetch or verify the URL.
+    """
+
+    value = clean(url)
+
+    if not value:
+        return ""
+
+    # Remove surrounding whitespace
+    value = value.strip()
+
+    # Scheme-relative URL
+    if value.startswith("//"):
+        return "https:" + value
+
+    # Already valid
+    if value.startswith(
+        (
+            "http://",
+            "https://",
+        )
+    ):
+        return value
+
+    # www.example.com
+    if value.lower().startswith("www."):
+        return "https://" + value
+
+    # Relative URL
+    if value.startswith("/"):
+        return "https://" + value.lstrip("/")
+
+    # Bare domain/path
+    return "https://" + value
+
+
 def make_id(*parts: Any) -> str:
-    raw = "||".join(clean(x) for x in parts)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+    raw = "||".join(
+        clean(x)
+        for x in parts
+    )
+
+    return hashlib.sha256(
+        raw.encode("utf-8")
+    ).hexdigest()[:32]
 
 
-def parse_datetime(value: Any) -> Optional[str]:
-    """
-    Convert common RSS / SEC timestamps into UTC ISO format.
-    """
+def parse_datetime(
+    value: Any,
+) -> Optional[str]:
+
     if value is None:
         return None
 
@@ -247,34 +313,51 @@ def parse_datetime(value: Any) -> Optional[str]:
     if not text:
         return None
 
-    # ISO
+    # ISO 8601
     try:
         dt = datetime.fromisoformat(
-            text.replace("Z", "+00:00")
+            text.replace(
+                "Z",
+                "+00:00",
+            )
         )
 
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(
+                tzinfo=timezone.utc
+            )
 
-        return dt.astimezone(timezone.utc).isoformat()
+        return dt.astimezone(
+            timezone.utc
+        ).isoformat()
 
     except Exception:
         pass
 
-    # RFC 2822 / RSS pubDate
+    # RFC 2822 / RSS
     try:
-        dt = parsedate_to_datetime(text)
+        dt = parsedate_to_datetime(
+            text
+        )
 
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(
+                tzinfo=timezone.utc
+            )
 
-        return dt.astimezone(timezone.utc).isoformat()
+        return dt.astimezone(
+            timezone.utc
+        ).isoformat()
 
     except Exception:
         pass
 
     return None
 
+
+# ============================================================
+# TOPIC CLASSIFICATION
+# ============================================================
 
 def classify_topic(
     title: str,
@@ -288,6 +371,7 @@ def classify_topic(
     ).lower()
 
     rules = [
+
         (
             "fed",
             [
@@ -300,6 +384,7 @@ def classify_topic(
                 "policy rate",
             ],
         ),
+
         (
             "inflation",
             [
@@ -311,6 +396,7 @@ def classify_topic(
                 "prices",
             ],
         ),
+
         (
             "labor",
             [
@@ -325,6 +411,7 @@ def classify_topic(
                 "wages",
             ],
         ),
+
         (
             "growth",
             [
@@ -343,6 +430,7 @@ def classify_topic(
                 "ism",
             ],
         ),
+
         (
             "energy",
             [
@@ -353,6 +441,7 @@ def classify_topic(
                 "natural gas",
             ],
         ),
+
         (
             "geopolitical",
             [
@@ -365,6 +454,7 @@ def classify_topic(
                 "geopolitical",
             ],
         ),
+
         (
             "market",
             [
@@ -381,18 +471,18 @@ def classify_topic(
     ]
 
     for topic, keywords in rules:
+
         for keyword in keywords:
+
             if keyword in text:
                 return topic
 
     return fallback
 
 
-def title_relevance(title: str) -> float:
-    """
-    Descriptive relevance score for US macro/news research.
-    This is NOT a trading score.
-    """
+def title_relevance(
+    title: str,
+) -> float:
 
     text = clean(title).lower()
 
@@ -432,16 +522,17 @@ def title_relevance(title: str) -> float:
     )
 
     return round(
-        min(1.0, hits / 4.0),
+        min(
+            1.0,
+            hits / 4.0,
+        ),
         4,
     )
 
 
-def infer_tone(title: str) -> float:
-    """
-    Very simple descriptive lexical tone.
-    It is NOT sentiment trading logic.
-    """
+def infer_tone(
+    title: str,
+) -> float:
 
     text = clean(title).lower()
 
@@ -474,12 +565,14 @@ def infer_tone(title: str) -> float:
     ]
 
     positive = sum(
-        1 for word in positive_words
+        1
+        for word in positive_words
         if word in text
     )
 
     negative = sum(
-        1 for word in negative_words
+        1
+        for word in negative_words
         if word in text
     )
 
@@ -502,14 +595,20 @@ def http_get(
     retries: int = 2,
     backoff_seconds: float = 2.0,
     user_agent: Optional[str] = None,
-) -> Tuple[Optional[bytes], Optional[str]]:
+) -> Tuple[
+    Optional[bytes],
+    Optional[str],
+]:
 
     headers = {
         "User-Agent": (
             user_agent
-            or "US500-Macro-Intelligence/2.1 "
-               "(research-only)"
+            or (
+                "US500-Macro-Intelligence/2.1 "
+                "(research-only)"
+            )
         ),
+
         "Accept": (
             "application/rss+xml, "
             "application/xml, "
@@ -517,15 +616,22 @@ def http_get(
             "application/json, "
             "*/*"
         ),
-        "Accept-Language": "en-US,en;q=0.8",
+
+        "Accept-Language": (
+            "en-US,en;q=0.8"
+        ),
+
         "Cache-Control": "no-cache",
     }
 
     last_error = None
 
-    for attempt in range(retries + 1):
+    for attempt in range(
+        retries + 1
+    ):
 
         try:
+
             request = urllib.request.Request(
                 url,
                 headers=headers,
@@ -546,48 +652,76 @@ def http_get(
                 body = response.read()
 
                 if status != 200:
-                    return None, f"HTTP {status}"
+                    return (
+                        None,
+                        f"HTTP {status}",
+                    )
 
-                return body, None
+                return (
+                    body,
+                    None,
+                )
 
         except urllib.error.HTTPError as exc:
 
-            last_error = f"HTTP {exc.code}"
+            last_error = (
+                f"HTTP {exc.code}"
+            )
 
+            # Don't repeatedly retry permanent errors.
             if exc.code in {
                 400,
                 401,
                 403,
                 404,
             }:
-                return None, last_error
+                return (
+                    None,
+                    last_error,
+                )
 
         except Exception as exc:
+
             last_error = repr(exc)
 
         if attempt < retries:
+
             delay = min(
-                backoff_seconds * (2 ** attempt),
+                backoff_seconds
+                * (2 ** attempt),
                 20.0,
             )
 
-            delay += random.uniform(0, 0.5)
+            delay += random.uniform(
+                0,
+                0.5,
+            )
 
             time.sleep(delay)
 
-    return None, last_error or "unknown_http_error"
+    return (
+        None,
+        last_error
+        or "unknown_http_error",
+    )
 
 
 # ============================================================
 # XML / RSS HELPERS
 # ============================================================
 
-def local_tag(tag: str) -> str:
+def local_tag(
+    tag: str,
+) -> str:
+
     if not tag:
         return ""
 
     if "}" in tag:
-        tag = tag.split("}", 1)[1]
+        tag = tag.split(
+            "}",
+            1,
+        )[1]
 
     return tag.lower()
 
@@ -604,42 +738,89 @@ def child_text(
 
     for child in list(element):
 
-        if local_tag(child.tag) in wanted:
-            return clean(child.text)
+        tag = local_tag(
+            child.tag
+        )
+
+        if tag in wanted:
+
+            return clean(
+                child.text
+            )
 
     return ""
 
 
-def element_link(element: ET.Element) -> str:
+def element_link(
+    element: ET.Element,
+) -> str:
+    """
+    Extract and normalize an RSS/Atom link.
 
-    # RSS <link>text</link>
+    Fixes the exact issue found in the current
+    Event News run where BEA returned:
+
+        www.bea.gov/...
+
+    instead of:
+
+        https://www.bea.gov/...
+    """
+
+    link = ""
+
+    # --------------------------------------------------------
+    # RSS / Atom child <link>
+    # --------------------------------------------------------
+
     for child in list(element):
 
-        if local_tag(child.tag) == "link":
+        if local_tag(
+            child.tag
+        ) != "link":
+            continue
 
-            href = child.attrib.get("href")
+        href = child.attrib.get(
+            "href"
+        )
 
-            if href:
-                return clean(href)
+        if href:
+            link = clean(href)
+            break
 
-            if child.text:
-                return clean(child.text)
+        if child.text:
+            link = clean(
+                child.text
+            )
+            break
 
-    return ""
+    # --------------------------------------------------------
+    # Normalize URL
+    # --------------------------------------------------------
+
+    return normalize_url(
+        link
+    )
 
 
 def parse_rss(
     body: bytes,
     fallback_topic: str,
-) -> List[Dict[str, Any]]:
+) -> List[
+    Dict[str, Any]
+]:
 
-    root = ET.fromstring(body)
+    root = ET.fromstring(
+        body
+    )
 
     items = []
 
     for element in root.iter():
 
-        tag = local_tag(element.tag)
+        tag = local_tag(
+            element.tag
+        )
 
         if tag not in {
             "item",
@@ -674,13 +855,18 @@ def parse_rss(
             ],
         )
 
-        url = element_link(element)
+        url = element_link(
+            element
+        )
 
         published_at = parse_datetime(
             published_raw
         )
 
-        if not title or not url:
+        if not title:
+            continue
+
+        if not url:
             continue
 
         topic = classify_topic(
@@ -703,20 +889,31 @@ def parse_rss(
 
 
 # ============================================================
-# GDELT RSS
+# GDELT
 # ============================================================
 
 def collect_gdelt() -> Dict[str, Any]:
 
-    print("\n" + "=" * 72)
-    print("GDELT COLLECTION")
-    print("=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "GDELT COLLECTION"
+    )
+
+    print(
+        "=" * 72
+    )
 
     params = {
         "query": GDELT_QUERY,
         "mode": "artlist",
         "format": "rss",
-        "maxrecords": str(GDELT_MAX_RECORDS),
+        "maxrecords": str(
+            GDELT_MAX_RECORDS
+        ),
         "timespan": GDELT_TIMESPAN,
         "sort": "HybridRel",
     }
@@ -724,7 +921,9 @@ def collect_gdelt() -> Dict[str, Any]:
     url = (
         GDELT_URL
         + "?"
-        + urllib.parse.urlencode(params)
+        + urllib.parse.urlencode(
+            params
+        )
     )
 
     body, error = http_get(
@@ -734,6 +933,7 @@ def collect_gdelt() -> Dict[str, Any]:
     )
 
     if error:
+
         print(
             f"GDELT unavailable: {error}"
         )
@@ -754,7 +954,8 @@ def collect_gdelt() -> Dict[str, Any]:
         )
 
         print(
-            f"GDELT RSS: OK rows={len(rows)}"
+            "GDELT RSS: "
+            f"OK rows={len(rows)}"
         )
 
         return {
@@ -767,9 +968,12 @@ def collect_gdelt() -> Dict[str, Any]:
 
     except Exception as exc:
 
-        preview = body[:200].decode(
-            "utf-8",
-            errors="replace",
+        preview = (
+            body[:200]
+            .decode(
+                "utf-8",
+                errors="replace",
+            )
         )
 
         print(
@@ -797,20 +1001,34 @@ def collect_gdelt() -> Dict[str, Any]:
 
 def collect_official_rss() -> Dict[str, Any]:
 
-    print("\n" + "=" * 72)
-    print("OFFICIAL RSS COLLECTION")
-    print("=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "OFFICIAL RSS COLLECTION"
+    )
+
+    print(
+        "=" * 72
+    )
 
     all_rows = []
+
     feed_results = {}
 
-    for name, config in OFFICIAL_RSS_FEEDS.items():
+    for name, config in (
+        OFFICIAL_RSS_FEEDS.items()
+    ):
 
         url = config["url"]
 
         source = config["source"]
 
-        fallback_topic = config["fallback_topic"]
+        fallback_topic = (
+            config["fallback_topic"]
+        )
 
         body, error = http_get(
             url,
@@ -842,12 +1060,18 @@ def collect_official_rss() -> Dict[str, Any]:
             for row in rows:
 
                 row["source"] = source
-                row["source_type"] = "OFFICIAL_RSS"
 
-            all_rows.extend(rows)
+                row["source_type"] = (
+                    "OFFICIAL_RSS"
+                )
+
+            all_rows.extend(
+                rows
+            )
 
             print(
-                f"{name}: OK rows={len(rows)}"
+                f"{name}: "
+                f"OK rows={len(rows)}"
             )
 
             feed_results[name] = {
@@ -859,7 +1083,8 @@ def collect_official_rss() -> Dict[str, Any]:
         except Exception as exc:
 
             print(
-                f"{name}: FAILED parse {repr(exc)}"
+                f"{name}: "
+                f"FAILED parse {repr(exc)}"
             )
 
             feed_results[name] = {
@@ -881,12 +1106,23 @@ def collect_official_rss() -> Dict[str, Any]:
 
 def collect_sec() -> Dict[str, Any]:
 
-    print("\n" + "=" * 72)
-    print("SEC COLLECTION")
-    print("=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "SEC COLLECTION"
+    )
+
+    print(
+        "=" * 72
+    )
 
     sec_user_agent = clean(
-        os.environ.get("SEC_USER_AGENT")
+        os.environ.get(
+            "SEC_USER_AGENT"
+        )
     )
 
     if not sec_user_agent:
@@ -900,12 +1136,16 @@ def collect_sec() -> Dict[str, Any]:
             "ok": False,
             "rows": [],
             "skipped": True,
-            "error": "SEC_USER_AGENT missing",
+            "error": (
+                "SEC_USER_AGENT missing"
+            ),
         }
 
     rows = []
 
-    for ticker, cik in SEC_UNIVERSE.items():
+    for ticker, cik in (
+        SEC_UNIVERSE.items()
+    ):
 
         url = SEC_SUBMISSIONS.format(
             cik=int(cik)
@@ -928,66 +1168,99 @@ def collect_sec() -> Dict[str, Any]:
 
         try:
 
-            data = json.loads(body.decode("utf-8"))
+            data = json.loads(
+                body.decode(
+                    "utf-8"
+                )
+            )
 
             recent = (
                 data
-                .get("filings", {})
-                .get("recent", {})
+                .get(
+                    "filings",
+                    {}
+                )
+                .get(
+                    "recent",
+                    {}
+                )
             )
 
             forms = recent.get(
                 "form",
-                [],
+                []
             )
 
-            accession_numbers = recent.get(
-                "accessionNumber",
-                [],
+            accession_numbers = (
+                recent.get(
+                    "accessionNumber",
+                    []
+                )
             )
 
-            filing_dates = recent.get(
-                "filingDate",
-                [],
+            filing_dates = (
+                recent.get(
+                    "filingDate",
+                    []
+                )
             )
 
-            primary_documents = recent.get(
-                "primaryDocument",
-                [],
+            primary_documents = (
+                recent.get(
+                    "primaryDocument",
+                    []
+                )
             )
 
-            for i, form in enumerate(forms):
+            for i, form in enumerate(
+                forms
+            ):
 
-                if form not in SEC_ALLOWED_FORMS:
+                if form not in (
+                    SEC_ALLOWED_FORMS
+                ):
                     continue
 
                 filing_date = (
                     filing_dates[i]
-                    if i < len(filing_dates)
+                    if i < len(
+                        filing_dates
+                    )
                     else ""
                 )
 
                 accession = (
                     accession_numbers[i]
-                    if i < len(accession_numbers)
+                    if i < len(
+                        accession_numbers
+                    )
                     else ""
                 )
 
                 document = (
                     primary_documents[i]
-                    if i < len(primary_documents)
+                    if i < len(
+                        primary_documents
+                    )
                     else ""
                 )
 
-                if not filing_date or not accession:
+                if (
+                    not filing_date
+                    or not accession
+                ):
                     continue
 
                 accession_clean = (
-                    accession.replace("-", "")
+                    accession.replace(
+                        "-",
+                        "",
+                    )
                 )
 
                 filing_url = (
-                    "https://www.sec.gov/Archives/edgar/data/"
+                    "https://www.sec.gov/"
+                    "Archives/edgar/data/"
                     f"{int(cik)}/"
                     f"{accession_clean}/"
                     f"{document}"
@@ -1006,7 +1279,9 @@ def collect_sec() -> Dict[str, Any]:
                             f"for {ticker}"
                         ),
                         "published_at": (
-                            parse_datetime(filing_date)
+                            parse_datetime(
+                                filing_date
+                            )
                         ),
                         "url": filing_url,
                         "topic": "market",
@@ -1023,7 +1298,8 @@ def collect_sec() -> Dict[str, Any]:
             )
 
     print(
-        f"SEC rows collected: {len(rows)}"
+        f"SEC rows collected: "
+        f"{len(rows)}"
     )
 
     return {
@@ -1039,7 +1315,9 @@ def collect_sec() -> Dict[str, Any]:
 # ============================================================
 
 def normalize_dataset(
-    rows: List[Dict[str, Any]]
+    rows: List[
+        Dict[str, Any]
+    ],
 ) -> pd.DataFrame:
 
     normalized = []
@@ -1054,7 +1332,9 @@ def normalize_dataset(
             row.get("description")
         )
 
-        url = clean(
+        # IMPORTANT:
+        # Normalize URLs before creating IDs.
+        url = normalize_url(
             row.get("url")
         )
 
@@ -1113,14 +1393,20 @@ def normalize_dataset(
                 "source": source,
                 "topic": topic,
                 "published_at": published_at,
-                "availability_date": published_at,
+                "availability_date": (
+                    published_at
+                ),
                 "title": title,
                 "url": url,
                 "language": "en",
                 "country": "US",
-                "tone": infer_tone(title),
+                "tone": infer_tone(
+                    title
+                ),
                 "topic_relevance_title": (
-                    title_relevance(title)
+                    title_relevance(
+                        title
+                    )
                 ),
                 "point_in_time_safe": True,
             }
@@ -1136,8 +1422,17 @@ def normalize_dataset(
         normalized
     )
 
+    # Remove exact duplicate event IDs.
     df = df.drop_duplicates(
-        subset=["event_id"]
+        subset=[
+            "event_id"
+        ]
+    )
+
+    # Final URL normalization safety pass.
+    df["url"] = (
+        df["url"]
+        .apply(normalize_url)
     )
 
     df = df.sort_values(
@@ -1186,10 +1481,13 @@ def validate(
 
         errors.append(
             {
-                "check": "required_columns",
+                "check": (
+                    "required_columns"
+                ),
                 "pass": False,
                 "detail": (
-                    f"missing={missing_columns}"
+                    f"missing="
+                    f"{missing_columns}"
                 ),
             }
         )
@@ -1198,9 +1496,13 @@ def validate(
 
         errors.append(
             {
-                "check": "required_columns",
+                "check": (
+                    "required_columns"
+                ),
                 "pass": True,
-                "detail": "all_required_columns_present",
+                "detail": (
+                    "all_required_columns_present"
+                ),
             }
         )
 
@@ -1214,11 +1516,14 @@ def validate(
 
         errors.append(
             {
-                "check": "minimum_dataset_rows",
+                "check": (
+                    "minimum_dataset_rows"
+                ),
                 "pass": False,
                 "detail": (
                     f"rows={row_count}; "
-                    f"minimum={MIN_TOTAL_ROWS}"
+                    f"minimum="
+                    f"{MIN_TOTAL_ROWS}"
                 ),
             }
         )
@@ -1227,7 +1532,9 @@ def validate(
 
         errors.append(
             {
-                "check": "minimum_dataset_rows",
+                "check": (
+                    "minimum_dataset_rows"
+                ),
                 "pass": True,
                 "detail": (
                     f"rows={row_count}"
@@ -1251,11 +1558,14 @@ def validate(
 
             errors.append(
                 {
-                    "check": "unique_event_ids",
+                    "check": (
+                        "unique_event_ids"
+                    ),
                     "pass": False,
                     "detail": (
                         f"rows={row_count}; "
-                        f"unique_ids={unique_ids}"
+                        f"unique_ids="
+                        f"{unique_ids}"
                     ),
                 }
             )
@@ -1264,10 +1574,13 @@ def validate(
 
             errors.append(
                 {
-                    "check": "unique_event_ids",
+                    "check": (
+                        "unique_event_ids"
+                    ),
                     "pass": True,
                     "detail": (
-                        f"unique_ids={unique_ids}"
+                        f"unique_ids="
+                        f"{unique_ids}"
                     ),
                 }
             )
@@ -1295,7 +1608,8 @@ def validate(
                     "check": "timestamps",
                     "pass": False,
                     "detail": (
-                        f"invalid_timestamps={bad}"
+                        f"invalid_timestamps="
+                        f"{bad}"
                     ),
                 }
             )
@@ -1306,7 +1620,9 @@ def validate(
                 {
                     "check": "timestamps",
                     "pass": True,
-                    "detail": "all_timestamps_parseable",
+                    "detail": (
+                        "all_timestamps_parseable"
+                    ),
                 }
             )
 
@@ -1316,11 +1632,15 @@ def validate(
 
     if "url" in df.columns:
 
+        normalized_urls = (
+            df["url"]
+            .astype(str)
+            .apply(normalize_url)
+        )
+
         bad_urls = int(
             (
-                ~df["url"]
-                .astype(str)
-                .str.startswith(
+                ~normalized_urls.str.startswith(
                     (
                         "http://",
                         "https://",
@@ -1336,7 +1656,8 @@ def validate(
                     "check": "urls",
                     "pass": False,
                     "detail": (
-                        f"invalid_urls={bad_urls}"
+                        f"invalid_urls="
+                        f"{bad_urls}"
                     ),
                 }
             )
@@ -1347,7 +1668,9 @@ def validate(
                 {
                     "check": "urls",
                     "pass": True,
-                    "detail": "all_urls_valid",
+                    "detail": (
+                        "all_urls_valid"
+                    ),
                 }
             )
 
@@ -1359,7 +1682,9 @@ def validate(
 
         invalid_pit = int(
             (
-                df["point_in_time_safe"]
+                df[
+                    "point_in_time_safe"
+                ]
                 != True
             ).sum()
         )
@@ -1368,10 +1693,13 @@ def validate(
 
             errors.append(
                 {
-                    "check": "point_in_time_safe",
+                    "check": (
+                        "point_in_time_safe"
+                    ),
                     "pass": False,
                     "detail": (
-                        f"invalid_rows={invalid_pit}"
+                        f"invalid_rows="
+                        f"{invalid_pit}"
                     ),
                 }
             )
@@ -1380,10 +1708,13 @@ def validate(
 
             errors.append(
                 {
-                    "check": "point_in_time_safe",
+                    "check": (
+                        "point_in_time_safe"
+                    ),
                     "pass": True,
                     "detail": (
-                        "all_rows_marked_point_in_time_safe"
+                        "all_rows_marked_"
+                        "point_in_time_safe"
                     ),
                 }
             )
@@ -1408,58 +1739,68 @@ def validate(
 
         covered = []
 
-    if len(covered) >= MIN_TOPIC_FAMILIES_FOR_FULL_COVERAGE:
+    if (
+        len(covered)
+        >= MIN_TOPIC_FAMILIES_FOR_FULL_COVERAGE
+    ):
 
         coverage_level = "FULL"
-
-        warnings.append(
-            {
-                "check": "core_topic_coverage",
-                "detail": (
-                    f"covered={covered}; "
-                    f"level=FULL"
-                ),
-            }
-        )
 
     else:
 
         coverage_level = "PARTIAL"
 
+    warnings.append(
+        {
+            "check": (
+                "core_topic_coverage"
+            ),
+            "detail": (
+                f"covered={covered}; "
+                f"level={coverage_level}; "
+                f"minimum_for_full="
+                f"{MIN_TOPIC_FAMILIES_FOR_FULL_COVERAGE}"
+            ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # GDELT availability
+    # --------------------------------------------------------
+
+    if not gdelt_result.get(
+        "ok"
+    ):
+
         warnings.append(
             {
-                "check": "core_topic_coverage",
-                "detail": (
-                    f"covered={covered}; "
-                    f"minimum_for_full="
-                    f"{MIN_TOPIC_FAMILIES_FOR_FULL_COVERAGE}"
+                "check": (
+                    "gdelt_collection"
                 ),
-            }
-        )
-
-    # --------------------------------------------------------
-    # Source availability
-    # --------------------------------------------------------
-
-    if not gdelt_result.get("ok"):
-
-        warnings.append(
-            {
-                "check": "gdelt_collection",
                 "detail": (
                     "GDELT unavailable; "
-                    "official sources used as fallback."
+                    "official sources used "
+                    "as fallback."
                 ),
             }
         )
 
-    if not rss_result.get("ok"):
+    # --------------------------------------------------------
+    # Official RSS availability
+    # --------------------------------------------------------
+
+    if not rss_result.get(
+        "ok"
+    ):
 
         warnings.append(
             {
-                "check": "official_rss_collection",
+                "check": (
+                    "official_rss_collection"
+                ),
                 "detail": (
-                    "No official RSS source returned data."
+                    "No official RSS source "
+                    "returned data."
                 ),
             }
         )
@@ -1471,36 +1812,50 @@ def validate(
             for name, result
             in rss_result.get(
                 "feeds",
-                {}
+                {},
             ).items()
-            if not result.get("ok")
+            if not result.get(
+                "ok"
+            )
         ]
 
         if failed_feeds:
 
             warnings.append(
                 {
-                    "check": "official_rss_partial",
+                    "check": (
+                        "official_rss_partial"
+                    ),
                     "detail": (
-                        f"failed_feeds={failed_feeds}"
+                        f"failed_feeds="
+                        f"{failed_feeds}"
                     ),
                 }
             )
 
-    if sec_result.get("skipped"):
+    # --------------------------------------------------------
+    # SEC
+    # --------------------------------------------------------
+
+    if sec_result.get(
+        "skipped"
+    ):
 
         warnings.append(
             {
-                "check": "sec_collection",
+                "check": (
+                    "sec_collection"
+                ),
                 "detail": (
                     "SEC skipped because "
-                    "SEC_USER_AGENT was not configured."
+                    "SEC_USER_AGENT was "
+                    "not configured."
                 ),
             }
         )
 
     # --------------------------------------------------------
-    # Final structural status
+    # Structural status
     # --------------------------------------------------------
 
     hard_failures = [
@@ -1518,6 +1873,10 @@ def validate(
         if validation_pass
         else "FAIL"
     )
+
+    # --------------------------------------------------------
+    # Counts
+    # --------------------------------------------------------
 
     topic_counts = {}
 
@@ -1561,35 +1920,43 @@ def validate(
         "coverage_level": coverage_level,
         "gdelt": {
             "ok": bool(
-                gdelt_result.get("ok")
+                gdelt_result.get(
+                    "ok"
+                )
             ),
             "rows": len(
                 gdelt_result.get(
                     "rows",
-                    []
+                    [],
                 )
             ),
             "error": gdelt_result.get(
                 "error"
             ),
-            "query_requests": gdelt_result.get(
-                "query_requests",
-                0,
+            "query_requests": (
+                gdelt_result.get(
+                    "query_requests",
+                    0,
+                )
             ),
-            "fallback_required": gdelt_result.get(
-                "fallback_required",
-                False,
+            "fallback_required": (
+                gdelt_result.get(
+                    "fallback_required",
+                    False,
+                )
             ),
         },
         "official_rss": rss_result,
         "sec": {
             "ok": bool(
-                sec_result.get("ok")
+                sec_result.get(
+                    "ok"
+                )
             ),
             "rows": len(
                 sec_result.get(
                     "rows",
-                    []
+                    [],
                 )
             ),
             "skipped": bool(
@@ -1606,11 +1973,12 @@ def validate(
         "warnings": warnings,
         **RESEARCH_ONLY_FLAGS,
         "interpretation": (
-            "Validation is structural/data-quality "
-            "validation only. Event/news coverage is "
-            "descriptive and does not establish causality, "
-            "predictiveness, trading usefulness, or "
-            "investment preference."
+            "Validation is structural and "
+            "data-quality validation only. "
+            "Event/news coverage is descriptive "
+            "and does not establish causality, "
+            "predictiveness, trading usefulness, "
+            "or investment preference."
         ),
     }
 
@@ -1625,20 +1993,30 @@ def build_summary(
 ) -> Dict[str, Any]:
 
     return {
-        "module": "Event / News Intelligence",
+        "module": (
+            "Event / News Intelligence"
+        ),
         "version": VERSION,
         "generated_at": utc_now_iso(),
-        "rows": int(len(df)),
-        "source_counts": validation.get(
-            "source_counts",
-            {},
+        "rows": int(
+            len(df)
         ),
-        "topic_counts": validation.get(
-            "topic_counts",
-            {},
+        "source_counts": (
+            validation.get(
+                "source_counts",
+                {},
+            )
         ),
-        "coverage_level": validation.get(
-            "coverage_level"
+        "topic_counts": (
+            validation.get(
+                "topic_counts",
+                {},
+            )
+        ),
+        "coverage_level": (
+            validation.get(
+                "coverage_level"
+            )
         ),
         **RESEARCH_ONLY_FLAGS,
     }
@@ -1654,7 +2032,9 @@ def main() -> int:
 
     parser.add_argument(
         "--output",
-        default="event_news_intelligence_v1",
+        default=(
+            "event_news_intelligence_v1"
+        ),
         help="Output directory",
     )
 
@@ -1669,17 +2049,38 @@ def main() -> int:
         exist_ok=True,
     )
 
-    print("\n" + "=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
     print(
         "EVENT / NEWS INTELLIGENCE v2.1"
     )
-    print("=" * 72)
 
-    print("Research-only: YES")
-    print("Decision Engine: DISABLED")
-    print("Trading signals: DISABLED")
-    print("Forecasting: DISABLED")
-    print("Version:", VERSION)
+    print(
+        "=" * 72
+    )
+
+    print(
+        "Research-only: YES"
+    )
+
+    print(
+        "Decision Engine: DISABLED"
+    )
+
+    print(
+        "Trading signals: DISABLED"
+    )
+
+    print(
+        "Forecasting: DISABLED"
+    )
+
+    print(
+        f"Version: {VERSION}"
+    )
 
     # --------------------------------------------------------
     # GDELT
@@ -1688,7 +2089,7 @@ def main() -> int:
     gdelt_result = collect_gdelt()
 
     # --------------------------------------------------------
-    # Official sources
+    # Official RSS
     # --------------------------------------------------------
 
     rss_result = collect_official_rss()
@@ -1708,27 +2109,36 @@ def main() -> int:
     raw_rows.extend(
         gdelt_result.get(
             "rows",
-            []
+            [],
         )
     )
 
     raw_rows.extend(
         rss_result.get(
             "rows",
-            []
+            [],
         )
     )
 
     raw_rows.extend(
         sec_result.get(
             "rows",
-            []
+            [],
         )
     )
 
-    print("\n" + "=" * 72)
-    print("NORMALIZATION")
-    print("=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "NORMALIZATION"
+    )
+
+    print(
+        "=" * 72
+    )
 
     df = normalize_dataset(
         raw_rows
@@ -1751,7 +2161,7 @@ def main() -> int:
     )
 
     # --------------------------------------------------------
-    # Output files
+    # Output paths
     # --------------------------------------------------------
 
     dataset_path = (
@@ -1769,10 +2179,18 @@ def main() -> int:
         / "event_news_research_summary_v2.json"
     )
 
+    # --------------------------------------------------------
+    # Save CSV
+    # --------------------------------------------------------
+
     df.to_csv(
         dataset_path,
         index=False,
     )
+
+    # --------------------------------------------------------
+    # Save validation
+    # --------------------------------------------------------
 
     validation_path.write_text(
         json.dumps(
@@ -1782,6 +2200,10 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
+
+    # --------------------------------------------------------
+    # Save summary
+    # --------------------------------------------------------
 
     summary_path.write_text(
         json.dumps(
@@ -1793,12 +2215,21 @@ def main() -> int:
     )
 
     # --------------------------------------------------------
-    # Report
+    # Validation report
     # --------------------------------------------------------
 
-    print("\n" + "=" * 72)
-    print("VALIDATION RESULT")
-    print("=" * 72)
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "VALIDATION RESULT"
+    )
+
+    print(
+        "=" * 72
+    )
 
     print(
         json.dumps(
@@ -1808,9 +2239,22 @@ def main() -> int:
         )
     )
 
-    print("\n" + "=" * 72)
-    print("DATASET SUMMARY")
-    print("=" * 72)
+    # --------------------------------------------------------
+    # Dataset summary
+    # --------------------------------------------------------
+
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "DATASET SUMMARY"
+    )
+
+    print(
+        "=" * 72
+    )
 
     print(
         f"rows={len(df)}"
@@ -1839,6 +2283,11 @@ def main() -> int:
     )
 
     print(
+        f"coverage_level="
+        f"{validation.get('coverage_level')}"
+    )
+
+    print(
         f"dataset={dataset_path}"
     )
 
@@ -1850,16 +2299,29 @@ def main() -> int:
         f"summary={summary_path}"
     )
 
-    print("\n" + "=" * 72)
-    print("EXECUTION SUMMARY")
-    print("=" * 72)
+    # --------------------------------------------------------
+    # Execution summary
+    # --------------------------------------------------------
+
+    print(
+        "\n"
+        + "=" * 72
+    )
+
+    print(
+        "EXECUTION SUMMARY"
+    )
+
+    print(
+        "=" * 72
+    )
 
     print(
         "GDELT rows:",
         len(
             gdelt_result.get(
                 "rows",
-                []
+                [],
             )
         ),
     )
@@ -1869,7 +2331,7 @@ def main() -> int:
         len(
             rss_result.get(
                 "rows",
-                []
+                [],
             )
         ),
     )
@@ -1879,7 +2341,7 @@ def main() -> int:
         len(
             sec_result.get(
                 "rows",
-                []
+                [],
             )
         ),
     )
@@ -1905,17 +2367,25 @@ def main() -> int:
         "Forecast: FALSE"
     )
 
-    if validation["validation_pass"]:
+    # --------------------------------------------------------
+    # Final status
+    # --------------------------------------------------------
+
+    if validation[
+        "validation_pass"
+    ]:
 
         print(
-            "\nEVENT / NEWS INTELLIGENCE "
+            "\n"
+            "EVENT / NEWS INTELLIGENCE "
             "v2.1 VALIDATION: PASS"
         )
 
         return 0
 
     print(
-        "\nEVENT / NEWS INTELLIGENCE "
+        "\n"
+        "EVENT / NEWS INTELLIGENCE "
         "v2.1 VALIDATION: FAIL"
     )
 
