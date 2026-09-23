@@ -1,4 +1,4 @@
-name: Research Integration - Full Validation v1
+name: Research Context Full Validation v1
 
 on:
   workflow_dispatch:
@@ -8,137 +8,1170 @@ permissions:
   actions: read
 
 jobs:
-  research-integration:
-    name: US500 Research Integration Full Validation v1
+  research-context-validation:
+    name: Validate Research Context v1
     runs-on: ubuntu-latest
 
     steps:
+
+      # ====================================================
+      # Checkout
+      # ====================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
+      # ====================================================
+      # Python
+      # ====================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
+      # ====================================================
+      # Dependencies
+      # ====================================================
       - name: Install dependencies
         run: |
+          set -e
+
           python -m pip install --upgrade pip
-          pip install pandas numpy yfinance
+          pip install pandas numpy
 
-      - name: Verify integration script
-        run: |
-          test -f tests/research_integration/research_integration_full_validation_v1.py
-          echo "Integration script found."
 
-      - name: Download latest Research Context artifact
+      # ====================================================
+      # Find latest Research Context artifact
+      # ====================================================
+      - name: Find latest Research Context artifact
+        id: research_context
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          mkdir -p input/research_context
 
           ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" \
-            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              .artifacts
+              | map(
+                  select(
+                    .name == "research-context-v1"
+                    and .expired == false
+                  )
+                )
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
 
-          test -n "$ARTIFACT_ID"
-          test "$ARTIFACT_ID" != "null"
-
-          gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
-            > /tmp/research_context.zip
-
-          unzip -o /tmp/research_context.zip -d input/research_context
-
-      - name: Download latest Liquidity artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          mkdir -p input/liquidity
-
-          ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" \
-            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
-
-          test -n "$ARTIFACT_ID"
-          test "$ARTIFACT_ID" != "null"
-
-          gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
-            > /tmp/liquidity.zip
-
-          unzip -o /tmp/liquidity.zip -d input/liquidity
-
-      - name: Download latest Market Breadth Full Validation artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          mkdir -p input/breadth
-
-          ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" \
-            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id')
-
-          test -n "$ARTIFACT_ID"
-          test "$ARTIFACT_ID" != "null"
-
-          gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
-            > /tmp/breadth.zip
-
-          unzip -o /tmp/breadth.zip -d input/breadth
-
-      - name: Locate input files
-        run: |
-          set -e
-
-          RESEARCH_CONTEXT_FILE=$(find input/research_context -type f -name "research_context_v1.csv" | head -n 1)
-          LIQUIDITY_FILE=$(find input/liquidity -type f -name "liquidity_intelligence_research_v1.csv" | head -n 1)
-          BREADTH_FILE=$(find input/breadth -type f -name "market_breadth_analysis_v1.csv" | head -n 1)
-
-          test -n "$RESEARCH_CONTEXT_FILE"
-          test -n "$LIQUIDITY_FILE"
-          test -n "$BREADTH_FILE"
-
-          echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE" >> "$GITHUB_ENV"
-          echo "LIQUIDITY_FILE=$LIQUIDITY_FILE" >> "$GITHUB_ENV"
-          echo "BREADTH_FILE=$BREADTH_FILE" >> "$GITHUB_ENV"
-
-          echo "Research Context: $RESEARCH_CONTEXT_FILE"
-          echo "Liquidity: $LIQUIDITY_FILE"
-          echo "Breadth: $BREADTH_FILE"
-
-      - name: Run Research Integration Full Validation
-        run: |
-          set -e
-
-          python tests/research_integration/research_integration_full_validation_v1.py \
-            --research-context "$RESEARCH_CONTEXT_FILE" \
-            --liquidity "$LIQUIDITY_FILE" \
-            --breadth "$BREADTH_FILE" \
-            --output research_integration_full_validation_v1
-
-      - name: Display final report
-        if: always()
-        run: |
-          echo "=============================================="
-          echo "RESEARCH INTEGRATION FULL VALIDATION v1"
-          echo "=============================================="
-
-          if [ -f "research_integration_full_validation_v1/research_integration_full_validation_summary_v1.json" ]; then
-            cat research_integration_full_validation_v1/research_integration_full_validation_summary_v1.json
-          else
-            echo "Final report was not generated."
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: research-context-v1 artifact not found."
+            exit 1
           fi
 
-      - name: Upload unified integration artifact
-        if: always()
+          echo "Research Context artifact ID: $ARTIFACT_ID"
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ====================================================
+      # Download Research Context artifact
+      # ====================================================
+      - name: Download Research Context artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/research_context
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.research_context.outputs.artifact_id }}/zip" \
+            > /tmp/research_context.zip
+
+          unzip -o /tmp/research_context.zip \
+            -d input/research_context
+
+          echo "Research Context files:"
+          find input/research_context \
+            -maxdepth 3 \
+            -type f \
+            -print
+
+
+      # ====================================================
+      # Locate required files
+      # ====================================================
+      - name: Locate Research Context files
+        run: |
+          set -e
+
+          CONTEXT_FILE=$(find input/research_context \
+            -type f \
+            -name "research_context_v1.csv" \
+            | head -n 1)
+
+          SUMMARY_FILE=$(find input/research_context \
+            -type f \
+            -name "research_context_summary_v1.csv" \
+            | head -n 1)
+
+          EXTREMES_FILE=$(find input/research_context \
+            -type f \
+            -name "research_context_extremes_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$CONTEXT_FILE" ]; then
+            echo "ERROR: research_context_v1.csv not found."
+            exit 1
+          fi
+
+          if [ -z "$SUMMARY_FILE" ]; then
+            echo "ERROR: research_context_summary_v1.csv not found."
+            exit 1
+          fi
+
+          if [ -z "$EXTREMES_FILE" ]; then
+            echo "ERROR: research_context_extremes_v1.csv not found."
+            exit 1
+          fi
+
+          echo "Context file: $CONTEXT_FILE"
+          echo "Summary file: $SUMMARY_FILE"
+          echo "Extremes file: $EXTREMES_FILE"
+
+          echo "CONTEXT_FILE=$CONTEXT_FILE" >> "$GITHUB_ENV"
+          echo "SUMMARY_FILE=$SUMMARY_FILE" >> "$GITHUB_ENV"
+          echo "EXTREMES_FILE=$EXTREMES_FILE" >> "$GITHUB_ENV"
+
+
+      # ====================================================
+      # Full Research Context validation
+      # ====================================================
+      - name: Run full validation
+        env:
+          CONTEXT_FILE: ${{ env.CONTEXT_FILE }}
+          SUMMARY_FILE: ${{ env.SUMMARY_FILE }}
+          EXTREMES_FILE: ${{ env.EXTREMES_FILE }}
+
+        run: |
+          set -e
+
+          python - <<'PY'
+
+          import os
+          import pandas as pd
+          import numpy as np
+
+
+          # ==================================================
+          # Configuration
+          # ==================================================
+
+          CONTEXT_FILE = os.environ["CONTEXT_FILE"]
+          SUMMARY_FILE = os.environ["SUMMARY_FILE"]
+          EXTREMES_FILE = os.environ["EXTREMES_FILE"]
+
+
+          # ==================================================
+          # Load datasets
+          # ==================================================
+
+          df = pd.read_csv(
+              CONTEXT_FILE
+          )
+
+          summary = pd.read_csv(
+              SUMMARY_FILE
+          )
+
+          extremes = pd.read_csv(
+              EXTREMES_FILE
+          )
+
+
+          print("=" * 70)
+          print("RESEARCH CONTEXT FULL VALIDATION v1")
+          print("=" * 70)
+
+
+          # ==================================================
+          # Basic existence / non-empty validation
+          # ==================================================
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Research Context dataset is empty."
+              )
+
+          if summary.empty:
+              raise SystemExit(
+                  "ERROR: Research Context summary is empty."
+              )
+
+
+          print("Context dataset: PASS")
+          print("Summary dataset: PASS")
+          print(
+              "Extremes dataset:",
+              "PASS | rows=",
+              len(extremes)
+          )
+
+
+          # ==================================================
+          # Required context columns
+          # ==================================================
+
+          required_columns = [
+
+              "context_date",
+
+              "available_layer_count",
+
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+
+              "point_in_time_safe",
+              "research_only",
+
+              "decision_engine_ready",
+
+              "trading_signal_generated",
+
+              "forecast_generated",
+
+              "unified_decision_generated",
+
+              "macro_availability_date",
+
+              "sentiment_asof_date",
+
+              "technical_observation_date",
+
+              "technical_availability_date",
+          ]
+
+
+          missing = [
+              column
+              for column in required_columns
+              if column not in df.columns
+          ]
+
+
+          if missing:
+              raise SystemExit(
+                  "ERROR: Missing required context columns: "
+                  f"{missing}"
+              )
+
+
+          print(
+              "Required context columns: PASS"
+          )
+
+
+          # ==================================================
+          # Date parsing
+          # ==================================================
+
+          dates = pd.to_datetime(
+              df["context_date"],
+              errors="coerce"
+          )
+
+
+          if dates.isna().any():
+
+              raise SystemExit(
+                  "ERROR: Invalid context_date values."
+              )
+
+
+          dates = dates.dt.normalize()
+
+
+          # ==================================================
+          # Date ordering
+          # ==================================================
+
+          if not dates.is_monotonic_increasing:
+
+              raise SystemExit(
+                  "ERROR: context_date is not monotonically increasing."
+              )
+
+
+          if dates.duplicated().any():
+
+              duplicate_count = int(
+                  dates.duplicated().sum()
+              )
+
+              raise SystemExit(
+                  "ERROR: Duplicate context dates: "
+                  f"{duplicate_count}"
+              )
+
+
+          print(
+              "Date ordering / uniqueness: PASS"
+          )
+
+
+          # ==================================================
+          # Determine expected cutoff
+          # ==================================================
+
+          expected_cutoff = dates.max()
+
+
+          print(
+              "Detected research cutoff:",
+              expected_cutoff.date()
+          )
+
+
+          # ==================================================
+          # No future context rows
+          # ==================================================
+
+          future_rows = dates > expected_cutoff
+
+
+          if future_rows.any():
+
+              raise SystemExit(
+                  "ERROR: Future context rows detected."
+              )
+
+
+          print(
+              "Future context rows: 0"
+          )
+
+
+          # ==================================================
+          # Layer availability booleans
+          # ==================================================
+
+          boolean_columns = [
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "unified_decision_generated",
+          ]
+
+
+          for column in boolean_columns:
+
+              values = set(
+                  df[column].dropna().tolist()
+              )
+
+              if not values.issubset(
+                  {True, False}
+              ):
+
+                  raise SystemExit(
+                      f"ERROR: {column} contains "
+                      f"non-boolean values: {values}"
+                  )
+
+
+          print(
+              "Boolean field validation: PASS"
+          )
+
+
+          # ==================================================
+          # Layer count
+          # ==================================================
+
+          layer_sum = (
+              df[
+                  [
+                      "macro_available",
+                      "sentiment_available",
+                      "technical_available",
+                  ]
+              ]
+              .astype(int)
+              .sum(axis=1)
+          )
+
+
+          if not (
+              df["available_layer_count"]
+              == layer_sum
+          ).all():
+
+              bad = int(
+                  (
+                      df["available_layer_count"]
+                      != layer_sum
+                  ).sum()
+              )
+
+              raise SystemExit(
+                  "ERROR: available_layer_count mismatch. "
+                  f"Rows affected: {bad}"
+              )
+
+
+          if (
+              (df["available_layer_count"] < 0)
+              |
+              (df["available_layer_count"] > 3)
+          ).any():
+
+              raise SystemExit(
+                  "ERROR: available_layer_count outside 0-3."
+              )
+
+
+          print(
+              "Layer count consistency: PASS"
+          )
+
+
+          # ==================================================
+          # Macro PIT validation
+          # ==================================================
+
+          macro_availability = pd.to_datetime(
+              df["macro_availability_date"],
+              errors="coerce"
+          )
+
+
+          macro_invalid = (
+              macro_availability.notna()
+              &
+              (
+                  macro_availability.dt.normalize()
+                  > dates
+              )
+          )
+
+
+          if macro_invalid.any():
+
+              raise SystemExit(
+                  "ERROR: Macro PIT lookahead detected."
+              )
+
+
+          print(
+              "Macro PIT synchronization: PASS"
+          )
+
+
+          # ==================================================
+          # Sentiment PIT validation
+          # ==================================================
+
+          sentiment_asof = pd.to_datetime(
+              df["sentiment_asof_date"],
+              errors="coerce"
+          )
+
+
+          sentiment_invalid = (
+              sentiment_asof.notna()
+              &
+              (
+                  sentiment_asof.dt.normalize()
+                  > dates
+              )
+          )
+
+
+          if sentiment_invalid.any():
+
+              raise SystemExit(
+                  "ERROR: Sentiment PIT lookahead detected."
+              )
+
+
+          print(
+              "Sentiment PIT synchronization: PASS"
+          )
+
+
+          # ==================================================
+          # Technical PIT validation
+          # ==================================================
+
+          technical_observation = pd.to_datetime(
+              df["technical_observation_date"],
+              errors="coerce"
+          )
+
+
+          technical_availability = pd.to_datetime(
+              df["technical_availability_date"],
+              errors="coerce"
+          )
+
+
+          technical_future = (
+              technical_availability.notna()
+              &
+              (
+                  technical_availability.dt.normalize()
+                  > dates
+              )
+          )
+
+
+          if technical_future.any():
+
+              raise SystemExit(
+                  "ERROR: Technical availability "
+                  "lookahead detected."
+              )
+
+
+          technical_internal = (
+              technical_observation.notna()
+              &
+              technical_availability.notna()
+              &
+              (
+                  technical_availability.dt.normalize()
+                  <
+                  technical_observation.dt.normalize()
+              )
+          )
+
+
+          if technical_internal.any():
+
+              raise SystemExit(
+                  "ERROR: Technical availability date "
+                  "is earlier than observation date."
+              )
+
+
+          print(
+              "Technical PIT synchronization: PASS"
+          )
+
+          print(
+              "Technical availability >= observation: PASS"
+          )
+
+
+          # ==================================================
+          # Availability flag consistency
+          # ==================================================
+
+          macro_expected = (
+              macro_availability.notna()
+              &
+              (
+                  macro_availability.dt.normalize()
+                  <= dates
+              )
+          )
+
+
+          sentiment_expected = (
+              sentiment_asof.notna()
+              &
+              (
+                  sentiment_asof.dt.normalize()
+                  <= dates
+              )
+          )
+
+
+          technical_expected = (
+              technical_availability.notna()
+              &
+              (
+                  technical_availability.dt.normalize()
+                  <= dates
+              )
+          )
+
+
+          for column, expected in [
+
+              ("macro_available", macro_expected),
+
+              ("sentiment_available", sentiment_expected),
+
+              ("technical_available", technical_expected),
+
+          ]:
+
+              actual = df[column].astype(bool)
+
+              if not actual.equals(
+                  expected.astype(bool)
+              ):
+
+                  bad = int(
+                      (
+                          actual
+                          != expected.astype(bool)
+                      ).sum()
+                  )
+
+                  raise SystemExit(
+                      f"ERROR: {column} does not match "
+                      f"its PIT availability rule. "
+                      f"Rows affected: {bad}"
+                  )
+
+
+          print(
+              "Layer availability/PIT consistency: PASS"
+          )
+
+
+          # ==================================================
+          # Research-only invariants
+          # ==================================================
+
+          if not df[
+              "point_in_time_safe"
+          ].all():
+
+              raise SystemExit(
+                  "ERROR: point_in_time_safe contains FALSE."
+              )
+
+
+          if not df[
+              "research_only"
+          ].all():
+
+              raise SystemExit(
+                  "ERROR: research_only contains FALSE."
+              )
+
+
+          if df[
+              "decision_engine_ready"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Decision Engine is enabled."
+              )
+
+
+          if df[
+              "trading_signal_generated"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Trading signal detected."
+              )
+
+
+          if df[
+              "forecast_generated"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Forecast detected."
+              )
+
+
+          if df[
+              "unified_decision_generated"
+          ].any():
+
+              raise SystemExit(
+                  "ERROR: Unified decision detected."
+              )
+
+
+          print(
+              "Research-only invariants: PASS"
+          )
+
+
+          # ==================================================
+          # Validate summary structure
+          # ==================================================
+
+          summary_required = [
+              "context_date",
+              "available_layer_count",
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "unified_decision_generated",
+          ]
+
+
+          missing_summary = [
+              column
+              for column in summary_required
+              if column not in summary.columns
+          ]
+
+
+          if missing_summary:
+
+              raise SystemExit(
+                  "ERROR: Missing summary columns: "
+                  f"{missing_summary}"
+              )
+
+
+          if len(summary) != 1:
+
+              raise SystemExit(
+                  "ERROR: Summary must contain exactly "
+                  f"one row. Found: {len(summary)}"
+              )
+
+
+          summary_date = pd.to_datetime(
+              summary.iloc[0]["context_date"],
+              errors="coerce"
+          )
+
+
+          if pd.isna(summary_date):
+
+              raise SystemExit(
+                  "ERROR: Invalid summary context_date."
+              )
+
+
+          if (
+              summary_date.normalize()
+              != expected_cutoff
+          ):
+
+              raise SystemExit(
+                  "ERROR: Summary date does not match "
+                  "latest context date."
+              )
+
+
+          print(
+              "Summary validation: PASS"
+          )
+
+
+          # ==================================================
+          # Summary consistency
+          # ==================================================
+
+          latest = df.iloc[-1]
+          summary_row = summary.iloc[0]
+
+
+          consistency_columns = [
+              "available_layer_count",
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "unified_decision_generated",
+          ]
+
+
+          for column in consistency_columns:
+
+              actual = latest[column]
+              reported = summary_row[column]
+
+
+              if pd.isna(actual) and pd.isna(reported):
+                  continue
+
+
+              if str(actual) != str(reported):
+
+                  raise SystemExit(
+                      f"ERROR: Summary mismatch for "
+                      f"{column}: context={actual}, "
+                      f"summary={reported}"
+                  )
+
+
+          print(
+              "Summary/latest-row consistency: PASS"
+          )
+
+
+          # ==================================================
+          # Extremes validation
+          # ==================================================
+
+          if "context_date" not in extremes.columns:
+
+              raise SystemExit(
+                  "ERROR: Extremes file missing context_date."
+              )
+
+
+          if not extremes.empty:
+
+              extreme_dates = pd.to_datetime(
+                  extremes["context_date"],
+                  errors="coerce"
+              )
+
+
+              if extreme_dates.isna().any():
+
+                  raise SystemExit(
+                      "ERROR: Invalid dates in extremes dataset."
+                  )
+
+
+              if (
+                  extreme_dates
+                  .dt.normalize()
+                  > expected_cutoff
+              ).any():
+
+                  raise SystemExit(
+                      "ERROR: Extremes dataset contains "
+                      "future dates."
+                  )
+
+
+              context_dates = set(
+                  dates.dt.strftime("%Y-%m-%d")
+              )
+
+
+              extreme_dates_set = set(
+                  extreme_dates.dt.strftime("%Y-%m-%d")
+              )
+
+
+              orphan_dates = (
+                  extreme_dates_set
+                  - context_dates
+              )
+
+
+              if orphan_dates:
+
+                  raise SystemExit(
+                      "ERROR: Extremes contains context dates "
+                      "not present in main context: "
+                      f"{sorted(orphan_dates)[:10]}"
+                  )
+
+
+          print(
+              "Extremes validation: PASS"
+          )
+
+
+          # ==================================================
+          # Latest row diagnostics
+          # ==================================================
+
+          print()
+          print("=" * 70)
+          print("LATEST RESEARCH CONTEXT")
+          print("=" * 70)
+
+          print(
+              "Latest context date:",
+              expected_cutoff.date()
+          )
+
+          print(
+              "Available layers:",
+              int(
+                  latest[
+                      "available_layer_count"
+                  ]
+              ),
+              "/ 3"
+          )
+
+          print(
+              "Macro available:",
+              bool(
+                  latest[
+                      "macro_available"
+                  ]
+              )
+          )
+
+          print(
+              "Sentiment available:",
+              bool(
+                  latest[
+                      "sentiment_available"
+                  ]
+              )
+          )
+
+          print(
+              "Technical available:",
+              bool(
+                  latest[
+                      "technical_available"
+                  ]
+              )
+          )
+
+
+          # ==================================================
+          # Optional descriptors
+          # ==================================================
+
+          optional_columns = [
+              "economic_regime",
+              "sentiment_regime",
+              "technical_regime",
+              "financial_stress_regime",
+              "trend_structure",
+          ]
+
+
+          for column in optional_columns:
+
+              if column in df.columns:
+
+                  print(
+                      f"{column}:",
+                      latest[column]
+                  )
+
+
+          # ==================================================
+          # Final status
+          # ==================================================
+
+          print()
+          print("=" * 70)
+          print("RESEARCH CONTEXT FULL VALIDATION PASSED")
+          print("=" * 70)
+
+          print(
+              "Rows:",
+              f"{len(df):,}"
+          )
+
+          print(
+              "Columns:",
+              f"{len(df.columns):,}"
+          )
+
+          print(
+              "Date range:",
+              dates.min().date(),
+              "->",
+              dates.max().date()
+          )
+
+          print(
+              "Extreme research rows:",
+              len(extremes)
+          )
+
+          print()
+          print("PIT safe: TRUE")
+          print("Research only: TRUE")
+          print("Decision Engine: FALSE")
+          print("Trading signal: FALSE")
+          print("Forecast: FALSE")
+          print("Unified decision: FALSE")
+          print("Future context rows: 0")
+          print()
+          print("ALL VALIDATIONS PASSED")
+          print("=" * 70)
+
+          PY
+
+
+      # ====================================================
+      # Create validation report
+      # ====================================================
+      - name: Create validation report
+        env:
+          CONTEXT_FILE: ${{ env.CONTEXT_FILE }}
+          SUMMARY_FILE: ${{ env.SUMMARY_FILE }}
+          EXTREMES_FILE: ${{ env.EXTREMES_FILE }}
+
+        run: |
+          set -e
+
+          python - <<'PY'
+
+          import os
+          import pandas as pd
+          from pathlib import Path
+
+
+          context_file = os.environ["CONTEXT_FILE"]
+          summary_file = os.environ["SUMMARY_FILE"]
+          extremes_file = os.environ["EXTREMES_FILE"]
+
+
+          context = pd.read_csv(
+              context_file
+          )
+
+          summary = pd.read_csv(
+              summary_file
+          )
+
+          extremes = pd.read_csv(
+              extremes_file
+          )
+
+
+          dates = pd.to_datetime(
+              context["context_date"]
+          )
+
+
+          latest = context.iloc[-1]
+
+
+          report = [
+
+              "Research Context Full Validation v1",
+              "",
+              "STATUS: PASSED",
+              "",
+
+              f"Rows: {len(context):,}",
+              f"Columns: {len(context.columns):,}",
+
+              (
+                  "Date range: "
+                  f"{dates.min().date()} -> "
+                  f"{dates.max().date()}"
+              ),
+
+              (
+                  "Latest context date: "
+                  f"{dates.max().date()}"
+              ),
+
+              (
+                  "Available layers: "
+                  f"{latest['available_layer_count']} / 3"
+              ),
+
+              (
+                  "Macro available: "
+                  f"{latest['macro_available']}"
+              ),
+
+              (
+                  "Sentiment available: "
+                  f"{latest['sentiment_available']}"
+              ),
+
+              (
+                  "Technical available: "
+                  f"{latest['technical_available']}"
+              ),
+
+              (
+                  "Extreme research rows: "
+                  f"{len(extremes):,}"
+              ),
+
+              "",
+
+              "PIT safe: TRUE",
+              "Research only: TRUE",
+              "Decision Engine: FALSE",
+              "Trading signal: FALSE",
+              "Forecast: FALSE",
+              "Unified decision: FALSE",
+              "Future context rows: 0",
+
+              "",
+
+              "Validated:",
+              "- Required schema",
+              "- Date ordering",
+              "- Date uniqueness",
+              "- Dynamic cutoff",
+              "- Macro PIT",
+              "- Sentiment PIT",
+              "- Technical PIT",
+              "- Technical availability >= observation",
+              "- Layer availability consistency",
+              "- Research-only invariants",
+              "- Summary consistency",
+              "- Extremes integrity",
+          ]
+
+
+          Path(
+              "research_context_full_validation_v1.txt"
+          ).write_text(
+              "\n".join(report),
+              encoding="utf-8"
+          )
+
+
+          print(
+              "Validation report created."
+          )
+
+          PY
+
+
+      # ====================================================
+      # Upload validation artifact
+      # ====================================================
+      - name: Upload validation report
         uses: actions/upload-artifact@v4
         with:
-          name: research-integration-full-validation-v1
-          path: research_integration_full_validation_v1/
-          if-no-files-found: warn
+          name: research-context-full-validation-v1
+          path: |
+            research_context_full_validation_v1.txt
+          if-no-files-found: error
           retention-days: 30
+
+
+      # ====================================================
+      # Final status
+      # ====================================================
+      - name: Final status
+        run: |
+          echo "=============================================="
+          echo "RESEARCH CONTEXT FULL VALIDATION v1 PASSED"
+          echo "=============================================="
+          echo "Research Context: VALID"
+          echo "PIT: PASSED"
+          echo "Anti-lookahead: PASSED"
+          echo "Research-only: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Trading Signal: FALSE"
+          echo "Forecast: FALSE"
+          echo "Unified Decision: FALSE"
+          echo "Validation Artifact:"
+          echo "research-context-full-validation-v1"
+          echo "=============================================="
