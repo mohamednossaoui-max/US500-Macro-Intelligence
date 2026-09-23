@@ -6,6 +6,7 @@ Purpose:
         - Economic Intelligence
         - Fed Intelligence
         - Financial Stress Intelligence
+        - Event / News Intelligence
 
 into one research-only macro context snapshot.
 
@@ -25,6 +26,8 @@ Expected inputs:
 
     financial_stress_research_v1.csv
 
+    event_news_research_v2.csv
+
 The script selects the latest available information as of the
 Fed Intelligence as_of_date and preserves the age of each source.
 """
@@ -32,19 +35,46 @@ Fed Intelligence as_of_date and preserves the age of each source.
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
 
+# ============================================================
+# INPUT FILES
+# ============================================================
+
 FED_FILE = Path("fed_intelligence_output_v1.json")
-ECONOMIC_FILE = Path("economic_regime_events_v1.csv")
-FINANCIAL_STRESS_FILE = Path("financial_stress_research_v1.csv")
 
-OUTPUT_JSON = Path("macro_context_v1.json")
-OUTPUT_CSV = Path("macro_context_v1.csv")
+ECONOMIC_FILE = Path(
+    "economic_regime_events_v1.csv"
+)
 
+FINANCIAL_STRESS_FILE = Path(
+    "financial_stress_research_v1.csv"
+)
+
+EVENT_NEWS_FILE = Path(
+    "event_news_research_v2.csv"
+)
+
+
+# ============================================================
+# OUTPUT FILES
+# ============================================================
+
+OUTPUT_JSON = Path(
+    "macro_context_v1.json"
+)
+
+OUTPUT_CSV = Path(
+    "macro_context_v1.csv"
+)
+
+
+# ============================================================
+# DATE HELPERS
+# ============================================================
 
 def parse_date(value):
     if value is None or pd.isna(value):
@@ -60,34 +90,84 @@ def days_between(later, earlier):
     return (later - earlier).days
 
 
+# ============================================================
+# FED INTELLIGENCE
+# ============================================================
+
 def load_fed():
+
     if not FED_FILE.exists():
         raise FileNotFoundError(
             f"Missing required file: {FED_FILE}"
         )
 
-    return json.loads(
-        FED_FILE.read_text(encoding="utf-8")
+    data = json.loads(
+        FED_FILE.read_text(
+            encoding="utf-8"
+        )
     )
 
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Fed Intelligence file must contain a JSON object."
+        )
+
+    return data
+
+
+# ============================================================
+# ECONOMIC INTELLIGENCE
+# ============================================================
 
 def load_economic(as_of_date):
+
     if not ECONOMIC_FILE.exists():
         raise FileNotFoundError(
             f"Missing required file: {ECONOMIC_FILE}"
         )
 
-    df = pd.read_csv(ECONOMIC_FILE)
+    df = pd.read_csv(
+        ECONOMIC_FILE
+    )
 
     if df.empty:
-        raise ValueError("Economic regime file is empty.")
+        raise ValueError(
+            "Economic regime file is empty."
+        )
+
+    required_columns = {
+        "release_date",
+    }
+
+    missing = (
+        required_columns
+        - set(df.columns)
+    )
+
+    if missing:
+        raise ValueError(
+            "Economic regime file is missing "
+            "required columns: "
+            + ", ".join(
+                sorted(missing)
+            )
+        )
 
     df["release_date"] = pd.to_datetime(
-        df["release_date"]
+        df["release_date"],
+        errors="coerce"
     ).dt.date
 
+    df = df[
+        df["release_date"].notna()
+    ].copy()
+
+    # --------------------------------------------------------
     # Anti-lookahead:
-    # only observations released on or before the context date.
+    # only observations released on or before
+    # the macro context date.
+    # --------------------------------------------------------
+
     df = df[
         df["release_date"] <= as_of_date
     ].copy()
@@ -98,36 +178,68 @@ def load_economic(as_of_date):
             "on or before the macro context date."
         )
 
-    df = df.sort_values("release_date")
+    df = df.sort_values(
+        "release_date"
+    )
 
     return df.iloc[-1].to_dict()
 
 
+# ============================================================
+# FINANCIAL STRESS
+# ============================================================
+
 def load_financial_stress(as_of_date):
+
     if not FINANCIAL_STRESS_FILE.exists():
         raise FileNotFoundError(
-            f"Missing required file: {FINANCIAL_STRESS_FILE}"
+            f"Missing required file: "
+            f"{FINANCIAL_STRESS_FILE}"
         )
 
-    df = pd.read_csv(FINANCIAL_STRESS_FILE)
+    df = pd.read_csv(
+        FINANCIAL_STRESS_FILE
+    )
 
     if df.empty:
         raise ValueError(
             "Financial stress research file is empty."
         )
 
-    # Support the actual v1.3/v1.x column names.
-    if "asof_date" not in df.columns:
+    required_columns = {
+        "asof_date",
+        "composite_stress_score",
+        "research_regime",
+        "point_in_time_safe",
+    }
+
+    missing = (
+        required_columns
+        - set(df.columns)
+    )
+
+    if missing:
         raise ValueError(
-            "Financial stress file does not contain "
-            "'asof_date'."
+            "Financial stress file is missing "
+            "required columns: "
+            + ", ".join(
+                sorted(missing)
+            )
         )
 
     df["asof_date"] = pd.to_datetime(
-        df["asof_date"]
+        df["asof_date"],
+        errors="coerce"
     ).dt.date
 
-    # Anti-lookahead.
+    df = df[
+        df["asof_date"].notna()
+    ].copy()
+
+    # --------------------------------------------------------
+    # Anti-lookahead
+    # --------------------------------------------------------
+
     df = df[
         df["asof_date"] <= as_of_date
     ].copy()
@@ -138,16 +250,194 @@ def load_financial_stress(as_of_date):
             "on or before the macro context date."
         )
 
-    df = df.sort_values("asof_date")
+    # --------------------------------------------------------
+    # PIT safety
+    # --------------------------------------------------------
+
+    df = df[
+        df["point_in_time_safe"] == True
+    ].copy()
+
+    if df.empty:
+        raise ValueError(
+            "No point-in-time-safe Financial Stress "
+            "observations available."
+        )
+
+    df = df.sort_values(
+        "asof_date"
+    )
 
     return df.iloc[-1].to_dict()
 
 
+# ============================================================
+# EVENT / NEWS INTELLIGENCE
+# ============================================================
+
+def load_event_news(as_of_date):
+
+    if not EVENT_NEWS_FILE.exists():
+        raise FileNotFoundError(
+            f"Missing required file: "
+            f"{EVENT_NEWS_FILE}"
+        )
+
+    df = pd.read_csv(
+        EVENT_NEWS_FILE
+    )
+
+    if df.empty:
+        raise ValueError(
+            "Event / News research file is empty."
+        )
+
+    required_columns = {
+        "published_at",
+        "availability_date",
+        "topic",
+        "title",
+        "source",
+        "point_in_time_safe",
+    }
+
+    missing = (
+        required_columns
+        - set(df.columns)
+    )
+
+    if missing:
+        raise ValueError(
+            "Event / News file is missing "
+            "required columns: "
+            + ", ".join(
+                sorted(missing)
+            )
+        )
+
+    # --------------------------------------------------------
+    # Normalize dates
+    # --------------------------------------------------------
+
+    df["availability_date"] = pd.to_datetime(
+        df["availability_date"],
+        errors="coerce"
+    ).dt.date
+
+    df["published_at"] = pd.to_datetime(
+        df["published_at"],
+        errors="coerce",
+        utc=True
+    )
+
+    # --------------------------------------------------------
+    # Remove invalid availability dates
+    # --------------------------------------------------------
+
+    df = df[
+        df["availability_date"].notna()
+    ].copy()
+
+    if df.empty:
+        raise ValueError(
+            "Event / News file contains no valid "
+            "availability dates."
+        )
+
+    # --------------------------------------------------------
+    # Anti-lookahead:
+    #
+    # Only information that was available on or
+    # before the macro context date can enter the
+    # Macro Context.
+    # --------------------------------------------------------
+
+    df = df[
+        df["availability_date"] <= as_of_date
+    ].copy()
+
+    # --------------------------------------------------------
+    # PIT safety
+    # --------------------------------------------------------
+
+    df = df[
+        df["point_in_time_safe"] == True
+    ].copy()
+
+    if df.empty:
+        raise ValueError(
+            "No point-in-time-safe Event / News "
+            "observations available on or before "
+            "the macro context date."
+        )
+
+    # --------------------------------------------------------
+    # Deterministic ordering
+    # --------------------------------------------------------
+
+    df = df.sort_values(
+        [
+            "availability_date",
+            "published_at",
+        ],
+        na_position="first"
+    )
+
+    latest = df.iloc[-1].to_dict()
+
+    topic_counts = (
+        df["topic"]
+        .astype(str)
+        .value_counts()
+        .to_dict()
+    )
+
+    return {
+        "source_date":
+            latest["availability_date"],
+
+        "published_at":
+            (
+                latest["published_at"].isoformat()
+                if pd.notna(
+                    latest["published_at"]
+                )
+                else None
+            ),
+
+        "latest_title":
+            latest.get("title"),
+
+        "latest_source":
+            latest.get("source"),
+
+        "latest_topic":
+            latest.get("topic"),
+
+        "events_available":
+            int(len(df)),
+
+        "topic_counts": {
+            str(key): int(value)
+            for key, value
+            in topic_counts.items()
+        },
+
+        "pit_safe": True,
+    }
+
+
+# ============================================================
+# SAFE FLOAT
+# ============================================================
+
 def safe_float(value):
+
     if value is None:
         return None
 
     try:
+
         value = float(value)
 
         if pd.isna(value):
@@ -155,18 +445,29 @@ def safe_float(value):
 
         return value
 
-    except (TypeError, ValueError):
+    except (
+        TypeError,
+        ValueError,
+    ):
         return None
 
 
+# ============================================================
+# BUILD MACRO CONTEXT
+# ============================================================
+
 def build_macro_context():
+
     print("=" * 70)
-    print("US500 MACRO CONTEXT LAYER v1")
+    print(
+        "US500 MACRO CONTEXT LAYER v1"
+    )
     print("=" * 70)
 
-    # ---------------------------------------------------------
+    # ========================================================
     # FED
-    # ---------------------------------------------------------
+    # ========================================================
+
     fed = load_fed()
 
     context_date = parse_date(
@@ -175,15 +476,18 @@ def build_macro_context():
 
     if context_date is None:
         raise ValueError(
-            "Fed Intelligence does not contain a valid "
-            "'as_of_date'."
+            "Fed Intelligence does not contain "
+            "a valid 'as_of_date'."
         )
 
-    print(f"Context date: {context_date}")
+    print(
+        f"Context date: {context_date}"
+    )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # ECONOMIC INTELLIGENCE
-    # ---------------------------------------------------------
+    # ========================================================
+
     economic = load_economic(
         context_date
     )
@@ -197,9 +501,10 @@ def build_macro_context():
         economic_date
     )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # FINANCIAL STRESS
-    # ---------------------------------------------------------
+    # ========================================================
+
     stress = load_financial_stress(
         context_date
     )
@@ -213,142 +518,250 @@ def build_macro_context():
         stress_date
     )
 
-    # ---------------------------------------------------------
-    # FED COMPONENTS
-    # ---------------------------------------------------------
-    statement = fed.get("statement") or {}
-    phase_2b = fed.get("phase_2b") or {}
-    fed_score = fed.get("fed_score")
+    # ========================================================
+    # EVENT / NEWS INTELLIGENCE
+    # ========================================================
 
-    if isinstance(fed_score, dict):
+    event_news = load_event_news(
+        context_date
+    )
+
+    event_news_date = parse_date(
+        event_news.get("source_date")
+    )
+
+    event_news_age = days_between(
+        context_date,
+        event_news_date
+    )
+
+    # ========================================================
+    # FED COMPONENTS
+    # ========================================================
+
+    statement = (
+        fed.get("statement")
+        or {}
+    )
+
+    phase_2b = (
+        fed.get("phase_2b")
+        or {}
+    )
+
+    fed_score = fed.get(
+        "fed_score"
+    )
+
+    if isinstance(
+        fed_score,
+        dict
+    ):
+
         fed_score_value = (
             fed_score.get("score")
         )
+
     else:
+
         fed_score_value = fed_score
 
-    sep_shift = fed.get("sep_shift")
+    sep_shift = fed.get(
+        "sep_shift"
+    )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # ECONOMIC COMPONENTS
-    # ---------------------------------------------------------
-    economic_regime = economic.get(
-        "economic_regime"
+    # ========================================================
+
+    economic_regime = (
+        economic.get(
+            "economic_regime"
+        )
     )
 
     inflation_score = safe_float(
-        economic.get("inflation_score")
+        economic.get(
+            "inflation_score"
+        )
     )
 
     labor_score = safe_float(
-        economic.get("labor_score")
+        economic.get(
+            "labor_score"
+        )
     )
 
     growth_score = safe_float(
-        economic.get("growth_score")
+        economic.get(
+            "growth_score"
+        )
     )
 
-    dimensions_available = economic.get(
-        "dimensions_available"
+    dimensions_available = (
+        economic.get(
+            "dimensions_available"
+        )
     )
 
     economic_pit_safe = bool(
-        economic.get("pit_safe", False)
+        economic.get(
+            "pit_safe",
+            False
+        )
     )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # FINANCIAL STRESS COMPONENTS
-    # ---------------------------------------------------------
+    # ========================================================
+
     stress_composite = safe_float(
-        stress.get("composite_stress_score")
+        stress.get(
+            "composite_stress_score"
+        )
     )
 
-    stress_regime = stress.get(
-        "research_regime"
+    stress_regime = (
+        stress.get(
+            "research_regime"
+        )
     )
 
     stress_pit_safe = bool(
-        stress.get("point_in_time_safe", False)
+        stress.get(
+            "point_in_time_safe",
+            False
+        )
     )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # MACRO CONTEXT OBJECT
-    # ---------------------------------------------------------
+    # ========================================================
+
     context = {
-        "methodology_version": "macro_context_v1",
 
-        "context_date": context_date.isoformat(),
+        "methodology_version":
+            "macro_context_v1",
 
-        "research_only": True,
+        "context_date":
+            context_date.isoformat(),
 
-        "decision_engine_ready": False,
+        "research_only":
+            True,
 
-        "trade_signal": None,
+        "decision_engine_ready":
+            False,
 
-        "forecast": None,
+        "trade_signal":
+            None,
+
+        "forecast":
+            None,
+
+        # ----------------------------------------------------
+        # ECONOMIC
+        # ----------------------------------------------------
 
         "economic": {
-            "source_date": (
-                economic_date.isoformat()
-                if economic_date
-                else None
-            ),
-            "age_days": economic_age,
 
-            "economic_regime": economic_regime,
+            "source_date":
+                (
+                    economic_date.isoformat()
+                    if economic_date
+                    else None
+                ),
 
-            "inflation_score": inflation_score,
-            "labor_score": labor_score,
-            "growth_score": growth_score,
+            "age_days":
+                economic_age,
+
+            "economic_regime":
+                economic_regime,
+
+            "inflation_score":
+                inflation_score,
+
+            "labor_score":
+                labor_score,
+
+            "growth_score":
+                growth_score,
 
             "dimensions_available":
                 dimensions_available,
 
-            "pit_safe": economic_pit_safe,
+            "pit_safe":
+                economic_pit_safe,
         },
 
+        # ----------------------------------------------------
+        # FED
+        # ----------------------------------------------------
+
         "fed": {
-            "as_of_date": fed.get(
-                "as_of_date"
-            ),
 
-            "latest_fomc": fed.get(
-                "latest_fomc"
-            ),
+            "as_of_date":
+                fed.get(
+                    "as_of_date"
+                ),
 
-            "fed_chair": fed.get(
-                "fed_chair"
-            ),
+            "latest_fomc":
+                fed.get(
+                    "latest_fomc"
+                ),
 
-            "statement_tone": statement.get(
-                "tone"
-            ),
+            "fed_chair":
+                fed.get(
+                    "fed_chair"
+                ),
+
+            "statement_tone":
+                statement.get(
+                    "tone"
+                ),
 
             "statement_tone_score":
-                statement.get("tone_score"),
+                statement.get(
+                    "tone_score"
+                ),
 
-            "phase_2b": phase_2b,
+            "phase_2b":
+                phase_2b,
 
-            "fed_score": fed_score_value,
+            "fed_score":
+                fed_score_value,
 
-            "sep_shift": sep_shift,
+            "sep_shift":
+                sep_shift,
 
             "beige_book_available":
-                (fed.get("beige_book") or {}).get(
+                (
+                    fed.get(
+                        "beige_book"
+                    )
+                    or {}
+                ).get(
                     "available"
                 ),
 
-            "pit_safe": True,
+            "pit_safe":
+                True,
         },
 
-        "financial_stress": {
-            "source_date": (
-                stress_date.isoformat()
-                if stress_date
-                else None
-            ),
+        # ----------------------------------------------------
+        # FINANCIAL STRESS
+        # ----------------------------------------------------
 
-            "age_days": stress_age,
+        "financial_stress": {
+
+            "source_date":
+                (
+                    stress_date.isoformat()
+                    if stress_date
+                    else None
+                ),
+
+            "age_days":
+                stress_age,
 
             "composite_stress_score":
                 stress_composite,
@@ -356,17 +769,26 @@ def build_macro_context():
             "research_regime":
                 stress_regime,
 
-            "vix": safe_float(
-                stress.get("VIX")
-            ),
+            "vix":
+                safe_float(
+                    stress.get(
+                        "VIX"
+                    )
+                ),
 
-            "treasury_2y": safe_float(
-                stress.get("TREASURY_2Y")
-            ),
+            "treasury_2y":
+                safe_float(
+                    stress.get(
+                        "TREASURY_2Y"
+                    )
+                ),
 
-            "treasury_10y": safe_float(
-                stress.get("TREASURY_10Y")
-            ),
+            "treasury_10y":
+                safe_float(
+                    stress.get(
+                        "TREASURY_10Y"
+                    )
+                ),
 
             "yield_10y_2y_spread":
                 safe_float(
@@ -375,42 +797,144 @@ def build_macro_context():
                     )
                 ),
 
-            "pit_safe": stress_pit_safe,
+            "pit_safe":
+                stress_pit_safe,
         },
 
+        # ----------------------------------------------------
+        # EVENT / NEWS
+        # ----------------------------------------------------
+
+        "event_news": {
+
+            "source_date":
+                (
+                    event_news_date.isoformat()
+                    if event_news_date
+                    else None
+                ),
+
+            "age_days":
+                event_news_age,
+
+            "latest_published_at":
+                event_news.get(
+                    "published_at"
+                ),
+
+            "latest_title":
+                event_news.get(
+                    "latest_title"
+                ),
+
+            "latest_source":
+                event_news.get(
+                    "latest_source"
+                ),
+
+            "latest_topic":
+                event_news.get(
+                    "latest_topic"
+                ),
+
+            "events_available":
+                event_news.get(
+                    "events_available"
+                ),
+
+            "topic_counts":
+                event_news.get(
+                    "topic_counts",
+                    {}
+                ),
+
+            "pit_safe":
+                event_news.get(
+                    "pit_safe",
+                    False
+                ),
+        },
+
+        # ----------------------------------------------------
+        # TEMPORAL ALIGNMENT
+        # ----------------------------------------------------
+
         "temporal_alignment": {
+
             "economic_age_days":
                 economic_age,
 
             "financial_stress_age_days":
                 stress_age,
 
-            "fed_is_current_snapshot": True,
+            "event_news_age_days":
+                event_news_age,
 
-            "anti_lookahead": True,
+            "fed_is_current_snapshot":
+                True,
 
-            "note": (
-                "Sources are not forced to be "
-                "same-day. Source age is preserved "
-                "explicitly."
-            ),
+            "anti_lookahead":
+                True,
+
+            "note":
+                (
+                    "Sources are not forced to be "
+                    "same-day. Source age is preserved "
+                    "explicitly. Event / News is filtered "
+                    "by availability_date before entering "
+                    "the Macro Context."
+                ),
         },
     }
 
-    # ---------------------------------------------------------
+    # ========================================================
     # VALIDATION
-    # ---------------------------------------------------------
-    assert context["research_only"] is True
-    assert context["decision_engine_ready"] is False
-    assert context["trade_signal"] is None
-    assert context["forecast"] is None
+    # ========================================================
 
-    assert economic_pit_safe is True
-    assert stress_pit_safe is True
+    assert (
+        context["research_only"]
+        is True
+    )
 
-    # ---------------------------------------------------------
+    assert (
+        context["decision_engine_ready"]
+        is False
+    )
+
+    assert (
+        context["trade_signal"]
+        is None
+    )
+
+    assert (
+        context["forecast"]
+        is None
+    )
+
+    assert (
+        economic_pit_safe
+        is True
+    )
+
+    assert (
+        stress_pit_safe
+        is True
+    )
+
+    assert (
+        event_news.get("pit_safe")
+        is True
+    )
+
+    assert (
+        event_news_date
+        is not None
+    )
+
+    # ========================================================
     # WRITE JSON
-    # ---------------------------------------------------------
+    # ========================================================
+
     OUTPUT_JSON.write_text(
         json.dumps(
             context,
@@ -420,16 +944,21 @@ def build_macro_context():
         encoding="utf-8",
     )
 
-    # ---------------------------------------------------------
+    # ========================================================
     # WRITE ONE-ROW CSV
-    # ---------------------------------------------------------
+    # ========================================================
+
     flat = {
+
         "methodology_version":
             "macro_context_v1",
 
         "context_date":
-            context["context_date"],
+            context[
+                "context_date"
+            ],
 
+        # Economic
         "economic_source_date":
             economic_date,
 
@@ -448,24 +977,36 @@ def build_macro_context():
         "growth_score":
             growth_score,
 
+        # Fed
         "fed_as_of_date":
-            fed.get("as_of_date"),
+            fed.get(
+                "as_of_date"
+            ),
 
         "latest_fomc":
-            fed.get("latest_fomc"),
+            fed.get(
+                "latest_fomc"
+            ),
 
         "fed_chair":
-            fed.get("fed_chair"),
+            fed.get(
+                "fed_chair"
+            ),
 
         "statement_tone":
-            statement.get("tone"),
+            statement.get(
+                "tone"
+            ),
 
         "statement_tone_score":
-            statement.get("tone_score"),
+            statement.get(
+                "tone_score"
+            ),
 
         "fed_score":
             fed_score_value,
 
+        # Financial Stress
         "financial_stress_source_date":
             stress_date,
 
@@ -479,16 +1020,24 @@ def build_macro_context():
             stress_regime,
 
         "vix":
-            safe_float(stress.get("VIX")),
+            safe_float(
+                stress.get(
+                    "VIX"
+                )
+            ),
 
         "treasury_2y":
             safe_float(
-                stress.get("TREASURY_2Y")
+                stress.get(
+                    "TREASURY_2Y"
+                )
             ),
 
         "treasury_10y":
             safe_float(
-                stress.get("TREASURY_10Y")
+                stress.get(
+                    "TREASURY_10Y"
+                )
             ),
 
         "yield_10y_2y_spread":
@@ -498,6 +1047,29 @@ def build_macro_context():
                 )
             ),
 
+        # Event / News
+        "event_news_source_date":
+            event_news_date,
+
+        "event_news_age_days":
+            event_news_age,
+
+        "event_news_latest_topic":
+            event_news.get(
+                "latest_topic"
+            ),
+
+        "event_news_latest_source":
+            event_news.get(
+                "latest_source"
+            ),
+
+        "event_news_events_available":
+            event_news.get(
+                "events_available"
+            ),
+
+        # Research controls
         "research_only":
             True,
 
@@ -512,45 +1084,114 @@ def build_macro_context():
 
         "financial_stress_pit_safe":
             stress_pit_safe,
+
+        "event_news_pit_safe":
+            event_news.get(
+                "pit_safe"
+            ),
     }
 
-    pd.DataFrame([flat]).to_csv(
+    pd.DataFrame(
+        [flat]
+    ).to_csv(
         OUTPUT_CSV,
         index=False
     )
 
-    print()
-    print("Macro Context created successfully.")
-    print(f"JSON: {OUTPUT_JSON}")
-    print(f"CSV:  {OUTPUT_CSV}")
+    # ========================================================
+    # TERMINAL OUTPUT
+    # ========================================================
 
     print()
-    print("Economic regime:", economic_regime)
+    print(
+        "Macro Context created successfully."
+    )
+
+    print(
+        f"JSON: {OUTPUT_JSON}"
+    )
+
+    print(
+        f"CSV:  {OUTPUT_CSV}"
+    )
+
+    print()
+
+    print(
+        "Economic regime:",
+        economic_regime
+    )
+
     print(
         "Economic age:",
         economic_age,
         "days"
     )
+
     print(
         "Financial stress regime:",
         stress_regime
     )
+
     print(
         "Financial stress age:",
         stress_age,
         "days"
     )
+
     print(
         "Fed score:",
         fed_score_value
     )
 
-    print()
-    print("Research-only: TRUE")
-    print("Decision Engine: FALSE")
-    print("Trade signal: NONE")
-    print("Forecast: NONE")
+    print(
+        "Event / News latest topic:",
+        event_news.get(
+            "latest_topic"
+        )
+    )
 
+    print(
+        "Event / News latest source:",
+        event_news.get(
+            "latest_source"
+        )
+    )
+
+    print(
+        "Event / News age:",
+        event_news_age,
+        "days"
+    )
+
+    print(
+        "Event / News events available:",
+        event_news.get(
+            "events_available"
+        )
+    )
+
+    print()
+    print(
+        "Research-only: TRUE"
+    )
+
+    print(
+        "Decision Engine: FALSE"
+    )
+
+    print(
+        "Trade signal: NONE"
+    )
+
+    print(
+        "Forecast: NONE"
+    )
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
 
 if __name__ == "__main__":
     build_macro_context()
