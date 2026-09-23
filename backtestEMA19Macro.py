@@ -194,6 +194,22 @@ def print_baseline_check(trades):
     print("BASELINE STATUS:", "PASS" if ok else "FAIL")
     if not ok:
         print("Expected:", expected, "PF~=1.973")
+
+        # DIAGNOSTIC ONLY: expose the last 12 baseline signals so the
+        # single extra OPEN signal can be identified without changing
+        # the frozen baseline, entry, stop, RR, result, or sizing rules.
+        print("\nBASELINE DIAGNOSTIC — LAST 12 SIGNALS")
+        print("=" * 72)
+        diagnostic_cols = [
+            "signal_date", "signal_index", "entry", "stop",
+            "result", "R", "exit_date",
+        ]
+        available = [c for c in diagnostic_cols if c in trades.columns]
+        if available:
+            print(trades[available].tail(12).to_string(index=False))
+        else:
+            print("Diagnostic columns not found. Available columns:")
+            print(list(trades.columns))
     return ok
 
 # ============================================================
