@@ -25,13 +25,30 @@ jobs:
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
-          python backtestEMA19Macro.py
+          set -o pipefail
+          python backtestEMA19Macro.py 2>&1 | tee backtestEMA19Macro_run.log
 
-      - name: Upload Backtest Results
+      - name: Publish Backtest Log to Job Summary
+        if: always()
+        run: |
+          {
+            echo "# EMA19 Macro Backtest — Run Report"
+            echo
+            echo "## Full execution log"
+            echo
+            echo '```text'
+            cat backtestEMA19Macro_run.log 2>/dev/null || echo "No backtest log was created."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Backtest Results and Run Log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: EMA19-Macro-Backtest-Results
+          if-no-files-found: warn
           path: |
+            backtestEMA19Macro_run.log
             backtestEMA19Macro_trades.csv
             backtestEMA19Macro_regimes.csv
             backtestEMA19Macro_yearly.csv
