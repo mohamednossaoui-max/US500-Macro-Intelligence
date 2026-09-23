@@ -31,6 +31,7 @@ import yfinance as yf
 
 VERSION = "1.0"
 
+
 RESEARCH_ONLY_FLAGS = {
     "research_only": True,
     "decision_engine_ready": False,
@@ -40,9 +41,9 @@ RESEARCH_ONLY_FLAGS = {
 }
 
 
-# ---------------------------------------------------------------------
-# Cross-asset universe
-# ---------------------------------------------------------------------
+# ============================================================
+# CROSS-ASSET UNIVERSE
+# ============================================================
 
 ASSETS: Dict[str, str] = {
     "SP500": "^GSPC",
@@ -56,34 +57,43 @@ ASSETS: Dict[str, str] = {
 }
 
 
-# ---------------------------------------------------------------------
-# Methodology parameters
-# ---------------------------------------------------------------------
+# ============================================================
+# METHODOLOGY PARAMETERS
+# ============================================================
 
 START_DATE = "2000-01-01"
+
 DOWNLOAD_BUFFER_DAYS = 40
 
 VOL_WINDOW = 20
+
 CORRELATION_WINDOW = 60
 
 MIN_ASSET_COVERAGE = 0.70
 
 
-# ---------------------------------------------------------------------
-# Stable deterministic identifier
-# ---------------------------------------------------------------------
+# ============================================================
+# STABLE ID
+# ============================================================
 
-def stable_id(*parts: str, length: int = 24) -> str:
-    raw = "|".join(str(x) for x in parts)
+def stable_id(
+    *parts: str,
+    length: int = 24,
+) -> str:
+
+    raw = "|".join(
+        str(x)
+        for x in parts
+    )
 
     return hashlib.sha256(
         raw.encode("utf-8")
     ).hexdigest()[:length]
 
 
-# ---------------------------------------------------------------------
-# Yahoo Finance downloader
-# ---------------------------------------------------------------------
+# ============================================================
+# DOWNLOAD ONE ASSET
+# ============================================================
 
 def download_asset(
     symbol: str,
@@ -93,9 +103,7 @@ def download_asset(
     """
     Download one daily close series from Yahoo Finance.
 
-    The function explicitly normalizes yfinance's possible
-    MultiIndex output so downstream code always receives
-    a one-dimensional Series.
+    Handles both normal and MultiIndex yfinance output.
     """
 
     frame = yf.download(
@@ -111,57 +119,74 @@ def download_asset(
     )
 
     if frame is None or frame.empty:
+
         raise RuntimeError(
             f"No data returned for {symbol}"
         )
 
-    # -------------------------------------------------------------
-    # Extract Close robustly from either normal or MultiIndex data
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
+    # Extract Close
+    # --------------------------------------------------------
 
-    if isinstance(frame.columns, pd.MultiIndex):
+    if isinstance(
+        frame.columns,
+        pd.MultiIndex,
+    ):
 
-        level_zero = frame.columns.get_level_values(0)
+        level_zero = (
+            frame.columns
+            .get_level_values(0)
+        )
 
         if "Close" not in level_zero:
+
             raise RuntimeError(
                 f"Close column not found for {symbol}"
             )
 
         close = frame["Close"]
 
-        if isinstance(close, pd.DataFrame):
+        if isinstance(
+            close,
+            pd.DataFrame,
+        ):
 
-            # Preferred: exact ticker column
             if symbol in close.columns:
+
                 close = close[symbol]
 
-            # Fallback: if only one column remains
             elif close.shape[1] == 1:
+
                 close = close.iloc[:, 0]
 
             else:
-                # Final deterministic fallback
+
                 close = close.iloc[:, 0]
 
     else:
 
         if "Close" not in frame.columns:
+
             raise RuntimeError(
                 f"Close column not found for {symbol}"
             )
 
         close = frame["Close"]
 
-    # -------------------------------------------------------------
-    # Guarantee Series
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
+    # Guarantee one-dimensional Series
+    # --------------------------------------------------------
 
-    if isinstance(close, pd.DataFrame):
+    if isinstance(
+        close,
+        pd.DataFrame,
+    ):
 
         if close.shape[1] != 1:
+
             raise RuntimeError(
-                f"Unable to reduce Close data to one Series for {symbol}"
+                f"Unable to reduce Close data "
+                f"to one Series for {symbol}"
             )
 
         close = close.iloc[:, 0]
@@ -171,9 +196,9 @@ def download_asset(
         errors="coerce",
     )
 
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
     # Normalize datetime index
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
 
     index = pd.to_datetime(
         close.index,
@@ -181,16 +206,25 @@ def download_asset(
     )
 
     try:
+
         if index.tz is not None:
-            index = index.tz_convert(None)
+
+            index = index.tz_convert(
+                None
+            )
+
     except AttributeError:
+
         pass
 
     index = index.normalize()
 
     close.index = index
 
+    # --------------------------------------------------------
     # Remove invalid / duplicate dates
+    # --------------------------------------------------------
+
     close = close[
         ~close.index.isna()
     ]
@@ -203,14 +237,15 @@ def download_asset(
 
     close = close.dropna()
 
-    # Explicit index name.
-    # This prevents reset_index() from creating "Date"
-    # or another provider-specific column name.
-    close.index.name = "observation_date"
+    # Canonical index name
+    close.index.name = (
+        "observation_date"
+    )
 
     close.name = symbol
 
     if close.empty:
+
         raise RuntimeError(
             f"Close series is empty for {symbol}"
         )
@@ -218,9 +253,9 @@ def download_asset(
     return close
 
 
-# ---------------------------------------------------------------------
-# Build Cross-Asset dataset
-# ---------------------------------------------------------------------
+# ============================================================
+# BUILD DATASET
+# ============================================================
 
 def build_dataset(
     end_date: str,
@@ -242,13 +277,19 @@ def build_dataset(
         )
     )
 
-    series: Dict[str, pd.Series] = {}
+    series: Dict[
+        str,
+        pd.Series
+    ] = {}
 
-    collection_errors: Dict[str, str] = {}
+    collection_errors: Dict[
+        str,
+        str
+    ] = {}
 
-    # -------------------------------------------------------------
-    # Download requested assets
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
+    # Download all assets
+    # --------------------------------------------------------
 
     for asset, symbol in ASSETS.items():
 
@@ -270,22 +311,22 @@ def build_dataset(
                 f"{type(exc).__name__}: {exc}"
             )
 
-    # Require a meaningful cross-asset universe
+    # --------------------------------------------------------
+    # Require meaningful universe
+    # --------------------------------------------------------
+
     if len(series) < 5:
 
         raise RuntimeError(
             "Cross-asset collection failed: "
-            "fewer than 5 requested assets were available. "
+            "fewer than 5 requested assets "
+            "were available. "
             f"Errors: {collection_errors}"
         )
 
-    # -------------------------------------------------------------
-    # Combine series
-    # -------------------------------------------------------------
-    #
-    # sort=False explicitly avoids the pandas future warning
-    # concerning sorting behavior during concatenation.
-    # -------------------------------------------------------------
+    # --------------------------------------------------------
+    # Combine price series
+    # --------------------------------------------------------
 
     prices = pd.concat(
         series,
@@ -296,10 +337,14 @@ def build_dataset(
 
     prices = prices.sort_index()
 
-    # Ensure the index has the canonical name
-    prices.index.name = "observation_date"
+    prices.index.name = (
+        "observation_date"
+    )
 
-    # Apply date boundaries
+    # --------------------------------------------------------
+    # Date boundaries
+    # --------------------------------------------------------
+
     prices = prices[
         prices.index <= end_ts
     ]
@@ -319,24 +364,27 @@ def build_dataset(
 
     output = prices.copy()
 
-    # -------------------------------------------------------------
-    # Daily returns
-    # -------------------------------------------------------------
+    # ========================================================
+    # DAILY RETURNS
+    # ========================================================
 
     for asset in ASSETS:
 
         if asset not in output.columns:
+
             continue
 
         output[
             f"{asset}_RETURN_1D"
-        ] = output[asset].pct_change(
+        ] = output[
+            asset
+        ].pct_change(
             fill_method=None
         )
 
-    # -------------------------------------------------------------
-    # 20-day annualized volatility
-    # -------------------------------------------------------------
+    # ========================================================
+    # 20-DAY ANNUALIZED VOLATILITY
+    # ========================================================
 
     for asset in ASSETS:
 
@@ -345,12 +393,15 @@ def build_dataset(
         )
 
         if return_column not in output.columns:
+
             continue
 
         output[
             f"{asset}_VOL_20D"
         ] = (
-            output[return_column]
+            output[
+                return_column
+            ]
             .rolling(
                 VOL_WINDOW,
                 min_periods=10,
@@ -359,9 +410,9 @@ def build_dataset(
             * np.sqrt(252.0)
         )
 
-    # -------------------------------------------------------------
-    # Cross-asset rolling correlations
-    # -------------------------------------------------------------
+    # ========================================================
+    # CROSS-ASSET CORRELATIONS
+    # ========================================================
 
     pairs = [
         ("SP500", "NASDAQ"),
@@ -390,101 +441,134 @@ def build_dataset(
             left_column not in output.columns
             or right_column not in output.columns
         ):
+
             continue
 
         output[
             f"CORR_{left}_{right}_60D"
         ] = (
-            output[left_column]
+            output[
+                left_column
+            ]
             .rolling(
                 CORRELATION_WINDOW,
                 min_periods=30,
             )
             .corr(
-                output[right_column]
+                output[
+                    right_column
+                ]
             )
         )
 
-    # -------------------------------------------------------------
-    # Convert index into canonical observation_date column
-    # -------------------------------------------------------------
+    # ========================================================
+    # CANONICAL OBSERVATION DATE
+    # ========================================================
 
-    output.index.name = "observation_date"
+    output.index.name = (
+        "observation_date"
+    )
 
     output = output.reset_index()
 
-    # Explicit safety check
-    if "observation_date" not in output.columns:
+    if (
+        "observation_date"
+        not in output.columns
+    ):
 
         raise RuntimeError(
             "Internal schema error: "
-            "observation_date was not created after reset_index()."
+            "observation_date was not created "
+            "after reset_index()."
         )
 
-    output["observation_date"] = (
+    output[
+        "observation_date"
+    ] = (
         pd.to_datetime(
-            output["observation_date"],
+            output[
+                "observation_date"
+            ],
             errors="coerce",
         )
-        .dt.strftime("%Y-%m-%d")
+        .dt.strftime(
+            "%Y-%m-%d"
+        )
     )
 
-    if output["observation_date"].isna().any():
+    if (
+        output[
+            "observation_date"
+        ].isna().any()
+    ):
 
         raise RuntimeError(
-            "Invalid observation_date values detected."
+            "Invalid observation_date "
+            "values detected."
         )
 
-    # -------------------------------------------------------------
-    # Point-in-time availability convention
-    # -------------------------------------------------------------
-    #
-    # Cross-asset daily observation becomes available to the
-    # research layer on the following calendar day.
-    #
-    # This is deliberately conservative and avoids using the
-    # observation date itself as an availability timestamp.
-    # -------------------------------------------------------------
+    # ========================================================
+    # POINT-IN-TIME AVAILABILITY
+    # ========================================================
 
     observation_dates = pd.to_datetime(
-        output["observation_date"]
+        output[
+            "observation_date"
+        ]
     )
 
-    output["availability_date"] = (
+    output[
+        "availability_date"
+    ] = (
         observation_dates
         + pd.Timedelta(days=1)
-    ).dt.strftime("%Y-%m-%d")
+    ).dt.strftime(
+        "%Y-%m-%d"
+    )
 
-    # -------------------------------------------------------------
-    # PIT validation flag
-    # -------------------------------------------------------------
-
-    output["point_in_time_safe"] = (
+    output[
+        "point_in_time_safe"
+    ] = (
         pd.to_datetime(
-            output["availability_date"]
+            output[
+                "availability_date"
+            ]
         )
-        > pd.to_datetime(
-            output["observation_date"]
+        >
+        pd.to_datetime(
+            output[
+                "observation_date"
+            ]
         )
     )
 
-    # -------------------------------------------------------------
-    # Research-only invariants
-    # -------------------------------------------------------------
+    # ========================================================
+    # RESEARCH-ONLY FLAGS
+    # ========================================================
 
-    output["research_only"] = True
+    output[
+        "research_only"
+    ] = True
 
-    output["decision_engine_ready"] = False
+    output[
+        "decision_engine_ready"
+    ] = False
 
-    output["trading_signal_generated"] = False
+    output[
+        "trading_signal_generated"
+    ] = False
 
-    output["forecast_generated"] = False
+    output[
+        "forecast_generated"
+    ] = False
 
-    output["unified_decision_generated"] = False
+    output[
+        "unified_decision_generated"
+    ] = False
 
-    # -------------------------------------------------------------
-    # Available asset count
-    # -------------------------------------------------------------
+    # ========================================================
+    # AVAILABLE ASSET COUNT
+    # ========================================================
 
     available_asset_columns = [
         asset
@@ -492,7 +576,9 @@ def build_dataset(
         if asset in output.columns
     ]
 
-    output["available_asset_count"] = (
+    output[
+        "available_asset_count"
+    ] = (
         output[
             available_asset_columns
         ]
@@ -500,24 +586,30 @@ def build_dataset(
         .sum(axis=1)
     )
 
-    # -------------------------------------------------------------
-    # Stable observation ID
-    # -------------------------------------------------------------
+    # ========================================================
+    # STABLE OBSERVATION ID
+    # ========================================================
 
     output[
         "cross_asset_observation_id"
     ] = [
+
         stable_id(
             str(date),
             str(count),
         )
+
         for date, count in zip(
-            output["observation_date"],
-            output["available_asset_count"],
+            output[
+                "observation_date"
+            ],
+            output[
+                "available_asset_count"
+            ],
         )
     ]
 
-    # Store collection errors in DataFrame metadata
+    # Preserve collection errors
     output.attrs[
         "collection_errors"
     ] = collection_errors
@@ -525,15 +617,19 @@ def build_dataset(
     return output
 
 
-# ---------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------
+# ============================================================
+# VALIDATION
+# ============================================================
 
 def validate(
     data: pd.DataFrame,
     output_dir: Path,
     collection_errors: Dict[str, str],
 ) -> dict:
+
+    # --------------------------------------------------------
+    # Required columns
+    # --------------------------------------------------------
 
     required_columns = [
         "observation_date",
@@ -548,7 +644,6 @@ def validate(
         "cross_asset_observation_id",
     ]
 
-    # Required asset columns
     for asset in ASSETS:
 
         required_columns.extend(
@@ -567,40 +662,53 @@ def validate(
 
     checks = {}
 
-    # -------------------------------------------------------------
-    # Dataset
-    # -------------------------------------------------------------
+    # ========================================================
+    # DATASET
+    # ========================================================
 
-    checks["dataset_nonempty"] = (
-        len(data) > 0
-    )
+    checks[
+        "dataset_nonempty"
+    ] = len(data) > 0
 
-    checks["required_columns_present"] = (
+    checks[
+        "required_columns_present"
+    ] = (
         len(missing_columns) == 0
     )
 
-    # -------------------------------------------------------------
-    # Observation dates
-    # -------------------------------------------------------------
+    # ========================================================
+    # OBSERVATION DATES
+    # ========================================================
 
-    if "observation_date" in data.columns:
+    if (
+        "observation_date"
+        in data.columns
+    ):
 
         observation_dates = pd.to_datetime(
-            data["observation_date"],
+            data[
+                "observation_date"
+            ],
             errors="coerce",
         )
 
-        checks["observation_dates_valid"] = bool(
+        checks[
+            "observation_dates_valid"
+        ] = bool(
             observation_dates.notna().all()
         )
 
-        checks["date_sorted"] = bool(
+        checks[
+            "date_sorted"
+        ] = bool(
             data[
                 "observation_date"
             ].is_monotonic_increasing
         )
 
-        checks["dates_unique"] = bool(
+        checks[
+            "dates_unique"
+        ] = bool(
             data[
                 "observation_date"
             ].is_unique
@@ -608,32 +716,47 @@ def validate(
 
     else:
 
-        checks["observation_dates_valid"] = False
+        checks[
+            "observation_dates_valid"
+        ] = False
 
-        checks["date_sorted"] = False
+        checks[
+            "date_sorted"
+        ] = False
 
-        checks["dates_unique"] = False
+        checks[
+            "dates_unique"
+        ] = False
 
-    # -------------------------------------------------------------
-    # Availability dates
-    # -------------------------------------------------------------
+    # ========================================================
+    # AVAILABILITY DATES
+    # ========================================================
 
     if (
-        "availability_date" in data.columns
-        and "observation_date" in data.columns
+        "availability_date"
+        in data.columns
+        and
+        "observation_date"
+        in data.columns
     ):
 
         availability_dates = pd.to_datetime(
-            data["availability_date"],
+            data[
+                "availability_date"
+            ],
             errors="coerce",
         )
 
         observation_dates = pd.to_datetime(
-            data["observation_date"],
+            data[
+                "observation_date"
+            ],
             errors="coerce",
         )
 
-        checks["availability_dates_valid"] = bool(
+        checks[
+            "availability_dates_valid"
+        ] = bool(
             availability_dates.notna().all()
         )
 
@@ -642,7 +765,8 @@ def validate(
         ] = bool(
             (
                 availability_dates
-                > observation_dates
+                >
+                observation_dates
             ).all()
         )
 
@@ -656,129 +780,335 @@ def validate(
             "availability_after_observation"
         ] = False
 
-    # -------------------------------------------------------------
-    # PIT flag
-    # -------------------------------------------------------------
+    # ========================================================
+    # PIT
+    # ========================================================
 
-    checks["point_in_time_safe_all"] = (
+    checks[
+        "point_in_time_safe_all"
+    ] = (
+
         bool(
             data[
                 "point_in_time_safe"
             ].eq(True).all()
         )
-        if "point_in_time_safe"
+
+        if
+        "point_in_time_safe"
         in data.columns
+
         else False
     )
 
-    # -------------------------------------------------------------
-    # Research-only invariants
-    # -------------------------------------------------------------
+    # ========================================================
+    # RESEARCH-ONLY INVARIANTS
+    # ========================================================
 
-    checks["research_only_all"] = (
+    checks[
+        "research_only_all"
+    ] = (
+
         bool(
             data[
                 "research_only"
             ].eq(True).all()
         )
-        if "research_only"
+
+        if
+        "research_only"
         in data.columns
+
         else False
     )
 
-    checks["decision_engine_disabled"] = (
+    checks[
+        "decision_engine_disabled"
+    ] = (
+
         bool(
             data[
                 "decision_engine_ready"
             ].eq(False).all()
         )
-        if "decision_engine_ready"
+
+        if
+        "decision_engine_ready"
         in data.columns
+
         else False
     )
 
-    checks["trading_signals_disabled"] = (
+    checks[
+        "trading_signals_disabled"
+    ] = (
+
         bool(
             data[
                 "trading_signal_generated"
             ].eq(False).all()
         )
-        if "trading_signal_generated"
+
+        if
+        "trading_signal_generated"
         in data.columns
+
         else False
     )
 
-    checks["forecast_disabled"] = (
+    checks[
+        "forecast_disabled"
+    ] = (
+
         bool(
             data[
                 "forecast_generated"
             ].eq(False).all()
         )
-        if "forecast_generated"
+
+        if
+        "forecast_generated"
         in data.columns
+
         else False
     )
 
-    checks["unified_decision_disabled"] = (
+    checks[
+        "unified_decision_disabled"
+    ] = (
+
         bool(
             data[
                 "unified_decision_generated"
             ].eq(False).all()
         )
-        if "unified_decision_generated"
+
+        if
+        "unified_decision_generated"
         in data.columns
+
         else False
     )
 
-    # -------------------------------------------------------------
-    # Asset coverage
-    # -------------------------------------------------------------
+    # ========================================================
+    # ASSET COVERAGE
+    # ========================================================
+    #
+    # IMPORTANT:
+    #
+    # Different instruments have different inception dates.
+    #
+    # We therefore DO NOT measure coverage against the
+    # complete 2000 -> present calendar.
+    #
+    # Instead, each asset is evaluated only between its
+    # first and last actual observation.
+    #
+    # This prevents Bitcoin, for example, from being
+    # incorrectly penalized for not existing in 2000.
+    # ========================================================
 
     asset_coverage = {}
 
+    asset_first_dates = {}
+
+    asset_last_dates = {}
+
+    asset_observation_counts = {}
+
     for asset in ASSETS:
 
-        if asset in data.columns:
+        if asset not in data.columns:
 
-            coverage = float(
-                data[asset]
-                .notna()
-                .mean()
+            asset_coverage[
+                asset
+            ] = 0.0
+
+            asset_first_dates[
+                asset
+            ] = None
+
+            asset_last_dates[
+                asset
+            ] = None
+
+            asset_observation_counts[
+                asset
+            ] = 0
+
+            continue
+
+        asset_series = data[
+            asset
+        ]
+
+        valid_mask = (
+            asset_series.notna()
+        )
+
+        if not valid_mask.any():
+
+            asset_coverage[
+                asset
+            ] = 0.0
+
+            asset_first_dates[
+                asset
+            ] = None
+
+            asset_last_dates[
+                asset
+            ] = None
+
+            asset_observation_counts[
+                asset
+            ] = 0
+
+            continue
+
+        valid_dates = pd.to_datetime(
+            data.loc[
+                valid_mask,
+                "observation_date",
+            ],
+            errors="coerce",
+        )
+
+        first_date = (
+            valid_dates.min()
+        )
+
+        last_date = (
+            valid_dates.max()
+        )
+
+        asset_first_dates[
+            asset
+        ] = (
+
+            first_date.strftime(
+                "%Y-%m-%d"
             )
 
-            asset_coverage[asset] = round(
-                coverage,
-                4,
+            if pd.notna(first_date)
+
+            else None
+        )
+
+        asset_last_dates[
+            asset
+        ] = (
+
+            last_date.strftime(
+                "%Y-%m-%d"
+            )
+
+            if pd.notna(last_date)
+
+            else None
+        )
+
+        # ----------------------------------------------------
+        # Asset-specific historical window
+        # ----------------------------------------------------
+
+        all_observation_dates = pd.to_datetime(
+            data[
+                "observation_date"
+            ]
+        )
+
+        asset_window = data[
+            (
+                all_observation_dates
+                >= first_date
+            )
+            &
+            (
+                all_observation_dates
+                <= last_date
+            )
+        ]
+
+        total_window_rows = len(
+            asset_window
+        )
+
+        valid_asset_rows = int(
+            asset_window[
+                asset
+            ]
+            .notna()
+            .sum()
+        )
+
+        if total_window_rows > 0:
+
+            coverage = (
+                valid_asset_rows
+                / total_window_rows
             )
 
         else:
 
-            asset_coverage[asset] = 0.0
+            coverage = 0.0
 
-    checks["minimum_asset_coverage"] = all(
+        asset_coverage[
+            asset
+        ] = round(
+            float(coverage),
+            4,
+        )
+
+        asset_observation_counts[
+            asset
+        ] = valid_asset_rows
+
+    # --------------------------------------------------------
+    # Asset availability
+    # --------------------------------------------------------
+
+    checks[
+        "all_requested_assets_available"
+    ] = all(
+        asset in data.columns
+        for asset in ASSETS
+    )
+
+    # --------------------------------------------------------
+    # Coverage requirement
+    # --------------------------------------------------------
+
+    checks[
+        "minimum_asset_coverage"
+    ] = all(
         value >= MIN_ASSET_COVERAGE
         for value in asset_coverage.values()
     )
 
-    # -------------------------------------------------------------
-    # Correlation features
-    # -------------------------------------------------------------
+    # ========================================================
+    # CORRELATION FEATURES
+    # ========================================================
 
     correlation_columns = [
         column
         for column in data.columns
-        if column.startswith("CORR_")
+        if column.startswith(
+            "CORR_"
+        )
     ]
 
     checks[
         "correlation_features_present"
     ] = (
-        len(correlation_columns) >= 5
+        len(
+            correlation_columns
+        ) >= 5
     )
 
-    # -------------------------------------------------------------
-    # Warnings
-    # -------------------------------------------------------------
+    # ========================================================
+    # WARNINGS
+    # ========================================================
 
     warnings: List[str] = []
 
@@ -787,27 +1117,29 @@ def validate(
         warnings.append(
             "One or more requested Yahoo Finance "
             "symbols were unavailable: "
-            + "; ".join(
+            +
+            "; ".join(
                 f"{key}={value}"
                 for key, value
                 in collection_errors.items()
             )
         )
 
-    # -------------------------------------------------------------
-    # Overall validation
-    # -------------------------------------------------------------
+    # ========================================================
+    # OVERALL RESULT
+    # ========================================================
 
     passed = all(
         bool(value)
         for value in checks.values()
     )
 
-    # -------------------------------------------------------------
-    # Validation report
-    # -------------------------------------------------------------
+    # ========================================================
+    # VALIDATION REPORT
+    # ========================================================
 
     validation = {
+
         "validator":
             "Cross-Asset Intelligence v1",
 
@@ -830,7 +1162,9 @@ def validate(
                         "observation_date"
                     ].min()
                 )
+
                 if len(data)
+
                 else None
             ),
 
@@ -841,7 +1175,9 @@ def validate(
                         "observation_date"
                     ].max()
                 )
+
                 if len(data)
+
                 else None
             ),
 
@@ -857,6 +1193,15 @@ def validate(
 
         "asset_coverage":
             asset_coverage,
+
+        "asset_first_dates":
+            asset_first_dates,
+
+        "asset_last_dates":
+            asset_last_dates,
+
+        "asset_observation_counts":
+            asset_observation_counts,
 
         "rolling_correlation_features":
             correlation_columns,
@@ -874,6 +1219,7 @@ def validate(
             RESEARCH_ONLY_FLAGS,
 
         "methodology": {
+
             "price_source":
                 "Yahoo Finance via yfinance",
 
@@ -897,8 +1243,19 @@ def validate(
 
             "missing_session_policy":
                 "No forward-fill across different asset sessions",
+
+            "asset_coverage_policy":
+                "Coverage is measured within each asset's "
+                "own first-to-last available observation window",
+
+            "historical_union_start":
+                START_DATE,
         },
     }
+
+    # ========================================================
+    # WRITE VALIDATION JSON
+    # ========================================================
 
     output_dir.mkdir(
         parents=True,
@@ -917,11 +1274,12 @@ def validate(
         encoding="utf-8",
     )
 
-    # -------------------------------------------------------------
-    # Summary
-    # -------------------------------------------------------------
+    # ========================================================
+    # SUMMARY
+    # ========================================================
 
     summary = {
+
         "validator":
             "Cross-Asset Intelligence v1",
 
@@ -950,19 +1308,36 @@ def validate(
             int(len(data.columns)),
 
         "date_start":
-            validation["date_start"],
+            validation[
+                "date_start"
+            ],
 
         "date_end":
-            validation["date_end"],
+            validation[
+                "date_end"
+            ],
 
         "available_assets":
-            validation["assets_available"],
+            validation[
+                "assets_available"
+            ],
 
         "asset_coverage":
             asset_coverage,
 
+        "asset_first_dates":
+            asset_first_dates,
+
+        "asset_last_dates":
+            asset_last_dates,
+
+        "asset_observation_counts":
+            asset_observation_counts,
+
         "correlation_feature_count":
-            len(correlation_columns),
+            len(
+                correlation_columns
+            ),
 
         "point_in_time_safe":
             bool(
@@ -990,9 +1365,9 @@ def validate(
     return validation
 
 
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
+# ============================================================
+# MAIN
+# ============================================================
 
 def main() -> int:
 
@@ -1005,7 +1380,8 @@ def main() -> int:
         "--output",
         default=
         "cross_asset_intelligence_v1",
-        help="Output directory",
+        help=
+        "Output directory",
     )
 
     parser.add_argument(
@@ -1013,7 +1389,9 @@ def main() -> int:
         default=
         pd.Timestamp.now(
             "UTC"
-        ).strftime("%Y-%m-%d"),
+        ).strftime(
+            "%Y-%m-%d"
+        ),
         help=
         "Inclusive research cutoff date YYYY-MM-DD",
     )
@@ -1024,9 +1402,9 @@ def main() -> int:
         args.output
     )
 
-    # -------------------------------------------------------------
-    # Build dataset
-    # -------------------------------------------------------------
+    # ========================================================
+    # BUILD
+    # ========================================================
 
     try:
 
@@ -1037,24 +1415,25 @@ def main() -> int:
     except Exception as exc:
 
         print(
-            f"ERROR: {type(exc).__name__}: {exc}",
+            f"ERROR: "
+            f"{type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
 
         return 1
 
-    # -------------------------------------------------------------
-    # Output directory
-    # -------------------------------------------------------------
+    # ========================================================
+    # OUTPUT DIRECTORY
+    # ========================================================
 
     output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    # -------------------------------------------------------------
-    # Research dataset
-    # -------------------------------------------------------------
+    # ========================================================
+    # RESEARCH DATASET
+    # ========================================================
 
     data.to_csv(
         output_dir
@@ -1062,9 +1441,9 @@ def main() -> int:
         index=False,
     )
 
-    # -------------------------------------------------------------
-    # Collection errors
-    # -------------------------------------------------------------
+    # ========================================================
+    # COLLECTION ERRORS
+    # ========================================================
 
     collection_errors = (
         data.attrs.get(
@@ -1073,9 +1452,9 @@ def main() -> int:
         )
     )
 
-    # -------------------------------------------------------------
-    # Validation
-    # -------------------------------------------------------------
+    # ========================================================
+    # VALIDATION
+    # ========================================================
 
     validation = validate(
         data=data,
@@ -1084,17 +1463,21 @@ def main() -> int:
             collection_errors,
     )
 
-    # -------------------------------------------------------------
-    # Console report
-    # -------------------------------------------------------------
+    # ========================================================
+    # CONSOLE REPORT
+    # ========================================================
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         "CROSS-ASSET INTELLIGENCE v1"
     )
 
-    print("=" * 60)
+    print(
+        "=" * 60
+    )
 
     print(
         f"Rows: "
@@ -1114,7 +1497,8 @@ def main() -> int:
 
     print(
         "Assets available: "
-        + ", ".join(
+        +
+        ", ".join(
             validation[
                 "assets_available"
             ]
@@ -1151,11 +1535,48 @@ def main() -> int:
         "Unified decision: FALSE"
     )
 
-    # -------------------------------------------------------------
-    # Warnings
-    # -------------------------------------------------------------
+    # ========================================================
+    # ASSET COVERAGE REPORT
+    # ========================================================
 
-    if validation["warnings"]:
+    print(
+        "Asset coverage:"
+    )
+
+    for asset in ASSETS:
+
+        coverage = validation[
+            "asset_coverage"
+        ].get(
+            asset,
+            0.0,
+        )
+
+        first_date = validation[
+            "asset_first_dates"
+        ].get(
+            asset
+        )
+
+        last_date = validation[
+            "asset_last_dates"
+        ].get(
+            asset
+        )
+
+        print(
+            f"  {asset}: "
+            f"{coverage:.2%} "
+            f"({first_date} -> {last_date})"
+        )
+
+    # ========================================================
+    # WARNINGS
+    # ========================================================
+
+    if validation[
+        "warnings"
+    ]:
 
         print(
             "WARNINGS:"
@@ -1169,16 +1590,33 @@ def main() -> int:
                 f"- {warning}"
             )
 
-    # -------------------------------------------------------------
-    # Final status
-    # -------------------------------------------------------------
+    # ========================================================
+    # FINAL STATUS
+    # ========================================================
 
-    if not validation["passed"]:
+    if not validation[
+        "passed"
+    ]:
 
         print(
             "CROSS-ASSET INTELLIGENCE "
             "VALIDATION FAILED"
         )
+
+        # Print failed checks explicitly
+        print(
+            "FAILED CHECKS:"
+        )
+
+        for name, value in validation[
+            "checks"
+        ].items():
+
+            if not value:
+
+                print(
+                    f"- {name}"
+                )
 
         return 1
 
