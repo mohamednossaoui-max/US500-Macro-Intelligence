@@ -13,31 +13,34 @@ jobs:
 
     steps:
 
-      # --------------------------------------------------
+      # ==================================================
       # 1. Checkout repository
-      # --------------------------------------------------
+      # ==================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --------------------------------------------------
+
+      # ==================================================
       # 2. Python
-      # --------------------------------------------------
+      # ==================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # --------------------------------------------------
+
+      # ==================================================
       # 3. Dependencies
-      # --------------------------------------------------
+      # ==================================================
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas
 
-      # --------------------------------------------------
+
+      # ==================================================
       # 4. Download latest Economic Intelligence artifact
-      # --------------------------------------------------
+      # ==================================================
       - name: Download Economic Intelligence artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,9 +79,11 @@ jobs:
             "$RUNNER_TEMP/economic/economic.zip" \
             -d "$RUNNER_TEMP/economic"
 
+          echo "Economic artifact contents:"
+
           find "$RUNNER_TEMP/economic" \
+            -maxdepth 4 \
             -type f \
-            -maxdepth 3 \
             -print
 
           ECONOMIC_FILE=$(find "$RUNNER_TEMP/economic" \
@@ -91,14 +96,16 @@ jobs:
             exit 1
           fi
 
-          cp "$ECONOMIC_FILE" economic_regime_events_v1.csv
+          cp "$ECONOMIC_FILE" \
+            economic_regime_events_v1.csv
 
           echo "Economic input:"
           ls -lh economic_regime_events_v1.csv
 
-      # --------------------------------------------------
-      # 5. Find and download latest Financial Stress artifact
-      # --------------------------------------------------
+
+      # ==================================================
+      # 5. Download Financial Stress artifact
+      # ==================================================
       - name: Download Financial Stress artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -121,12 +128,20 @@ jobs:
                   .created_at
                 ]
               | @tsv
-            ' | sort -k3,3r > "$RUNNER_TEMP/financial_stress_artifacts.tsv"
+            ' \
+            | sort -k3,3r \
+            > "$RUNNER_TEMP/financial_stress_artifacts.tsv"
 
           echo "Available Financial Stress artifacts:"
-          cat "$RUNNER_TEMP/financial_stress_artifacts.tsv" || true
 
-          # Prefer a dedicated Research artifact if one exists.
+          cat \
+            "$RUNNER_TEMP/financial_stress_artifacts.tsv" \
+            || true
+
+          # ------------------------------------------------
+          # Prefer dedicated research artifact
+          # ------------------------------------------------
+
           ARTIFACT_ID=$(awk '
             BEGIN { IGNORECASE=1 }
             /financial-stress-research/ {
@@ -135,8 +150,12 @@ jobs:
             }
           ' "$RUNNER_TEMP/financial_stress_artifacts.tsv")
 
-          # Otherwise use the historical collector artifact.
+          # ------------------------------------------------
+          # Otherwise use historical artifact
+          # ------------------------------------------------
+
           if [ -z "$ARTIFACT_ID" ]; then
+
             ARTIFACT_ID=$(awk '
               BEGIN { IGNORECASE=1 }
               /financial-stress-historical/ {
@@ -144,19 +163,27 @@ jobs:
                 exit
               }
             ' "$RUNNER_TEMP/financial_stress_artifacts.tsv")
+
           fi
 
           if [ -z "$ARTIFACT_ID" ]; then
+
             echo ""
             echo "ERROR: No usable Financial Stress artifact found."
-            echo "The available artifacts were:"
-            cat "$RUNNER_TEMP/financial_stress_artifacts.tsv" || true
+
+            cat \
+              "$RUNNER_TEMP/financial_stress_artifacts.tsv" \
+              || true
+
             exit 1
+
           fi
 
-          echo "Selected Financial Stress artifact ID: $ARTIFACT_ID"
+          echo \
+            "Selected Financial Stress artifact ID: $ARTIFACT_ID"
 
-          mkdir -p "$RUNNER_TEMP/financial_stress"
+          mkdir -p \
+            "$RUNNER_TEMP/financial_stress"
 
           gh api \
             "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
@@ -167,33 +194,42 @@ jobs:
             -d "$RUNNER_TEMP/financial_stress"
 
           echo "Financial Stress artifact contents:"
+
           find "$RUNNER_TEMP/financial_stress" \
-            -type f \
             -maxdepth 4 \
+            -type f \
             -print
 
-          STRESS_FILE=$(find "$RUNNER_TEMP/financial_stress" \
+          STRESS_FILE=$(find \
+            "$RUNNER_TEMP/financial_stress" \
             -type f \
             -name "financial_stress_research_v1.csv" \
             | head -1)
 
           if [ -z "$STRESS_FILE" ]; then
+
             echo ""
-            echo "ERROR: financial_stress_research_v1.csv was not found."
+            echo "ERROR:"
+            echo "financial_stress_research_v1.csv was not found."
             echo ""
             echo "The selected artifact may contain only raw historical data."
-            echo "In that case the existing research analyzer must be run first."
+            echo "Run the Financial Stress research analyzer first."
+
             exit 1
+
           fi
 
-          cp "$STRESS_FILE" financial_stress_research_v1.csv
+          cp "$STRESS_FILE" \
+            financial_stress_research_v1.csv
 
           echo "Financial Stress input:"
-          ls -lh financial_stress_research_v1.csv
+          ls -lh \
+            financial_stress_research_v1.csv
 
-      # --------------------------------------------------
+
+      # ==================================================
       # 6. Download Fed Intelligence artifact
-      # --------------------------------------------------
+      # ==================================================
       - name: Download Fed Intelligence artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -232,6 +268,13 @@ jobs:
             "$RUNNER_TEMP/fed/fed.zip" \
             -d "$RUNNER_TEMP/fed"
 
+          echo "Fed artifact contents:"
+
+          find "$RUNNER_TEMP/fed" \
+            -maxdepth 4 \
+            -type f \
+            -print
+
           FED_FILE=$(find "$RUNNER_TEMP/fed" \
             -type f \
             -name "fed_intelligence_output_v1.json" \
@@ -242,27 +285,108 @@ jobs:
             exit 1
           fi
 
-          cp "$FED_FILE" fed_intelligence_output_v1.json
+          cp "$FED_FILE" \
+            fed_intelligence_output_v1.json
 
           echo "Fed input:"
-          ls -lh fed_intelligence_output_v1.json
+          ls -lh \
+            fed_intelligence_output_v1.json
 
-      # --------------------------------------------------
-      # 7. Verify all Macro Context inputs
-      # --------------------------------------------------
+
+      # ==================================================
+      # 7. Download Event / News Intelligence v2.1
+      # ==================================================
+      - name: Download Event News Intelligence artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts" \
+            -f name="event-news-intelligence-v2.1" \
+            -f per_page=100 \
+            --jq '
+              [
+                .artifacts[]
+                | select(.expired == false)
+              ]
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: Event / News Intelligence artifact not found."
+            exit 1
+          fi
+
+          echo \
+            "Event / News artifact ID: $ARTIFACT_ID"
+
+          mkdir -p \
+            "$RUNNER_TEMP/event_news"
+
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > "$RUNNER_TEMP/event_news/event_news.zip"
+
+          unzip -o \
+            "$RUNNER_TEMP/event_news/event_news.zip" \
+            -d "$RUNNER_TEMP/event_news"
+
+          echo "Event / News artifact contents:"
+
+          find "$RUNNER_TEMP/event_news" \
+            -maxdepth 5 \
+            -type f \
+            -print
+
+          EVENT_NEWS_FILE=$(find \
+            "$RUNNER_TEMP/event_news" \
+            -type f \
+            -name "event_news_research_v2.csv" \
+            | head -1)
+
+          if [ -z "$EVENT_NEWS_FILE" ]; then
+            echo ""
+            echo "ERROR:"
+            echo "event_news_research_v2.csv was not found."
+            exit 1
+          fi
+
+          cp "$EVENT_NEWS_FILE" \
+            event_news_research_v2.csv
+
+          echo ""
+          echo "Event / News input:"
+          ls -lh \
+            event_news_research_v2.csv
+
+
+      # ==================================================
+      # 8. Verify all Macro Context inputs
+      # ==================================================
       - name: Verify inputs
         run: |
           set -e
 
           echo "Input files:"
+
           ls -lh \
             fed_intelligence_output_v1.json \
             economic_regime_events_v1.csv \
-            financial_stress_research_v1.csv
+            financial_stress_research_v1.csv \
+            event_news_research_v2.csv
 
           python - <<'PY'
           import json
           import pandas as pd
+
+          # ------------------------------------------------
+          # Fed
+          # ------------------------------------------------
 
           with open(
               "fed_intelligence_output_v1.json",
@@ -271,22 +395,94 @@ jobs:
           ) as f:
               fed = json.load(f)
 
+          # ------------------------------------------------
+          # Economic
+          # ------------------------------------------------
+
           economic = pd.read_csv(
               "economic_regime_events_v1.csv"
           )
+
+          # ------------------------------------------------
+          # Financial Stress
+          # ------------------------------------------------
 
           stress = pd.read_csv(
               "financial_stress_research_v1.csv"
           )
 
-          assert isinstance(fed, dict)
+          # ------------------------------------------------
+          # Event / News
+          # ------------------------------------------------
+
+          event_news = pd.read_csv(
+              "event_news_research_v2.csv"
+          )
+
+          # ------------------------------------------------
+          # Basic checks
+          # ------------------------------------------------
+
+          assert isinstance(
+              fed,
+              dict
+          )
+
           assert not economic.empty
           assert not stress.empty
+          assert not event_news.empty
 
+          # ------------------------------------------------
+          # Event / News schema
+          # ------------------------------------------------
+
+          required_event_columns = {
+              "published_at",
+              "availability_date",
+              "topic",
+              "title",
+              "source",
+              "point_in_time_safe",
+          }
+
+          missing_event_columns = (
+              required_event_columns
+              - set(event_news.columns)
+          )
+
+          assert not missing_event_columns, (
+              "Event / News file missing columns: "
+              + ", ".join(
+                  sorted(
+                      missing_event_columns
+                  )
+              )
+          )
+
+          # ------------------------------------------------
+          # Event / News PIT validation
+          # ------------------------------------------------
+
+          assert (
+              event_news[
+                  "point_in_time_safe"
+              ]
+              .astype(bool)
+              .all()
+          )
+
+          print("")
+          print("=" * 60)
+          print("MACRO CONTEXT INPUT VALIDATION PASSED")
+          print("=" * 60)
+
+          print("")
           print("Fed Intelligence: OK")
           print("Economic Intelligence: OK")
           print("Financial Stress: OK")
+          print("Event / News Intelligence: OK")
 
+          print("")
           print(
               "Fed as_of_date:",
               fed.get("as_of_date")
@@ -301,18 +497,36 @@ jobs:
               "Financial Stress rows:",
               len(stress)
           )
+
+          print(
+              "Event / News rows:",
+              len(event_news)
+          )
+
+          print(
+              "Event / News PIT-safe rows:",
+              int(
+                  event_news[
+                      "point_in_time_safe"
+                  ]
+                  .astype(bool)
+                  .sum()
+              )
+          )
           PY
 
-      # --------------------------------------------------
-      # 8. Build Macro Context
-      # --------------------------------------------------
+
+      # ==================================================
+      # 9. Run Macro Context
+      # ==================================================
       - name: Run Macro Context v1
         run: |
           python macro_context_v1.py
 
-      # --------------------------------------------------
-      # 9. Validate Macro Context
-      # --------------------------------------------------
+
+      # ==================================================
+      # 10. Validate Macro Context
+      # ==================================================
       - name: Validate Macro Context
         run: |
           set -e
@@ -323,6 +537,10 @@ jobs:
           python - <<'PY'
           import json
           import pandas as pd
+
+          # ------------------------------------------------
+          # Load outputs
+          # ------------------------------------------------
 
           with open(
               "macro_context_v1.json",
@@ -335,22 +553,124 @@ jobs:
               "macro_context_v1.csv"
           )
 
-          assert data["research_only"] is True
-          assert data["decision_engine_ready"] is False
-          assert data["trade_signal"] is None
-          assert data["forecast"] is None
+          # ------------------------------------------------
+          # Research-only safety
+          # ------------------------------------------------
 
-          assert data[
-              "temporal_alignment"
-          ]["anti_lookahead"] is True
+          assert (
+              data["research_only"]
+              is True
+          )
+
+          assert (
+              data["decision_engine_ready"]
+              is False
+          )
+
+          assert (
+              data["trade_signal"]
+              is None
+          )
+
+          assert (
+              data["forecast"]
+              is None
+          )
+
+          # ------------------------------------------------
+          # Anti-lookahead
+          # ------------------------------------------------
+
+          assert (
+              data[
+                  "temporal_alignment"
+              ]["anti_lookahead"]
+              is True
+          )
+
+          # ------------------------------------------------
+          # Economic PIT
+          # ------------------------------------------------
+
+          assert (
+              data[
+                  "economic"
+              ]["pit_safe"]
+              is True
+          )
+
+          # ------------------------------------------------
+          # Financial Stress PIT
+          # ------------------------------------------------
+
+          assert (
+              data[
+                  "financial_stress"
+              ]["pit_safe"]
+              is True
+          )
+
+          # ------------------------------------------------
+          # Event / News PIT
+          # ------------------------------------------------
+
+          assert (
+              data[
+                  "event_news"
+              ]["pit_safe"]
+              is True
+          )
+
+          # ------------------------------------------------
+          # Event / News temporal field
+          # ------------------------------------------------
+
+          assert (
+              "event_news_age_days"
+              in data[
+                  "temporal_alignment"
+              ]
+          )
+
+          # ------------------------------------------------
+          # CSV
+          # ------------------------------------------------
 
           assert len(df) == 1
+
+          required_csv_columns = {
+              "event_news_source_date",
+              "event_news_age_days",
+              "event_news_latest_topic",
+              "event_news_latest_source",
+              "event_news_events_available",
+              "event_news_pit_safe",
+          }
+
+          missing_csv_columns = (
+              required_csv_columns
+              - set(df.columns)
+          )
+
+          assert not missing_csv_columns, (
+              "Macro Context CSV missing columns: "
+              + ", ".join(
+                  sorted(
+                      missing_csv_columns
+                  )
+              )
+          )
+
+          # ------------------------------------------------
+          # Final validation output
+          # ------------------------------------------------
 
           print("")
           print("=" * 60)
           print("MACRO CONTEXT VALIDATION PASSED")
           print("=" * 60)
 
+          print("")
           print(
               "Context date:",
               data["context_date"]
@@ -358,7 +678,9 @@ jobs:
 
           print(
               "Economic regime:",
-              data["economic"]["economic_regime"]
+              data[
+                  "economic"
+              ]["economic_regime"]
           )
 
           print(
@@ -377,7 +699,46 @@ jobs:
 
           print(
               "Fed score:",
-              data["fed"]["fed_score"]
+              data[
+                  "fed"
+              ]["fed_score"]
+          )
+
+          print("")
+          print(
+              "Event / News source date:",
+              data[
+                  "event_news"
+              ]["source_date"]
+          )
+
+          print(
+              "Event / News age:",
+              data[
+                  "event_news"
+              ]["age_days"],
+              "days"
+          )
+
+          print(
+              "Event / News latest topic:",
+              data[
+                  "event_news"
+              ]["latest_topic"]
+          )
+
+          print(
+              "Event / News latest source:",
+              data[
+                  "event_news"
+              ]["latest_source"]
+          )
+
+          print(
+              "Event / News events available:",
+              data[
+                  "event_news"
+              ]["events_available"]
           )
 
           print("")
@@ -385,11 +746,14 @@ jobs:
           print("Decision Engine: FALSE")
           print("Trade signal: NONE")
           print("Forecast: NONE")
+          print("Anti-lookahead: TRUE")
+          print("Event / News PIT-safe: TRUE")
           PY
 
-      # --------------------------------------------------
-      # 10. Upload Macro Context artifact
-      # --------------------------------------------------
+
+      # ==================================================
+      # 11. Upload Macro Context artifact
+      # ==================================================
       - name: Upload Macro Context artifact
         uses: actions/upload-artifact@v4
         with:
