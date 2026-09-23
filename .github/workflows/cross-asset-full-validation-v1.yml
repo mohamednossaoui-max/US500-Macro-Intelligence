@@ -1,0 +1,1168 @@
+name: Cross-Asset Full Validation v1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cross-asset-full-validation-v1
+  cancel-in-progress: false
+
+jobs:
+  cross-asset-validation:
+    name: Validate Cross-Asset Intelligence v1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+
+          pip install \
+            pandas \
+            numpy
+
+      # ============================================================
+      # FIND LATEST CROSS-ASSET ARTIFACT
+      # ============================================================
+
+      - name: Find latest Cross-Asset artifact
+        id: cross_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              [
+                .artifacts[]
+                | select(
+                    .name == "cross-asset-intelligence-v1"
+                    and .expired == false
+                  )
+              ]
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo ""
+            echo "ERROR: No valid cross-asset-intelligence-v1 artifact found."
+            echo ""
+            echo "Run Cross-Asset Intelligence v1 first."
+            exit 1
+          fi
+
+          echo ""
+          echo "Selected Cross-Asset artifact ID:"
+          echo "$ARTIFACT_ID"
+
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+      # ============================================================
+      # DOWNLOAD ARTIFACT
+      # ============================================================
+
+      - name: Download Cross-Asset artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/cross_asset
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.cross_asset.outputs.artifact_id }}/zip" \
+            > /tmp/cross_asset.zip
+
+          unzip -o \
+            /tmp/cross_asset.zip \
+            -d input/cross_asset
+
+          echo ""
+          echo "Downloaded Cross-Asset artifact:"
+          find input/cross_asset \
+            -maxdepth 5 \
+            -type f \
+            -print
+
+      # ============================================================
+      # LOCATE FILES
+      # ============================================================
+
+      - name: Locate Cross-Asset datasets
+        run: |
+          set -e
+
+          DATA_FILE=$(find input/cross_asset \
+            -type f \
+            -name "cross_asset_research_v1.csv" \
+            | head -n 1)
+
+          SUMMARY_FILE=$(find input/cross_asset \
+            -type f \
+            -name "cross_asset_summary_v1.json" \
+            | head -n 1)
+
+          VALIDATION_FILE=$(find input/cross_asset \
+            -type f \
+            -name "cross_asset_validation_v1.json" \
+            | head -n 1)
+
+          if [ -z "$DATA_FILE" ]; then
+            echo "ERROR: cross_asset_research_v1.csv not found."
+            exit 1
+          fi
+
+          if [ -z "$SUMMARY_FILE" ]; then
+            echo "ERROR: cross_asset_summary_v1.json not found."
+            exit 1
+          fi
+
+          if [ -z "$VALIDATION_FILE" ]; then
+            echo "ERROR: cross_asset_validation_v1.json not found."
+            exit 1
+          fi
+
+          echo "Research dataset: $DATA_FILE"
+          echo "Summary: $SUMMARY_FILE"
+          echo "Validation: $VALIDATION_FILE"
+
+          echo "DATA_FILE=$DATA_FILE" >> "$GITHUB_ENV"
+          echo "SUMMARY_FILE=$SUMMARY_FILE" >> "$GITHUB_ENV"
+          echo "VALIDATION_FILE=$VALIDATION_FILE" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # FULL VALIDATION
+      # ============================================================
+
+      - name: Run Cross-Asset Full Validation
+        env:
+          DATA_FILE: ${{ env.DATA_FILE }}
+          SUMMARY_FILE: ${{ env.SUMMARY_FILE }}
+          VALIDATION_FILE: ${{ env.VALIDATION_FILE }}
+        run: |
+          set -e
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          import pandas as pd
+
+
+          DATA_FILE = os.environ["DATA_FILE"]
+          SUMMARY_FILE = os.environ["SUMMARY_FILE"]
+          VALIDATION_FILE = os.environ["VALIDATION_FILE"]
+
+
+          ASSETS = [
+              "SP500",
+              "NASDAQ",
+              "GOLD",
+              "DXY",
+              "VIX",
+              "US10Y",
+              "WTI",
+              "BITCOIN",
+          ]
+
+
+          CORRELATION_PAIRS = [
+              ("SP500", "NASDAQ"),
+              ("SP500", "GOLD"),
+              ("SP500", "DXY"),
+              ("SP500", "VIX"),
+              ("SP500", "US10Y"),
+              ("SP500", "WTI"),
+              ("SP500", "BITCOIN"),
+              ("GOLD", "DXY"),
+              ("GOLD", "US10Y"),
+              ("DXY", "US10Y"),
+          ]
+
+
+          RESEARCH_ONLY_EXPECTED = {
+              "research_only": True,
+              "decision_engine_ready": False,
+              "trading_signal_generated": False,
+              "forecast_generated": False,
+              "unified_decision_generated": False,
+          }
+
+
+          def parse_bool_series(series, column):
+              normalized = (
+                  series.astype(str)
+                  .str.strip()
+                  .str.lower()
+              )
+
+              mapping = {
+                  "true": True,
+                  "false": False,
+              }
+
+              parsed = normalized.map(mapping)
+
+              if parsed.isna().any():
+                  bad = sorted(
+                      set(normalized[parsed.isna()].tolist())
+                  )
+
+                  raise SystemExit(
+                      f"ERROR: {column} contains non-boolean values: {bad}"
+                  )
+
+              return parsed
+
+
+          def compare_scalar(actual, expected, column):
+              if str(actual) != str(expected):
+                  raise SystemExit(
+                      f"ERROR: Summary mismatch for {column}: "
+                      f"dataset={actual}, summary={expected}"
+                  )
+
+
+          # ============================================================
+          # LOAD
+          # ============================================================
+
+          df = pd.read_csv(
+              DATA_FILE,
+              low_memory=False,
+          )
+
+          with open(
+              SUMMARY_FILE,
+              "r",
+              encoding="utf-8",
+          ) as handle:
+              summary = json.load(handle)
+
+          with open(
+              VALIDATION_FILE,
+              "r",
+              encoding="utf-8",
+          ) as handle:
+              validation = json.load(handle)
+
+
+          print("=" * 72)
+          print("CROSS-ASSET FULL VALIDATION v1")
+          print("=" * 72)
+
+
+          # ============================================================
+          # A. DATASET
+          # ============================================================
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Cross-Asset research dataset is empty."
+              )
+
+          print("Research dataset nonempty: PASS")
+
+
+          # ============================================================
+          # B. REQUIRED SCHEMA
+          # ============================================================
+
+          required_columns = [
+              "observation_date",
+              "availability_date",
+              "available_asset_count",
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "unified_decision_generated",
+              "cross_asset_observation_id",
+          ]
+
+
+          for asset in ASSETS:
+
+              required_columns.extend([
+                  asset,
+                  f"{asset}_RETURN_1D",
+                  f"{asset}_VOL_20D",
+              ])
+
+
+          for left, right in CORRELATION_PAIRS:
+
+              required_columns.append(
+                  f"CORR_{left}_{right}_60D"
+              )
+
+
+          missing = sorted(
+              set(required_columns)
+              - set(df.columns)
+          )
+
+
+          if missing:
+
+              raise SystemExit(
+                  "ERROR: Missing required Cross-Asset columns: "
+                  + ", ".join(missing)
+              )
+
+
+          print(
+              "Required Cross-Asset schema: PASS | "
+              f"columns={len(required_columns)}"
+          )
+
+
+          # ============================================================
+          # C. DATE INTEGRITY
+          # ============================================================
+
+          observation_dates = pd.to_datetime(
+              df["observation_date"],
+              errors="coerce",
+          ).dt.normalize()
+
+
+          availability_dates = pd.to_datetime(
+              df["availability_date"],
+              errors="coerce",
+          ).dt.normalize()
+
+
+          if observation_dates.isna().any():
+
+              raise SystemExit(
+                  "ERROR: Invalid observation_date values."
+              )
+
+
+          if availability_dates.isna().any():
+
+              raise SystemExit(
+                  "ERROR: Invalid availability_date values."
+              )
+
+
+          if not observation_dates.is_monotonic_increasing:
+
+              raise SystemExit(
+                  "ERROR: observation_date is not "
+                  "monotonically increasing."
+              )
+
+
+          if observation_dates.duplicated().any():
+
+              raise SystemExit(
+                  "ERROR: Duplicate observation_date values detected."
+              )
+
+
+          print(
+              "Observation date validity/order/uniqueness: PASS"
+          )
+
+
+          # ============================================================
+          # D. AVAILABILITY / PIT
+          # ============================================================
+
+          availability_failure = (
+              availability_dates
+              <= observation_dates
+          )
+
+
+          if availability_failure.any():
+
+              raise SystemExit(
+                  "ERROR: availability_date must be strictly "
+                  "later than observation_date."
+              )
+
+
+          print(
+              "Availability date > observation date: PASS"
+          )
+
+
+          # ============================================================
+          # E. PIT FLAG CONSISTENCY
+          # ============================================================
+
+          pit = parse_bool_series(
+              df["point_in_time_safe"],
+              "point_in_time_safe",
+          )
+
+
+          expected_pit = (
+              availability_dates
+              > observation_dates
+          )
+
+
+          if not pit.equals(expected_pit):
+
+              raise SystemExit(
+                  "ERROR: point_in_time_safe is inconsistent "
+                  "with availability_date and observation_date."
+              )
+
+
+          if not pit.all():
+
+              raise SystemExit(
+                  "ERROR: point_in_time_safe contains FALSE."
+              )
+
+
+          print(
+              "PIT flag consistency: PASS"
+          )
+
+          print(
+              "Anti-lookahead: PASSED"
+          )
+
+
+          # ============================================================
+          # F. RESEARCH-ONLY INVARIANTS
+          # ============================================================
+
+          for column, expected in RESEARCH_ONLY_EXPECTED.items():
+
+              parsed = parse_bool_series(
+                  df[column],
+                  column,
+              )
+
+
+              if not parsed.eq(expected).all():
+
+                  raise SystemExit(
+                      f"ERROR: Research-only invariant failed: "
+                      f"{column} must be {expected}."
+                  )
+
+
+          print(
+              "Research-only invariants: PASS"
+          )
+
+
+          # ============================================================
+          # G. ASSET AVAILABILITY
+          # ============================================================
+
+          actual_asset_count = pd.to_numeric(
+              df["available_asset_count"],
+              errors="coerce",
+          )
+
+
+          if actual_asset_count.isna().any():
+
+              raise SystemExit(
+                  "ERROR: available_asset_count contains invalid values."
+              )
+
+
+          expected_asset_count = (
+              df[ASSETS]
+              .notna()
+              .sum(axis=1)
+              .astype(int)
+          )
+
+
+          if not actual_asset_count.astype(int).equals(
+              expected_asset_count
+          ):
+
+              raise SystemExit(
+                  "ERROR: available_asset_count is inconsistent "
+                  "with asset price availability."
+              )
+
+
+          if (
+              (actual_asset_count < 0)
+              |
+              (actual_asset_count > len(ASSETS))
+          ).any():
+
+              raise SystemExit(
+                  "ERROR: available_asset_count outside valid range."
+              )
+
+
+          for asset in ASSETS:
+
+              if not df[asset].notna().any():
+
+                  raise SystemExit(
+                      f"ERROR: No observations for {asset}."
+                  )
+
+
+          print(
+              "Asset availability/count consistency: PASS | "
+              f"{len(ASSETS)}/{len(ASSETS)} assets represented"
+          )
+
+
+          # ============================================================
+          # H. ASSET-SPECIFIC COVERAGE
+          # ============================================================
+
+          for asset in ASSETS:
+
+              valid = df[asset].notna()
+
+
+              first_date = (
+                  observation_dates[valid].min()
+              )
+
+
+              last_date = (
+                  observation_dates[valid].max()
+              )
+
+
+              window = (
+                  (observation_dates >= first_date)
+                  &
+                  (observation_dates <= last_date)
+              )
+
+
+              total_window_rows = int(
+                  window.sum()
+              )
+
+
+              valid_rows = int(
+                  df.loc[
+                      window,
+                      asset,
+                  ].notna().sum()
+              )
+
+
+              coverage = (
+                  valid_rows
+                  / total_window_rows
+                  if total_window_rows
+                  else 0.0
+              )
+
+
+              if coverage < 0.70:
+
+                  raise SystemExit(
+                      f"ERROR: {asset} coverage below 70% "
+                      f"within its own observation window: "
+                      f"{coverage:.2%}"
+                  )
+
+
+              print(
+                  f"  {asset}: {coverage:.2%} | "
+                  f"{first_date.date()} -> {last_date.date()}"
+              )
+
+
+          print(
+              "Asset-specific coverage: PASS"
+          )
+
+
+          # ============================================================
+          # I. RETURNS / VOLATILITY
+          # ============================================================
+
+          for asset in ASSETS:
+
+              return_col = (
+                  f"{asset}_RETURN_1D"
+              )
+
+              vol_col = (
+                  f"{asset}_VOL_20D"
+              )
+
+
+              if df[return_col].dtype.kind not in "biufc":
+
+                  raise SystemExit(
+                      f"ERROR: {return_col} is not numeric."
+                  )
+
+
+              if df[vol_col].dtype.kind not in "biufc":
+
+                  raise SystemExit(
+                      f"ERROR: {vol_col} is not numeric."
+                  )
+
+
+          print(
+              "Return and volatility feature schema/types: PASS"
+          )
+
+
+          # ============================================================
+          # J. CORRELATIONS
+          # ============================================================
+
+          correlation_columns = [
+              f"CORR_{left}_{right}_60D"
+              for left, right in CORRELATION_PAIRS
+          ]
+
+
+          if len(correlation_columns) != 10:
+
+              raise SystemExit(
+                  "ERROR: Expected exactly 10 "
+                  "rolling correlation definitions."
+              )
+
+
+          for column in correlation_columns:
+
+              if df[column].dtype.kind not in "biufc":
+
+                  raise SystemExit(
+                      f"ERROR: {column} is not numeric."
+                  )
+
+
+              non_null = (
+                  df[column]
+                  .dropna()
+              )
+
+
+              if not non_null.between(
+                  -1.0,
+                  1.0,
+              ).all():
+
+                  raise SystemExit(
+                      f"ERROR: {column} contains "
+                      "values outside [-1, 1]."
+                  )
+
+
+          print(
+              "Rolling correlation schema/range: PASS | "
+              "features=10"
+          )
+
+
+          # ============================================================
+          # K. STABLE IDS
+          # ============================================================
+
+          ids = (
+              df["cross_asset_observation_id"]
+              .astype(str)
+          )
+
+
+          if ids.duplicated().any():
+
+              raise SystemExit(
+                  "ERROR: Duplicate cross_asset_observation_id values."
+              )
+
+
+          print(
+              "Stable observation IDs: PASS"
+          )
+
+
+          # ============================================================
+          # L. UPSTREAM VALIDATION JSON
+          # ============================================================
+
+          if validation.get(
+              "validator"
+          ) != "Cross-Asset Intelligence v1":
+
+              raise SystemExit(
+                  "ERROR: Unexpected upstream validation identity."
+              )
+
+
+          if validation.get(
+              "version"
+          ) != "1.0":
+
+              raise SystemExit(
+                  "ERROR: Unexpected upstream validation version."
+              )
+
+
+          if validation.get(
+              "passed"
+          ) is not True:
+
+              raise SystemExit(
+                  "ERROR: Upstream validation JSON "
+                  "does not report passed=true."
+              )
+
+
+          if int(
+              validation.get("rows", -1)
+          ) != len(df):
+
+              raise SystemExit(
+                  "ERROR: Upstream validation row count mismatch."
+              )
+
+
+          if int(
+              validation.get("columns", -1)
+          ) != len(df.columns):
+
+              raise SystemExit(
+                  "ERROR: Upstream validation column count mismatch."
+              )
+
+
+          expected_start = (
+              observation_dates
+              .min()
+              .strftime("%Y-%m-%d")
+          )
+
+
+          expected_end = (
+              observation_dates
+              .max()
+              .strftime("%Y-%m-%d")
+          )
+
+
+          if validation.get(
+              "date_start"
+          ) != expected_start:
+
+              raise SystemExit(
+                  "ERROR: Upstream validation date_start mismatch."
+              )
+
+
+          if validation.get(
+              "date_end"
+          ) != expected_end:
+
+              raise SystemExit(
+                  "ERROR: Upstream validation date_end mismatch."
+              )
+
+
+          print(
+              "Upstream validation artifact consistency: PASS"
+          )
+
+
+          # ============================================================
+          # M. SUMMARY JSON
+          # ============================================================
+
+          if summary.get(
+              "validator"
+          ) != "Cross-Asset Intelligence v1":
+
+              raise SystemExit(
+                  "ERROR: Unexpected summary validator identity."
+              )
+
+
+          if summary.get(
+              "version"
+          ) != "1.0":
+
+              raise SystemExit(
+                  "ERROR: Unexpected summary version."
+              )
+
+
+          if summary.get(
+              "passed"
+          ) is not True:
+
+              raise SystemExit(
+                  "ERROR: Summary does not report passed=true."
+              )
+
+
+          if int(
+              summary.get("rows", -1)
+          ) != len(df):
+
+              raise SystemExit(
+                  "ERROR: Summary row count mismatch."
+              )
+
+
+          if int(
+              summary.get("columns", -1)
+          ) != len(df.columns):
+
+              raise SystemExit(
+                  "ERROR: Summary column count mismatch."
+              )
+
+
+          compare_scalar(
+              summary.get("date_start"),
+              expected_start,
+              "date_start",
+          )
+
+
+          compare_scalar(
+              summary.get("date_end"),
+              expected_end,
+              "date_end",
+          )
+
+
+          if summary.get(
+              "available_assets"
+          ) != ASSETS:
+
+              raise SystemExit(
+                  "ERROR: Summary available_assets does not "
+                  "contain the complete requested universe."
+              )
+
+
+          if int(
+              summary.get(
+                  "correlation_feature_count",
+                  -1,
+              )
+          ) != 10:
+
+              raise SystemExit(
+                  "ERROR: Summary correlation_feature_count "
+                  "must equal 10."
+              )
+
+
+          if summary.get(
+              "point_in_time_safe"
+          ) is not True:
+
+              raise SystemExit(
+                  "ERROR: Summary point_in_time_safe must be true."
+              )
+
+
+          for column, expected in RESEARCH_ONLY_EXPECTED.items():
+
+              if summary.get(column) is not expected:
+
+                  raise SystemExit(
+                      f"ERROR: Summary research-only flag "
+                      f"{column} must be {expected}."
+                  )
+
+
+          print(
+              "Summary JSON consistency: PASS"
+          )
+
+
+          # ============================================================
+          # N. COVERAGE METADATA
+          # ============================================================
+
+          summary_coverage = (
+              summary.get(
+                  "asset_coverage",
+                  {},
+              )
+          )
+
+
+          validation_coverage = (
+              validation.get(
+                  "asset_coverage",
+                  {},
+              )
+          )
+
+
+          if set(summary_coverage) != set(ASSETS):
+
+              raise SystemExit(
+                  "ERROR: Summary asset_coverage keys are incomplete."
+              )
+
+
+          if set(validation_coverage) != set(ASSETS):
+
+              raise SystemExit(
+                  "ERROR: Validation asset_coverage keys are incomplete."
+              )
+
+
+          for asset in ASSETS:
+
+              summary_value = float(
+                  summary_coverage[asset]
+              )
+
+
+              validation_value = float(
+                  validation_coverage[asset]
+              )
+
+
+              if abs(
+                  summary_value
+                  - validation_value
+              ) > 1e-9:
+
+                  raise SystemExit(
+                      f"ERROR: Asset coverage mismatch for {asset}."
+                  )
+
+
+              if summary_value < 0.70:
+
+                  raise SystemExit(
+                      f"ERROR: Reported coverage below "
+                      f"threshold for {asset}."
+                  )
+
+
+          print(
+              "Asset coverage metadata consistency: PASS"
+          )
+
+
+          # ============================================================
+          # O. ARTIFACT CUTOFF
+          # ============================================================
+
+          upstream_end = pd.Timestamp(
+              validation["date_end"]
+          ).normalize()
+
+
+          if observation_dates.max() > upstream_end:
+
+              raise SystemExit(
+                  "ERROR: Research dataset contains observations "
+                  "after the upstream validation cutoff."
+              )
+
+
+          print(
+              "Artifact cutoff / future-row check: PASS"
+          )
+
+
+          # ============================================================
+          # P. FINAL PASS
+          # ============================================================
+
+          print("")
+          print("=" * 72)
+          print(
+              "CROSS-ASSET FULL VALIDATION PASSED"
+          )
+          print("=" * 72)
+
+          print(
+              f"Rows: {len(df):,}"
+          )
+
+          print(
+              f"Columns: {len(df.columns):,}"
+          )
+
+          print(
+              "Date range: "
+              f"{observation_dates.min().date()} -> "
+              f"{observation_dates.max().date()}"
+          )
+
+          print(
+              "Assets: "
+              "SP500, NASDAQ, GOLD, DXY, VIX, US10Y, WTI, BITCOIN"
+          )
+
+          print(
+              "Rolling correlation features: 10"
+          )
+
+          print(
+              "PIT safe: TRUE"
+          )
+
+          print(
+              "Anti-lookahead: PASSED"
+          )
+
+          print(
+              "Research only: TRUE"
+          )
+
+          print(
+              "Decision Engine: FALSE"
+          )
+
+          print(
+              "Trading signal: FALSE"
+          )
+
+          print(
+              "Forecast: FALSE"
+          )
+
+          print(
+              "Unified decision: FALSE"
+          )
+
+          print("")
+          print(
+              "ALL CROSS-ASSET FULL VALIDATIONS PASSED"
+          )
+
+          print("=" * 72)
+
+
+          # ============================================================
+          # REPORT
+          # ============================================================
+
+          report = [
+              "Cross-Asset Full Validation v1",
+              "",
+              "STATUS: PASSED",
+              "",
+              f"Rows: {len(df):,}",
+              f"Columns: {len(df.columns):,}",
+              (
+                  "Date range: "
+                  f"{observation_dates.min().date()} -> "
+                  f"{observation_dates.max().date()}"
+              ),
+              (
+                  "Assets: "
+                  "SP500, NASDAQ, GOLD, DXY, VIX, US10Y, WTI, BITCOIN"
+              ),
+              "Rolling correlation features: 10",
+              "",
+              "Validation scope:",
+              "- Research dataset nonempty",
+              "- Required Cross-Asset schema",
+              "- Observation date ordering and uniqueness",
+              "- Availability date > observation date",
+              "- PIT flag consistency",
+              "- Anti-lookahead",
+              "- Research-only invariants",
+              "- Asset availability and count consistency",
+              "- Asset-specific historical coverage",
+              "- Return and volatility feature types",
+              "- Rolling correlation schema and [-1, 1] range",
+              "- Stable observation IDs",
+              "- Upstream validation JSON consistency",
+              "- Summary JSON consistency",
+              "- Asset coverage metadata consistency",
+              "- Artifact cutoff / future-row check",
+              "",
+              "PIT safe: TRUE",
+              "Anti-lookahead: PASSED",
+              "Research only: TRUE",
+              "Decision Engine: FALSE",
+              "Trading signal: FALSE",
+              "Forecast: FALSE",
+              "Unified decision: FALSE",
+          ]
+
+
+          Path(
+              "cross_asset_full_validation_v1.txt"
+          ).write_text(
+              "\n".join(report),
+              encoding="utf-8",
+          )
+
+
+          print("")
+          print(
+              "Validation report created: "
+              "cross_asset_full_validation_v1.txt"
+          )
+
+          PY
+
+      # ============================================================
+      # UPLOAD VALIDATION ARTIFACT
+      # ============================================================
+
+      - name: Upload Cross-Asset Full Validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-asset-full-validation-v1
+          path: cross_asset_full_validation_v1.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      # ============================================================
+      # FINAL STATUS
+      # ============================================================
+
+      - name: Final status
+        run: |
+          echo "============================================================"
+          echo "CROSS-ASSET FULL VALIDATION v1 PASSED"
+          echo "============================================================"
+          echo "Cross-Asset Intelligence: VALID"
+          echo "PIT: PASSED"
+          echo "Anti-lookahead: PASSED"
+          echo "Research-only: TRUE"
+          echo "Decision Engine: DISABLED"
+          echo "Trading Signal: FALSE"
+          echo "Forecast: FALSE"
+          echo "Unified Decision: FALSE"
+          echo ""
+          echo "Validation Artifact:"
+          echo "cross-asset-full-validation-v1"
+          echo "============================================================"
