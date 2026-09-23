@@ -136,6 +136,7 @@ jobs:
       # Determine Research Context cutoff
       # ====================================================
       - name: Determine Research Context cutoff
+        id: cutoff
         run: |
           set -e
 
@@ -197,10 +198,7 @@ jobs:
                   f"RESEARCH_CONTEXT_AS_OF_DATE={cutoff}\n"
               )
 
-          with open(
-              os.environ["GITHUB_OUTPUT"],
-              "w"
-          ) as f:
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(
                   f"cutoff={cutoff}\n"
               )
@@ -361,19 +359,21 @@ jobs:
 
 
       # ====================================================
-      # Validate source dates BEFORE building context
+      # Validate source datasets
+      #
+      # IMPORTANT:
+      # Future rows are allowed here.
+      #
+      # Research Context v1 is responsible for applying
+      # the final as-of cutoff and preventing lookahead.
       # ====================================================
-      - name: Validate source date boundaries
+      - name: Validate source datasets
         run: |
           set -e
 
           python - <<'PY'
           import os
           import pandas as pd
-
-          cutoff = pd.Timestamp(
-              os.environ["RESEARCH_CONTEXT_AS_OF_DATE"]
-          )
 
           files = {
               "Macro Context": os.environ["MACRO_FILE"],
@@ -382,10 +382,8 @@ jobs:
           }
 
           print("=" * 70)
-          print("SOURCE DATE BOUNDARY VALIDATION")
+          print("SOURCE DATASET VALIDATION")
           print("=" * 70)
-          print("Research cutoff:", cutoff.date())
-          print()
 
           for name, path in files.items():
 
@@ -399,9 +397,10 @@ jobs:
               candidates = [
                   "context_date",
                   "asof_date",
+                  "observation_date",
                   "date",
                   "event_date",
-                  "session_date"
+                  "session_date",
               ]
 
               date_column = None
@@ -427,24 +426,22 @@ jobs:
                       f"ERROR: Invalid dates detected in {name}."
                   )
 
-              future_rows = dates > cutoff
-
-              if future_rows.any():
-                  max_future = dates[future_rows].max()
-
-                  raise SystemExit(
-                      f"ERROR: {name} contains future rows beyond "
-                      f"{cutoff.date()}: {max_future.date()}"
-                  )
-
               print(
                   f"{name}: PASS | "
                   f"date column={date_column} | "
-                  f"latest={dates.max().date()}"
+                  f"rows={len(df):,} | "
+                  f"range={dates.min().date()} -> "
+                  f"{dates.max().date()}"
               )
 
           print()
-          print("All source datasets respect the research cutoff.")
+          print(
+              "Source datasets are valid."
+          )
+          print(
+              "Future source rows are permitted and will be "
+              "handled by the Research Context cutoff/PIT logic."
+          )
           print("=" * 70)
 
           PY
@@ -515,6 +512,7 @@ jobs:
       - name: Validate Research Context dataset
         env:
           RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
+
         run: |
           set -e
 
@@ -739,6 +737,107 @@ jobs:
 
 
           # ==================================================
+          # Validate PIT synchronization columns
+          # ==================================================
+
+          if "macro_availability_date" in df.columns:
+
+              macro_availability = pd.to_datetime(
+                  df["macro_availability_date"],
+                  errors="coerce"
+              )
+
+              invalid = (
+                  macro_availability.notna()
+                  & (
+                      macro_availability
+                      > dates
+                  )
+              )
+
+              if invalid.any():
+                  raise SystemExit(
+                      "ERROR: Macro availability "
+                      "lookahead detected."
+                  )
+
+
+          if "sentiment_asof_date" in df.columns:
+
+              sentiment_asof = pd.to_datetime(
+                  df["sentiment_asof_date"],
+                  errors="coerce"
+              )
+
+              invalid = (
+                  sentiment_asof.notna()
+                  & (
+                      sentiment_asof
+                      > dates
+                  )
+              )
+
+              if invalid.any():
+                  raise SystemExit(
+                      "ERROR: Sentiment as-of "
+                      "lookahead detected."
+                  )
+
+
+          if "technical_availability_date" in df.columns:
+
+              technical_availability = pd.to_datetime(
+                  df["technical_availability_date"],
+                  errors="coerce"
+              )
+
+              invalid = (
+                  technical_availability.notna()
+                  & (
+                      technical_availability
+                      > dates
+                  )
+              )
+
+              if invalid.any():
+                  raise SystemExit(
+                      "ERROR: Technical availability "
+                      "lookahead detected."
+                  )
+
+
+          if {
+              "technical_observation_date",
+              "technical_availability_date",
+          }.issubset(df.columns):
+
+              technical_observation = pd.to_datetime(
+                  df["technical_observation_date"],
+                  errors="coerce"
+              )
+
+              technical_availability = pd.to_datetime(
+                  df["technical_availability_date"],
+                  errors="coerce"
+              )
+
+              invalid = (
+                  technical_observation.notna()
+                  & technical_availability.notna()
+                  & (
+                      technical_availability
+                      < technical_observation
+                  )
+              )
+
+              if invalid.any():
+                  raise SystemExit(
+                      "ERROR: Technical availability date "
+                      "is earlier than observation date."
+                  )
+
+
+          # ==================================================
           # Latest row
           # ==================================================
 
@@ -787,11 +886,6 @@ jobs:
               "/ 3"
           )
 
-
-          # ==================================================
-          # Optional research descriptors
-          # ==================================================
-
           for column in [
               "economic_regime",
               "sentiment_regime",
@@ -815,7 +909,7 @@ jobs:
           print("Trading signal: FALSE")
           print("Forecast: FALSE")
           print("Unified decision: FALSE")
-          print("Future rows: 0")
+          print("Future context rows: 0")
           print("=" * 70)
 
           PY
@@ -842,6 +936,7 @@ jobs:
       - name: Final status
         env:
           RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
+
         run: |
           echo "=============================================="
           echo "Research Context v1 PASSED"
