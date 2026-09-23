@@ -3,7 +3,7 @@ name: Financial Stress Frequency Sensitivity v1.2
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Financial Stress Historical Collector v1"]
+    workflows: ["financial-stress-historical-v1"]
     types: [completed]
 
 permissions:
@@ -50,11 +50,23 @@ jobs:
           else
             echo "Manual run detected: triggering a fresh Historical Collector run."
 
-            gh workflow run financial-stress-historical-v1.yml               --repo "$REPOSITORY"               --ref main
+            gh workflow run financial-stress-historical-v1.yml \
+              --repo "$REPOSITORY" \
+              --ref main
 
             echo "Waiting for the collector workflow to start..."
+
             for i in $(seq 1 30); do
-              RUN_ID="$(gh run list                 --repo "$REPOSITORY"                 --workflow financial-stress-historical-v1.yml                 --branch main                 --limit 10                 --json databaseId,status,headBranch                 --jq '.[] | select(.headBranch=="main") | .databaseId'                 | head -n 1 || true)"
+              RUN_ID="$(
+                gh run list \
+                  --repo "$REPOSITORY" \
+                  --workflow financial-stress-historical-v1.yml \
+                  --branch main \
+                  --limit 10 \
+                  --json databaseId,status,headBranch \
+                  --jq '.[] | select(.headBranch=="main") | .databaseId' \
+                  | head -n 1 || true
+              )"
 
               if [ -n "${RUN_ID:-}" ]; then
                 COLLECTOR_RUN_ID="$RUN_ID"
@@ -73,16 +85,28 @@ jobs:
             echo "Waiting for collector run ${COLLECTOR_RUN_ID} to finish..."
 
             for i in $(seq 1 60); do
-              STATUS="$(gh run view "$COLLECTOR_RUN_ID"                 --repo "$REPOSITORY"                 --json status                 --jq '.status')"
+              STATUS="$(
+                gh run view "$COLLECTOR_RUN_ID" \
+                  --repo "$REPOSITORY" \
+                  --json status \
+                  --jq '.status'
+              )"
 
-              CONCLUSION="$(gh run view "$COLLECTOR_RUN_ID"                 --repo "$REPOSITORY"                 --json conclusion                 --jq '.conclusion // ""')"
+              CONCLUSION="$(
+                gh run view "$COLLECTOR_RUN_ID" \
+                  --repo "$REPOSITORY" \
+                  --json conclusion \
+                  --jq '.conclusion // ""'
+              )"
 
               echo "Collector status: ${STATUS}; conclusion: ${CONCLUSION}"
 
               if [ "$STATUS" = "completed" ]; then
                 if [ "$CONCLUSION" != "success" ]; then
                   echo "ERROR: Historical Collector failed."
-                  gh run view "$COLLECTOR_RUN_ID" --repo "$REPOSITORY" --log-failed || true
+                  gh run view "$COLLECTOR_RUN_ID" \
+                    --repo "$REPOSITORY" \
+                    --log-failed || true
                   exit 1
                 fi
                 break
@@ -93,32 +117,52 @@ jobs:
           fi
 
           echo "Downloading all artifacts from collector run ${COLLECTOR_RUN_ID}..."
+
           rm -rf raw_collector_artifact
           mkdir -p raw_collector_artifact
 
           # Do not depend on a hard-coded artifact name.
-          # Download every artifact from the selected collector run, then
-          # locate the required CSV recursively.
-          gh run download "$COLLECTOR_RUN_ID"             --repo "$REPOSITORY"             --dir raw_collector_artifact
+          # Download every artifact from the selected collector run,
+          # then locate the required CSV recursively.
+          gh run download "$COLLECTOR_RUN_ID" \
+            --repo "$REPOSITORY" \
+            --dir raw_collector_artifact
 
-          CSV_PATH="$(find raw_collector_artifact -type f             -name 'financial_stress_records_input_v1.csv'             -print -quit)"
+          CSV_PATH="$(
+            find raw_collector_artifact \
+              -type f \
+              -name 'financial_stress_records_input_v1.csv' \
+              -print -quit
+          )"
 
           if [ -z "${CSV_PATH:-}" ]; then
             echo "ERROR: financial_stress_records_input_v1.csv was not found."
+
             echo "Downloaded artifact contents:"
-            find raw_collector_artifact -maxdepth 5 -type f -print || true
+            find raw_collector_artifact \
+              -maxdepth 5 \
+              -type f \
+              -print || true
+
             echo "Collector artifacts:"
-            gh api               "repos/${REPOSITORY}/actions/runs/${COLLECTOR_RUN_ID}/artifacts?per_page=100"               --jq '.artifacts[] | [.name, .expired, .size_in_bytes] | @tsv' || true
+            gh api \
+              "repos/${REPOSITORY}/actions/runs/${COLLECTOR_RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[] | [.name, .expired, .size_in_bytes] | @tsv' || true
+
             exit 1
           fi
 
           cp "$CSV_PATH" financial_stress_records_input_v1.csv
 
           echo "Raw PIT input located at: $CSV_PATH"
+
           echo "Rows:"
+
           python - <<'PY'
           import pandas as pd
+
           df = pd.read_csv("financial_stress_records_input_v1.csv")
+
           print(len(df))
           print(df.columns.tolist())
           PY
@@ -149,41 +193,82 @@ jobs:
           ]
 
           missing = [c for c in required if c not in df.columns]
+
           if missing:
-              raise SystemExit(f"Missing required columns: {missing}")
+              raise SystemExit(
+                  f"Missing required columns: {missing}"
+              )
 
           if df.empty:
-              raise SystemExit("Raw PIT input contains zero rows.")
+              raise SystemExit(
+                  "Raw PIT input contains zero rows."
+              )
 
-          df["observation_date"] = pd.to_datetime(df["observation_date"], errors="coerce")
-          df["availability_date"] = pd.to_datetime(df["availability_date"], errors="coerce")
+          df["observation_date"] = pd.to_datetime(
+              df["observation_date"],
+              errors="coerce"
+          )
+
+          df["availability_date"] = pd.to_datetime(
+              df["availability_date"],
+              errors="coerce"
+          )
 
           if df["observation_date"].isna().any():
-              raise SystemExit("Invalid observation_date values found.")
+              raise SystemExit(
+                  "Invalid observation_date values found."
+              )
 
           if df["availability_date"].isna().any():
-              raise SystemExit("Invalid availability_date values found.")
+              raise SystemExit(
+                  "Invalid availability_date values found."
+              )
 
-          if (df["availability_date"] < df["observation_date"]).any():
-              raise SystemExit("PIT violation: availability_date < observation_date.")
+          if (
+              df["availability_date"]
+              < df["observation_date"]
+          ).any():
+              raise SystemExit(
+                  "PIT violation: availability_date < observation_date."
+              )
 
-          safe = df["point_in_time_safe"].astype(str).str.lower()
-          unsafe = ~safe.isin(["true", "1", "yes"])
+          safe = (
+              df["point_in_time_safe"]
+              .astype(str)
+              .str.lower()
+          )
+
+          unsafe = ~safe.isin(
+              ["true", "1", "yes"]
+          )
+
           if unsafe.any():
               raise SystemExit(
-                  f"Found {int(unsafe.sum())} non-PIT-safe raw records."
+                  f"Found {int(unsafe.sum())} "
+                  "non-PIT-safe raw records."
               )
 
           print(f"Raw PIT rows: {len(df)}")
+
           print("Indicators:")
-          print(df["indicator"].value_counts().to_string())
+          print(
+              df["indicator"]
+              .value_counts()
+              .to_string()
+          )
+
           print("Frequencies:")
-          print(df["frequency"].value_counts(dropna=False).to_string())
+          print(
+              df["frequency"]
+              .value_counts(dropna=False)
+              .to_string()
+          )
           PY
 
       - name: Compile v1.2 analyzer
         run: |
-          python -m py_compile financial_stress_frequency_sensitivity_v1_2.py
+          python -m py_compile \
+            financial_stress_frequency_sensitivity_v1_2.py
 
       - name: Run Frequency Sensitivity v1.2
         run: |
@@ -213,6 +298,7 @@ jobs:
               print(f"{f}: {len(df)} rows")
 
           print("\nFrequency sensitivity:")
+
           print(
               pd.read_csv(
                   "financial_stress_frequency_sensitivity_v1_2.csv"
@@ -224,7 +310,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if grep -RniE             "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal"             financial_stress_frequency_sensitivity_v1_2.py; then
+          if grep -RniE \
+            "decision_engine|decisionengine|execute_trade|executeTrade|place_order|placeOrder|buy_signal|buySignal|sell_signal|sellSignal" \
+            financial_stress_frequency_sensitivity_v1_2.py; then
+
             echo "ERROR: Research-only guard failed."
             exit 1
           fi
@@ -235,10 +324,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: financial-stress-frequency-sensitivity-v1-2
+
           path: |
             financial_stress_validation_v1_2.csv
             financial_stress_validation_summary_v1_2.csv
             financial_stress_validation_events_v1_2.csv
             financial_stress_frequency_sensitivity_v1_2.csv
+
           if-no-files-found: error
           retention-days: 90
