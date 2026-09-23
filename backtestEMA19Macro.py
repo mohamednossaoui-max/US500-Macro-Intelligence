@@ -30,7 +30,7 @@ EMA19 = 19
 EMA200 = 200
 ATR14 = 14
 LOW_LOOKBACK = 5
-BASELINE_AS_OF_DATE = pd.Timestamp("2026-09-22")
+BASELINE_AS_OF_DATE = pd.Timestamp("2026-09-17")
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 
 FRED_SERIES = {
