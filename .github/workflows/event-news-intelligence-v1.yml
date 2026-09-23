@@ -20,27 +20,13 @@ jobs:
 
     steps:
 
-      # ======================================================
-      # CHECKOUT
-      # ======================================================
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-
-      # ======================================================
-      # PYTHON
-      # ======================================================
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-
-      # ======================================================
-      # DEPENDENCIES
-      # ======================================================
 
       - name: Install dependencies
         run: |
@@ -48,13 +34,7 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          pip install \
-            pandas
-
-
-      # ======================================================
-      # VERIFY FILES
-      # ======================================================
+          pip install pandas
 
       - name: Verify Event News files
         run: |
@@ -64,16 +44,11 @@ jobs:
 
           test -f .github/workflows/event-news-intelligence-v1.yml
 
-          echo "Event News Python file:"
+          echo "Python file:"
           ls -lh tests/event_news/event_news_intelligence_v1.py
 
-          echo "Workflow file:"
+          echo "Workflow:"
           ls -lh .github/workflows/event-news-intelligence-v1.yml
-
-
-      # ======================================================
-      # PYTHON COMPILE CHECK
-      # ======================================================
 
       - name: Compile Event News Intelligence
         run: |
@@ -81,11 +56,6 @@ jobs:
 
           python -m py_compile \
             tests/event_news/event_news_intelligence_v1.py
-
-
-      # ======================================================
-      # RUN EVENT / NEWS INTELLIGENCE
-      # ======================================================
 
       - name: Run Event / News Intelligence v2.1
         env:
@@ -95,11 +65,6 @@ jobs:
 
           python tests/event_news/event_news_intelligence_v1.py \
             --output event_news_intelligence_v1
-
-
-      # ======================================================
-      # RESEARCH-ONLY SAFETY CHECK
-      # ======================================================
 
       - name: Verify research-only output
         run: |
@@ -136,7 +101,6 @@ jobs:
               actual = data.get(key)
 
               if actual != expected:
-
                   raise SystemExit(
                       f"Safety check failed: "
                       f"{key}={actual}, "
@@ -147,11 +111,6 @@ jobs:
               "Research-only safety check: PASS"
           )
           PY
-
-
-      # ======================================================
-      # DISPLAY VALIDATION
-      # ======================================================
 
       - name: Display validation
         if: always()
@@ -164,11 +123,6 @@ jobs:
             event_news_intelligence_v1/event_news_validation_v2.json \
             2>/dev/null || true
 
-
-      # ======================================================
-      # DISPLAY SUMMARY
-      # ======================================================
-
       - name: Display summary
         if: always()
         run: |
@@ -179,11 +133,6 @@ jobs:
           cat \
             event_news_intelligence_v1/event_news_research_summary_v2.json \
             2>/dev/null || true
-
-
-      # ======================================================
-      # DISPLAY DATASET INFO
-      # ======================================================
 
       - name: Display dataset information
         if: always()
@@ -201,6 +150,7 @@ jobs:
 
             echo ""
             echo "Header:"
+
             head -n 1 \
               event_news_intelligence_v1/event_news_research_v2.csv
 
@@ -209,11 +159,6 @@ jobs:
             echo "Dataset not found."
 
           fi
-
-
-      # ======================================================
-      # UPLOAD ARTIFACTS
-      # ======================================================
 
       - name: Upload Event News artifacts
         if: always()
