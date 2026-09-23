@@ -1,52 +1,245 @@
-name: Backtest EMA19
+name: Backtest EMA19 Macro
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  backtest-ema19:
+  backtest-ema19-macro:
+    name: EMA19 Macro Backtest
     runs-on: ubuntu-latest
 
     steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
+      # ============================================================
+      # 3. INSTALL DEPENDENCIES
+      # ============================================================
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install pandas numpy requests yfinance streamlit
+          python -m pip install --upgrade pip
+          python -m pip install \
+            pandas \
+            numpy \
+            requests \
+            yfinance \
+            streamlit
 
-      - name: Run EMA19 Backtest
+      # ============================================================
+      # 4. ENVIRONMENT CHECK
+      # ============================================================
+      - name: Environment check
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
+          set -e
+
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "EMA19 MACRO BACKTEST — ENVIRONMENT CHECK"
+          echo "============================================================"
+
+          python --version
+          pip --version
+
+          echo
+          echo "Python packages:"
+          python - <<'PY'
+          import pandas
+          import numpy
+          import requests
+          import yfinance
+
+          print("pandas     :", pandas.__version__)
+          print("numpy      :", numpy.__version__)
+          print("requests   :", requests.__version__)
+          print("yfinance   :", yfinance.__version__)
+          PY
+
+          echo
+          if [ -z "${FRED_API_KEY}" ]; then
+            echo "ERROR: FRED_API_KEY is missing."
+            exit 1
+          fi
+
+          echo "FRED_API_KEY: configured"
+
+      # ============================================================
+      # 5. VERIFY BACKTEST SCRIPT
+      # ============================================================
+      - name: Verify backtest source
+        run: |
+          set -e
+
+          echo "============================================================"
+          echo "VERIFYING BACKTEST SOURCE"
+          echo "============================================================"
+
+          test -f backtestEMA19Macro.py
+
+          echo "Found:"
+          ls -lh backtestEMA19Macro.py
+
+          echo
+          echo "Script header:"
+          sed -n '1,45p' backtestEMA19Macro.py
+
+      # ============================================================
+      # 6. RUN EMA19 MACRO BACKTEST
+      # ============================================================
+      - name: Run EMA19 Macro Backtest
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: |
           set -o pipefail
+
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "EMA19 MACRO BACKTEST"
+          echo "============================================================"
+          echo
+          echo "Research-only"
+          echo "No trade execution"
+          echo "No broker integration"
+          echo "No Decision Engine modification"
+          echo
+
           python backtestEMA19Macro.py 2>&1 | tee backtestEMA19Macro_run.log
 
-      - name: Publish Backtest Log to Job Summary
+      # ============================================================
+      # 7. DISPLAY GENERATED FILES
+      # ============================================================
+      - name: Inspect generated outputs
+        if: always()
+        run: |
+          echo "============================================================"
+          echo "GENERATED OUTPUTS"
+          echo "============================================================"
+
+          echo
+          echo "Repository root:"
+          ls -lah
+
+          echo
+          echo "EMA19 generated files:"
+          find . -maxdepth 1 -type f \
+            \( \
+              -name "backtestEMA19Macro*" \
+            \) \
+            -print \
+            -exec ls -lh {} \;
+
+      # ============================================================
+      # 8. BUILD GITHUB SUMMARY
+      # ============================================================
+      - name: Publish Backtest Report to Job Summary
         if: always()
         run: |
           {
-            echo "# EMA19 Macro Backtest — Run Report"
+            echo "# US500 Macro Intelligence — EMA19 Macro Backtest"
             echo
-            echo "## Full execution log"
+            echo "**Mode:** Research-only"
+            echo
+            echo "**Execution:** GitHub Actions"
+            echo
+            echo "**Market:** S&P 500 (^GSPC)"
+            echo
+            echo "**Baseline:** EMA19 frozen baseline"
+            echo
+            echo "**FRED:** API data with point-in-time/as-of processing"
+            echo
+            echo "---"
+            echo
+            echo "## Execution Log"
             echo
             echo '```text'
-            cat backtestEMA19Macro_run.log 2>/dev/null || echo "No backtest log was created."
+
+            if [ -f backtestEMA19Macro_run.log ]; then
+              cat backtestEMA19Macro_run.log
+            else
+              echo "No execution log was created."
+            fi
+
             echo '```'
+            echo
+            echo "---"
+            echo
+            echo "## Generated CSV Files"
+            echo
+
+            for f in \
+              backtestEMA19Macro_trades.csv \
+              backtestEMA19Macro_regimes.csv \
+              backtestEMA19Macro_yearly.csv \
+              backtestEMA19Macro_summary.csv \
+              backtestEMA19Macro_macro_data.csv \
+              backtestEMA19Macro_data_quality.csv \
+              backtestEMA19Macro_signals.csv
+            do
+              if [ -f "$f" ]; then
+                echo "- \`$f\` — $(wc -l < "$f") lines"
+              else
+                echo "- \`$f\` — NOT GENERATED"
+              fi
+            done
+
+            echo
+            echo "---"
+            echo
+            echo "## Backtest Summary CSV"
+            echo
+
+            if [ -f backtestEMA19Macro_summary.csv ]; then
+              echo '```csv'
+              cat backtestEMA19Macro_summary.csv
+              echo '```'
+            else
+              echo "Summary CSV not available."
+            fi
+
+            echo
+            echo "---"
+            echo
+            echo "## Data Quality"
+            echo
+
+            if [ -f backtestEMA19Macro_data_quality.csv ]; then
+              echo '```csv'
+              cat backtestEMA19Macro_data_quality.csv
+              echo '```'
+            else
+              echo "Data-quality CSV not available."
+            fi
+
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Backtest Results and Run Log
+      # ============================================================
+      # 9. UPLOAD ALL BACKTEST ARTIFACTS
+      # ============================================================
+      - name: Upload EMA19 Backtest Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: EMA19-Macro-Backtest-Results
           if-no-files-found: warn
+          retention-days: 30
           path: |
             backtestEMA19Macro_run.log
             backtestEMA19Macro_trades.csv
@@ -56,3 +249,19 @@ jobs:
             backtestEMA19Macro_macro_data.csv
             backtestEMA19Macro_data_quality.csv
             backtestEMA19Macro_signals.csv
+
+      # ============================================================
+      # 10. FINAL STATUS
+      # ============================================================
+      - name: Final status
+        if: always()
+        run: |
+          echo "============================================================"
+          echo "EMA19 MACRO BACKTEST WORKFLOW FINISHED"
+          echo "============================================================"
+          echo
+          echo "Research-only: YES"
+          echo "Trade execution: NO"
+          echo "Decision Engine integration: NO"
+          echo "Artifacts: uploaded"
+          echo
