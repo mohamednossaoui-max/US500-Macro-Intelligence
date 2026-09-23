@@ -42,7 +42,7 @@ jobs:
 
 
       # ====================================================
-      # Verify source
+      # Verify Research Context source
       # ====================================================
       - name: Verify Research Context source
         run: |
@@ -108,11 +108,11 @@ jobs:
           unzip -o /tmp/macro.zip -d input/macro
 
           echo "Macro files:"
-          find input/macro -maxdepth 2 -type f -print
+          find input/macro -maxdepth 3 -type f -print
 
 
       # ====================================================
-      # Locate Macro CSV
+      # Locate Macro Context CSV
       # ====================================================
       - name: Locate Macro Context CSV
         run: |
@@ -130,6 +130,82 @@ jobs:
 
           echo "Macro CSV: $MACRO_FILE"
           echo "MACRO_FILE=$MACRO_FILE" >> "$GITHUB_ENV"
+
+
+      # ====================================================
+      # Determine Research Context cutoff
+      # ====================================================
+      - name: Determine Research Context cutoff
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          macro_file = os.environ["MACRO_FILE"]
+
+          df = pd.read_csv(macro_file)
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Macro Context dataset is empty."
+              )
+
+          date_candidates = [
+              "context_date",
+              "asof_date",
+              "date"
+          ]
+
+          date_column = None
+
+          for column in date_candidates:
+              if column in df.columns:
+                  date_column = column
+                  break
+
+          if date_column is None:
+              raise SystemExit(
+                  "ERROR: Macro Context date column not found. "
+                  f"Available columns: {list(df.columns)}"
+              )
+
+          dates = pd.to_datetime(
+              df[date_column],
+              errors="coerce"
+          )
+
+          if dates.isna().any():
+              raise SystemExit(
+                  "ERROR: Macro Context contains invalid dates."
+              )
+
+          latest_date = dates.max()
+
+          cutoff = latest_date.strftime("%Y-%m-%d")
+
+          print("=" * 70)
+          print("RESEARCH CONTEXT CUTOFF")
+          print("=" * 70)
+          print("Macro date column:", date_column)
+          print("Latest Macro Context date:", cutoff)
+          print("=" * 70)
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(
+                  f"RESEARCH_CONTEXT_AS_OF_DATE={cutoff}\n"
+              )
+
+          with open(
+              os.environ["GITHUB_OUTPUT"],
+              "w"
+          ) as f:
+              f.write(
+                  f"cutoff={cutoff}\n"
+              )
+
+          PY
 
 
       # ====================================================
@@ -184,7 +260,7 @@ jobs:
           unzip -o /tmp/sentiment.zip -d input/sentiment
 
           echo "Sentiment files:"
-          find input/sentiment -maxdepth 2 -type f -print
+          find input/sentiment -maxdepth 3 -type f -print
 
 
       # ====================================================
@@ -260,7 +336,7 @@ jobs:
           unzip -o /tmp/technical.zip -d input/technical
 
           echo "Technical files:"
-          find input/technical -maxdepth 2 -type f -print
+          find input/technical -maxdepth 3 -type f -print
 
 
       # ====================================================
@@ -282,6 +358,96 @@ jobs:
 
           echo "Technical CSV: $TECHNICAL_FILE"
           echo "TECHNICAL_FILE=$TECHNICAL_FILE" >> "$GITHUB_ENV"
+
+
+      # ====================================================
+      # Validate source dates BEFORE building context
+      # ====================================================
+      - name: Validate source date boundaries
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          cutoff = pd.Timestamp(
+              os.environ["RESEARCH_CONTEXT_AS_OF_DATE"]
+          )
+
+          files = {
+              "Macro Context": os.environ["MACRO_FILE"],
+              "Sentiment Engine": os.environ["SENTIMENT_FILE"],
+              "Technical Intelligence": os.environ["TECHNICAL_FILE"],
+          }
+
+          print("=" * 70)
+          print("SOURCE DATE BOUNDARY VALIDATION")
+          print("=" * 70)
+          print("Research cutoff:", cutoff.date())
+          print()
+
+          for name, path in files.items():
+
+              df = pd.read_csv(path)
+
+              if df.empty:
+                  raise SystemExit(
+                      f"ERROR: {name} dataset is empty."
+                  )
+
+              candidates = [
+                  "context_date",
+                  "asof_date",
+                  "date",
+                  "event_date",
+                  "session_date"
+              ]
+
+              date_column = None
+
+              for column in candidates:
+                  if column in df.columns:
+                      date_column = column
+                      break
+
+              if date_column is None:
+                  raise SystemExit(
+                      f"ERROR: Date column not found for {name}. "
+                      f"Columns: {list(df.columns)}"
+                  )
+
+              dates = pd.to_datetime(
+                  df[date_column],
+                  errors="coerce"
+              )
+
+              if dates.isna().any():
+                  raise SystemExit(
+                      f"ERROR: Invalid dates detected in {name}."
+                  )
+
+              future_rows = dates > cutoff
+
+              if future_rows.any():
+                  max_future = dates[future_rows].max()
+
+                  raise SystemExit(
+                      f"ERROR: {name} contains future rows beyond "
+                      f"{cutoff.date()}: {max_future.date()}"
+                  )
+
+              print(
+                  f"{name}: PASS | "
+                  f"date column={date_column} | "
+                  f"latest={dates.max().date()}"
+              )
+
+          print()
+          print("All source datasets respect the research cutoff.")
+          print("=" * 70)
+
+          PY
 
 
       # ====================================================
@@ -314,16 +480,17 @@ jobs:
           MACRO_CONTEXT_FILE: context_input/macro_context_v1.csv
           SENTIMENT_ENGINE_FILE: context_input/sentiment_engine_research_v1.csv
           TECHNICAL_INTELLIGENCE_FILE: context_input/technical_intelligence_research_v1.csv
-
-          # IMPORTANT:
-          # Prevent future rows such as 2026-09-22.
-          RESEARCH_CONTEXT_AS_OF_DATE: "2026-09-21"
+          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
 
         run: |
           set -e
 
-          echo "Research Context cutoff:"
+          echo "=============================================="
+          echo "RESEARCH CONTEXT v1"
+          echo "=============================================="
+          echo "Research cutoff:"
           echo "$RESEARCH_CONTEXT_AS_OF_DATE"
+          echo
 
           python research-context-v1.py
 
@@ -346,17 +513,20 @@ jobs:
       # Final dataset validation
       # ====================================================
       - name: Validate Research Context dataset
+        env:
+          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
         run: |
           set -e
 
           python - <<'PY'
 
+          import os
           import pandas as pd
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Load
-          # ------------------------------------------------
+          # ==================================================
 
           df = pd.read_csv(
               "research_context_v1.csv"
@@ -369,9 +539,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Required columns
-          # ------------------------------------------------
+          # ==================================================
 
           required = [
               "context_date",
@@ -401,9 +571,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Dates
-          # ------------------------------------------------
+          # ==================================================
 
           dates = pd.to_datetime(
               df["context_date"],
@@ -429,12 +599,12 @@ jobs:
               )
 
 
-          # ------------------------------------------------
-          # Explicit cutoff validation
-          # ------------------------------------------------
+          # ==================================================
+          # Dynamic cutoff
+          # ==================================================
 
           cutoff = pd.Timestamp(
-              "2026-09-21"
+              os.environ["RESEARCH_CONTEXT_AS_OF_DATE"]
           )
 
 
@@ -456,9 +626,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # PIT
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "point_in_time_safe"
@@ -469,9 +639,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Research-only
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "research_only"
@@ -482,9 +652,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Decision Engine
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "decision_engine_ready"
@@ -495,9 +665,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # No trading signal
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "trading_signal_generated"
@@ -508,9 +678,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # No forecast
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "forecast_generated"
@@ -521,9 +691,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # No unified decision
-          # ------------------------------------------------
+          # ==================================================
 
           if not df[
               "unified_decision_generated"
@@ -534,9 +704,9 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Layer count
-          # ------------------------------------------------
+          # ==================================================
 
           if (
               (df["available_layer_count"] < 0)
@@ -549,22 +719,39 @@ jobs:
               )
 
 
-          # ------------------------------------------------
+          # ==================================================
+          # Layer availability flags
+          # ==================================================
+
+          for column in [
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+          ]:
+
+              invalid = ~df[column].isin([True, False])
+
+              if invalid.any():
+
+                  raise SystemExit(
+                      f"ERROR: Invalid boolean values in {column}."
+                  )
+
+
+          # ==================================================
           # Latest row
-          # ------------------------------------------------
+          # ==================================================
 
           latest = df.iloc[-1]
 
 
-          # ------------------------------------------------
+          # ==================================================
           # Output
-          # ------------------------------------------------
+          # ==================================================
 
           print()
           print("=" * 70)
-          print(
-              "RESEARCH CONTEXT VALIDATION PASSED"
-          )
+          print("RESEARCH CONTEXT VALIDATION PASSED")
           print("=" * 70)
 
           print(
@@ -585,7 +772,7 @@ jobs:
           )
 
           print(
-              "Required cutoff:",
+              "Dynamic cutoff:",
               cutoff.date()
           )
 
@@ -601,9 +788,9 @@ jobs:
           )
 
 
-          # ------------------------------------------------
-          # Optional regimes
-          # ------------------------------------------------
+          # ==================================================
+          # Optional research descriptors
+          # ==================================================
 
           for column in [
               "economic_regime",
@@ -622,34 +809,13 @@ jobs:
 
 
           print()
-          print(
-              "PIT safe: TRUE"
-          )
-
-          print(
-              "Research only: TRUE"
-          )
-
-          print(
-              "Decision Engine: FALSE"
-          )
-
-          print(
-              "Trading signal: FALSE"
-          )
-
-          print(
-              "Forecast: FALSE"
-          )
-
-          print(
-              "Unified decision: FALSE"
-          )
-
-          print(
-              "Future rows: 0"
-          )
-
+          print("PIT safe: TRUE")
+          print("Research only: TRUE")
+          print("Decision Engine: FALSE")
+          print("Trading signal: FALSE")
+          print("Forecast: FALSE")
+          print("Unified decision: FALSE")
+          print("Future rows: 0")
           print("=" * 70)
 
           PY
@@ -674,6 +840,8 @@ jobs:
       # Final status
       # ====================================================
       - name: Final status
+        env:
+          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
         run: |
           echo "=============================================="
           echo "Research Context v1 PASSED"
@@ -686,5 +854,6 @@ jobs:
           echo "Trading Signal: FALSE"
           echo "Forecast: FALSE"
           echo "Unified Decision: FALSE"
-          echo "Cutoff: 2026-09-21"
+          echo "Dynamic Cutoff: $RESEARCH_CONTEXT_AS_OF_DATE"
           echo "Artifact: research-context-v1"
+          echo "=============================================="
