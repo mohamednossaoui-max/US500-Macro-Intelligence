@@ -1,0 +1,1020 @@
+name: Research Context v2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  research-context-v2:
+    name: Build Unified Research Context v2
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ====================================================
+      # Checkout
+      # ====================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ====================================================
+      # Python
+      # ====================================================
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ====================================================
+      # Dependencies
+      # ====================================================
+      - name: Install dependencies
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+
+      # ====================================================
+      # Verify source
+      # ====================================================
+      - name: Verify Research Context v2 source
+        run: |
+          set -e
+
+          if [ ! -f "research-context-v2.py" ]; then
+            echo "ERROR: research-context-v2.py not found."
+            exit 1
+          fi
+
+          python -m py_compile research-context-v2.py
+
+          echo "Research Context v2 source found and compiled."
+
+
+      # ====================================================
+      # Find Macro artifact
+      # ====================================================
+      - name: Find latest Macro Context artifact
+        id: macro
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              .artifacts
+              | map(
+                  select(
+                    .name == "macro-context-v1"
+                    and .expired == false
+                  )
+                )
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: macro-context-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Macro artifact ID: $ARTIFACT_ID"
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ====================================================
+      # Download Macro
+      # ====================================================
+      - name: Download Macro Context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/macro
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.macro.outputs.artifact_id }}/zip" \
+            > /tmp/macro.zip
+
+          unzip -o /tmp/macro.zip -d input/macro
+
+          find input/macro -maxdepth 3 -type f -print
+
+
+      # ====================================================
+      # Locate Macro CSV
+      # ====================================================
+      - name: Locate Macro Context CSV
+        run: |
+          set -e
+
+          MACRO_FILE=$(find input/macro \
+            -type f \
+            -name "*.csv" \
+            | head -n 1)
+
+          if [ -z "$MACRO_FILE" ]; then
+            echo "ERROR: Macro CSV not found."
+            exit 1
+          fi
+
+          echo "MACRO_FILE=$MACRO_FILE" >> "$GITHUB_ENV"
+
+          echo "Macro CSV:"
+          echo "$MACRO_FILE"
+
+
+      # ====================================================
+      # Determine master cutoff
+      # ====================================================
+      - name: Determine Research Context cutoff
+        id: cutoff
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          path = os.environ["MACRO_FILE"]
+
+          df = pd.read_csv(
+              path,
+              low_memory=False,
+          )
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Macro Context dataset is empty."
+              )
+
+          candidates = [
+              "context_date",
+              "asof_date",
+              "observation_date",
+              "date",
+          ]
+
+          date_column = None
+
+          for column in candidates:
+              if column in df.columns:
+                  date_column = column
+                  break
+
+          if date_column is None:
+              raise SystemExit(
+                  "ERROR: Macro Context date column not found."
+              )
+
+          dates = pd.to_datetime(
+              df[date_column],
+              errors="coerce",
+          )
+
+          if dates.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid Macro Context dates."
+              )
+
+          cutoff = dates.max().normalize()
+
+          cutoff_string = cutoff.strftime("%Y-%m-%d")
+
+          print("=" * 70)
+          print("RESEARCH CONTEXT v2 MASTER CUTOFF")
+          print("=" * 70)
+          print("Macro date column:", date_column)
+          print("Master cutoff:", cutoff_string)
+          print("=" * 70)
+
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+          ) as f:
+              f.write(
+                  f"RESEARCH_CONTEXT_AS_OF_DATE={cutoff_string}\n"
+              )
+
+          with open(
+              os.environ["GITHUB_OUTPUT"],
+              "a",
+          ) as f:
+              f.write(
+                  f"cutoff={cutoff_string}\n"
+              )
+          PY
+
+
+      # ====================================================
+      # Find Sentiment artifact
+      # ====================================================
+      - name: Find latest Sentiment Engine artifact
+        id: sentiment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              .artifacts
+              | map(
+                  select(
+                    .name == "sentiment-engine-v1"
+                    and .expired == false
+                  )
+                )
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: sentiment-engine-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ====================================================
+      # Download Sentiment
+      # ====================================================
+      - name: Download Sentiment Engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/sentiment
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.sentiment.outputs.artifact_id }}/zip" \
+            > /tmp/sentiment.zip
+
+          unzip -o /tmp/sentiment.zip -d input/sentiment
+
+          find input/sentiment -maxdepth 3 -type f -print
+
+
+      # ====================================================
+      # Locate Sentiment
+      # ====================================================
+      - name: Locate Sentiment CSV
+        run: |
+          set -e
+
+          SENTIMENT_FILE=$(find input/sentiment \
+            -type f \
+            -name "sentiment_engine_research_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$SENTIMENT_FILE" ]; then
+            echo "ERROR: sentiment_engine_research_v1.csv not found."
+            exit 1
+          fi
+
+          echo "SENTIMENT_FILE=$SENTIMENT_FILE" >> "$GITHUB_ENV"
+
+
+      # ====================================================
+      # Find Technical artifact
+      # ====================================================
+      - name: Find latest Technical Intelligence artifact
+        id: technical
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              .artifacts
+              | map(
+                  select(
+                    .name == "technical-intelligence-v1"
+                    and .expired == false
+                  )
+                )
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: technical-intelligence-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ====================================================
+      # Download Technical
+      # ====================================================
+      - name: Download Technical Intelligence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/technical
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.technical.outputs.artifact_id }}/zip" \
+            > /tmp/technical.zip
+
+          unzip -o /tmp/technical.zip -d input/technical
+
+          find input/technical -maxdepth 3 -type f -print
+
+
+      # ====================================================
+      # Locate Technical
+      # ====================================================
+      - name: Locate Technical CSV
+        run: |
+          set -e
+
+          TECHNICAL_FILE=$(find input/technical \
+            -type f \
+            -name "technical_intelligence_research_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$TECHNICAL_FILE" ]; then
+            echo "ERROR: technical_intelligence_research_v1.csv not found."
+            exit 1
+          fi
+
+          echo "TECHNICAL_FILE=$TECHNICAL_FILE" >> "$GITHUB_ENV"
+
+
+      # ====================================================
+      # Find Cross-Asset artifact
+      # ====================================================
+      - name: Find latest Cross-Asset Intelligence artifact
+        id: cross_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          ARTIFACT_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '
+              .artifacts
+              | map(
+                  select(
+                    .name == "cross-asset-intelligence-v1"
+                    and .expired == false
+                  )
+                )
+              | sort_by(.created_at)
+              | last
+              | .id
+            ')
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: cross-asset-intelligence-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Cross-Asset artifact ID: $ARTIFACT_ID"
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+
+
+      # ====================================================
+      # Download Cross-Asset
+      # ====================================================
+      - name: Download Cross-Asset Intelligence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          mkdir -p input/cross_asset
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.cross_asset.outputs.artifact_id }}/zip" \
+            > /tmp/cross_asset.zip
+
+          unzip -o /tmp/cross_asset.zip -d input/cross_asset
+
+          find input/cross_asset -maxdepth 3 -type f -print
+
+
+      # ====================================================
+      # Locate Cross-Asset CSV
+      # ====================================================
+      - name: Locate Cross-Asset CSV
+        run: |
+          set -e
+
+          CROSS_ASSET_FILE=$(find input/cross_asset \
+            -type f \
+            -name "cross_asset_research_v1.csv" \
+            | head -n 1)
+
+          if [ -z "$CROSS_ASSET_FILE" ]; then
+            echo "ERROR: cross_asset_research_v1.csv not found."
+            exit 1
+          fi
+
+          echo "CROSS_ASSET_FILE=$CROSS_ASSET_FILE" >> "$GITHUB_ENV"
+
+          echo "Cross-Asset CSV:"
+          echo "$CROSS_ASSET_FILE"
+
+
+      # ====================================================
+      # Validate source datasets
+      # ====================================================
+      - name: Validate source datasets
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          files = {
+              "Macro Context": os.environ["MACRO_FILE"],
+              "Sentiment Engine": os.environ["SENTIMENT_FILE"],
+              "Technical Intelligence": os.environ["TECHNICAL_FILE"],
+              "Cross-Asset Intelligence": os.environ["CROSS_ASSET_FILE"],
+          }
+
+          print("=" * 70)
+          print("RESEARCH CONTEXT v2 SOURCE VALIDATION")
+          print("=" * 70)
+
+          for name, path in files.items():
+
+              df = pd.read_csv(
+                  path,
+                  low_memory=False,
+              )
+
+              if df.empty:
+                  raise SystemExit(
+                      f"ERROR: {name} dataset is empty."
+                  )
+
+              candidates = [
+                  "context_date",
+                  "asof_date",
+                  "observation_date",
+                  "date",
+                  "event_date",
+                  "session_date",
+              ]
+
+              date_column = None
+
+              for column in candidates:
+                  if column in df.columns:
+                      date_column = column
+                      break
+
+              if date_column is None:
+                  raise SystemExit(
+                      f"ERROR: Date column not found for {name}."
+                  )
+
+              dates = pd.to_datetime(
+                  df[date_column],
+                  errors="coerce",
+              )
+
+              if dates.isna().any():
+                  raise SystemExit(
+                      f"ERROR: Invalid dates in {name}."
+                  )
+
+              print(
+                  f"{name}: PASS | "
+                  f"rows={len(df):,} | "
+                  f"date={date_column} | "
+                  f"range={dates.min().date()} -> "
+                  f"{dates.max().date()}"
+              )
+
+          print()
+          print(
+              "All source datasets are valid."
+          )
+          print(
+              "Future source rows are permitted."
+          )
+          print(
+              "PIT backward synchronization will apply "
+              "the master cutoff."
+          )
+          print("=" * 70)
+          PY
+
+
+      # ====================================================
+      # Prepare inputs
+      # ====================================================
+      - name: Prepare Research Context v2 inputs
+        run: |
+          set -e
+
+          mkdir -p context_input
+
+          cp "$MACRO_FILE" \
+            context_input/macro_context_v1.csv
+
+          cp "$SENTIMENT_FILE" \
+            context_input/sentiment_engine_research_v1.csv
+
+          cp "$TECHNICAL_FILE" \
+            context_input/technical_intelligence_research_v1.csv
+
+          cp "$CROSS_ASSET_FILE" \
+            context_input/cross_asset_research_v1.csv
+
+          echo "Prepared Research Context v2 inputs:"
+          ls -lh context_input
+
+
+      # ====================================================
+      # Run Research Context v2
+      # ====================================================
+      - name: Run Research Context v2
+        env:
+          MACRO_CONTEXT_FILE: context_input/macro_context_v1.csv
+          SENTIMENT_ENGINE_FILE: context_input/sentiment_engine_research_v1.csv
+          TECHNICAL_INTELLIGENCE_FILE: context_input/technical_intelligence_research_v1.csv
+          CROSS_ASSET_FILE: context_input/cross_asset_research_v1.csv
+          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
+
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "RESEARCH CONTEXT v2"
+          echo "=============================================="
+          echo "Master cutoff:"
+          echo "$RESEARCH_CONTEXT_AS_OF_DATE"
+          echo
+
+          python research-context-v2.py
+
+
+      # ====================================================
+      # Validate output existence
+      # ====================================================
+      - name: Validate Research Context v2 outputs
+        run: |
+          set -e
+
+          test -f research_context_v2.csv
+          test -f research_context_summary_v2.csv
+          test -f research_context_extremes_v2.csv
+
+          echo "Research Context v2 outputs exist."
+
+
+      # ====================================================
+      # Final validation
+      # ====================================================
+      - name: Final Research Context v2 validation
+        env:
+          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
+
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          df = pd.read_csv(
+              "research_context_v2.csv",
+              low_memory=False,
+          )
+
+          if df.empty:
+              raise SystemExit(
+                  "ERROR: Research Context v2 is empty."
+              )
+
+          required = [
+              "context_date",
+              "available_layer_count",
+
+              "macro_available",
+              "sentiment_available",
+              "technical_available",
+              "cross_asset_available",
+
+              "macro_availability_date",
+              "sentiment_asof_date",
+              "technical_observation_date",
+              "technical_availability_date",
+              "cross_asset_observation_date",
+              "cross_asset_availability_date",
+
+              "point_in_time_safe",
+              "research_only",
+              "decision_engine_ready",
+              "trading_signal_generated",
+              "forecast_generated",
+              "unified_decision_generated",
+          ]
+
+          missing = [
+              c for c in required
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  f"ERROR: Missing required columns: {missing}"
+              )
+
+          dates = pd.to_datetime(
+              df["context_date"],
+              errors="coerce",
+          )
+
+          if dates.isna().any():
+              raise SystemExit(
+                  "ERROR: Invalid context_date values."
+              )
+
+          if not dates.is_monotonic_increasing:
+              raise SystemExit(
+                  "ERROR: context_date is not sorted."
+              )
+
+          if dates.duplicated().any():
+              raise SystemExit(
+                  "ERROR: Duplicate context_date values."
+              )
+
+          cutoff = pd.Timestamp(
+              os.environ[
+                  "RESEARCH_CONTEXT_AS_OF_DATE"
+              ]
+          )
+
+          if dates.max() > cutoff:
+              raise SystemExit(
+                  "ERROR: Future context row detected."
+              )
+
+          if dates.max() != cutoff:
+              raise SystemExit(
+                  "ERROR: Latest context date does not "
+                  "equal master cutoff."
+              )
+
+          # PIT checks
+          pit_pairs = [
+              (
+                  "macro_availability_date",
+                  "Macro",
+              ),
+              (
+                  "sentiment_asof_date",
+                  "Sentiment",
+              ),
+              (
+                  "technical_availability_date",
+                  "Technical",
+              ),
+              (
+                  "cross_asset_availability_date",
+                  "Cross-Asset",
+              ),
+          ]
+
+          for column, label in pit_pairs:
+
+              values = pd.to_datetime(
+                  df[column],
+                  errors="coerce",
+              )
+
+              mask = (
+                  values.notna()
+                  & (
+                      values
+                      > dates
+                  )
+              )
+
+              if mask.any():
+                  raise SystemExit(
+                      f"ERROR: {label} PIT lookahead detected."
+                  )
+
+          # Technical internal PIT
+          technical_obs = pd.to_datetime(
+              df["technical_observation_date"],
+              errors="coerce",
+          )
+
+          technical_avail = pd.to_datetime(
+              df["technical_availability_date"],
+              errors="coerce",
+          )
+
+          technical_bad = (
+              technical_obs.notna()
+              & technical_avail.notna()
+              & (
+                  technical_avail
+                  < technical_obs
+              )
+          )
+
+          if technical_bad.any():
+              raise SystemExit(
+                  "ERROR: Technical availability "
+                  "earlier than observation."
+              )
+
+          # Cross-Asset internal PIT
+          cross_obs = pd.to_datetime(
+              df["cross_asset_observation_date"],
+              errors="coerce",
+          )
+
+          cross_avail = pd.to_datetime(
+              df["cross_asset_availability_date"],
+              errors="coerce",
+          )
+
+          cross_bad = (
+              cross_obs.notna()
+              & cross_avail.notna()
+              & (
+                  cross_avail
+                  <= cross_obs
+              )
+          )
+
+          if cross_bad.any():
+              raise SystemExit(
+                  "ERROR: Cross-Asset availability "
+                  "is not strictly after observation."
+              )
+
+          # Layer count
+          expected_count = (
+              df[
+                  [
+                      "macro_available",
+                      "sentiment_available",
+                      "technical_available",
+                      "cross_asset_available",
+                  ]
+              ]
+              .sum(axis=1)
+              .astype(int)
+          )
+
+          if not df[
+              "available_layer_count"
+          ].equals(expected_count):
+
+              raise SystemExit(
+                  "ERROR: available_layer_count mismatch."
+              )
+
+          # Research-only
+          if not df[
+              "point_in_time_safe"
+          ].eq(True).all():
+
+              raise SystemExit(
+                  "ERROR: point_in_time_safe != TRUE."
+              )
+
+          if not df[
+              "research_only"
+          ].eq(True).all():
+
+              raise SystemExit(
+                  "ERROR: research_only != TRUE."
+              )
+
+          if not df[
+              "decision_engine_ready"
+          ].eq(False).all():
+
+              raise SystemExit(
+                  "ERROR: Decision Engine enabled."
+              )
+
+          if not df[
+              "trading_signal_generated"
+          ].eq(False).all():
+
+              raise SystemExit(
+                  "ERROR: Trading signal detected."
+              )
+
+          if not df[
+              "forecast_generated"
+          ].eq(False).all():
+
+              raise SystemExit(
+                  "ERROR: Forecast detected."
+              )
+
+          if not df[
+              "unified_decision_generated"
+          ].eq(False).all():
+
+              raise SystemExit(
+                  "ERROR: Unified decision detected."
+              )
+
+          summary = pd.read_csv(
+              "research_context_summary_v2.csv",
+              low_memory=False,
+          )
+
+          if len(summary) != 1:
+              raise SystemExit(
+                  "ERROR: Summary must contain exactly one row."
+              )
+
+          summary_date = pd.to_datetime(
+              summary.iloc[0]["context_date"],
+              errors="coerce",
+          )
+
+          if summary_date != dates.max():
+              raise SystemExit(
+                  "ERROR: Summary context date mismatch."
+              )
+
+          extremes = pd.read_csv(
+              "research_context_extremes_v2.csv",
+              low_memory=False,
+          )
+
+          if not extremes.empty:
+
+              extreme_dates = pd.to_datetime(
+                  extremes["context_date"],
+                  errors="coerce",
+              )
+
+              if extreme_dates.isna().any():
+                  raise SystemExit(
+                      "ERROR: Invalid extreme dates."
+                  )
+
+              if (
+                  extreme_dates > cutoff
+              ).any():
+
+                  raise SystemExit(
+                      "ERROR: Future rows in extremes."
+                  )
+
+          print("=" * 70)
+          print("RESEARCH CONTEXT v2 VALIDATION PASSED")
+          print("=" * 70)
+
+          print(
+              f"Rows: {len(df):,}"
+          )
+
+          print(
+              f"Columns: {len(df.columns):,}"
+          )
+
+          print(
+              "Date range:",
+              dates.min().date(),
+              "->",
+              dates.max().date(),
+          )
+
+          print(
+              "Master cutoff:",
+              cutoff.date(),
+          )
+
+          print(
+              "Latest available layers:",
+              int(
+                  df.iloc[-1][
+                      "available_layer_count"
+                  ]
+              ),
+              "/ 4",
+          )
+
+          print(
+              "Macro:",
+              bool(
+                  df.iloc[-1][
+                      "macro_available"
+                  ]
+              ),
+          )
+
+          print(
+              "Sentiment:",
+              bool(
+                  df.iloc[-1][
+                      "sentiment_available"
+                  ]
+              ),
+          )
+
+          print(
+              "Technical:",
+              bool(
+                  df.iloc[-1][
+                      "technical_available"
+                  ]
+              ),
+          )
+
+          print(
+              "Cross-Asset:",
+              bool(
+                  df.iloc[-1][
+                      "cross_asset_available"
+                  ]
+              ),
+          )
+
+          print(
+              "PIT safe: TRUE"
+          )
+
+          print(
+              "Anti-lookahead: PASSED"
+          )
+
+          print(
+              "Research only: TRUE"
+          )
+
+          print(
+              "Decision Engine: FALSE"
+          )
+
+          print(
+              "Trading signal: FALSE"
+          )
+
+          print(
+              "Forecast: FALSE"
+          )
+
+          print(
+              "Unified decision: FALSE"
+          )
+
+          print(
+              "Extreme research rows:",
+              len(extremes),
+          )
+
+          print("=" * 70)
+          print(
+              "ALL RESEARCH CONTEXT v2 VALIDATIONS PASSED"
+          )
+          print("=" * 70)
+
+          PY
+
+
+      # ====================================================
+      # Upload artifact
+      # ====================================================
+      - name: Upload Research Context v2 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-context-v2
+          path: |
+            research_context_v2.csv
+            research_context_summary_v2.csv
+            research_context_extremes_v2.csv
+          if-no-files-found: error
