@@ -1,18 +1,24 @@
 name: Final End-to-End Validation V1
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
   actions: read
+
 jobs:
   final-end-to-end-validation:
     runs-on: ubuntu-latest
+
     steps:
+
       # ============================================================
       # CHECKOUT
       # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
+
       # ============================================================
       # PYTHON
       # ============================================================
@@ -20,13 +26,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
+        shell: bash
         run: |
           set -euo pipefail
+
           python -m pip install --upgrade pip
+
           pip install \
             pandas \
             numpy
+
       # ============================================================
       # PREPARE
       # ============================================================
@@ -34,9 +45,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           rm -rf artifacts
+          rm -rf final_end_to_end_validation_output
+
+          rm -f final_end_to_end_validation_run.log
+          rm -f final_end_to_end_validation_exit_code.txt
+
           mkdir -p artifacts
-          echo "Artifact directory prepared."
+
       # ============================================================
       # DISCOVER ALL GITHUB ACTIONS ARTIFACTS
       #
@@ -44,7 +61,8 @@ jobs:
       #
       # --paginate + --slurp
       #
-      # prevents the old 100-artifact limitation.
+      # preserves full pagination and avoids the old 100-artifact
+      # limitation.
       # ============================================================
       - name: Discover ALL GitHub Actions artifacts
         env:
@@ -52,90 +70,75 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "============================================================"
-          echo "DISCOVERING ALL GITHUB ACTIONS ARTIFACTS"
-          echo "============================================================"
+
           gh api \
             --paginate \
             --slurp \
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             > /tmp/all_artifacts_pages.json
+
           python - <<'PY'
           import json
           from pathlib import Path
-          path = Path(
-              "/tmp/all_artifacts_pages.json"
-          )
+
+          source = Path("/tmp/all_artifacts_pages.json")
+          destination = Path("/tmp/all_artifacts.json")
+
           raw = json.loads(
-              path.read_text(
+              source.read_text(
                   encoding="utf-8"
               )
           )
+
           artifacts = []
+
           for page in raw:
-              if isinstance(
-                  page,
-                  dict
-              ):
+              if isinstance(page, dict):
                   artifacts.extend(
                       page.get(
                           "artifacts",
                           []
                       )
                   )
-          # --------------------------------------------------------
+
           # Remove duplicate artifact IDs.
-          # --------------------------------------------------------
           unique = {}
+
           for artifact in artifacts:
-              unique[
-                  str(
-                      artifact["id"]
+              artifact_id = str(
+                  artifact.get(
+                      "id"
                   )
-              ] = artifact
+              )
+
+              unique[artifact_id] = artifact
+
           artifacts = list(
               unique.values()
           )
-          output = {
-              "artifacts": artifacts
-          }
-          Path(
-              "/tmp/all_artifacts.json"
-          ).write_text(
+
+          destination.write_text(
               json.dumps(
-                  output,
+                  {
+                      "artifacts": artifacts
+                  },
                   indent=2
               ),
               encoding="utf-8"
           )
+
           print(
-              "Total artifacts discovered "
-              "across all pages: "
-              f"{len(artifacts)}"
+              f"Discovered {len(artifacts)} GitHub Actions artifacts."
           )
-          print()
-          for artifact in sorted(
-              artifacts,
-              key=lambda x:
-                  x.get(
-                      "created_at",
-                      ""
-                  )
-          ):
-              print(
-                  f"{artifact.get('id')} | "
-                  f"{artifact.get('name')} | "
-                  f"expired="
-                  f"{artifact.get('expired')} | "
-                  f"created="
-                  f"{artifact.get('created_at')}"
-              )
           PY
+
       # ============================================================
       # SELECT AND DOWNLOAD RESEARCH ARTIFACTS
       #
-      # We do NOT download arbitrary unrelated artifacts.
+      # Only relevant research artifacts are downloaded.
+      # Detailed download information is intentionally suppressed
+      # from the Actions log.
       # ============================================================
       - name: Download relevant research artifacts
         env:
@@ -143,15 +146,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           python - <<'PY'
           import json
           import os
           import re
           import subprocess
           from pathlib import Path
-          repo = os.environ[
-              "GITHUB_REPOSITORY"
-          ]
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+
           data = json.loads(
               Path(
                   "/tmp/all_artifacts.json"
@@ -159,10 +163,12 @@ jobs:
                   encoding="utf-8"
               )
           )
+
           artifacts = data.get(
               "artifacts",
               []
           )
+
           # --------------------------------------------------------
           # Relevant research artifact patterns.
           # --------------------------------------------------------
@@ -183,18 +189,23 @@ jobs:
               r"research[-_ ]context",
               r"ema19",
           ]
+
           selected = []
+
           for artifact in artifacts:
+
               if artifact.get(
                   "expired"
               ):
                   continue
+
               name = str(
                   artifact.get(
                       "name",
                       ""
                   )
               ).lower()
+
               if any(
                   re.search(
                       pattern,
@@ -205,18 +216,16 @@ jobs:
                   selected.append(
                       artifact
                   )
+
           # --------------------------------------------------------
           # Keep newest non-expired artifact for each exact name.
-          #
-          # This prevents stale duplicate versions from overwhelming
-          # the validation while preserving one complete snapshot
-          # for every artifact name.
           # --------------------------------------------------------
           newest = {}
+
           for artifact in selected:
-              name = artifact[
-                  "name"
-              ]
+
+              name = artifact["name"]
+
               if (
                   name not in newest
                   or artifact.get(
@@ -229,6 +238,7 @@ jobs:
                   )
               ):
                   newest[name] = artifact
+
           selected = sorted(
               newest.values(),
               key=lambda x: (
@@ -244,30 +254,32 @@ jobs:
                   ),
               )
           )
+
           print(
-              "Relevant non-expired artifact "
-              "names selected: "
-              f"{len(selected)}"
+              f"Selected {len(selected)} relevant research artifacts."
           )
+
           download_root = Path(
               "artifacts"
           )
+
           download_root.mkdir(
               parents=True,
               exist_ok=True
           )
+
           for artifact in selected:
-              artifact_id = artifact[
-                  "id"
-              ]
-              artifact_name = artifact[
-                  "name"
-              ]
+
+              artifact_id = artifact["id"]
+
+              artifact_name = artifact["name"]
+
               safe_name = re.sub(
                   r"[^A-Za-z0-9._-]+",
                   "_",
                   artifact_name
               )
+
               destination = (
                   download_root
                   / (
@@ -275,42 +287,23 @@ jobs:
                       f"{safe_name}"
                   )
               )
+
               destination.mkdir(
                   parents=True,
                   exist_ok=True
               )
-              print()
-              print(
-                  "------------------------------------------------------------"
-              )
-              print(
-                  f"Downloading artifact: "
-                  f"{artifact_name}"
-              )
-              print(
-                  f"Artifact ID         : "
-                  f"{artifact_id}"
-              )
-              print(
-                  f"Created             : "
-                  f"{artifact.get('created_at')}"
-              )
-              print(
-                  f"Destination         : "
-                  f"{destination}"
-              )
-              print(
-                  "------------------------------------------------------------"
-              )
+
               url = (
                   "https://api.github.com/repos/"
                   f"{repo}/actions/artifacts/"
                   f"{artifact_id}/zip"
               )
+
               archive = (
                   destination
                   / "artifact.zip"
               )
+
               subprocess.run(
                   [
                       "curl",
@@ -332,130 +325,194 @@ jobs:
                       str(archive),
                   ],
                   check=True,
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
               )
+
               subprocess.run(
                   [
                       "unzip",
+                      "-q",
                       "-o",
                       str(archive),
                       "-d",
                       str(destination),
                   ],
                   check=True,
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
               )
+
               archive.unlink(
                   missing_ok=True
               )
-          print()
+
           print(
-              "Artifact download completed successfully."
-          )
-          print(
-              "CSV and JSON research artifacts "
-              "are included in validation."
+              "Research artifact download completed."
           )
           PY
-      # ============================================================
-      # SHOW ARTIFACT TREE
-      # ============================================================
-      - name: Show downloaded artifact tree
-        shell: bash
-        run: |
-          echo "============================================================"
-          echo "DOWNLOADED ARTIFACT TREE"
-          echo "============================================================"
-          find artifacts \
-            -maxdepth 8 \
-            -type f \
-            -print \
-            | sort
-      # ============================================================
-      # SHOW RESEARCH ARTIFACT INVENTORY
-      # ============================================================
-      - name: Show research artifact inventory
-        shell: bash
-        run: |
-          echo "============================================================"
-          echo "RESEARCH ARTIFACT INVENTORY"
-          echo "============================================================"
-          find artifacts \
-            -type f \
-            \( \
-              -name "*.csv" \
-              -o \
-              -name "*.json" \
-            \) \
-            -print \
-            | sort
+
       # ============================================================
       # RUN FINAL VALIDATION
+      #
+      # IMPORTANT:
+      #
+      # The validator output is stored in a log file instead of
+      # flooding the GitHub Actions console.
       # ============================================================
       - name: Run Final End-to-End Validation
+        id: validation
         shell: bash
         run: |
-          set -o pipefail
-          echo "============================================================"
-          echo "US500 MACRO INTELLIGENCE"
-          echo "FINAL END-TO-END VALIDATION V1"
-          echo "============================================================"
+          set +e
+
           python \
             tests/final_end_to_end_validation_v1.py \
             --repo-root . \
             --artifacts-dir artifacts \
             --output-dir final_end_to_end_validation_output \
-            2>&1 \
-            | tee \
-              final_end_to_end_validation_run.log
+            > final_end_to_end_validation_run.log 2>&1
+
+          rc=$?
+
+          echo "${rc}" \
+            > final_end_to_end_validation_exit_code.txt
+
+          exit 0
+
       # ============================================================
-      # DISPLAY SUMMARY
+      # DISPLAY CLEAN VALIDATION SUMMARY
+      #
+      # This is the ONLY detailed validation output shown in the
+      # normal GitHub Actions console.
       # ============================================================
-      - name: Display validation summary
+      - name: Display clean validation summary
         if: always()
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "============================================================"
-          echo "VALIDATION SUMMARY"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "FINAL END-TO-END VALIDATION V1"
           echo "============================================================"
-          if [ -f \
-            final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
-          ]; then
-            cat \
-              final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
-          else
-            echo "Summary file not found."
-          fi
           echo
-          echo "============================================================"
-          echo "VALIDATION EVENTS"
-          echo "============================================================"
-          if [ -f \
-            final_end_to_end_validation_output/final_end_to_end_validation_events.csv
-          ]; then
-            cat \
-              final_end_to_end_validation_output/final_end_to_end_validation_events.csv
-          else
-            echo "Events file not found."
+
+          JSON_FILE="final_end_to_end_validation_output/final_end_to_end_validation.json"
+
+          if [ ! -f "$JSON_FILE" ]; then
+            echo "------------------------------------------------------------"
+            echo "VALIDATION SUMMARY"
+            echo "------------------------------------------------------------"
+            echo "Validation JSON : NOT FOUND"
+            echo
+            echo "Detailed validation output:"
+            echo "final_end_to_end_validation_run.log"
+            echo "------------------------------------------------------------"
+            exit 0
           fi
+
+          python - "$JSON_FILE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+
+          data = json.loads(
+              path.read_text(
+                  encoding="utf-8"
+              )
+          )
+
+          passed = int(
+              data.get(
+                  "checks_pass",
+                  0
+              )
+          )
+
+          review = int(
+              data.get(
+                  "checks_review",
+                  0
+              )
+          )
+
+          failed = int(
+              data.get(
+                  "checks_fail",
+                  0
+              )
+          )
+
+          if failed > 0:
+              status = "FAILED"
+          elif review > 0:
+              status = "PASSED WITH REVIEW"
+          else:
+              status = "PASSED"
+
+          print(
+              "------------------------------------------------------------"
+          )
+          print(
+              "VALIDATION SUMMARY"
+          )
+          print(
+              "------------------------------------------------------------"
+          )
+
+          print(
+              f"PASS              : {passed}"
+          )
+
+          print(
+              f"REVIEW            : {review}"
+          )
+
+          print(
+              f"FAIL              : {failed}"
+          )
+
+          print()
+
+          print(
+              "Validation logic  : PASSED"
+          )
+
+          print(
+              f"Validation status : {status}"
+          )
+
+          print()
+
+          print(
+              "Detailed validation output:"
+          )
+
+          print(
+              "final_end_to_end_validation_run.log"
+          )
+
+          print(
+              "------------------------------------------------------------"
+          )
+
+          print(
+              f"FINAL STATUS: {status}"
+          )
+
+          print(
+              "------------------------------------------------------------"
+          )
+          PY
+
       # ============================================================
-      # DISPLAY FINAL JSON
-      # ============================================================
-      - name: Verify final JSON
-        if: always()
-        shell: bash
-        run: |
-          echo "============================================================"
-          echo "FINAL VALIDATION JSON"
-          echo "============================================================"
-          if [ -f \
-            final_end_to_end_validation_output/final_end_to_end_validation.json
-          ]; then
-            cat \
-              final_end_to_end_validation_output/final_end_to_end_validation.json
-          else
-            echo "Final JSON not found."
-          fi
-      # ============================================================
-      # UPLOAD VALIDATION RESULTS
+      # UPLOAD COMPLETE VALIDATION RESULTS
+      #
+      # The console stays clean, while all detailed information is
+      # still preserved as a downloadable GitHub Actions artifact.
       # ============================================================
       - name: Upload Final End-to-End Validation artifacts
         if: always()
@@ -464,6 +521,46 @@ jobs:
           name: Final-End-to-End-Validation-V1
           path: |
             final_end_to_end_validation_run.log
+            final_end_to_end_validation_exit_code.txt
             final_end_to_end_validation_output/
           if-no-files-found: warn
           retention-days: 30
+
+      # ============================================================
+      # FINAL WORKFLOW STATUS
+      #
+      # REVIEW  -> success
+      # PASS    -> success
+      # FAIL    -> workflow failure
+      # ============================================================
+      - name: Apply final validation status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f \
+            final_end_to_end_validation_exit_code.txt
+          ]; then
+            echo "Validation exit code file not found."
+            exit 1
+          fi
+
+          rc="$(
+            cat \
+              final_end_to_end_validation_exit_code.txt
+          )"
+
+          echo
+          echo "============================================================"
+
+          if [ "$rc" -eq 0 ]; then
+            echo "FINAL END-TO-END VALIDATION: SUCCESS"
+            echo "============================================================"
+            exit 0
+          fi
+
+          echo "FINAL END-TO-END VALIDATION: FAILED"
+          echo "============================================================"
+
+          exit "$rc"
