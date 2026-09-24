@@ -1,17 +1,15 @@
-# US500 Research Terminal — Streamlit deployment
+# US500 Research Terminal
 
-## Files
-- `app.py` — complete dashboard
-- `requirements.txt` — runtime dependencies
+Research-only Streamlit dashboard for the US500 Macro Intelligence repository.
 
 ## Streamlit secrets
-For a private GitHub repository, add:
 
 ```toml
 GITHUB_TOKEN = "YOUR_GITHUB_TOKEN"
+FRED_API_KEY = "YOUR_FRED_API_KEY"
 US500_TICKER = "^GSPC"
 ```
 
-`^GSPC` is a public S&P 500 market-price proxy and may differ from a broker's US500 CFD/futures price.
+`GITHUB_TOKEN` must be able to read Actions artifacts from the repository. The app discovers the latest non-expired artifact by artifact name, so it does not depend on hard-coded artifact IDs.
 
-The app is research-only. It does not generate trading signals, deterministic forecasts, execution instructions, position sizing, or SL/TP instructions.
+The dashboard does not generate trading signals, forecasts, execution instructions, position sizing, or directional recommendations.
