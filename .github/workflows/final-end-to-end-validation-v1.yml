@@ -31,7 +31,7 @@ jobs:
           rm -rf artifacts
           mkdir -p artifacts
 
-      - name: Discover latest GitHub Actions artifacts
+      - name: Discover available GitHub Actions artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -43,7 +43,6 @@ jobs:
           echo "============================================================"
 
           gh api \
-            --paginate \
             -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
             > /tmp/all_artifacts.json
@@ -52,8 +51,11 @@ jobs:
           import json
           from pathlib import Path
 
-          source = Path("/tmp/all_artifacts.json")
-          data = json.loads(source.read_text())
+          path = Path("/tmp/all_artifacts.json")
+
+          text = path.read_text(encoding="utf-8").strip()
+
+          data = json.loads(text)
 
           artifacts = data.get("artifacts", [])
 
@@ -61,10 +63,10 @@ jobs:
 
           for artifact in artifacts:
               print(
-                  artifact.get("id"),
-                  artifact.get("name"),
-                  artifact.get("expired"),
-                  artifact.get("created_at")
+                  f"{artifact.get('id')} | "
+                  f"{artifact.get('name')} | "
+                  f"expired={artifact.get('expired')} | "
+                  f"created={artifact.get('created_at')}"
               )
           PY
 
@@ -85,7 +87,9 @@ jobs:
           repo = os.environ["GITHUB_REPOSITORY"]
 
           data = json.loads(
-              Path("/tmp/all_artifacts.json").read_text()
+              Path("/tmp/all_artifacts.json").read_text(
+                  encoding="utf-8"
+              )
           )
 
           artifacts = data.get("artifacts", [])
@@ -130,10 +134,11 @@ jobs:
               f"{len(selected)}"
           )
 
-          # Keep the newest artifact for each exact artifact name.
+          # Keep only the newest artifact for each exact name.
           newest = {}
 
           for artifact in selected:
+
               name = artifact["name"]
 
               if (
@@ -153,7 +158,7 @@ jobs:
           download_root = Path("artifacts")
           download_root.mkdir(
               parents=True,
-              exist_ok=True,
+              exist_ok=True
           )
 
           for artifact in selected:
@@ -164,7 +169,7 @@ jobs:
               safe_name = re.sub(
                   r"[^A-Za-z0-9._-]+",
                   "_",
-                  artifact_name,
+                  artifact_name
               )
 
               destination = (
@@ -174,7 +179,7 @@ jobs:
 
               destination.mkdir(
                   parents=True,
-                  exist_ok=True,
+                  exist_ok=True
               )
 
               print()
@@ -238,7 +243,7 @@ jobs:
           echo "============================================================"
 
           find artifacts \
-            -maxdepth 5 \
+            -maxdepth 6 \
             -type f \
             -print \
             | sort
