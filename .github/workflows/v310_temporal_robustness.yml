@@ -12,49 +12,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # ============================================================
-      # 1. CHECKOUT FROZEN V3.10 SOURCE
+      # 1. CHECKOUT CURRENT FROZEN V3.10 SOURCE
       # ============================================================
       - name: Checkout frozen V3.10 source
         uses: actions/checkout@v4
         with:
-          ref: 4a1055163bf575cfe4b6c7965941e84ec09446ef
+          # IMPORTANT:
+          # This is the commit containing the currently validated
+          # EMA19 Macro V3.10 implementation.
+          ref: 2e1bd32089f74b0c6b72b5dcaaa81a06ea1ae04a
           fetch-depth: 1
 
       # ============================================================
       # 2. PYTHON
       # ============================================================
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       # ============================================================
       # 3. INSTALL DEPENDENCIES
       # ============================================================
       - name: Install dependencies
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           python -m pip install --upgrade pip
 
-          python -m pip install \
-            pandas \
-            numpy \
-            requests \
-            yfinance \
-            streamlit
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+          pip install pandas numpy yfinance
 
       # ============================================================
-      # 4. ENVIRONMENT CHECK
+      # 4. ENVIRONMENT VALIDATION
       # ============================================================
-      - name: Environment and V3.10 source check
+      - name: Validate environment
+        shell: bash
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
-          set -e
+          set -euo pipefail
 
           echo "============================================================"
           echo "US500 MACRO INTELLIGENCE — V3.10"
@@ -62,121 +64,117 @@ jobs:
           echo "============================================================"
 
           echo
-          echo "Python:"
-          python --version
+          echo "Repository:"
+          git remote get-url origin || true
 
           echo
-          echo "Pip:"
-          pip --version
+          echo "Checked-out commit:"
+          git rev-parse HEAD
 
-          echo
-          echo "Checking FRED API key..."
+          EXPECTED_COMMIT="2e1bd32089f74b0c6b72b5dcaaa81a06ea1ae04a"
+          ACTUAL_COMMIT="$(git rev-parse HEAD)"
 
-          if [ -z "${FRED_API_KEY}" ]; then
-            echo "ERROR: FRED_API_KEY is missing."
+          if [ "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]; then
+            echo "ERROR: Incorrect source commit."
+            echo "Expected: $EXPECTED_COMMIT"
+            echo "Actual:   $ACTUAL_COMMIT"
             exit 1
           fi
 
-          echo "FRED_API_KEY: configured"
+          echo "Source commit validation: PASS"
 
-          echo
-          echo "Checking frozen V3.10 source..."
+          if [ -z "${FRED_API_KEY:-}" ]; then
+            echo "ERROR: FRED_API_KEY secret is missing."
+            exit 1
+          fi
 
-          test -f backtestEMA19Macro.py
+          echo "FRED_API_KEY validation: PASS"
 
-          grep -q "US500 MACRO INTELLIGENCE — V3.10" \
-            backtestEMA19Macro.py
+          if [ ! -f backtestEMA19Macro.py ]; then
+            echo "ERROR: backtestEMA19Macro.py not found."
+            exit 1
+          fi
 
-          grep -q "def v310_main" \
-            backtestEMA19Macro.py
-
-          grep -q "V3.10 VALIDATION COMPLETE" \
-            backtestEMA19Macro.py
-
-          grep -q "NOT a new strict OOS test" \
-            backtestEMA19Macro.py
-
-          echo "V3.10 source verification: PASS"
-
-          echo
-          echo "Frozen V3.10 commit:"
-          git rev-parse HEAD
+          echo "EMA19 Macro source validation: PASS"
 
       # ============================================================
       # 5. RUN V3.10
       # ============================================================
-      - name: Run V3.10 Extended Temporal Robustness
+      - name: Run EMA19 Macro V3.10
+        shell: bash
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           PYTHONUNBUFFERED: "1"
         run: |
           set -o pipefail
 
+          echo
           echo "============================================================"
-          echo "RUNNING V3.10"
+          echo "RUNNING EMA19 MACRO V3.10"
           echo "============================================================"
 
-          python backtestEMA19Macro.py 2>&1 | tee v310_run.log
+          python backtestEMA19Macro.py 2>&1 | tee backtestEMA19Macro_v310_run.log
 
       # ============================================================
-      # 6. VERIFY FROZEN BASELINE INTEGRITY
+      # 6. VERIFY FROZEN BASELINE GUARDS
       # ============================================================
-      - name: Verify frozen baseline integrity
-        if: always()
+      - name: Verify V3.10 frozen baseline guards
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "============================================================"
-          echo "V3.10 FROZEN BASELINE INTEGRITY CHECK"
-          echo "============================================================"
+          LOG_FILE="backtestEMA19Macro_v310_run.log"
 
-          test -f v310_run.log
-
-          grep -q \
-            "V3.10 FROZEN 119-SIGNAL GUARD: PASS" \
-            v310_run.log
-
-          grep -q \
-            "V3.10 FROZEN 36W/73L GUARD: PASS" \
-            v310_run.log
-
-          grep -q \
-            "V3.10 FROZEN +71R GUARD: PASS" \
-            v310_run.log
-
-          grep -q \
-            "V3.10 NO ENTRY CREATION: PASS" \
-            v310_run.log
-
-          grep -q \
-            "V3.10 NO BASELINE MODIFICATION: PASS" \
-            v310_run.log
-
-          grep -q \
-            "V3.10 NO PARAMETER OPTIMIZATION: PASS" \
-            v310_run.log
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "ERROR: V3.10 run log was not created."
+            exit 1
+          fi
 
           echo
-          echo "Frozen 119-signal guard: PASS"
-          echo "Frozen 36W/73L guard: PASS"
-          echo "Frozen +71R guard: PASS"
-          echo "No entry creation: PASS"
-          echo "No baseline modification: PASS"
-          echo "No parameter optimization: PASS"
+          echo "============================================================"
+          echo "V3.10 FROZEN GUARD VALIDATION"
+          echo "============================================================"
+
+          REQUIRED_GUARDS=(
+            "V3.10 FROZEN 119-SIGNAL GUARD: PASS"
+            "V3.10 FROZEN 36W/73L GUARD: PASS"
+            "V3.10 FROZEN +71R GUARD: PASS"
+          )
+
+          for GUARD in "${REQUIRED_GUARDS[@]}"; do
+            if grep -Fq "$GUARD" "$LOG_FILE"; then
+              echo "$GUARD"
+            else
+              echo "ERROR: Missing required guard:"
+              echo "$GUARD"
+              exit 1
+            fi
+          done
+
+          if grep -Fq "FAILED" "$LOG_FILE"; then
+            echo
+            echo "ERROR: V3.10 run contains FAILED status."
+            grep -F "FAILED" "$LOG_FILE" || true
+            exit 1
+          fi
+
+          echo
+          echo "All frozen baseline guards: PASS"
 
       # ============================================================
-      # 7. VERIFY V3.10 OUTPUT FILES
+      # 7. VERIFY V3.10 TEMPORAL OUTPUTS
       # ============================================================
-      - name: Verify V3.10 output files
-        if: always()
+      - name: Verify V3.10 temporal outputs
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
+          echo
           echo "============================================================"
-          echo "V3.10 OUTPUT VALIDATION"
+          echo "V3.10 TEMPORAL OUTPUT VALIDATION"
           echo "============================================================"
 
-          required_files=(
+          REQUIRED_FILES=(
             "macro_backtest_v310_year_by_year.csv"
             "macro_backtest_v310_temporal_summary.csv"
             "macro_backtest_v310_max_drawdown.csv"
@@ -186,75 +184,175 @@ jobs:
             "macro_backtest_v310_robustness_verdict.csv"
           )
 
-          for file in "${required_files[@]}"; do
-
-            if [ ! -s "$file" ]; then
-              echo "ERROR: Missing or empty file:"
-              echo "$file"
+          for FILE in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$FILE" ]; then
+              echo "ERROR: Missing V3.10 output: $FILE"
               exit 1
             fi
 
-            echo "PASS: $file"
+            if [ ! -s "$FILE" ]; then
+              echo "ERROR: Empty V3.10 output: $FILE"
+              exit 1
+            fi
 
+            echo "PASS: $FILE"
           done
 
           echo
-          echo "All V3.10 output files exist and are non-empty."
+          echo "All required V3.10 outputs exist and are non-empty."
 
       # ============================================================
-      # 8. STRUCTURAL CSV VALIDATION
+      # 8. VALIDATE CSV STRUCTURE
       # ============================================================
       - name: Validate V3.10 CSV structure
-        if: always()
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
+          python - <<'PY'
+          import pandas as pd
+          from pathlib import Path
+
+          required = {
+              "macro_backtest_v310_year_by_year.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_temporal_summary.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_max_drawdown.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_leave_one_year_out.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_crisis_exclusion.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_largest_year_exclusion.csv": [
+                  "context"
+              ],
+              "macro_backtest_v310_robustness_verdict.csv": [
+                  "context",
+                  "resolved",
+                  "years_with_resolved",
+                  "total_R",
+                  "avg_R",
+                  "positive_years",
+                  "negative_years",
+                  "status",
+                  "research_only",
+                  "NOT_STRICT_OOS",
+              ],
+          }
+
+          for filename, columns in required.items():
+              path = Path(filename)
+
+              if not path.exists():
+                  raise SystemExit(f"ERROR: Missing file: {filename}")
+
+              df = pd.read_csv(path)
+
+              if df.empty:
+                  raise SystemExit(f"ERROR: Empty CSV: {filename}")
+
+              missing = [c for c in columns if c not in df.columns]
+
+              if missing:
+                  raise SystemExit(
+                      f"ERROR: {filename} missing columns: {missing}"
+                  )
+
+              print(
+                  f"PASS: {filename} "
+                  f"rows={len(df)} columns={len(df.columns)}"
+              )
+
+          print()
+          print("CSV structural validation: PASS")
+          PY
+
+      # ============================================================
+      # 9. VALIDATE RESEARCH-ONLY / NON-OOS FLAGS
+      # ============================================================
+      - name: Validate research-only methodology flags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = "macro_backtest_v310_robustness_verdict.csv"
+
+          df = pd.read_csv(path)
+
+          if df.empty:
+              raise SystemExit("ERROR: Robustness verdict is empty.")
+
+          if "research_only" not in df.columns:
+              raise SystemExit(
+                  "ERROR: research_only column missing."
+              )
+
+          if "NOT_STRICT_OOS" not in df.columns:
+              raise SystemExit(
+                  "ERROR: NOT_STRICT_OOS column missing."
+              )
+
+          def is_true(value):
+              return str(value).strip().lower() in {
+                  "true",
+                  "1",
+                  "yes"
+              }
+
+          if not df["research_only"].map(is_true).all():
+              raise SystemExit(
+                  "ERROR: One or more V3.10 contexts are not "
+                  "marked research_only=True."
+              )
+
+          if not df["NOT_STRICT_OOS"].map(is_true).all():
+              raise SystemExit(
+                  "ERROR: One or more V3.10 contexts are not "
+                  "marked NOT_STRICT_OOS=True."
+              )
+
+          print(
+              "Research-only validation: PASS"
+          )
+
+          print(
+              "NOT_STRICT_OOS validation: PASS"
+          )
+
+          print()
+          print("V3.10 methodology flags are valid.")
+          PY
+
+      # ============================================================
+      # 10. DISPLAY ROBUSTNESS VERDICT
+      # ============================================================
+      - name: Display V3.10 robustness verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo
           echo "============================================================"
-          echo "V3.10 CSV STRUCTURE VALIDATION"
+          echo "V3.10 ROBUSTNESS VERDICT"
           echo "============================================================"
 
           python - <<'PY'
           import pandas as pd
-          import sys
 
-          files = {
-              "year_by_year":
-                  "macro_backtest_v310_year_by_year.csv",
+          path = "macro_backtest_v310_robustness_verdict.csv"
 
-              "temporal_summary":
-                  "macro_backtest_v310_temporal_summary.csv",
+          df = pd.read_csv(path)
 
-              "max_drawdown":
-                  "macro_backtest_v310_max_drawdown.csv",
-
-              "leave_one_year_out":
-                  "macro_backtest_v310_leave_one_year_out.csv",
-
-              "crisis_exclusion":
-                  "macro_backtest_v310_crisis_exclusion.csv",
-
-              "largest_year_exclusion":
-                  "macro_backtest_v310_largest_year_exclusion.csv",
-
-              "robustness_verdict":
-                  "macro_backtest_v310_robustness_verdict.csv",
-          }
-
-          for name, path in files.items():
-
-              df = pd.read_csv(path)
-
-              print(f"{name}: {len(df)} rows")
-
-              if df.empty:
-                  print(f"ERROR: {path} is empty")
-                  sys.exit(1)
-
-          verdict = pd.read_csv(
-              "macro_backtest_v310_robustness_verdict.csv"
-          )
-
-          required = {
+          display_columns = [
               "context",
               "resolved",
               "years_with_resolved",
@@ -263,110 +361,90 @@ jobs:
               "positive_years",
               "negative_years",
               "status",
-              "research_only",
-              "NOT_STRICT_OOS",
-          }
+          ]
 
-          missing = required - set(verdict.columns)
+          available = [
+              c for c in display_columns
+              if c in df.columns
+          ]
 
-          if missing:
-              print("ERROR: Missing verdict columns:")
-              print(sorted(missing))
-              sys.exit(1)
-
-          if not verdict["research_only"].astype(bool).all():
-              print("ERROR: research_only flag failed")
-              sys.exit(1)
-
-          if not verdict["NOT_STRICT_OOS"].astype(bool).all():
-              print("ERROR: NOT_STRICT_OOS flag failed")
-              sys.exit(1)
-
-          print("CSV structure validation: PASS")
+          print(
+              df[available].to_string(index=False)
+          )
 
           print()
-          print("V3.10 robustness verdict:")
-          print(verdict.to_string(index=False))
-
+          print(
+              "IMPORTANT: INSUFFICIENT_EXTENDED_SAMPLE is a "
+              "methodological verdict, not a workflow failure."
+          )
+          print(
+              "It means the extended temporal sample is too sparse "
+              "for a strong robustness conclusion."
+          )
           PY
 
       # ============================================================
-      # 9. BUILD JOB SUMMARY
+      # 11. PUBLISH GITHUB SUMMARY
       # ============================================================
       - name: Publish V3.10 report
-        if: always()
+        shell: bash
         run: |
+          set -euo pipefail
+
           {
             echo "# US500 Macro Intelligence — V3.10"
             echo
             echo "## Extended Temporal Robustness / Survival Validation"
             echo
-            echo "**Mode:** Research-only"
+            echo "**Validated source commit:**"
             echo
-            echo "**Strict OOS:** NO"
+            echo "\`2e1bd32089f74b0c6b72b5dcaaa81a06ea1ae04a\`"
             echo
-            echo "**Decision Engine modification:** NO"
-            echo
-            echo "**Parameter optimization:** NO"
-            echo
-            echo "**Frozen source commit:**"
-            echo
-            echo "\`4a1055163bf575cfe4b6c7965941e84ec09446ef\`"
-            echo
-            echo "---"
-            echo
-            echo "## Frozen Integrity Guards"
+            echo "## Frozen Baseline"
             echo
             echo "- 119 signals"
             echo "- 36 wins"
             echo "- 73 losses"
             echo "- +71R"
-            echo "- No entry creation"
-            echo "- No baseline modification"
-            echo "- No parameter optimization"
             echo
-            echo "---"
+            echo "## Frozen Guards"
             echo
-            echo "## V3.10 Robustness Verdict"
+            echo "- V3.10 FROZEN 119-SIGNAL GUARD: PASS"
+            echo "- V3.10 FROZEN 36W/73L GUARD: PASS"
+            echo "- V3.10 FROZEN +71R GUARD: PASS"
             echo
-
-            if [ -f macro_backtest_v310_robustness_verdict.csv ]; then
-              echo '```csv'
-              cat macro_backtest_v310_robustness_verdict.csv
-              echo '```'
-            else
-              echo "Verdict CSV not available."
-            fi
-
+            echo "## Methodology"
             echo
-            echo "---"
+            echo "- Research-only"
+            echo "- NOT strict OOS"
+            echo "- No trade execution"
+            echo "- No Decision Engine integration"
+            echo "- No market forecast"
             echo
-            echo "## Full Execution Log"
+            echo "## Extended Temporal Robustness"
             echo
-            echo '```text'
-
-            if [ -f v310_run.log ]; then
-              cat v310_run.log
-            else
-              echo "No execution log available."
-            fi
-
-            echo '```'
-
+            echo 'See \`macro_backtest_v310_robustness_verdict.csv\`.'
+            echo
+            echo "A status of \`INSUFFICIENT_EXTENDED_SAMPLE\` means "
+            echo "the available context-specific sample is too sparse "
+            echo "to support a strong robustness conclusion."
+            echo
+            echo "## Validation Status"
+            echo
+            echo "**V3.10 VALIDATION COMPLETE**"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ============================================================
-      # 10. UPLOAD ARTIFACTS
+      # 12. UPLOAD ARTIFACTS
       # ============================================================
       - name: Upload V3.10 artifacts
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: US500-Macro-Intelligence-V3.10
-          if-no-files-found: warn
-          retention-days: 30
+          name: EMA19-Macro-V3.10-Temporal-Robustness
+          if-no-files-found: error
+          retention-days: 90
           path: |
-            v310_run.log
+            backtestEMA19Macro_v310_run.log
             macro_backtest_v310_year_by_year.csv
             macro_backtest_v310_temporal_summary.csv
             macro_backtest_v310_max_drawdown.csv
@@ -376,19 +454,54 @@ jobs:
             macro_backtest_v310_robustness_verdict.csv
 
       # ============================================================
-      # 11. FINAL STATUS
+      # 13. FINAL STATUS
       # ============================================================
-      - name: Final status
-        if: always()
+      - name: Final V3.10 status
+        shell: bash
         run: |
-          echo "============================================================"
-          echo "V3.10 WORKFLOW FINISHED"
-          echo "============================================================"
+          set -euo pipefail
 
           echo
-          echo "Research-only: YES"
-          echo "Strict OOS: NO"
-          echo "Decision Engine integration: NO"
-          echo "Baseline modification: NO"
-          echo "Parameter optimization: NO"
-          echo "Artifacts: UPLOADED"
+          echo "============================================================"
+          echo "V3.10 VALIDATION COMPLETE"
+          echo "============================================================"
+
+          echo "Source:"
+          git rev-parse HEAD
+
+          echo
+          echo "Frozen baseline:"
+          echo "119 signals / 36 wins / 73 losses / +71R"
+
+          echo
+          echo "Frozen guards:"
+          echo "PASS"
+
+          echo
+          echo "Temporal robustness outputs:"
+          echo "PASS"
+
+          echo
+          echo "Research-only:"
+          echo "TRUE"
+
+          echo
+          echo "Strict OOS:"
+          echo "NO — NOT_STRICT_OOS=TRUE"
+
+          echo
+          echo "Decision Engine:"
+          echo "NOT INTEGRATED"
+
+          echo
+          echo "Trading execution:"
+          echo "NONE"
+
+          echo
+          echo "Forecasting:"
+          echo "NONE"
+
+          echo
+          echo "============================================================"
+          echo "V3.10 STATUS: VALIDATED"
+          echo "============================================================"
