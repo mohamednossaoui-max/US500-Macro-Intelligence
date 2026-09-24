@@ -32,6 +32,7 @@ VERSION = "FINAL_END_TO_END_VALIDATION_V1"
 
 ARCHITECTURE_FILE = "FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md"
 
+
 # ---------------------------------------------------------------------
 # REQUIRED RESEARCH LAYERS
 # ---------------------------------------------------------------------
@@ -65,57 +66,70 @@ PRIMARY_PATTERNS = {
         r"economic.*research",
         r"economic.*intelligence",
     ],
+
     "Fed Intelligence": [
         r"fed.*intelligence",
         r"fed.*research",
     ],
+
     "Financial Stress": [
         r"financial[-_ ]stress.*research",
         r"financial[-_ ]stress.*intelligence",
     ],
+
     "COT Positioning": [
         r"cot.*positioning.*research",
         r"cot.*positioning",
     ],
+
     "AAII Sentiment": [
         r"aaii.*sentiment.*research",
         r"aaii.*sentiment",
     ],
+
     "VIX Sentiment": [
         r"vix.*sentiment.*research",
         r"vix.*sentiment",
     ],
+
     "Unified Sentiment": [
         r"sentiment.*engine.*research",
         r"sentiment[-_ ]engine",
     ],
+
     "Technical Intelligence": [
         r"technical.*intelligence.*research",
         r"technical[-_ ]intelligence",
     ],
+
     "Market Breadth": [
         r"market.*breadth.*research",
         r"market[-_ ]breadth.*analysis",
         r"breadth.*research",
     ],
+
     "Cross-Asset Intelligence": [
         r"cross[-_ ]asset.*research",
         r"cross[-_ ]asset.*intelligence",
     ],
+
     "Event / News Intelligence": [
         r"event[-_ ]news.*research",
         r"event[-_ ]news.*intelligence",
     ],
+
     "Earnings Intelligence": [
         r"earnings.*research",
         r"earnings.*intelligence",
         r"earnings.*contextual",
         r"earnings.*reaction",
     ],
+
     "Macro Context": [
         r"macro[-_ ]context",
         r"macro.*research",
     ],
+
     "Research Context": [
         r"research[-_ ]context",
     ],
@@ -131,8 +145,7 @@ DIAGNOSTIC_PATTERNS = [
     r"conflict",
     r"extreme",
     r"frequency",
-    r"event",
-    r"events",
+    r"events?",
     r"summary",
     r"membership",
     r"quality",
@@ -190,6 +203,7 @@ FORBIDDEN_FORECAST_COLUMNS = {
 
 @dataclass
 class CheckResult:
+
     check_id: str
     category: str
     layer: str
@@ -215,7 +229,12 @@ class CheckResult:
 # ---------------------------------------------------------------------
 
 def normalize_name(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-")
+
+    return re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        str(value).lower()
+    ).strip("-")
 
 
 def add_check(
@@ -228,6 +247,7 @@ def add_check(
     message: str,
     detail: str = "",
 ):
+
     results.append(
         CheckResult(
             check_id=check_id,
@@ -242,24 +262,46 @@ def add_check(
 
 
 def file_sha256(path: Path) -> str:
+
     h = hashlib.sha256()
 
     with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+
+        for chunk in iter(
+            lambda: f.read(1024 * 1024),
+            b""
+        ):
+
             h.update(chunk)
 
     return h.hexdigest()
 
 
-def read_csv_safe(path: Path) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+def read_csv_safe(
+    path: Path,
+) -> Tuple[
+    Optional[pd.DataFrame],
+    Optional[str],
+]:
+
     try:
-        df = pd.read_csv(path, low_memory=False)
+
+        df = pd.read_csv(
+            path,
+            low_memory=False,
+        )
+
         return df, None
+
     except Exception as exc:
+
         return None, str(exc)
 
 
-def parse_dates(series: pd.Series) -> pd.Series:
+def parse_dates(
+    series: pd.Series,
+) -> pd.Series:
+
     return pd.to_datetime(
         series,
         errors="coerce",
@@ -267,7 +309,10 @@ def parse_dates(series: pd.Series) -> pd.Series:
     )
 
 
-def bool_series(series: pd.Series) -> Optional[pd.Series]:
+def bool_series(
+    series: pd.Series,
+) -> Optional[pd.Series]:
+
     if series is None:
         return None
 
@@ -296,7 +341,10 @@ def bool_series(series: pd.Series) -> Optional[pd.Series]:
     return converted.astype(bool)
 
 
-def discover_csv_files(root: Path) -> List[Path]:
+def discover_csv_files(
+    root: Path,
+) -> List[Path]:
+
     if not root.exists():
         return []
 
@@ -309,7 +357,10 @@ def discover_csv_files(root: Path) -> List[Path]:
     )
 
 
-def discover_json_files(root: Path) -> List[Path]:
+def discover_json_files(
+    root: Path,
+) -> List[Path]:
+
     if not root.exists():
         return []
 
@@ -326,56 +377,125 @@ def discover_json_files(root: Path) -> List[Path]:
 # ARTIFACT CLASSIFICATION
 # ---------------------------------------------------------------------
 
-def is_diagnostic_name(name: str) -> bool:
+def is_diagnostic_name(
+    name: str,
+) -> bool:
+
     normalized = normalize_name(name)
 
     return any(
-        re.search(pattern, normalized)
+        re.search(
+            pattern,
+            normalized
+        )
         for pattern in DIAGNOSTIC_PATTERNS
     )
 
 
-def detect_primary_layer(path: Path) -> Optional[str]:
-    normalized = normalize_name(path.name)
+def detect_primary_layer(
+    path: Path,
+) -> Optional[str]:
+
+    normalized = normalize_name(
+        path.name
+    )
 
     for layer, patterns in PRIMARY_PATTERNS.items():
+
         for pattern in patterns:
-            if re.search(pattern, normalized):
+
+            if re.search(
+                pattern,
+                normalized
+            ):
+
                 return layer
 
     return None
 
 
-def classify_artifact(path: Path) -> Tuple[str, Optional[str]]:
+def classify_artifact(
+    path: Path,
+) -> Tuple[
+    str,
+    Optional[str],
+]:
+
     """
     Returns:
+
         (classification, layer)
 
     classification:
+
         PRIMARY
         SUPPORTING
         DIAGNOSTIC
         UNKNOWN
+
+    Classification is intentionally conservative.
+
+    A canonical Event / News research artifact must not be
+    downgraded simply because its filename contains the generic
+    word "event".
     """
 
-    name = normalize_name(path.name)
+    name = normalize_name(
+        path.name
+    )
 
-    layer = detect_primary_layer(path)
+    layer = detect_primary_layer(
+        path
+    )
 
-    if is_diagnostic_name(path.name):
-        # A file can contain a layer name while still being diagnostic.
-        return "DIAGNOSTIC", layer
+    # Event / News research files are PRIMARY.
+    if (
+        layer == "Event / News Intelligence"
+        and re.search(
+            r"event[-_ ]news[-_ ]research",
+            name,
+        )
+    ):
+
+        return (
+            "PRIMARY",
+            layer,
+        )
+
+    # Diagnostic artifacts are validation evidence.
+    if is_diagnostic_name(
+        path.name
+    ):
+
+        return (
+            "DIAGNOSTIC",
+            layer,
+        )
 
     if layer:
-        return "PRIMARY", layer
+
+        return (
+            "PRIMARY",
+            layer,
+        )
 
     if any(
-        re.search(pattern, name)
+        re.search(
+            pattern,
+            name
+        )
         for pattern in SUPPORTING_PATTERNS
     ):
-        return "SUPPORTING", None
 
-    return "UNKNOWN", None
+        return (
+            "SUPPORTING",
+            None,
+        )
+
+    return (
+        "UNKNOWN",
+        None,
+    )
 
 
 # ---------------------------------------------------------------------
@@ -388,15 +508,28 @@ def validate_basic_dataframe(
     results: List[CheckResult],
     strict: bool,
 ):
-    classification, layer = classify_artifact(path)
+
+    classification, layer = classify_artifact(
+        path
+    )
 
     if layer is None:
         layer = "Unclassified"
 
     name = path.name
 
+    # Diagnostic files are validation evidence, not canonical
+    # research datasets.
+    if classification == "DIAGNOSTIC":
+        return
+
     if df.empty:
-        if classification == "PRIMARY" and strict:
+
+        if (
+            classification == "PRIMARY"
+            and strict
+        ):
+
             add_check(
                 results,
                 "PRIMARY_NONEMPTY",
@@ -404,9 +537,14 @@ def validate_basic_dataframe(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name} is a PRIMARY artifact but contains zero rows.",
+                (
+                    f"{name} is a PRIMARY artifact "
+                    f"but contains zero rows."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 "NONEMPTY",
@@ -416,10 +554,13 @@ def validate_basic_dataframe(
                 "WARNING",
                 (
                     f"{name} contains zero rows; "
-                    f"artifact classification={classification}."
+                    f"artifact classification="
+                    f"{classification}."
                 ),
             )
+
     else:
+
         add_check(
             results,
             "NONEMPTY",
@@ -427,10 +568,14 @@ def validate_basic_dataframe(
             layer,
             "PASS",
             "INFO",
-            f"{name} contains {len(df)} data rows.",
+            (
+                f"{name} contains "
+                f"{len(df)} data rows."
+            ),
         )
 
     if len(df.columns) == 0:
+
         add_check(
             results,
             "SCHEMA_COLUMNS",
@@ -440,7 +585,9 @@ def validate_basic_dataframe(
             "ERROR",
             f"{name} contains no columns.",
         )
+
     else:
+
         add_check(
             results,
             "SCHEMA_COLUMNS",
@@ -448,22 +595,42 @@ def validate_basic_dataframe(
             layer,
             "PASS",
             "INFO",
-            f"{name} contains {len(df.columns)} columns.",
+            (
+                f"{name} contains "
+                f"{len(df.columns)} columns."
+            ),
         )
 
-    duplicate_rows = int(df.duplicated().sum())
+    duplicate_rows = int(
+        df.duplicated().sum()
+    )
 
     if duplicate_rows:
+
         add_check(
             results,
             "DUPLICATE_ROWS",
             "Data Integrity",
             layer,
-            "FAIL" if classification == "PRIMARY" else "REVIEW",
-            "ERROR" if classification == "PRIMARY" else "WARNING",
-            f"{name} contains {duplicate_rows} completely duplicated rows.",
+            (
+                "FAIL"
+                if classification == "PRIMARY"
+                else "REVIEW"
+            ),
+            (
+                "ERROR"
+                if classification == "PRIMARY"
+                else "WARNING"
+            ),
+            (
+                f"{name} contains "
+                f"{duplicate_rows} completely "
+                f"duplicated rows."
+            ),
         )
+
     else:
+
         add_check(
             results,
             "DUPLICATE_ROWS",
@@ -471,7 +638,10 @@ def validate_basic_dataframe(
             layer,
             "PASS",
             "INFO",
-            f"{name} contains no completely duplicated rows.",
+            (
+                f"{name} contains no completely "
+                f"duplicated rows."
+            ),
         )
 
 
@@ -501,23 +671,32 @@ def validate_dates(
     df: pd.DataFrame,
     results: List[CheckResult],
 ):
-    classification, layer = classify_artifact(path)
+
+    classification, layer = classify_artifact(
+        path
+    )
 
     if layer is None:
         layer = "Unclassified"
 
     for column in DATE_COLUMNS:
+
         if column not in df.columns:
             continue
 
         series = df[column]
 
-        # Empty values are allowed.
-        non_empty = series.notna() & (
-            series.astype(str).str.strip() != ""
+        non_empty = (
+            series.notna()
+            & (
+                series.astype(str)
+                .str.strip()
+                != ""
+            )
         )
 
         if not non_empty.any():
+
             add_check(
                 results,
                 "DATE_PARSE",
@@ -525,28 +704,47 @@ def validate_dates(
                 layer,
                 "REVIEW",
                 "WARNING",
-                f"{path.name}:{column} contains no populated values.",
+                (
+                    f"{path.name}:{column} "
+                    f"contains no populated values."
+                ),
             )
+
             continue
 
-        parsed = parse_dates(series[non_empty])
+        parsed = parse_dates(
+            series[non_empty]
+        )
 
-        invalid = int(parsed.isna().sum())
+        invalid = int(
+            parsed.isna().sum()
+        )
 
         if invalid:
+
             add_check(
                 results,
                 "DATE_PARSE",
                 "Temporal Integrity",
                 layer,
-                "FAIL" if classification == "PRIMARY" else "REVIEW",
-                "ERROR" if classification == "PRIMARY" else "WARNING",
+                (
+                    "FAIL"
+                    if classification == "PRIMARY"
+                    else "REVIEW"
+                ),
+                (
+                    "ERROR"
+                    if classification == "PRIMARY"
+                    else "WARNING"
+                ),
                 (
                     f"{path.name}:{column} contains "
                     f"{invalid} populated invalid dates."
                 ),
             )
+
         else:
+
             add_check(
                 results,
                 "DATE_PARSE",
@@ -554,12 +752,15 @@ def validate_dates(
                 layer,
                 "PASS",
                 "INFO",
-                f"{path.name}:{column} populated dates parsed successfully.",
+                (
+                    f"{path.name}:{column} populated "
+                    f"dates parsed successfully."
+                ),
             )
 
 
 # ---------------------------------------------------------------------
-# PIT VALIDATION
+# POINT-IN-TIME VALIDATION
 # ---------------------------------------------------------------------
 
 def validate_pit(
@@ -567,17 +768,28 @@ def validate_pit(
     df: pd.DataFrame,
     results: List[CheckResult],
 ):
-    classification, layer = classify_artifact(path)
+
+    classification, layer = classify_artifact(
+        path
+    )
 
     if layer is None:
         layer = "Unclassified"
 
     name = path.name
 
+    # -------------------------------------------------------------
+    # PIT FLAG
+    # -------------------------------------------------------------
+
     if "point_in_time_safe" in df.columns:
-        values = bool_series(df["point_in_time_safe"])
+
+        values = bool_series(
+            df["point_in_time_safe"]
+        )
 
         if values is None:
+
             add_check(
                 results,
                 "PIT_FLAG_PARSE",
@@ -585,9 +797,14 @@ def validate_pit(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name}:point_in_time_safe contains invalid boolean values.",
+                (
+                    f"{name}:point_in_time_safe "
+                    f"contains invalid boolean values."
+                ),
             )
+
         elif bool(values.all()):
+
             add_check(
                 results,
                 "PIT_FLAG",
@@ -595,10 +812,17 @@ def validate_pit(
                 layer,
                 "PASS",
                 "INFO",
-                f"{name}:point_in_time_safe is TRUE for all rows.",
+                (
+                    f"{name}:point_in_time_safe "
+                    f"is TRUE for all rows."
+                ),
             )
+
         else:
-            bad = int((~values).sum())
+
+            bad = int(
+                (~values).sum()
+            )
 
             add_check(
                 results,
@@ -607,18 +831,30 @@ def validate_pit(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name}:point_in_time_safe is FALSE for {bad} rows.",
+                (
+                    f"{name}:point_in_time_safe "
+                    f"is FALSE for {bad} rows."
+                ),
             )
 
-    observation_candidates = [
+    # -------------------------------------------------------------
+    # MASTER PIT RULE
+    #
+    # availability_date <= asof_date
+    #
+    # DO NOT compare availability_date to observation_date.
+    #
+    # Observation date and release/availability date can legitimately
+    # be different. A later release after an observation date is not
+    # automatically look-ahead.
+    # -------------------------------------------------------------
+
+    asof_candidates = [
         c
         for c in [
-            "observation_date",
             "asof_date",
             "context_date",
-            "source_date",
-            "event_date",
-            "reported_date",
+            "sentiment_asof_date",
         ]
         if c in df.columns
     ]
@@ -634,18 +870,32 @@ def validate_pit(
         if c in df.columns
     ]
 
-    if not observation_candidates or not availability_candidates:
+    if (
+        not asof_candidates
+        or not availability_candidates
+    ):
+
         return
 
-    obs_col = observation_candidates[0]
-    obs = parse_dates(df[obs_col])
+    asof_col = asof_candidates[0]
+
+    asof = parse_dates(
+        df[asof_col]
+    )
 
     for avail_col in availability_candidates:
-        avail = parse_dates(df[avail_col])
 
-        valid = obs.notna() & avail.notna()
+        avail = parse_dates(
+            df[avail_col]
+        )
+
+        valid = (
+            asof.notna()
+            & avail.notna()
+        )
 
         if not valid.any():
+
             add_check(
                 results,
                 "PIT_DATE_COMPARISON",
@@ -654,28 +904,23 @@ def validate_pit(
                 "REVIEW",
                 "WARNING",
                 (
-                    f"{name}: no populated date pairs available for "
-                    f"{obs_col}/{avail_col}."
+                    f"{name}: no populated date pairs "
+                    f"available for "
+                    f"{avail_col}/{asof_col}."
                 ),
             )
+
             continue
 
-        # IMPORTANT:
-        # Availability is allowed to be equal to observation date.
-        # The architecture master rule is:
-        #
-        # availability_date <= asof_date
-        #
-        # Therefore this check only rejects availability after
-        # the relevant as-of/observation date.
         bad = int(
             (
                 avail[valid]
-                > obs[valid]
+                > asof[valid]
             ).sum()
         )
 
         if bad:
+
             add_check(
                 results,
                 "PIT_DATE_COMPARISON",
@@ -684,11 +929,13 @@ def validate_pit(
                 "FAIL",
                 "ERROR",
                 (
-                    f"{name}:{avail_col} is later than {obs_col} "
-                    f"for {bad} rows."
+                    f"{name}:{avail_col} is later than "
+                    f"{asof_col} for {bad} rows."
                 ),
             )
+
         else:
+
             add_check(
                 results,
                 "PIT_DATE_COMPARISON",
@@ -698,7 +945,7 @@ def validate_pit(
                 "INFO",
                 (
                     f"{name}:{avail_col} satisfies "
-                    f"{avail_col} <= {obs_col}."
+                    f"{avail_col} <= {asof_col}."
                 ),
             )
 
@@ -712,7 +959,10 @@ def validate_research_boundaries(
     df: pd.DataFrame,
     results: List[CheckResult],
 ):
-    classification, layer = classify_artifact(path)
+
+    classification, layer = classify_artifact(
+        path
+    )
 
     if layer is None:
         layer = "Unclassified"
@@ -720,9 +970,16 @@ def validate_research_boundaries(
     name = path.name
 
     if "research_only" in df.columns:
-        values = bool_series(df["research_only"])
 
-        if values is None or not bool(values.all()):
+        values = bool_series(
+            df["research_only"]
+        )
+
+        if (
+            values is None
+            or not bool(values.all())
+        ):
+
             add_check(
                 results,
                 "RESEARCH_ONLY",
@@ -730,9 +987,14 @@ def validate_research_boundaries(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name}:research_only is not TRUE for every row.",
+                (
+                    f"{name}:research_only is not "
+                    f"TRUE for every row."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 "RESEARCH_ONLY",
@@ -740,7 +1002,10 @@ def validate_research_boundaries(
                 layer,
                 "PASS",
                 "INFO",
-                f"{name}:research_only is TRUE for all rows.",
+                (
+                    f"{name}:research_only is TRUE "
+                    f"for all rows."
+                ),
             )
 
     for column in [
@@ -748,13 +1013,18 @@ def validate_research_boundaries(
         "trading_signal_generated",
         "forecast_generated",
         "unified_decision_generated",
+        "trade_execution",
     ]:
+
         if column not in df.columns:
             continue
 
-        values = bool_series(df[column])
+        values = bool_series(
+            df[column]
+        )
 
         if values is None:
+
             add_check(
                 results,
                 f"BOUNDARY_{column.upper()}",
@@ -762,9 +1032,14 @@ def validate_research_boundaries(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name}:{column} contains invalid boolean values.",
+                (
+                    f"{name}:{column} contains "
+                    f"invalid boolean values."
+                ),
             )
+
         elif bool(values.any()):
+
             add_check(
                 results,
                 f"BOUNDARY_{column.upper()}",
@@ -772,9 +1047,14 @@ def validate_research_boundaries(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{name}:{column} is TRUE in some rows.",
+                (
+                    f"{name}:{column} is TRUE "
+                    f"in some rows."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 f"BOUNDARY_{column.upper()}",
@@ -782,16 +1062,21 @@ def validate_research_boundaries(
                 layer,
                 "PASS",
                 "INFO",
-                f"{name}:{column} is FALSE for all rows.",
+                (
+                    f"{name}:{column} is FALSE "
+                    f"for all rows."
+                ),
             )
 
     forbidden_execution = [
         c
         for c in df.columns
-        if c.lower() in FORBIDDEN_EXECUTION_COLUMNS
+        if c.lower()
+        in FORBIDDEN_EXECUTION_COLUMNS
     ]
 
     if forbidden_execution:
+
         add_check(
             results,
             "NO_EXECUTION_FIELDS",
@@ -800,11 +1085,14 @@ def validate_research_boundaries(
             "FAIL",
             "ERROR",
             (
-                f"{name} contains explicit execution fields: "
+                f"{name} contains explicit execution "
+                f"fields: "
                 + ", ".join(forbidden_execution)
             ),
         )
+
     else:
+
         add_check(
             results,
             "NO_EXECUTION_FIELDS",
@@ -812,16 +1100,21 @@ def validate_research_boundaries(
             layer,
             "PASS",
             "INFO",
-            f"{name} contains no explicit execution fields.",
+            (
+                f"{name} contains no explicit "
+                f"execution fields."
+            ),
         )
 
     forbidden_forecast = [
         c
         for c in df.columns
-        if c.lower() in FORBIDDEN_FORECAST_COLUMNS
+        if c.lower()
+        in FORBIDDEN_FORECAST_COLUMNS
     ]
 
     if forbidden_forecast:
+
         add_check(
             results,
             "NO_FORECAST_FIELDS",
@@ -830,11 +1123,14 @@ def validate_research_boundaries(
             "FAIL",
             "ERROR",
             (
-                f"{name} contains explicit forecast fields: "
+                f"{name} contains explicit forecast "
+                f"fields: "
                 + ", ".join(forbidden_forecast)
             ),
         )
+
     else:
+
         add_check(
             results,
             "NO_FORECAST_FIELDS",
@@ -842,7 +1138,10 @@ def validate_research_boundaries(
             layer,
             "PASS",
             "INFO",
-            f"{name} contains no explicit forecast fields.",
+            (
+                f"{name} contains no explicit "
+                f"forecast fields."
+            ),
         )
 
 
@@ -855,7 +1154,10 @@ def validate_record_identity(
     df: pd.DataFrame,
     results: List[CheckResult],
 ):
-    classification, layer = classify_artifact(path)
+
+    classification, layer = classify_artifact(
+        path
+    )
 
     if layer is None:
         layer = "Unclassified"
@@ -877,6 +1179,7 @@ def validate_record_identity(
     ]
 
     if not id_candidates:
+
         add_check(
             results,
             "RECORD_ID",
@@ -884,15 +1187,26 @@ def validate_record_identity(
             layer,
             "REVIEW",
             "WARNING",
-            f"{path.name} has no recognized record identity field.",
+            (
+                f"{path.name} has no recognized "
+                f"record identity field."
+            ),
         )
+
         return
 
     for column in id_candidates:
-        nulls = int(df[column].isna().sum())
-        duplicates = int(df[column].duplicated().sum())
+
+        nulls = int(
+            df[column].isna().sum()
+        )
+
+        duplicates = int(
+            df[column].duplicated().sum()
+        )
 
         if nulls:
+
             add_check(
                 results,
                 "RECORD_ID_NULL",
@@ -900,9 +1214,14 @@ def validate_record_identity(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"{path.name}:{column} contains {nulls} null IDs.",
+                (
+                    f"{path.name}:{column} contains "
+                    f"{nulls} null IDs."
+                ),
             )
+
         elif duplicates:
+
             add_check(
                 results,
                 "RECORD_ID_DUPLICATE",
@@ -915,7 +1234,9 @@ def validate_record_identity(
                     f"{duplicates} duplicate IDs."
                 ),
             )
+
         else:
+
             add_check(
                 results,
                 "RECORD_ID",
@@ -923,7 +1244,10 @@ def validate_record_identity(
                 layer,
                 "PASS",
                 "INFO",
-                f"{path.name}:{column} is non-null and unique.",
+                (
+                    f"{path.name}:{column} is non-null "
+                    f"and unique."
+                ),
             )
 
 
@@ -936,6 +1260,7 @@ def validate_final_context(
     df: pd.DataFrame,
     results: List[CheckResult],
 ):
+
     layer = "Research Context"
 
     required = [
@@ -956,6 +1281,7 @@ def validate_final_context(
     ]
 
     if missing:
+
         add_check(
             results,
             "CANONICAL_CONTEXT_SCHEMA",
@@ -963,9 +1289,13 @@ def validate_final_context(
             layer,
             "FAIL",
             "ERROR",
-            "Canonical Research Context is missing required columns.",
+            (
+                "Canonical Research Context is missing "
+                "required columns."
+            ),
             ", ".join(missing),
         )
+
         return
 
     add_check(
@@ -975,12 +1305,18 @@ def validate_final_context(
         layer,
         "PASS",
         "INFO",
-        "Canonical Research Context required control schema is present.",
+        (
+            "Canonical Research Context required "
+            "control schema is present."
+        ),
     )
 
-    dates = parse_dates(df["context_date"])
+    dates = parse_dates(
+        df["context_date"]
+    )
 
     if dates.isna().any():
+
         add_check(
             results,
             "CONTEXT_DATE_VALID",
@@ -988,10 +1324,16 @@ def validate_final_context(
             layer,
             "FAIL",
             "ERROR",
-            "Canonical context_date contains invalid dates.",
+            (
+                "Canonical context_date contains "
+                "invalid dates."
+            ),
         )
+
     else:
+
         if not dates.is_monotonic_increasing:
+
             add_check(
                 results,
                 "CONTEXT_DATE_ORDER",
@@ -999,9 +1341,14 @@ def validate_final_context(
                 layer,
                 "FAIL",
                 "ERROR",
-                "Canonical context_date is not monotonically increasing.",
+                (
+                    "Canonical context_date is not "
+                    "monotonically increasing."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 "CONTEXT_DATE_ORDER",
@@ -1009,12 +1356,18 @@ def validate_final_context(
                 layer,
                 "PASS",
                 "INFO",
-                "Canonical context_date is monotonically increasing.",
+                (
+                    "Canonical context_date is "
+                    "monotonically increasing."
+                ),
             )
 
-        duplicates = int(dates.duplicated().sum())
+        duplicates = int(
+            dates.duplicated().sum()
+        )
 
         if duplicates:
+
             add_check(
                 results,
                 "CONTEXT_DATE_UNIQUE",
@@ -1022,9 +1375,14 @@ def validate_final_context(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"Canonical context_date has {duplicates} duplicates.",
+                (
+                    f"Canonical context_date has "
+                    f"{duplicates} duplicates."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 "CONTEXT_DATE_UNIQUE",
@@ -1032,16 +1390,25 @@ def validate_final_context(
                 layer,
                 "PASS",
                 "INFO",
-                "Canonical context_date is unique.",
+                (
+                    "Canonical context_date is unique."
+                ),
             )
 
     for column in [
         "point_in_time_safe",
         "research_only",
     ]:
-        values = bool_series(df[column])
 
-        if values is None or not bool(values.all()):
+        values = bool_series(
+            df[column]
+        )
+
+        if (
+            values is None
+            or not bool(values.all())
+        ):
+
             add_check(
                 results,
                 f"CANONICAL_{column.upper()}",
@@ -1049,9 +1416,14 @@ def validate_final_context(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"Canonical {column} is not TRUE for all rows.",
+                (
+                    f"Canonical {column} is not TRUE "
+                    f"for all rows."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 f"CANONICAL_{column.upper()}",
@@ -1059,7 +1431,10 @@ def validate_final_context(
                 layer,
                 "PASS",
                 "INFO",
-                f"Canonical {column} is TRUE for all rows.",
+                (
+                    f"Canonical {column} is TRUE "
+                    f"for all rows."
+                ),
             )
 
     for column in [
@@ -1068,9 +1443,16 @@ def validate_final_context(
         "forecast_generated",
         "unified_decision_generated",
     ]:
-        values = bool_series(df[column])
 
-        if values is None or bool(values.any()):
+        values = bool_series(
+            df[column]
+        )
+
+        if (
+            values is None
+            or bool(values.any())
+        ):
+
             add_check(
                 results,
                 f"CANONICAL_{column.upper()}",
@@ -1078,9 +1460,14 @@ def validate_final_context(
                 layer,
                 "FAIL",
                 "ERROR",
-                f"Canonical {column} contains TRUE/invalid values.",
+                (
+                    f"Canonical {column} contains "
+                    f"TRUE/invalid values."
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 f"CANONICAL_{column.upper()}",
@@ -1088,7 +1475,10 @@ def validate_final_context(
                 layer,
                 "PASS",
                 "INFO",
-                f"Canonical {column} is FALSE for all rows.",
+                (
+                    f"Canonical {column} is FALSE "
+                    f"for all rows."
+                ),
             )
 
     counts = pd.to_numeric(
@@ -1097,6 +1487,7 @@ def validate_final_context(
     )
 
     if counts.isna().any():
+
         add_check(
             results,
             "AVAILABLE_LAYER_COUNT",
@@ -1104,9 +1495,14 @@ def validate_final_context(
             layer,
             "FAIL",
             "ERROR",
-            "available_layer_count contains non-numeric values.",
+            (
+                "available_layer_count contains "
+                "non-numeric values."
+            ),
         )
+
     elif (counts < 0).any():
+
         add_check(
             results,
             "AVAILABLE_LAYER_COUNT",
@@ -1114,9 +1510,14 @@ def validate_final_context(
             layer,
             "FAIL",
             "ERROR",
-            "available_layer_count contains negative values.",
+            (
+                "available_layer_count contains "
+                "negative values."
+            ),
         )
+
     else:
+
         add_check(
             results,
             "AVAILABLE_LAYER_COUNT",
@@ -1124,7 +1525,10 @@ def validate_final_context(
             layer,
             "PASS",
             "INFO",
-            "available_layer_count is numerically valid.",
+            (
+                "available_layer_count is "
+                "numerically valid."
+            ),
         )
 
 
@@ -1136,9 +1540,14 @@ def validate_architecture_document(
     repo_root: Path,
     results: List[CheckResult],
 ):
-    path = repo_root / ARCHITECTURE_FILE
+
+    path = (
+        repo_root
+        / ARCHITECTURE_FILE
+    )
 
     if not path.exists():
+
         add_check(
             results,
             "ARCHITECTURE_DOCUMENT",
@@ -1148,6 +1557,7 @@ def validate_architecture_document(
             "ERROR",
             f"{ARCHITECTURE_FILE} is missing.",
         )
+
         return
 
     content = path.read_text(
@@ -1156,44 +1566,50 @@ def validate_architecture_document(
     )
 
     required_groups = {
+
         "research_only": [
             "research_only",
         ],
+
         "pit": [
             "availability_date",
             "point_in_time_safe",
         ],
+
         "decision_boundary": [
             "decision_engine_ready",
             "trading_signal_generated",
             "forecast_generated",
             "unified_decision_generated",
         ],
+
         "conflict_policy": [
             "CONFLICTING_CONTEXT",
             "MIXED_CONTEXT",
             "CROSS_LAYER_DIVERGENCE",
         ],
-        "decision_engine_state": [
-            "Decision Engine NOT IMPLEMENTED",
-            "Research-only boundary ACTIVE",
+
+        "architecture_state": [
+            "Research Mode: ACTIVE",
+            "Decision Engine: NOT IMPLEMENTED",
+            "Trade Execution: NOT IMPLEMENTED",
         ],
     }
 
     missing = []
 
     for group, phrases in required_groups.items():
-        if not all(
-            phrase in content
-            for phrase in phrases
-        ):
-            missing.extend(
-                f"{group}:{phrase}"
-                for phrase in phrases
-                if phrase not in content
-            )
+
+        for phrase in phrases:
+
+            if phrase not in content:
+
+                missing.append(
+                    f"{group}:{phrase}"
+                )
 
     if missing:
+
         add_check(
             results,
             "ARCHITECTURE_CONTRACT",
@@ -1201,10 +1617,15 @@ def validate_architecture_document(
             "Architecture",
             "FAIL",
             "ERROR",
-            "Architecture document is missing required contract elements.",
+            (
+                "Architecture document is missing "
+                "required contract elements."
+            ),
             ", ".join(missing),
         )
+
     else:
+
         add_check(
             results,
             "ARCHITECTURE_CONTRACT",
@@ -1212,7 +1633,10 @@ def validate_architecture_document(
             "Architecture",
             "PASS",
             "INFO",
-            "Architecture contract contains required research-only boundaries.",
+            (
+                "Architecture contract contains "
+                "required research-only boundaries."
+            ),
         )
 
 
@@ -1221,22 +1645,40 @@ def validate_architecture_document(
 # ---------------------------------------------------------------------
 
 def classify_layers(
-    csv_files: List[Path],
+    artifact_files: List[Path],
 ):
-    mapping: Dict[str, Dict[str, List[Path]]] = {
+
+    mapping: Dict[
+        str,
+        Dict[
+            str,
+            List[Path]
+        ]
+    ] = {
+
         layer: {
             "PRIMARY": [],
             "SUPPORTING": [],
             "DIAGNOSTIC": [],
         }
+
         for layer in REQUIRED_LAYERS
     }
 
-    for path in csv_files:
-        classification, layer = classify_artifact(path)
+    for path in artifact_files:
 
-        if layer in mapping and classification in mapping[layer]:
-            mapping[layer][classification].append(path)
+        classification, layer = classify_artifact(
+            path
+        )
+
+        if (
+            layer in mapping
+            and classification in mapping[layer]
+        ):
+
+            mapping[layer][classification].append(
+                path
+            )
 
     return mapping
 
@@ -1245,12 +1687,17 @@ def validate_layer_coverage(
     mapping,
     results: List[CheckResult],
 ):
+
     for layer in REQUIRED_LAYERS:
+
         primary = mapping[layer]["PRIMARY"]
+
         supporting = mapping[layer]["SUPPORTING"]
+
         diagnostic = mapping[layer]["DIAGNOSTIC"]
 
         if primary:
+
             add_check(
                 results,
                 "LAYER_COVERAGE",
@@ -1259,11 +1706,13 @@ def validate_layer_coverage(
                 "PASS",
                 "INFO",
                 (
-                    f"PRIMARY artifact coverage confirmed: "
-                    f"{len(primary)} file(s)."
+                    f"PRIMARY artifact coverage "
+                    f"confirmed: {len(primary)} file(s)."
                 ),
             )
+
         elif supporting:
+
             add_check(
                 results,
                 "LAYER_COVERAGE",
@@ -1272,12 +1721,18 @@ def validate_layer_coverage(
                 "REVIEW",
                 "WARNING",
                 (
-                    "Supporting artifact(s) were found but no "
-                    "canonical primary artifact was automatically identified."
+                    "Supporting artifact(s) were found "
+                    "but no canonical primary artifact "
+                    "was automatically identified."
                 ),
-                ", ".join(p.name for p in supporting),
+                ", ".join(
+                    p.name
+                    for p in supporting
+                ),
             )
+
         elif diagnostic:
+
             add_check(
                 results,
                 "LAYER_COVERAGE",
@@ -1286,11 +1741,17 @@ def validate_layer_coverage(
                 "REVIEW",
                 "WARNING",
                 (
-                    "Only diagnostic artifacts were found for this layer."
+                    "Only diagnostic artifacts were "
+                    "found for this layer."
                 ),
-                ", ".join(p.name for p in diagnostic),
+                ", ".join(
+                    p.name
+                    for p in diagnostic
+                ),
             )
+
         else:
+
             add_check(
                 results,
                 "LAYER_COVERAGE",
@@ -1298,7 +1759,10 @@ def validate_layer_coverage(
                 layer,
                 "FAIL",
                 "ERROR",
-                "No artifact was found for this required research layer.",
+                (
+                    "No artifact was found for this "
+                    "required research layer."
+                ),
             )
 
 
@@ -1309,34 +1773,57 @@ def validate_layer_coverage(
 def find_research_context(
     csv_files: List[Path],
 ) -> Optional[Path]:
+
     candidates = []
 
     for path in csv_files:
-        name = normalize_name(path.name)
+
+        name = normalize_name(
+            path.name
+        )
+
+        parent_name = normalize_name(
+            str(path.parent)
+        )
 
         if (
             "research-context" in name
-            or "research-context" in normalize_name(str(path.parent))
+            or "research-context" in parent_name
         ):
-            classification, _ = classify_artifact(path)
+
+            classification, _ = classify_artifact(
+                path
+            )
 
             if classification == "PRIMARY":
-                candidates.append(path)
+
+                candidates.append(
+                    path
+                )
 
     if not candidates:
         return None
 
-    # Prefer files with canonical context columns.
     for candidate in candidates:
-        df, error = read_csv_safe(candidate)
 
-        if error or df is None:
+        df, error = read_csv_safe(
+            candidate
+        )
+
+        if (
+            error
+            or df is None
+        ):
+
             continue
 
         if {
             "context_date",
             "available_layer_count",
-        }.issubset(df.columns):
+        }.issubset(
+            df.columns
+        ):
+
             return candidate
 
     return candidates[0]
@@ -1346,9 +1833,13 @@ def validate_cross_layer_context(
     csv_files: List[Path],
     results: List[CheckResult],
 ):
-    selected = find_research_context(csv_files)
+
+    selected = find_research_context(
+        csv_files
+    )
 
     if selected is None:
+
         add_check(
             results,
             "CANONICAL_CONTEXT_DISCOVERY",
@@ -1356,13 +1847,23 @@ def validate_cross_layer_context(
             "Research Context",
             "FAIL",
             "ERROR",
-            "No PRIMARY Research Context CSV was discovered.",
+            (
+                "No PRIMARY Research Context CSV "
+                "was discovered."
+            ),
         )
+
         return
 
-    df, error = read_csv_safe(selected)
+    df, error = read_csv_safe(
+        selected
+    )
 
-    if error or df is None:
+    if (
+        error
+        or df is None
+    ):
+
         add_check(
             results,
             "CANONICAL_CONTEXT_READ",
@@ -1370,8 +1871,12 @@ def validate_cross_layer_context(
             "Research Context",
             "FAIL",
             "ERROR",
-            f"Unable to read {selected.name}: {error}",
+            (
+                f"Unable to read "
+                f"{selected.name}: {error}"
+            ),
         )
+
         return
 
     validate_final_context(
@@ -1392,10 +1897,15 @@ def validate_cross_layer_context(
     ]
 
     if layer_flags:
+
         for column in layer_flags:
-            values = bool_series(df[column])
+
+            values = bool_series(
+                df[column]
+            )
 
             if values is None:
+
                 add_check(
                     results,
                     "CONTEXT_LAYER_FLAG",
@@ -1405,10 +1915,12 @@ def validate_cross_layer_context(
                     "ERROR",
                     (
                         f"{selected.name}:{column} "
-                        "contains invalid boolean values."
+                        f"contains invalid boolean values."
                     ),
                 )
+
             else:
+
                 add_check(
                     results,
                     "CONTEXT_LAYER_FLAG",
@@ -1416,9 +1928,14 @@ def validate_cross_layer_context(
                     "Research Context",
                     "PASS",
                     "INFO",
-                    f"{selected.name}:{column} is boolean-consistent.",
+                    (
+                        f"{selected.name}:{column} "
+                        f"is boolean-consistent."
+                    ),
                 )
+
     else:
+
         add_check(
             results,
             "CONTEXT_LAYER_FLAGS",
@@ -1426,8 +1943,140 @@ def validate_cross_layer_context(
             "Research Context",
             "REVIEW",
             "WARNING",
-            "No recognizable layer availability flags were found.",
+            (
+                "No recognizable layer availability "
+                "flags were found."
+            ),
         )
+
+
+# ---------------------------------------------------------------------
+# JSON ARTIFACT VALIDATION
+# ---------------------------------------------------------------------
+
+def validate_json_artifact(
+    path: Path,
+    results: List[CheckResult],
+):
+
+    classification, layer = classify_artifact(
+        path
+    )
+
+    if layer is None:
+        layer = "Unclassified"
+
+    try:
+
+        content = path.read_text(
+            encoding="utf-8",
+            errors="strict",
+        )
+
+        data = json.loads(
+            content
+        )
+
+    except Exception as exc:
+
+        status = (
+            "FAIL"
+            if classification == "PRIMARY"
+            else "REVIEW"
+        )
+
+        severity = (
+            "ERROR"
+            if status == "FAIL"
+            else "WARNING"
+        )
+
+        add_check(
+            results,
+            "JSON_READ",
+            "Artifact Integrity",
+            layer,
+            status,
+            severity,
+            (
+                f"Unable to parse "
+                f"{path.name}: {exc}"
+            ),
+        )
+
+        return
+
+    # Diagnostic JSON is not a canonical dataset.
+    if classification == "DIAGNOSTIC":
+        return
+
+    add_check(
+        results,
+        "JSON_READ",
+        "Artifact Integrity",
+        layer,
+        "PASS",
+        "INFO",
+        (
+            f"{path.name} is valid JSON."
+        ),
+    )
+
+    # Validate explicit research-boundary fields when present.
+    if isinstance(data, dict):
+
+        expected = {
+
+            "research_only": True,
+
+            "decision_engine_ready": False,
+
+            "trading_signal_generated": False,
+
+            "forecast_generated": False,
+
+            "unified_decision_generated": False,
+
+            "trade_execution": False,
+        }
+
+        for field, expected_value in expected.items():
+
+            if field not in data:
+                continue
+
+            value = data[field]
+
+            if value != expected_value:
+
+                add_check(
+                    results,
+                    f"JSON_BOUNDARY_{field.upper()}",
+                    "Research Boundary",
+                    layer,
+                    "FAIL",
+                    "ERROR",
+                    (
+                        f"{path.name}:{field} violates "
+                        f"the expected research-only "
+                        f"boundary."
+                    ),
+                )
+
+            else:
+
+                add_check(
+                    results,
+                    f"JSON_BOUNDARY_{field.upper()}",
+                    "Research Boundary",
+                    layer,
+                    "PASS",
+                    "INFO",
+                    (
+                        f"{path.name}:{field} has the "
+                        f"expected value."
+                    ),
+                )
 
 
 # ---------------------------------------------------------------------
@@ -1438,10 +2087,16 @@ def build_manifest(
     csv_files: List[Path],
     json_files: List[Path],
 ) -> pd.DataFrame:
+
     rows = []
 
-    for path in csv_files + json_files:
+    for path in (
+        csv_files
+        + json_files
+    ):
+
         try:
+
             stat = path.stat()
 
             rows.append(
@@ -1451,12 +2106,16 @@ def build_manifest(
                     "extension": path.suffix.lower(),
                     "size_bytes": stat.st_size,
                     "sha256": file_sha256(path),
-                    "detected_layer": detect_primary_layer(path) or "",
-                    "classification": classify_artifact(path)[0],
+                    "detected_layer":
+                        detect_primary_layer(path)
+                        or "",
+                    "classification":
+                        classify_artifact(path)[0],
                 }
             )
 
         except Exception:
+
             rows.append(
                 {
                     "file": str(path),
@@ -1469,14 +2128,19 @@ def build_manifest(
                 }
             )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows
+    )
 
 
 # ---------------------------------------------------------------------
 # OVERALL STATUS
 # ---------------------------------------------------------------------
 
-def overall_status(results: List[CheckResult]) -> str:
+def overall_status(
+    results: List[CheckResult],
+) -> str:
+
     statuses = [
         r.status
         for r in results
@@ -1516,9 +2180,17 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    repo_root = Path(args.repo_root).resolve()
-    artifacts_dir = Path(args.artifacts_dir).resolve()
-    output_dir = Path(args.output_dir).resolve()
+    repo_root = Path(
+        args.repo_root
+    ).resolve()
+
+    artifacts_dir = Path(
+        args.artifacts_dir
+    ).resolve()
+
+    output_dir = Path(
+        args.output_dir
+    ).resolve()
 
     output_dir.mkdir(
         parents=True,
@@ -1528,22 +2200,44 @@ def main() -> int:
     results: List[CheckResult] = []
 
     print("=" * 78)
-    print("US500 MACRO INTELLIGENCE")
-    print("FINAL END-TO-END VALIDATION V1")
-    print("ARTIFACT-AWARE / PAGINATION-SAFE")
+    print(
+        "US500 MACRO INTELLIGENCE"
+    )
+    print(
+        "FINAL END-TO-END VALIDATION V1"
+    )
+    print(
+        "ARTIFACT-AWARE / PAGINATION-SAFE"
+    )
     print("=" * 78)
     print()
 
-    print(f"Repository root : {repo_root}")
-    print(f"Artifacts dir   : {artifacts_dir}")
-    print(f"Output dir      : {output_dir}")
+    print(
+        f"Repository root : {repo_root}"
+    )
+
+    print(
+        f"Artifacts dir   : {artifacts_dir}"
+    )
+
+    print(
+        f"Output dir      : {output_dir}"
+    )
+
     print()
 
-    # Architecture
+    # -------------------------------------------------------------
+    # ARCHITECTURE
+    # -------------------------------------------------------------
+
     validate_architecture_document(
         repo_root,
         results,
     )
+
+    # -------------------------------------------------------------
+    # DISCOVER ARTIFACTS
+    # -------------------------------------------------------------
 
     csv_files = discover_csv_files(
         artifacts_dir
@@ -1554,16 +2248,21 @@ def main() -> int:
     )
 
     print(
-        f"CSV artifacts discovered : {len(csv_files)}"
+        f"CSV artifacts discovered : "
+        f"{len(csv_files)}"
     )
 
     print(
-        f"JSON artifacts discovered: {len(json_files)}"
+        f"JSON artifacts discovered: "
+        f"{len(json_files)}"
     )
 
     print()
 
-    if not csv_files and not json_files:
+    if (
+        not csv_files
+        and not json_files
+    ):
 
         add_check(
             results,
@@ -1572,7 +2271,10 @@ def main() -> int:
             "Global",
             "FAIL",
             "ERROR",
-            "No CSV or JSON artifacts were discovered.",
+            (
+                "No CSV or JSON artifacts "
+                "were discovered."
+            ),
         )
 
     else:
@@ -1585,41 +2287,62 @@ def main() -> int:
             "PASS",
             "INFO",
             (
-                f"Discovered {len(csv_files)} CSV and "
-                f"{len(json_files)} JSON artifacts."
+                f"Discovered {len(csv_files)} CSV "
+                f"and {len(json_files)} JSON artifacts."
             ),
         )
 
-    # Layer classification
-    mapping = classify_layers(
+    # -------------------------------------------------------------
+    # LAYER CLASSIFICATION
+    # -------------------------------------------------------------
+
+    all_artifact_files = (
         csv_files
+        + json_files
+    )
+
+    mapping = classify_layers(
+        all_artifact_files
     )
 
     print("=" * 78)
-    print("RESEARCH LAYER COVERAGE")
+    print(
+        "RESEARCH LAYER COVERAGE"
+    )
     print("=" * 78)
 
     for layer in REQUIRED_LAYERS:
 
         primary = mapping[layer]["PRIMARY"]
+
         supporting = mapping[layer]["SUPPORTING"]
+
         diagnostic = mapping[layer]["DIAGNOSTIC"]
 
         print()
+
         print(layer)
+
         print(
-            f"  PRIMARY    : {len(primary)}"
+            f"  PRIMARY    : "
+            f"{len(primary)}"
         )
+
         print(
-            f"  SUPPORTING : {len(supporting)}"
+            f"  SUPPORTING : "
+            f"{len(supporting)}"
         )
+
         print(
-            f"  DIAGNOSTIC : {len(diagnostic)}"
+            f"  DIAGNOSTIC : "
+            f"{len(diagnostic)}"
         )
 
         for path in primary:
+
             print(
-                f"    PRIMARY -> {path.name}"
+                f"    PRIMARY -> "
+                f"{path.name}"
             )
 
     print()
@@ -1629,15 +2352,19 @@ def main() -> int:
         results,
     )
 
-    # Validate CSVs
+    # -------------------------------------------------------------
+    # VALIDATE CSV ARTIFACTS
+    # -------------------------------------------------------------
+
     for path in csv_files:
 
-        classification, layer = classify_artifact(
-            path
+        classification, layer = (
+            classify_artifact(path)
         )
 
         print(
-            f"Validating [{classification}] "
+            f"Validating "
+            f"[{classification}] "
             f"{path}"
         )
 
@@ -1647,11 +2374,16 @@ def main() -> int:
 
         if error:
 
-            # Empty diagnostic/supporting files are not fatal.
             status = (
                 "FAIL"
                 if classification == "PRIMARY"
                 else "REVIEW"
+            )
+
+            severity = (
+                "ERROR"
+                if status == "FAIL"
+                else "WARNING"
             )
 
             add_check(
@@ -1660,8 +2392,11 @@ def main() -> int:
                 "Artifact Integrity",
                 layer or "Unclassified",
                 status,
-                "ERROR" if status == "FAIL" else "WARNING",
-                f"Unable to read {path.name}: {error}",
+                severity,
+                (
+                    f"Unable to read "
+                    f"{path.name}: {error}"
+                ),
             )
 
             continue
@@ -1669,7 +2404,9 @@ def main() -> int:
         if df is None:
             continue
 
-        strict = classification == "PRIMARY"
+        strict = (
+            classification == "PRIMARY"
+        )
 
         validate_basic_dataframe(
             path,
@@ -1678,12 +2415,13 @@ def main() -> int:
             strict,
         )
 
-        # Only primary/supporting research data are subject
-        # to temporal/PIT checks.
+        # Only PRIMARY and SUPPORTING research data
+        # receive temporal / PIT / boundary checks.
         if classification in {
             "PRIMARY",
             "SUPPORTING",
         }:
+
             validate_dates(
                 path,
                 df,
@@ -1702,7 +2440,6 @@ def main() -> int:
                 results,
             )
 
-        # Record identity is a canonical-data check.
         validate_record_identity(
             path,
             df,
@@ -1710,19 +2447,43 @@ def main() -> int:
         )
 
         if layer == "Research Context":
+
             validate_final_context(
                 path,
                 df,
                 results,
             )
 
-    # Cross-layer canonical context
+    # -------------------------------------------------------------
+    # VALIDATE JSON ARTIFACTS
+    # -------------------------------------------------------------
+
+    for path in json_files:
+
+        print(
+            f"Validating JSON "
+            f"[{classify_artifact(path)[0]}] "
+            f"{path}"
+        )
+
+        validate_json_artifact(
+            path,
+            results,
+        )
+
+    # -------------------------------------------------------------
+    # CROSS-LAYER CANONICAL CONTEXT
+    # -------------------------------------------------------------
+
     validate_cross_layer_context(
         csv_files,
         results,
     )
 
-    # Manifest
+    # -------------------------------------------------------------
+    # MANIFEST
+    # -------------------------------------------------------------
+
     manifest = build_manifest(
         csv_files,
         json_files,
@@ -1738,7 +2499,10 @@ def main() -> int:
         index=False,
     )
 
-    # Report
+    # -------------------------------------------------------------
+    # REPORT
+    # -------------------------------------------------------------
+
     results_df = pd.DataFrame(
         [
             r.to_dict()
@@ -1756,7 +2520,10 @@ def main() -> int:
         index=False,
     )
 
-    # Summary
+    # -------------------------------------------------------------
+    # SUMMARY
+    # -------------------------------------------------------------
+
     summary_rows = []
 
     for status in [
@@ -1808,16 +2575,24 @@ def main() -> int:
         index=False,
     )
 
-    # Events
-    events = (
-        results_df[
+    # -------------------------------------------------------------
+    # EVENTS
+    # -------------------------------------------------------------
+
+    if not results_df.empty:
+
+        events = results_df[
             results_df["status"].isin(
-                ["FAIL", "REVIEW"]
+                [
+                    "FAIL",
+                    "REVIEW",
+                ]
             )
         ].copy()
-        if not results_df.empty
-        else pd.DataFrame()
-    )
+
+    else:
+
+        events = pd.DataFrame()
 
     events_path = (
         output_dir
@@ -1829,16 +2604,23 @@ def main() -> int:
         index=False,
     )
 
-    # JSON
+    # -------------------------------------------------------------
+    # FINAL JSON
+    # -------------------------------------------------------------
+
     json_output = {
-        "validation_version": VERSION,
+
+        "validation_version":
+            VERSION,
+
         "architecture_version":
             "FINAL_UNIFIED_DECISION_ARCHITECTURE_V1",
 
         "overall_status":
             final_status,
 
-        "research_only": True,
+        "research_only":
+            True,
 
         "decision_engine_implemented":
             False,
@@ -1902,14 +2684,21 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    # Final console output
+    # -------------------------------------------------------------
+    # FINAL CONSOLE OUTPUT
+    # -------------------------------------------------------------
+
     print()
+
     print("=" * 78)
-    print("FINAL END-TO-END VALIDATION RESULT")
+    print(
+        "FINAL END-TO-END VALIDATION RESULT"
+    )
     print("=" * 78)
 
     print(
-        f"OVERALL STATUS : {final_status}"
+        f"OVERALL STATUS : "
+        f"{final_status}"
     )
 
     print(
@@ -1955,21 +2744,25 @@ def main() -> int:
 
     print()
 
-    # IMPORTANT:
-    # REVIEW does not fail the workflow.
-    # Only genuine mandatory FAIL conditions fail it.
+    # REVIEW is informational and does not fail the workflow.
+    # Only mandatory FAIL conditions return exit code 1.
+
     if final_status == "FAIL":
+
         print(
             "FINAL RESULT: FAILED — "
             "mandatory validation invariant(s) failed."
         )
+
         return 1
 
     if final_status == "REVIEW":
+
         print(
             "FINAL RESULT: PASSED WITH REVIEW — "
             "no mandatory validation invariant failed."
         )
+
         return 0
 
     print(
@@ -1981,6 +2774,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+
     raise SystemExit(
         main()
     )
