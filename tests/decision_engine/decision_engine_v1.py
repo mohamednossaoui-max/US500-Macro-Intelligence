@@ -1,54 +1,71 @@
 #!/usr/bin/env python3
 
 """
-US500 MACRO INTELLIGENCE — DECISION ENGINE V1
+US500 MACRO INTELLIGENCE
+DECISION ENGINE V1
 
-Research-only.
-No trade execution.
-No BUY/SELL signals.
-No forecasting.
+CONTRACT-FIRST / RESEARCH-ONLY
 
 Purpose:
-    Combine the latest available Research Context layers into
-    one descriptive decision-context snapshot.
+- Consume ONLY the validated Research Context v1 summary.
+- Preserve the frozen architecture contract.
+- Produce a descriptive research-context record.
+- Do NOT generate trading signals.
+- Do NOT generate forecasts.
+- Do NOT execute trades.
+- Do NOT score market direction.
+- Do NOT convert regimes into BUY/SELL decisions.
 
-Important:
-    - Point-in-time aware
-    - Research-only
-    - No execution
-    - No trading signal generation
-    - No forecasting
-    - No forced interpretation of numeric Fed score
+Frozen invariants:
+    research_only = TRUE
+    decision_engine_ready = FALSE
+    trading_signal_generated = FALSE
+    forecast_generated = FALSE
+    unified_decision_generated = FALSE
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import glob
 import hashlib
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
-# ============================================================
-# CONSTANTS
-# ============================================================
+ARCHITECTURE_VERSION = "1.0"
+METHODOLOGY_VERSION = "DECISION_ENGINE_V1_CONTRACT_FIRST"
 
-STATES = {
-    "BULLISH_CONTEXT",
-    "BEARISH_CONTEXT",
-    "NEUTRAL_CONTEXT",
-    "CONFLICTED",
-    "INSUFFICIENT_DATA",
-}
+INPUT_FILENAME = "research_context_summary_v1.csv"
+
+LAYER_NAMES = (
+    "macro",
+    "sentiment",
+    "technical",
+)
+
+TOTAL_LAYER_COUNT = len(LAYER_NAMES)
+
+REQUIRED_INPUT_COLUMNS = [
+    "context_date",
+    "available_layer_count",
+    "macro_available",
+    "sentiment_available",
+    "technical_available",
+    "point_in_time_safe",
+    "research_only",
+    "decision_engine_ready",
+    "trading_signal_generated",
+    "forecast_generated",
+    "unified_decision_generated",
+]
+
 
 TRUE_VALUES = {
-    "1",
     "true",
+    "1",
     "yes",
     "y",
     "pass",
@@ -56,8 +73,8 @@ TRUE_VALUES = {
 }
 
 FALSE_VALUES = {
-    "0",
     "false",
+    "0",
     "no",
     "n",
     "fail",
@@ -69,1172 +86,883 @@ FALSE_VALUES = {
 # ARGUMENTS
 # ============================================================
 
-def parse_args():
-
-    parser = argparse.ArgumentParser()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "US500 Macro Intelligence — "
+            "Decision Engine V1"
+        )
+    )
 
     parser.add_argument(
         "--artifacts-dir",
         default="artifacts",
+        help="Directory containing Research Context artifact.",
     )
 
     parser.add_argument(
         "--output",
         default="decision_engine_research_v1.csv",
+        help="Decision Engine output CSV.",
     )
 
     parser.add_argument(
         "--summary-output",
         default="decision_engine_summary_v1.csv",
+        help="Decision Engine summary CSV.",
     )
 
     return parser.parse_args()
 
 
 # ============================================================
-# NORMALIZATION
+# BASIC HELPERS
 # ============================================================
 
-def nk(value):
-
-    return (
-        str(value or "")
-        .strip()
-        .lower()
-        .replace("-", "_")
-        .replace(" ", "_")
-    )
-
-
-def truthy(value):
-
+def clean(value: Any) -> str:
     if value is None:
-        return None
+        return ""
 
-    s = str(value).strip().lower()
+    return str(value).strip()
 
-    if s in TRUE_VALUES:
+
+def parse_boolean(value: Any) -> bool | None:
+    normalized = clean(value).lower()
+
+    if normalized in TRUE_VALUES:
         return True
 
-    if s in FALSE_VALUES:
+    if normalized in FALSE_VALUES:
         return False
 
     return None
 
 
-def safe_float(value):
-
-    if value is None:
-        return None
-
+def parse_integer(value: Any) -> int | None:
     try:
-
-        value = float(value)
-
-        if value != value:
-            return None
-
-        return value
-
-    except (
-        TypeError,
-        ValueError,
-    ):
+        return int(clean(value))
+    except (TypeError, ValueError):
         return None
 
 
-# ============================================================
-# CSV
-# ============================================================
-
-def read_csv(path):
-
-    with open(
-        path,
+def read_csv(path: Path) -> List[Dict[str, str]]:
+    with path.open(
         "r",
         encoding="utf-8-sig",
         newline="",
-    ) as f:
+    ) as handle:
 
-        return list(
-            csv.DictReader(f)
+        return list(csv.DictReader(handle))
+
+
+def write_csv(
+    path: Path,
+    rows: List[Dict[str, Any]],
+) -> None:
+
+    if not rows:
+        raise RuntimeError(
+            f"Cannot write empty CSV: {path}"
+        )
+
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    fieldnames = list(rows[0].keys())
+
+    with path.open(
+        "w",
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+        )
+
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+# ============================================================
+# INPUT DISCOVERY
+# ============================================================
+
+def find_research_context(
+    artifacts_dir: Path,
+) -> Path:
+
+    candidates = sorted(
+        artifacts_dir.rglob(INPUT_FILENAME)
+    )
+
+    if not candidates:
+
+        raise RuntimeError(
+            f"Required Research Context file not found: "
+            f"{INPUT_FILENAME}\n"
+            f"Search root: {artifacts_dir}"
+        )
+
+    if len(candidates) > 1:
+
+        # Deterministic selection.
+        candidates = sorted(
+            candidates,
+            key=lambda path: str(path),
+        )
+
+    return candidates[0]
+
+
+# ============================================================
+# VALIDATE INPUT CONTRACT
+# ============================================================
+
+def validate_required_columns(
+    row: Dict[str, str],
+) -> None:
+
+    missing = [
+        column
+        for column in REQUIRED_INPUT_COLUMNS
+        if column not in row
+    ]
+
+    if missing:
+
+        raise RuntimeError(
+            "Research Context input is missing required "
+            "architecture fields:\n"
+            + "\n".join(
+                f"  - {column}"
+                for column in missing
+            )
         )
 
 
+def validate_control_flags(
+    row: Dict[str, str],
+) -> None:
+
+    required_true = [
+        "point_in_time_safe",
+        "research_only",
+    ]
+
+    required_false = [
+        "decision_engine_ready",
+        "trading_signal_generated",
+        "forecast_generated",
+        "unified_decision_generated",
+    ]
+
+    for field in required_true:
+
+        value = parse_boolean(row.get(field))
+
+        if value is not True:
+
+            raise RuntimeError(
+                f"Architecture violation: "
+                f"{field} must be TRUE."
+            )
+
+    for field in required_false:
+
+        value = parse_boolean(row.get(field))
+
+        if value is not False:
+
+            raise RuntimeError(
+                f"Architecture violation: "
+                f"{field} must be FALSE."
+            )
+
+
+def validate_layer_count(
+    row: Dict[str, str],
+) -> int:
+
+    declared = parse_integer(
+        row.get("available_layer_count")
+    )
+
+    if declared is None:
+
+        raise RuntimeError(
+            "available_layer_count is not a valid integer."
+        )
+
+    actual = 0
+
+    for layer in LAYER_NAMES:
+
+        available = parse_boolean(
+            row.get(f"{layer}_available")
+        )
+
+        if available is None:
+
+            raise RuntimeError(
+                f"{layer}_available must be "
+                f"TRUE or FALSE."
+            )
+
+        if available:
+            actual += 1
+
+    if declared != actual:
+
+        raise RuntimeError(
+            "Layer-count mismatch: "
+            f"declared={declared}, "
+            f"actual={actual}"
+        )
+
+    if declared < 0 or declared > TOTAL_LAYER_COUNT:
+
+        raise RuntimeError(
+            "available_layer_count is outside "
+            "the valid range."
+        )
+
+    return actual
+
+
 # ============================================================
-# DATE
+# CONTEXT CLASSIFICATION
 # ============================================================
 
-def date_field(row):
+def completeness_status(
+    available_count: int,
+) -> str:
 
-    for key in (
-        "asof_date",
-        "date",
-        "context_date",
-        "event_date",
-        "reported_date",
-        "observation_date",
-    ):
+    if available_count == TOTAL_LAYER_COUNT:
+        return "COMPLETE"
 
-        if row.get(key):
-            return row[key]
+    if available_count >= 1:
+        return "PARTIAL"
+
+    return "INSUFFICIENT"
+
+
+def context_state(
+    completeness: str,
+) -> str:
+
+    mapping = {
+        "COMPLETE": "COMPLETE_CONTEXT",
+        "PARTIAL": "PARTIAL_CONTEXT",
+        "INSUFFICIENT": "INSUFFICIENT_CONTEXT",
+    }
+
+    return mapping[completeness]
+
+
+# ============================================================
+# PROVENANCE
+# ============================================================
+
+def source_snapshot_id(
+    row: Dict[str, str],
+) -> str:
+
+    canonical = json.dumps(
+        row,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+    return hashlib.sha256(
+        canonical.encode("utf-8")
+    ).hexdigest()
+
+
+def record_id(
+    record: Dict[str, Any],
+) -> str:
+
+    deterministic = {
+        key: value
+        for key, value in record.items()
+        if key not in {
+            "retrieval_timestamp_utc",
+            "record_id",
+        }
+    }
+
+    canonical = json.dumps(
+        deterministic,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+
+    return hashlib.sha256(
+        canonical.encode("utf-8")
+    ).hexdigest()[:16]
+
+
+# ============================================================
+# DATE / AGE
+# ============================================================
+
+def calculate_age_days(
+    asof_date: str,
+    availability_date: str,
+) -> str:
+
+    if not asof_date:
+        return ""
+
+    if not availability_date:
+        return ""
+
+    try:
+
+        from datetime import date
+
+        asof = date.fromisoformat(
+            asof_date[:10]
+        )
+
+        available = date.fromisoformat(
+            availability_date[:10]
+        )
+
+        return str(
+            (asof - available).days
+        )
+
+    except ValueError:
+
+        return ""
+
+
+# ============================================================
+# LAYER FIELD HELPERS
+# ============================================================
+
+def layer_observation_date(
+    row: Dict[str, str],
+    layer: str,
+) -> str:
+
+    candidates = [
+        f"{layer}_observation_date",
+        f"{layer}_context_date",
+        f"{layer}_asof_date",
+    ]
+
+    for field in candidates:
+
+        value = clean(
+            row.get(field)
+        )
+
+        if value:
+            return value
 
     return ""
 
 
+def layer_availability_date(
+    row: Dict[str, str],
+    layer: str,
+) -> str:
+
+    candidates = [
+        f"{layer}_availability_date",
+        f"{layer}_available_date",
+    ]
+
+    for field in candidates:
+
+        value = clean(
+            row.get(field)
+        )
+
+        if value:
+            return value
+
+    return ""
+
+
+def layer_source(
+    row: Dict[str, str],
+    layer: str,
+) -> str:
+
+    value = clean(
+        row.get(f"{layer}_source")
+    )
+
+    if value:
+        return value
+
+    return "research-context-v1"
+
+
+def layer_source_url(
+    row: Dict[str, str],
+    layer: str,
+) -> str:
+
+    return clean(
+        row.get(
+            f"{layer}_source_url"
+        )
+    )
+
+
 # ============================================================
-# DISCOVERY
+# BUILD CANONICAL RECORD
 # ============================================================
 
-def discover(root):
+def build_record(
+    row: Dict[str, str],
+    source_file: Path,
+) -> Dict[str, Any]:
 
-    output = set()
+    validate_required_columns(row)
+    validate_control_flags(row)
 
-    for path in glob.glob(
-        os.path.join(
-            root,
-            "**",
-            "*.csv",
-        ),
-        recursive=True,
-    ):
+    context_date = clean(
+        row.get("context_date")
+    )
 
-        real_path = os.path.realpath(path)
+    if not context_date:
 
-        if (
-            os.path.basename(real_path)
-            .startswith("decision_engine_")
-        ):
-            continue
+        raise RuntimeError(
+            "context_date cannot be empty."
+        )
 
-        if "/.git/" in real_path:
-            continue
+    available_count = validate_layer_count(row)
 
-        output.add(real_path)
+    completeness = completeness_status(
+        available_count
+    )
 
-    return sorted(output)
+    state = context_state(
+        completeness
+    )
 
+    snapshot = source_snapshot_id(row)
 
-# ============================================================
-# EXTRACT RESEARCH CONTEXT
-# ============================================================
-
-def extract(row):
-
-    low = {
-        nk(key): value
-        for key, value in row.items()
-    }
-
-    aliases = {
+    record: Dict[str, Any] = {
 
         # ----------------------------------------------------
-        # Economic
+        # Canonical dates
         # ----------------------------------------------------
 
-        "economic_regime": [
-            "economic_regime",
-            "growth_regime",
-            "economic_context",
-        ],
+        "context_date": context_date,
+
+        "asof_date": context_date,
 
         # ----------------------------------------------------
-        # Fed
-        #
-        # IMPORTANT:
-        # fed_score is accepted as evidence.
-        # It is NOT converted into a fabricated
-        # DOVISH/Hawkish regime.
+        # Layer architecture
         # ----------------------------------------------------
 
-        "fed_regime": [
-            "fed_regime",
-            "fed_context",
-            "monetary_regime",
-        ],
+        "available_layer_count":
+            available_count,
+
+        "total_layer_count":
+            TOTAL_LAYER_COUNT,
+
+        "completeness_status":
+            completeness,
+
+        "context_state":
+            state,
 
         # ----------------------------------------------------
-        # Financial Stress
+        # Frozen control flags
         # ----------------------------------------------------
 
-        "financial_stress_regime": [
-            "financial_stress_regime",
-            "research_regime",
-            "stress_regime",
-        ],
+        "point_in_time_safe":
+            "TRUE",
+
+        "research_only":
+            "TRUE",
+
+        "decision_engine_ready":
+            "FALSE",
+
+        "trading_signal_generated":
+            "FALSE",
+
+        "forecast_generated":
+            "FALSE",
+
+        "unified_decision_generated":
+            "FALSE",
+
+        # ----------------------------------------------------
+        # Architecture / provenance
+        # ----------------------------------------------------
+
+        "architecture_version":
+            ARCHITECTURE_VERSION,
+
+        "methodology_version":
+            METHODOLOGY_VERSION,
+
+        "source_snapshot_id":
+            snapshot,
+
+        "source_file":
+            source_file.name,
+
+        # ----------------------------------------------------
+        # Macro
+        # ----------------------------------------------------
+
+        "macro_available":
+            "TRUE"
+            if parse_boolean(
+                row.get("macro_available")
+            )
+            else "FALSE",
+
+        "macro_observation_date":
+            layer_observation_date(
+                row,
+                "macro",
+            ),
+
+        "macro_availability_date":
+            layer_availability_date(
+                row,
+                "macro",
+            ),
+
+        "macro_age":
+            calculate_age_days(
+                context_date,
+                layer_availability_date(
+                    row,
+                    "macro",
+                ),
+            ),
+
+        "macro_source":
+            layer_source(
+                row,
+                "macro",
+            ),
+
+        "macro_source_url":
+            layer_source_url(
+                row,
+                "macro",
+            ),
+
+        "macro_point_in_time_safe":
+            "TRUE",
 
         # ----------------------------------------------------
         # Sentiment
         # ----------------------------------------------------
 
-        "sentiment_regime": [
-            "sentiment_regime",
-            "sentiment_context",
-        ],
+        "sentiment_available":
+            "TRUE"
+            if parse_boolean(
+                row.get("sentiment_available")
+            )
+            else "FALSE",
+
+        "sentiment_observation_date":
+            layer_observation_date(
+                row,
+                "sentiment",
+            ),
+
+        "sentiment_availability_date":
+            layer_availability_date(
+                row,
+                "sentiment",
+            ),
+
+        "sentiment_age":
+            calculate_age_days(
+                context_date,
+                layer_availability_date(
+                    row,
+                    "sentiment",
+                ),
+            ),
+
+        "sentiment_source":
+            layer_source(
+                row,
+                "sentiment",
+            ),
+
+        "sentiment_source_url":
+            layer_source_url(
+                row,
+                "sentiment",
+            ),
+
+        "sentiment_point_in_time_safe":
+            "TRUE",
 
         # ----------------------------------------------------
         # Technical
         # ----------------------------------------------------
 
-        "technical_regime": [
-            "technical_regime",
-            "technical_context",
-        ],
-    }
-
-    output = {}
-
-    # ========================================================
-    # TEXTUAL REGIMES
-    # ========================================================
-
-    for target, keys in aliases.items():
-
-        for key in keys:
-
-            normalized_key = nk(key)
-
-            if (
-                normalized_key in low
-                and str(
-                    low[normalized_key]
-                ).strip()
-            ):
-
-                output[target] = (
-                    low[normalized_key]
-                )
-
-                break
-
-    # ========================================================
-    # FED SCORE
-    # ========================================================
-
-    if "fed_score" in low:
-
-        fed_score = safe_float(
-            low["fed_score"]
-        )
-
-        if fed_score is not None:
-
-            output["fed_score"] = fed_score
-
-    # ========================================================
-    # OTHER CONTROL FIELDS
-    # ========================================================
-
-    for key in (
-        "point_in_time_safe",
-        "data_quality",
-        "availability_date",
-    ):
-
-        normalized_key = nk(key)
-
-        if normalized_key in low:
-
-            output[key] = (
-                low[normalized_key]
-            )
-
-    return output
-
-
-# ============================================================
-# LOCATE LATEST EVIDENCE
-# ============================================================
-
-def locate(paths):
-
-    keys = [
-        "economic_regime",
-        "fed_regime",
-        "financial_stress_regime",
-        "sentiment_regime",
-        "technical_regime",
-    ]
-
-    candidates = {
-        key: []
-        for key in keys
-    }
-
-    fed_score_candidates = []
-
-    for path in paths:
-
-        try:
-
-            rows = read_csv(path)
-
-        except Exception:
-
-            continue
-
-        for row in rows:
-
-            extracted = extract(row)
-
-            # ------------------------------------------------
-            # Textual layers
-            # ------------------------------------------------
-
-            for key in keys:
-
-                if key in extracted:
-
-                    candidates[key].append(
-                        (
-                            date_field(row),
-                            path,
-                            row,
-                            extracted,
-                        )
-                    )
-
-            # ------------------------------------------------
-            # Fed score
-            # ------------------------------------------------
-
-            if "fed_score" in extracted:
-
-                fed_score_candidates.append(
-                    (
-                        date_field(row),
-                        path,
-                        row,
-                        extracted,
-                    )
-                )
-
-    result = {}
-
-    # ========================================================
-    # LATEST TEXTUAL EVIDENCE
-    # ========================================================
-
-    for key, items in candidates.items():
-
-        if not items:
-            continue
-
-        items.sort(
-            key=lambda item: (
-                item[0],
-                item[1],
-            )
-        )
-
-        date_value, path, row, extracted = (
-            items[-1]
-        )
-
-        result[key] = {
-
-            "value":
-                extracted.get(
-                    key,
-                    "",
-                ),
-
-            "source_file":
-                path,
-
-            "source_date":
-                date_value,
-
-            "point_in_time_safe":
-                extracted.get(
-                    "point_in_time_safe",
-                    "",
-                ),
-
-            "data_quality":
-                extracted.get(
-                    "data_quality",
-                    "",
-                ),
-        }
-
-    # ========================================================
-    # LATEST FED SCORE
-    # ========================================================
-
-    if fed_score_candidates:
-
-        fed_score_candidates.sort(
-            key=lambda item: (
-                item[0],
-                item[1],
-            )
-        )
-
-        (
-            date_value,
-            path,
-            row,
-            extracted,
-        ) = fed_score_candidates[-1]
-
-        result["fed_score"] = {
-
-            "value":
-                extracted[
-                    "fed_score"
-                ],
-
-            "source_file":
-                path,
-
-            "source_date":
-                date_value,
-
-            "point_in_time_safe":
-                extracted.get(
-                    "point_in_time_safe",
-                    "",
-                ),
-
-            "data_quality":
-                extracted.get(
-                    "data_quality",
-                    "",
-                ),
-        }
-
-    return result
-
-
-# ============================================================
-# SCORING
-# ============================================================
-
-def score(name, value):
-
-    value_normalized = nk(value)
-    name_normalized = nk(name)
-
-    if not value_normalized:
-
-        return None
-
-    # ========================================================
-    # ECONOMIC
-    # ========================================================
-
-    if "economic" in name_normalized:
-
-        if any(
-            item in value_normalized
-            for item in (
-                "expansion",
-                "strong",
-                "positive",
-                "improving",
-            )
-        ):
-
-            return 1
-
-        if any(
-            item in value_normalized
-            for item in (
-                "contraction",
-                "weak",
-                "negative",
-                "deteriorating",
-                "recession",
-            )
-        ):
-
-            return -1
-
-    # ========================================================
-    # FED
-    # ========================================================
-
-    if (
-        "fed" in name_normalized
-        or "monetary" in name_normalized
-    ):
-
-        if any(
-            item in value_normalized
-            for item in (
-                "dovish",
-                "accommodative",
-                "easing",
-            )
-        ):
-
-            return 1
-
-        if any(
-            item in value_normalized
-            for item in (
-                "hawkish",
-                "restrictive",
-                "tightening",
-            )
-        ):
-
-            return -1
-
-    # ========================================================
-    # FINANCIAL STRESS
-    # ========================================================
-
-    if (
-        "stress" in name_normalized
-        or "financial" in name_normalized
-    ):
-
-        if any(
-            item in value_normalized
-            for item in (
-                "low",
-                "normal",
-                "calm",
-            )
-        ):
-
-            return 1
-
-        if any(
-            item in value_normalized
-            for item in (
-                "elevated",
-                "high",
-                "extreme",
-                "stress",
-            )
-        ):
-
-            return -1
-
-    # ========================================================
-    # SENTIMENT
-    # ========================================================
-
-    if "sentiment" in name_normalized:
-
-        if any(
-            item in value_normalized
-            for item in (
-                "positive",
-                "bullish",
-                "optimistic",
-                "risk_on",
-            )
-        ):
-
-            return 1
-
-        if any(
-            item in value_normalized
-            for item in (
-                "negative",
-                "bearish",
-                "pessimistic",
-                "risk_off",
-            )
-        ):
-
-            return -1
-
-    # ========================================================
-    # TECHNICAL
-    # ========================================================
-
-    if "technical" in name_normalized:
-
-        if any(
-            item in value_normalized
-            for item in (
-                "bullish",
-                "uptrend",
-                "positive",
-                "strong",
-            )
-        ):
-
-            return 1
-
-        if any(
-            item in value_normalized
-            for item in (
-                "bearish",
-                "downtrend",
-                "negative",
-                "weak",
-            )
-        ):
-
-            return -1
-
-    return 0
-
-
-# ============================================================
-# BUILD DECISION CONTEXT
-# ============================================================
-
-def build(layers):
-
-    keys = [
-        "economic_regime",
-        "fed_regime",
-        "financial_stress_regime",
-        "sentiment_regime",
-        "technical_regime",
-    ]
-
-    # ========================================================
-    # VALUES
-    # ========================================================
-
-    values = {
-
-        key:
-            layers.get(
-                key,
-                {},
-            ).get(
-                "value",
-                "",
-            )
-
-        for key in keys
-    }
-
-    # ========================================================
-    # FED FALLBACK
-    #
-    # If textual Fed regime is unavailable but fed_score exists,
-    # retain Fed as available research evidence without assigning
-    # an artificial directional regime.
-    # ========================================================
-
-    fed_score_available = (
-        "fed_score" in layers
-    )
-
-    if (
-        not values["fed_regime"]
-        and fed_score_available
-    ):
-
-        values["fed_regime"] = (
-            "FED_SCORE_AVAILABLE"
-        )
-
-    # ========================================================
-    # EVIDENCE SOURCES
-    # ========================================================
-
-    evidence = {}
-
-    for key in keys:
-
-        evidence[
-            key.replace(
-                "_regime",
-                "_evidence",
-            )
-        ] = layers.get(
-            key,
-            {},
-        ).get(
-            "source_file",
-            "",
-        )
-
-    # ========================================================
-    # FED SCORE EVIDENCE
-    # ========================================================
-
-    if fed_score_available:
-
-        evidence["fed_score_evidence"] = (
-            layers["fed_score"].get(
-                "source_file",
-                "",
-            )
-        )
-
-    # ========================================================
-    # DATES
-    # ========================================================
-
-    dates = []
-
-    for key in keys:
-
-        date_value = (
-            layers.get(
-                key,
-                {},
-            ).get(
-                "source_date",
-                "",
-            )
-        )
-
-        if date_value:
-
-            dates.append(
-                date_value
-            )
-
-    if fed_score_available:
-
-        fed_score_date = (
-            layers["fed_score"].get(
-                "source_date",
-                "",
-            )
-        )
-
-        if fed_score_date:
-
-            dates.append(
-                fed_score_date
-            )
-
-    # ========================================================
-    # SCORES
-    # ========================================================
-
-    scores = {}
-
-    for key in keys:
-
-        value = values[key]
-
-        # ----------------------------------------------------
-        # Fed score availability is evidence, but without a
-        # documented directional mapping it remains neutral.
-        # ----------------------------------------------------
-
-        if (
-            key == "fed_regime"
-            and value == "FED_SCORE_AVAILABLE"
-        ):
-
-            scores[key] = 0
-
-            continue
-
-        calculated = score(
-            key,
-            value,
-        )
-
-        if calculated is not None:
-
-            scores[key] = calculated
-
-    # ========================================================
-    # COUNTS
-    # ========================================================
-
-    positive = sum(
-        value > 0
-        for value in scores.values()
-    )
-
-    negative = sum(
-        value < 0
-        for value in scores.values()
-    )
-
-    neutral = sum(
-        value == 0
-        for value in scores.values()
-    )
-
-    missing = (
-        5
-        - len(scores)
-    )
-
-    # ========================================================
-    # DECISION STATE
-    #
-    # Descriptive context only.
-    # ========================================================
-
-    if len(scores) < 2:
-
-        state = (
-            "INSUFFICIENT_DATA"
-        )
-
-    elif (
-        positive >= 3
-        and negative == 0
-    ):
-
-        state = (
-            "BULLISH_CONTEXT"
-        )
-
-    elif (
-        negative >= 3
-        and positive == 0
-    ):
-
-        state = (
-            "BEARISH_CONTEXT"
-        )
-
-    elif (
-        positive > 0
-        and negative > 0
-    ):
-
-        state = (
-            "CONFLICTED"
-        )
-
-    else:
-
-        state = (
-            "NEUTRAL_CONTEXT"
-        )
-
-    # ========================================================
-    # CONFIDENCE
-    # ========================================================
-
-    confidence = (
-
-        round(
-            max(
-                positive,
-                negative,
-                neutral,
-            )
-            / len(scores),
-            4,
-        )
-
-        if scores
-
-        else 0.0
-    )
-
-    # ========================================================
-    # PIT SAFETY
-    # ========================================================
-
-    pit_values = []
-
-    for key in keys:
-
-        if key in layers:
-
-            value = truthy(
-                layers[key].get(
-                    "point_in_time_safe",
-                    "",
-                )
-            )
-
-            if value is not None:
-
-                pit_values.append(
-                    value
-                )
-
-    if fed_score_available:
-
-        fed_pit = truthy(
-            layers["fed_score"].get(
-                "point_in_time_safe",
-                "",
-            )
-        )
-
-        if fed_pit is not None:
-
-            pit_values.append(
-                fed_pit
-            )
-
-    if (
-        pit_values
-        and all(pit_values)
-    ):
-
-        pit = "PASS"
-
-    elif not pit_values:
-
-        pit = "REVIEW"
-
-    else:
-
-        pit = "FAIL"
-
-    # ========================================================
-    # DATA QUALITY
-    # ========================================================
-
-    if missing >= 3:
-
-        quality = (
-            "INSUFFICIENT"
-        )
-
-    elif missing:
-
-        quality = (
-            "REVIEW"
-        )
-
-    else:
-
-        quality = (
-            "PASS"
-        )
-
-    # ========================================================
-    # RESULT
-    # ========================================================
-
-    record = {
-
-        "asof_date":
-            max(dates)
-            if dates
-            else datetime.now(
-                timezone.utc
-            ).date().isoformat(),
-
-        **values,
-
-        **evidence,
-
-        "fed_score":
-            (
-                layers["fed_score"].get(
-                    "value",
-                    "",
-                )
-                if fed_score_available
-                else ""
-            ),
-
-        "fed_score_available":
+        "technical_available":
             "TRUE"
-            if fed_score_available
+            if parse_boolean(
+                row.get("technical_available")
+            )
             else "FALSE",
 
-        "evidence_count":
-            len(scores),
+        "technical_observation_date":
+            layer_observation_date(
+                row,
+                "technical",
+            ),
 
-        "supportive_count":
-            positive,
+        "technical_availability_date":
+            layer_availability_date(
+                row,
+                "technical",
+            ),
 
-        "contradictory_count":
-            negative,
+        "technical_age":
+            calculate_age_days(
+                context_date,
+                layer_availability_date(
+                    row,
+                    "technical",
+                ),
+            ),
 
-        "neutral_count":
-            neutral,
+        "technical_source":
+            layer_source(
+                row,
+                "technical",
+            ),
 
-        "missing_count":
-            missing,
+        "technical_source_url":
+            layer_source_url(
+                row,
+                "technical",
+            ),
 
-        "decision_state":
-            state,
-
-        "decision_confidence":
-            confidence,
-
-        "conflict_flag":
-            "YES"
-            if state == "CONFLICTED"
-            else "NO",
-
-        "data_quality":
-            quality,
-
-        "point_in_time_safe":
-            pit,
-
-        "research_only":
+        "technical_point_in_time_safe":
             "TRUE",
+
+        # ----------------------------------------------------
+        # Existing descriptive context
+        #
+        # These fields are copied for research traceability.
+        # They are NEVER converted into directional scoring.
+        # ----------------------------------------------------
+
+        "economic_regime":
+            clean(row.get("economic_regime")),
+
+        "fed_score":
+            clean(row.get("fed_score")),
+
+        "financial_stress_regime":
+            clean(
+                row.get(
+                    "financial_stress_regime"
+                )
+            ),
+
+        "sentiment_regime":
+            clean(
+                row.get("sentiment_regime")
+            ),
+
+        "technical_regime":
+            clean(
+                row.get("technical_regime")
+            ),
+
+        "trend_structure":
+            clean(
+                row.get("trend_structure")
+            ),
+
+        # ----------------------------------------------------
+        # Runtime provenance
+        # ----------------------------------------------------
+
+        "retrieval_timestamp_utc":
+            datetime.now(
+                timezone.utc
+            ).isoformat(),
     }
 
-    record["record_id"] = (
-        hashlib.sha256(
-            json.dumps(
-                record,
-                sort_keys=True,
-            ).encode()
-        ).hexdigest()[:16]
+    record["record_id"] = record_id(
+        record
     )
 
     return record
 
 
 # ============================================================
-# WRITE CSV
+# SUMMARY
 # ============================================================
 
-def write_csv(
-    path,
-    rows,
-):
+def build_summary(
+    record: Dict[str, Any],
+) -> Dict[str, Any]:
 
-    Path(path).parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    return {
 
-    with open(
-        path,
-        "w",
-        encoding="utf-8",
-        newline="",
-    ) as f:
+        "context_date":
+            record["context_date"],
 
-        writer = csv.DictWriter(
-            f,
-            fieldnames=list(
-                rows[0]
-            ),
-        )
+        "asof_date":
+            record["asof_date"],
 
-        writer.writeheader()
+        "available_layer_count":
+            record["available_layer_count"],
 
-        writer.writerows(
-            rows
-        )
+        "total_layer_count":
+            record["total_layer_count"],
+
+        "completeness_status":
+            record["completeness_status"],
+
+        "context_state":
+            record["context_state"],
+
+        "point_in_time_safe":
+            record["point_in_time_safe"],
+
+        "research_only":
+            record["research_only"],
+
+        "decision_engine_ready":
+            record["decision_engine_ready"],
+
+        "trading_signal_generated":
+            record["trading_signal_generated"],
+
+        "forecast_generated":
+            record["forecast_generated"],
+
+        "unified_decision_generated":
+            record["unified_decision_generated"],
+
+        "architecture_version":
+            record["architecture_version"],
+
+        "source_snapshot_id":
+            record["source_snapshot_id"],
+
+        "record_id":
+            record["record_id"],
+    }
 
 
 # ============================================================
 # MAIN
 # ============================================================
 
-def main():
+def main() -> int:
 
     args = parse_args()
 
-    paths = discover(
+    artifacts_dir = Path(
         args.artifacts_dir
     )
 
-    layers = locate(
-        paths
+    source_file = find_research_context(
+        artifacts_dir
     )
 
-    record = build(
-        layers
+    rows = read_csv(
+        source_file
+    )
+
+    if not rows:
+
+        raise RuntimeError(
+            "Research Context summary is empty."
+        )
+
+    if len(rows) != 1:
+
+        raise RuntimeError(
+            "Decision Engine V1 requires exactly "
+            "one canonical Research Context summary row. "
+            f"Found {len(rows)} rows."
+        )
+
+    record = build_record(
+        rows[0],
+        source_file,
+    )
+
+    summary = build_summary(
+        record
     )
 
     write_csv(
-        args.output,
+        Path(args.output),
         [record],
     )
 
-    summary = {
-
-        "run_timestamp_utc":
-            datetime.now(
-                timezone.utc
-            ).isoformat(),
-
-        "decision_state":
-            record[
-                "decision_state"
-            ],
-
-        "decision_confidence":
-            record[
-                "decision_confidence"
-            ],
-
-        "evidence_count":
-            record[
-                "evidence_count"
-            ],
-
-        "supportive_count":
-            record[
-                "supportive_count"
-            ],
-
-        "contradictory_count":
-            record[
-                "contradictory_count"
-            ],
-
-        "neutral_count":
-            record[
-                "neutral_count"
-            ],
-
-        "missing_count":
-            record[
-                "missing_count"
-            ],
-
-        "fed_score":
-            record[
-                "fed_score"
-            ],
-
-        "fed_score_available":
-            record[
-                "fed_score_available"
-            ],
-
-        "point_in_time_safe":
-            record[
-                "point_in_time_safe"
-            ],
-
-        "data_quality":
-            record[
-                "data_quality"
-            ],
-
-        "research_only":
-            "TRUE",
-
-        "source_csv_count":
-            len(paths),
-    }
-
     write_csv(
-        args.summary_output,
+        Path(args.summary_output),
         [summary],
     )
 
+    print()
+    print("=" * 70)
+    print(
+        "US500 MACRO INTELLIGENCE"
+    )
     print(
         "DECISION ENGINE V1"
     )
+    print(
+        "CONTRACT-FIRST / RESEARCH-ONLY"
+    )
+    print("=" * 70)
 
     print(
         json.dumps(
             summary,
             indent=2,
+            ensure_ascii=False,
         )
     )
+
+    print()
+    print(
+        "Decision Engine output is DESCRIPTIVE ONLY."
+    )
+    print(
+        "No trading signal generated."
+    )
+    print(
+        "No forecast generated."
+    )
+    print(
+        "No execution generated."
+    )
+
+    print("=" * 70)
 
     return 0
 
 
-# ============================================================
-# ENTRY POINT
-# ============================================================
-
 if __name__ == "__main__":
-
     raise SystemExit(
         main()
     )
