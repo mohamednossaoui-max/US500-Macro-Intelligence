@@ -1,109 +1,1059 @@
-import streamlit as st
-import pandas as pd
+#!/usr/bin/env python3
+
+"""
+US500 MACRO INTELLIGENCE
+RESEARCH TERMINAL / EDGE FINDER STYLE
+
+Purpose
+-------
+Professional visualization layer for the completed research stack.
+
+IMPORTANT ARCHITECTURE RULES
+----------------------------
+- Research-only.
+- No BUY / SELL signals.
+- No trade execution.
+- No deterministic market forecast.
+- No directional Decision Engine.
+- No position sizing.
+- No SL / TP.
+- No trading recommendation.
+
+The application visualizes existing research artifacts produced by
+GitHub Actions and committed research files.
+
+Primary data sources
+--------------------
+1. Latest GitHub Actions artifacts.
+2. Repository CSV fallback files.
+3. Public Yahoo Finance US500 proxy for current market visualization.
+
+Repository
+----------
+mohamednossaoui-max/US500-Macro-Intelligence
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-
-from datetime import datetime
-
-from config import (
-    APP_NAME,
-    MARKET_TICKER,
-    REFRESH_MINUTES,
-    FED_URL,
-)
-
-from data import (
-    get_market_data,
-    load_all_macro_data,
-    latest_value,
-)
-
-from engine import (
-    latest,
-    state,
-    analyze,
-    warnings,
-    classify,
-    decision_engine,
-    technical_confirmation,
-    early_warning,
-    sl_tp,
-    pullback_levels,
-    position_size,
-    build_analysis,
-    PULLBACKS,
-)
-
-# ============================================================
-# FED INTELLIGENCE
-# ============================================================
-
-from fed_intelligence import build_fed_intelligence
+import pandas as pd
+import requests
+import streamlit as st
+import yfinance as yf
 
 
 # ============================================================
-# PAGE CONFIG
+# CONFIGURATION
+# ============================================================
+
+APP_TITLE = "US500 Research Terminal"
+APP_VERSION = "1.0"
+
+GITHUB_OWNER = "mohamednossaoui-max"
+GITHUB_REPO = "US500-Macro-Intelligence"
+
+GITHUB_API = (
+    f"https://api.github.com/repos/"
+    f"{GITHUB_OWNER}/{GITHUB_REPO}"
+)
+
+US500_TICKER = os.getenv(
+    "US500_TICKER",
+    "^GSPC",
+)
+
+CACHE_TTL = 900
+
+
+ARTIFACT_MAP = {
+    "Research Context": "research-context-v1",
+    "Macro Context": "macro-context-v1",
+    "Financial Stress": "financial-stress-research-v1",
+    "Technical": "technical-intelligence-v1",
+    "Liquidity": "liquidity-intelligence-v1",
+    "Market Breadth": "market-breadth-analysis-v1",
+    "Cross Asset": "cross-asset-intelligence-v1",
+    "Historical Edge": "historical-event-study-v2",
+    "Historical Edge v1": "historical-event-study-v1",
+    "Event News": "event-news-intelligence-v2.1",
+    "Earnings": "earnings-market-reaction-v3-results",
+    "Decision Context": "decision-engine-v1",
+}
+
+
+# ============================================================
+# PAGE
 # ============================================================
 
 st.set_page_config(
-    page_title=APP_NAME,
-    page_icon="📊",
+    page_title=APP_TITLE,
+    page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
 # ============================================================
-# GLOBAL STYLE
+# GLOBAL CSS
 # ============================================================
 
 st.markdown(
     """
-    <style>
+<style>
 
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 700;
-        margin-bottom: 0.2rem;
-    }
+html, body, [class*="css"] {
+    font-family:
+        Inter,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+}
 
-    .subtitle {
-        color: #777;
-        margin-bottom: 1.5rem;
-    }
+.stApp {
+    background:
+        radial-gradient(
+            circle at top right,
+            rgba(35, 47, 72, 0.35),
+            transparent 38%
+        ),
+        #080b11;
+    color: #e8edf5;
+}
 
-    .decision-box {
-        padding: 18px;
-        border-radius: 10px;
-        margin: 10px 0 20px 0;
-    }
+section[data-testid="stSidebar"] {
+    background: #0b0f16;
+    border-right: 1px solid #1c2533;
+}
 
-    .small-note {
-        color: #777;
-        font-size: 0.85rem;
-    }
+section[data-testid="stSidebar"] * {
+    color: #d8dee9 !important;
+}
 
-    </style>
-    """,
+.block-container {
+    max-width: 1500px;
+    padding-top: 1.2rem;
+    padding-bottom: 3rem;
+}
+
+h1, h2, h3 {
+    letter-spacing: -0.025em;
+}
+
+.hero {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(20, 27, 40, 0.98),
+            rgba(11, 15, 23, 0.98)
+        );
+    border: 1px solid #202b3a;
+    border-radius: 18px;
+    padding: 26px 30px;
+    margin-bottom: 18px;
+    box-shadow: 0 12px 45px rgba(0,0,0,0.25);
+}
+
+.hero-title {
+    font-size: 31px;
+    font-weight: 750;
+    margin-bottom: 4px;
+}
+
+.hero-subtitle {
+    color: #8d99aa;
+    font-size: 14px;
+}
+
+.metric-card {
+    background: #10151e;
+    border: 1px solid #202a38;
+    border-radius: 14px;
+    padding: 18px;
+    min-height: 110px;
+}
+
+.metric-label {
+    color: #8490a2;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-value {
+    font-size: 26px;
+    font-weight: 720;
+    margin-top: 8px;
+}
+
+.metric-sub {
+    color: #7f8b9d;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.section-card {
+    background: #0f141d;
+    border: 1px solid #1e2937;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 18px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #17202d;
+    border: 1px solid #293547;
+    color: #aeb9c9;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+}
+
+.research-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #101f1c;
+    border: 1px solid #23463f;
+    color: #7bd8c2;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.small-muted {
+    color: #768295;
+    font-size: 12px;
+}
+
+.evidence {
+    background: #0c1118;
+    border-left: 3px solid #43536a;
+    border-radius: 8px;
+    padding: 13px 16px;
+    margin-bottom: 10px;
+    color: #b7c1cf;
+}
+
+.footer {
+    text-align: center;
+    color: #5f6b7c;
+    font-size: 11px;
+    padding-top: 25px;
+}
+
+div[data-testid="stMetric"] {
+    background: #10151e;
+    border: 1px solid #202a38;
+    border-radius: 13px;
+    padding: 12px;
+}
+
+button[kind="secondary"] {
+    border-color: #273344;
+}
+
+</style>
+""",
     unsafe_allow_html=True,
 )
 
 
 # ============================================================
-# HEADER
+# HELPERS
 # ============================================================
 
-st.markdown(
-    f"""
-    <div class="main-title">
-        📊 {APP_NAME}
-    </div>
+def clean(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
 
-    <div class="subtitle">
-        Daily Swing-Trading Decision Support System
-    </div>
-    """,
-    unsafe_allow_html=True,
+
+def safe_number(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+
+        text = str(value).strip()
+
+        if text == "":
+            return None
+
+        value = float(text)
+
+        if not np.isfinite(value):
+            return None
+
+        return value
+
+    except Exception:
+        return None
+
+
+def format_value(value: Any) -> str:
+    number = safe_number(value)
+
+    if number is not None:
+        if abs(number) >= 1000:
+            return f"{number:,.2f}"
+
+        if abs(number) >= 100:
+            return f"{number:,.1f}"
+
+        return f"{number:.3f}"
+
+    text = clean(value)
+
+    if len(text) > 60:
+        return text[:57] + "..."
+
+    return text
+
+
+def friendly_name(name: str) -> str:
+    text = str(name)
+
+    replacements = {
+        "_": " ",
+        "-": " ",
+    }
+
+    for a, b in replacements.items():
+        text = text.replace(a, b)
+
+    return text.strip().title()
+
+
+def is_true(value: Any) -> bool:
+    return clean(value).lower() in {
+        "true",
+        "1",
+        "yes",
+        "y",
+        "pass",
+        "passed",
+    }
+
+
+def latest_date(df: pd.DataFrame) -> str:
+    candidates = [
+        "asof_date",
+        "context_date",
+        "date",
+        "event_date",
+        "reported_date",
+        "observation_date",
+    ]
+
+    for column in candidates:
+        if column in df.columns:
+            parsed = pd.to_datetime(
+                df[column],
+                errors="coerce",
+            )
+
+            if parsed.notna().any():
+                return str(
+                    parsed.dropna().max().date()
+                )
+
+    return "N/A"
+
+
+def find_column(
+    df: pd.DataFrame,
+    candidates: List[str],
+) -> Optional[str]:
+
+    normalized = {
+        str(c).lower(): c
+        for c in df.columns
+    }
+
+    for candidate in candidates:
+
+        if candidate.lower() in normalized:
+            return normalized[candidate.lower()]
+
+    return None
+
+
+# ============================================================
+# GITHUB API
+# ============================================================
+
+def github_headers() -> Dict[str, str]:
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "US500-Research-Terminal",
+    }
+
+    token = None
+
+    try:
+        token = st.secrets.get(
+            "GITHUB_TOKEN",
+            None,
+        )
+    except Exception:
+        pass
+
+    token = token or os.getenv(
+        "GITHUB_TOKEN"
+    )
+
+    if token:
+        headers["Authorization"] = (
+            f"Bearer {token}"
+        )
+
+    return headers
+
+
+@st.cache_data(
+    ttl=CACHE_TTL,
+    show_spinner=False,
 )
+def list_artifacts() -> List[Dict[str, Any]]:
+
+    artifacts = []
+
+    for page in range(1, 6):
+
+        url = (
+            f"{GITHUB_API}/actions/artifacts"
+            f"?per_page=100&page={page}"
+        )
+
+        response = requests.get(
+            url,
+            headers=github_headers(),
+            timeout=30,
+        )
+
+        response.raise_for_status()
+
+        payload = response.json()
+
+        page_items = payload.get(
+            "artifacts",
+            [],
+        )
+
+        if not page_items:
+            break
+
+        artifacts.extend(
+            page_items
+        )
+
+        if len(page_items) < 100:
+            break
+
+    return artifacts
+
+
+def latest_artifact(
+    artifact_name: str,
+) -> Optional[Dict[str, Any]]:
+
+    try:
+
+        artifacts = list_artifacts()
+
+        candidates = [
+            a
+            for a in artifacts
+            if a.get("name")
+            == artifact_name
+            and not a.get(
+                "expired",
+                False,
+            )
+        ]
+
+        if not candidates:
+            return None
+
+        candidates.sort(
+            key=lambda x: x.get(
+                "created_at",
+                "",
+            ),
+            reverse=True,
+        )
+
+        return candidates[0]
+
+    except Exception:
+        return None
+
+
+@st.cache_data(
+    ttl=CACHE_TTL,
+    show_spinner=False,
+)
+def download_artifact(
+    artifact_id: int,
+) -> Dict[str, bytes]:
+
+    url = (
+        f"{GITHUB_API}/actions/artifacts/"
+        f"{artifact_id}/zip"
+    )
+
+    response = requests.get(
+        url,
+        headers=github_headers(),
+        timeout=90,
+        allow_redirects=True,
+    )
+
+    response.raise_for_status()
+
+    files = {}
+
+    with zipfile.ZipFile(
+        io.BytesIO(
+            response.content
+        )
+    ) as archive:
+
+        for name in archive.namelist():
+
+            if name.endswith("/"):
+                continue
+
+            files[
+                Path(name).name
+            ] = archive.read(name)
+
+    return files
+
+
+def artifact_dataframe(
+    artifact_name: str,
+) -> Optional[pd.DataFrame]:
+
+    artifact = latest_artifact(
+        artifact_name
+    )
+
+    if not artifact:
+        return None
+
+    try:
+
+        files = download_artifact(
+            int(artifact["id"])
+        )
+
+        csv_files = [
+            name
+            for name in files
+            if name.lower().endswith(
+                ".csv"
+            )
+        ]
+
+        if not csv_files:
+            return None
+
+        preferred = sorted(
+            csv_files,
+            key=lambda x: (
+                0
+                if "summary" in x.lower()
+                else 1,
+                x,
+            ),
+        )
+
+        raw = files[
+            preferred[0]
+        ]
+
+        return pd.read_csv(
+            io.BytesIO(raw)
+        )
+
+    except Exception:
+        return None
+
+
+# ============================================================
+# LOCAL FALLBACK
+# ============================================================
+
+def local_csv_candidates(
+    artifact_name: str,
+) -> List[Path]:
+
+    root = Path(
+        __file__
+    ).resolve().parent
+
+    mapping = {
+        "financial-stress-research-v1": [
+            "financial_stress_research_v1.csv",
+            "financial_stress_validation_v1_2.csv",
+        ],
+        "macro-context-v1": [
+            "macro_context_v1.csv",
+        ],
+        "technical-intelligence-v1": [
+            "technical_intelligence_research_v1.csv",
+            "technical_intelligence_research_summary_v1.csv",
+        ],
+        "liquidity-intelligence-v1": [
+            "liquidity_intelligence_research_v1.csv",
+            "liquidity_intelligence_summary_v1.csv",
+        ],
+        "market-breadth-analysis-v1": [
+            "market_breadth_analysis_v1.csv",
+        ],
+        "cross-asset-intelligence-v1": [
+            "cross_asset_intelligence_v1.csv",
+        ],
+    }
+
+    names = mapping.get(
+        artifact_name,
+        [],
+    )
+
+    return [
+        root / name
+        for name in names
+        if (root / name).exists()
+    ]
+
+
+@st.cache_data(
+    ttl=CACHE_TTL,
+    show_spinner=False,
+)
+def load_dataset(
+    artifact_name: str,
+) -> Optional[pd.DataFrame]:
+
+    # --------------------------------------------------------
+    # GitHub artifact
+    # --------------------------------------------------------
+
+    df = artifact_dataframe(
+        artifact_name
+    )
+
+    if df is not None and not df.empty:
+        return df
+
+    # --------------------------------------------------------
+    # Local fallback
+    # --------------------------------------------------------
+
+    for path in local_csv_candidates(
+        artifact_name
+    ):
+
+        try:
+
+            df = pd.read_csv(
+                path
+            )
+
+            if not df.empty:
+                return df
+
+        except Exception:
+            continue
+
+    return None
+
+
+# ============================================================
+# MARKET DATA
+# ============================================================
+
+@st.cache_data(
+    ttl=300,
+    show_spinner=False,
+)
+def load_market_data() -> pd.DataFrame:
+
+    try:
+
+        data = yf.download(
+            US500_TICKER,
+            period="2y",
+            interval="1d",
+            auto_adjust=False,
+            progress=False,
+        )
+
+        if isinstance(
+            data.columns,
+            pd.MultiIndex,
+        ):
+            data.columns = [
+                col[0]
+                for col in data.columns
+            ]
+
+        data = data.reset_index()
+
+        return data
+
+    except Exception:
+
+        return pd.DataFrame()
+
+
+market = load_market_data()
+
+
+def market_snapshot() -> Dict[str, Any]:
+
+    if market.empty:
+        return {
+            "price": None,
+            "change": None,
+            "change_pct": None,
+            "high": None,
+            "low": None,
+            "ath": None,
+            "drawdown": None,
+        }
+
+    close = pd.to_numeric(
+        market["Close"],
+        errors="coerce",
+    ).dropna()
+
+    if close.empty:
+        return {}
+
+    price = float(
+        close.iloc[-1]
+    )
+
+    previous = (
+        float(close.iloc[-2])
+        if len(close) >= 2
+        else price
+    )
+
+    change = price - previous
+
+    change_pct = (
+        change / previous * 100
+        if previous
+        else None
+    )
+
+    ath = float(
+        close.max()
+    )
+
+    drawdown = (
+        (price / ath - 1) * 100
+        if ath
+        else None
+    )
+
+    return {
+        "price": price,
+        "change": change,
+        "change_pct": change_pct,
+        "high": float(close.max()),
+        "low": float(close.min()),
+        "ath": ath,
+        "drawdown": drawdown,
+    }
+
+
+SNAPSHOT = market_snapshot()
+
+
+# ============================================================
+# DATASET LOADING
+# ============================================================
+
+@st.cache_data(
+    ttl=CACHE_TTL,
+    show_spinner=False,
+)
+def load_all_research() -> Dict[str, pd.DataFrame]:
+
+    result = {}
+
+    for label, artifact_name in (
+        ARTIFACT_MAP.items()
+    ):
+
+        df = load_dataset(
+            artifact_name
+        )
+
+        if df is not None and not df.empty:
+            result[label] = df
+
+    return result
+
+
+RESEARCH = load_all_research()
+
+
+# ============================================================
+# RESEARCH CONTEXT
+# ============================================================
+
+context = RESEARCH.get(
+    "Research Context"
+)
+
+if context is None:
+    context = RESEARCH.get(
+        "Decision Context"
+    )
+
+
+# ============================================================
+# CONTEXT EXTRACTION
+# ============================================================
+
+def context_value(
+    names: List[str],
+    default: Any = "N/A",
+) -> Any:
+
+    if context is None or context.empty:
+        return default
+
+    row = context.iloc[-1]
+
+    column = find_column(
+        context,
+        names,
+    )
+
+    if column is None:
+        return default
+
+    return row.get(
+        column,
+        default,
+    )
+
+
+def layer_status(
+    layer: str,
+) -> str:
+
+    value = context_value(
+        [
+            f"{layer}_available",
+            f"{layer}_status",
+            f"{layer}_completeness",
+        ],
+        "N/A",
+    )
+
+    if is_true(value):
+        return "AVAILABLE"
+
+    if clean(value).upper() in {
+        "COMPLETE",
+        "AVAILABLE",
+        "PASS",
+        "PASSED",
+    }:
+        return "AVAILABLE"
+
+    if clean(value).upper() in {
+        "FALSE",
+        "MISSING",
+        "UNAVAILABLE",
+    }:
+        return "UNAVAILABLE"
+
+    return clean(value) or "N/A"
+
+
+# ============================================================
+# UI COMPONENTS
+# ============================================================
+
+def metric_card(
+    label: str,
+    value: Any,
+    subtitle: str = "",
+):
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">
+                {label}
+            </div>
+            <div class="metric-value">
+                {format_value(value)}
+            </div>
+            <div class="metric-sub">
+                {subtitle}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def evidence_card(
+    title: str,
+    text: str,
+):
+
+    st.markdown(
+        f"""
+        <div class="evidence">
+            <strong>{title}</strong><br>
+            <span>{text}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def section_title(
+    title: str,
+    subtitle: str = "",
+):
+
+    st.markdown(
+        f"""
+        <div class="section-card">
+            <h3 style="margin-bottom:4px;">
+                {title}
+            </h3>
+            <div class="small-muted">
+                {subtitle}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def numeric_columns(
+    df: pd.DataFrame,
+) -> List[str]:
+
+    result = []
+
+    for column in df.columns:
+
+        converted = pd.to_numeric(
+            df[column],
+            errors="coerce",
+        )
+
+        if (
+            converted.notna().sum()
+            >= max(
+                1,
+                int(
+                    len(df) * 0.30
+                ),
+            )
+        ):
+            result.append(column)
+
+    return result
+
+
+def display_research_dataset(
+    df: Optional[pd.DataFrame],
+    title: str,
+):
+
+    if df is None or df.empty:
+
+        st.info(
+            f"No current artifact available for {title}."
+        )
+
+        return
+
+    st.caption(
+        f"{len(df):,} observations • "
+        f"latest date: {latest_date(df)}"
+    )
+
+    numeric = numeric_columns(
+        df
+    )
+
+    if numeric:
+
+        latest = df.iloc[-1]
+
+        selected = numeric[:8]
+
+        cols = st.columns(
+            min(
+                len(selected),
+                4,
+            )
+        )
+
+        for index, column in enumerate(
+            selected
+        ):
+
+            with cols[
+                index % len(cols)
+            ]:
+
+                metric_card(
+                    friendly_name(column),
+                    latest.get(
+                        column,
+                        "N/A",
+                    ),
+                    title,
+                )
+
+    with st.expander(
+        "Inspect latest research record"
+    ):
+
+        latest_row = (
+            df.tail(1)
+            .T
+            .reset_index()
+        )
+
+        latest_row.columns = [
+            "Field",
+            "Value",
+        ]
+
+        st.dataframe(
+            latest_row,
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 # ============================================================
@@ -112,2249 +1062,1131 @@ st.markdown(
 
 with st.sidebar:
 
-    st.header("⚙️ Settings")
-
-    st.write(
-        f"**Market:** `{MARKET_TICKER}`"
-    )
-
-    st.write(
-        f"**Refresh:** {REFRESH_MINUTES} min"
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Federal Reserve Stance"
-    )
-
-    fed_stance = st.selectbox(
-        "Current Fed stance",
-        [
-            "Neutral",
-            "Dovish",
-            "Hawkish",
-        ],
-        index=0,
-    )
-
-    st.caption(
-        "Fed stance is currently a manual input for the "
-        "main macro engine. Fed Intelligence is analyzed "
-        "separately and does not automatically modify the "
-        "final decision."
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Strategy"
-    )
-
-    st.write(
-        "Timeframe: Daily"
-    )
-
-    st.write(
-        "Style: Swing / Pullback"
-    )
-
-    st.write(
-        "Risk/Reward: 1 : 4"
-    )
-
-    st.write(
-        "Execution: Manual"
-    )
-
-    st.divider()
-
-    st.caption(
-        "This application provides analysis and decision support. "
-        "It does not execute trades."
-    )
-
-
-# ============================================================
-# LOAD MARKET DATA
-# ============================================================
-
-@st.cache_data(
-    ttl=REFRESH_MINUTES * 60
-)
-def load_market():
-
-    return get_market_data(
-        MARKET_TICKER,
-        period="5y",
-    )
-
-
-# ============================================================
-# LOAD MACRO DATA
-# ============================================================
-
-@st.cache_data(
-    ttl=REFRESH_MINUTES * 60
-)
-def load_macro():
-
-    return load_all_macro_data()
-
-
-# ============================================================
-# LOAD FED INTELLIGENCE
-# ============================================================
-
-@st.cache_data(
-    ttl=REFRESH_MINUTES * 60
-)
-def load_fed_intelligence():
-
-    try:
-
-        result = build_fed_intelligence()
-
-        if result is None:
-
-            return {
-                "available": False,
-                "error": "Fed Intelligence returned no data.",
-            }
-
-        return result
-
-    except Exception as e:
-
-        return {
-            "available": False,
-            "error": str(e),
-        }
-
-
-# ============================================================
-# GET DATA
-# ============================================================
-
-market = load_market()
-
-macro_data = load_macro()
-
-fed_intelligence = load_fed_intelligence()
-
-
-# ============================================================
-# DATA VALIDATION
-# ============================================================
-
-if market is None or market.empty:
-
-    st.error(
-        "Unable to load US500 market data."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# COMPLETE ANALYSIS
-# ============================================================
-
-analysis = build_analysis(
-    market,
-    macro_data,
-    fed=fed_stance,
-)
-
-
-# ============================================================
-# EXTRACT VALUES
-# ============================================================
-
-market_info = analysis["market"]
-
-macro_info = analysis["macro"]
-
-ew_info = analysis["early_warning"]
-
-technical_info = analysis["technical"]
-
-decision_info = analysis["decision"]
-
-price = market_info["price"]
-
-ath = market_info["ath"]
-
-drawdown = market_info["drawdown"]
-
-atr = market_info["atr14"]
-
-macro_score = macro_info["score"]
-
-regime = macro_info["regime"]
-
-ew_score = ew_info["score"]
-
-ew_level = ew_info["level"]
-
-technical_score = technical_info["score"]
-
-technical_status = technical_info["status"]
-
-final_decision = decision_info["decision"]
-
-
-# ============================================================
-# FED INTELLIGENCE HELPERS
-# ============================================================
-
-def fed_get(key, default=None):
-
-    if not isinstance(fed_intelligence, dict):
-
-        return default
-
-    return fed_intelligence.get(
-        key,
-        default,
-    )
-
-
-def safe_number(value):
-
-    try:
-
-        if value is None:
-            return None
-
-        if isinstance(value, float) and np.isnan(value):
-            return None
-
-        return float(value)
-
-    except Exception:
-
-        return None
-
-
-def format_number(value, decimals=1):
-
-    number = safe_number(value)
-
-    if number is None:
-
-        return "N/A"
-
-    return f"{number:.{decimals}f}"
-
-
-def format_date(value):
-
-    if value is None:
-
-        return "N/A"
-
-    return str(value)
-
-
-def display_reason(reason):
-
-    if reason is None:
-
-        return "NEUTRAL"
-
-    text = str(reason).strip()
-
-    if text == "" or text.lower() == "none":
-
-        return "NEUTRAL"
-
-    return text
-
-
-# ============================================================
-# TOP METRICS
-# ============================================================
-
-st.subheader(
-    "Live Market Dashboard"
-)
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-
-    st.metric(
-        "US500",
-        f"{price:.2f}",
-    )
-
-with c2:
-
-    st.metric(
-        "ATH",
-        f"{ath:.2f}",
-    )
-
-with c3:
-
-    st.metric(
-        "Drawdown",
-        f"{drawdown:.2f}%",
-    )
-
-with c4:
-
-    st.metric(
-        "ATR(14)",
-        f"{atr:.2f}"
-        if not np.isnan(atr)
-        else "N/A",
-    )
-
-
-c5, c6, c7, c8 = st.columns(4)
-
-with c5:
-
-    st.metric(
-        "Macro",
-        f"{macro_score:+d}/10",
-    )
-
-with c6:
-
-    st.metric(
-        "Regime",
-        regime.split("—")[0].strip(),
-    )
-
-with c7:
-
-    st.metric(
-        "Early Warning",
-        f"{ew_score}/100",
-    )
-
-with c8:
-
-    st.metric(
-        "Technical",
-        f"{technical_score}/5",
-    )
-
-
-# ============================================================
-# FINAL DECISION BANNER
-# ============================================================
-
-st.divider()
-
-if decision_info["color"] == "red":
-
-    st.error(
-        f"🔴 {final_decision}"
-    )
-
-elif decision_info["color"] == "orange":
-
-    st.warning(
-        f"🟠 {final_decision}"
-    )
-
-elif decision_info["color"] == "yellow":
-
-    st.warning(
-        f"🟡 {final_decision}"
-    )
-
-else:
-
-    st.success(
-        f"🟢 {final_decision}"
-    )
-
-st.info(
-    f"**Reason:** {decision_info['reason']}"
-)
-
-
-# ============================================================
-# CURRENT PULLBACK
-# ============================================================
-
-current_pullback = None
-
-if not np.isnan(drawdown):
-
-    if drawdown <= -30:
-        current_pullback = "−30%"
-
-    elif drawdown <= -20:
-        current_pullback = "−20%"
-
-    elif drawdown <= -10:
-        current_pullback = "−10%"
-
-    elif drawdown <= -5:
-        current_pullback = "−5%"
-
-    elif drawdown <= -3:
-        current_pullback = "−3%"
-
-    else:
-        current_pullback = "Normal"
-
-
-st.write(
-    f"**Current Pullback Zone:** {current_pullback}"
-)
-
-
-# ============================================================
-# TABS
-# ============================================================
-
-(
-    tab_live,
-    tab_early,
-    tab_technical,
-    tab_macro,
-    tab_fed,
-    tab_trading,
-    tab_events,
-    tab_history,
-) = st.tabs(
-    [
-        "LIVE",
-        "EARLY WARNING",
-        "TECHNICAL",
-        "MACRO",
-        "FED INTELLIGENCE",
-        "TRADING",
-        "EVENTS",
-        "HISTORY",
-    ]
-)
-
-
-# ============================================================
-# LIVE TAB
-# ============================================================
-
-with tab_live:
-
-    st.subheader(
-        "📊 Live Overview"
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        st.write(
-            "**Macro Regime**"
-        )
-
-        st.info(
-            regime
-        )
-
-        st.write(
-            "**Early Warning**"
-        )
-
-        st.progress(
-            ew_score / 100
-        )
-
-        st.write(
-            f"{ew_score}/100 — {ew_level}"
-        )
-
-    with col2:
-
-        st.write(
-            "**Technical Confirmation**"
-        )
-
-        st.progress(
-            technical_score / 5
-        )
-
-        st.write(
-            f"{technical_score}/5 — {technical_status}"
-        )
-
-        st.write(
-            "**Final Decision**"
-        )
-
-        st.info(
-            final_decision
-        )
-
-    st.divider()
-
-    st.subheader(
-        "Pullback Levels"
-    )
-
-    pullbacks = pullback_levels(
-        price,
-        ath,
-    )
-
-    if pullbacks:
-
-        rows = []
-
-        for pb in pullbacks:
-
-            rows.append(
-                [
-                    f"−{pb['level']}%",
-                    pb["price"],
-                    price - pb["price"],
-                ]
-            )
-
-        st.dataframe(
-            pd.DataFrame(
-                rows,
-                columns=[
-                    "Pullback",
-                    "Target Price",
-                    "Distance From Current",
-                ],
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    st.divider()
-
-    st.subheader(
-        "System Interpretation"
-    )
-
-    st.write(
-        "The system evaluates the market through five analytical layers:"
+    st.markdown(
+        "## ◈ US500 RESEARCH"
     )
 
     st.markdown(
-        """
-        1. **Macro Regime**
-        2. **Early Warning**
-        3. **Technical Confirmation**
-        4. **Drawdown / Pullback**
-        5. **Fed Intelligence**
-        """
+        '<span class="research-badge">'
+        'RESEARCH ONLY'
+        '</span>',
+        unsafe_allow_html=True,
     )
 
-    st.caption(
-        "Fed Intelligence is currently an independent analytical layer "
-        "and does not automatically modify the final decision."
-    )
+    st.write("")
 
-    st.caption(
-        "Drawdown depth alone never creates a buy signal."
-    )
-
-
-# ============================================================
-# EARLY WARNING TAB
-# ============================================================
-
-with tab_early:
-
-    st.subheader(
-        "⚠️ Early Warning System"
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        st.metric(
-            "Early Warning Score",
-            f"{ew_score}/100",
-        )
-
-    with col2:
-
-        st.metric(
-            "Risk Level",
-            ew_level,
-        )
-
-    st.progress(
-        ew_score / 100
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Component Breakdown"
-    )
-
-    component_rows = []
-
-    for name, value in ew_info[
-        "components"
-    ].items():
-
-        maximum = ew_info[
-            "max_components"
-        ][name]
-
-        component_rows.append(
-            [
-                name,
-                value,
-                maximum,
-                f"{value}/{maximum}",
-            ]
-        )
-
-    st.dataframe(
-        pd.DataFrame(
-            component_rows,
-            columns=[
-                "Component",
-                "Score",
-                "Maximum",
-                "Score / Maximum",
-            ],
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Current Warning Indicators"
-    )
-
-    indicator_rows = []
-
-    for name, value in ew_info[
-        "indicators"
-    ].items():
-
-        if value is None:
-
-            display_value = "N/A"
-
-        elif isinstance(value, float) and np.isnan(value):
-
-            display_value = "N/A"
-
-        elif isinstance(value, (int, float)):
-
-            display_value = f"{value:.3f}"
-
-        else:
-
-            display_value = str(value)
-
-        indicator_rows.append(
-            [
-                name,
-                display_value,
-            ]
-        )
-
-    st.dataframe(
-        pd.DataFrame(
-            indicator_rows,
-            columns=[
-                "Indicator",
-                "Current Value",
-            ],
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Why is Early Warning at this level?"
-    )
-
-    for reason in ew_info[
-        "reasons"
-    ]:
-
-        st.write(
-            f"• {reason}"
-        )
-
-    st.divider()
-
-    st.subheader(
-        "Risk Interpretation"
-    )
-
-    interpretation = pd.DataFrame(
+    page = st.radio(
+        "Research Desk",
         [
-            [
-                "0–24",
-                "LOW",
-                "No significant systemic warning.",
-            ],
-            [
-                "25–49",
-                "MODERATE",
-                "Leading indicators require caution.",
-            ],
-            [
-                "50–74",
-                "HIGH",
-                "Meaningful deterioration is present.",
-            ],
-            [
-                "75–100",
-                "CRITICAL",
-                "Systemic stress. No new trade.",
-            ],
-        ],
-        columns=[
-            "Score",
-            "Level",
-            "Interpretation",
+            "Overview",
+            "Market Regime",
+            "Macro",
+            "Financial Stress",
+            "Sentiment",
+            "Technical",
+            "Historical Edge",
+            "Event Studies",
+            "Cross-Asset",
+            "Earnings",
+            "Evidence",
         ],
     )
 
-    st.dataframe(
-        interpretation,
-        use_container_width=True,
-        hide_index=True,
-    )
+    st.divider()
 
-
-# ============================================================
-# TECHNICAL TAB
-# ============================================================
-
-with tab_technical:
-
-    st.subheader(
-        "📈 Technical Confirmation"
+    st.caption(
+        f"Ticker: {US500_TICKER}"
     )
 
     st.caption(
-        "Daily technical structure is used as a confirmation filter, "
-        "not as an automatic execution signal."
+        f"App: {APP_VERSION}"
     )
 
-    c1, c2 = st.columns(2)
+    if st.button(
+        "Refresh Research",
+        use_container_width=True,
+    ):
+
+        st.cache_data.clear()
+
+        st.rerun()
+
+
+# ============================================================
+# HERO
+# ============================================================
+
+st.markdown(
+    f"""
+    <div class="hero">
+        <div class="hero-title">
+            US500 Research Terminal
+        </div>
+
+        <div class="hero-subtitle">
+            Evidence-driven market intelligence —
+            Macro · Stress · Sentiment · Technical ·
+            Historical Edge · Cross-Asset · Earnings
+        </div>
+
+        <div style="margin-top:14px;">
+            <span class="research-badge">
+                NO TRADING SIGNALS
+            </span>
+            &nbsp;
+            <span class="badge">
+                FULL RESEARCH OUTPUT
+            </span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# OVERVIEW
+# ============================================================
+
+if page == "Overview":
+
+    st.subheader(
+        "Market Research Overview"
+    )
+
+    date_text = latest_date(
+        context
+    ) if context is not None else "N/A"
+
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-
-        st.metric(
-            "Technical Score",
-            f"{technical_score}/5",
+        metric_card(
+            "US500",
+            SNAPSHOT.get(
+                "price",
+                "N/A",
+            ),
+            "Public S&P 500 proxy",
         )
 
     with c2:
-
-        st.metric(
-            "Technical Status",
-            technical_status,
+        metric_card(
+            "Daily Change",
+            (
+                f"{SNAPSHOT['change_pct']:+.2f}%"
+                if SNAPSHOT.get(
+                    "change_pct"
+                )
+                is not None
+                else "N/A"
+            ),
+            "Latest completed session",
         )
 
-    st.progress(
-        technical_score / 5
-    )
+    with c3:
+        metric_card(
+            "All-Time Drawdown",
+            (
+                f"{SNAPSHOT['drawdown']:.2f}%"
+                if SNAPSHOT.get(
+                    "drawdown"
+                )
+                is not None
+                else "N/A"
+            ),
+            "Against available price history",
+        )
 
-    st.divider()
+    with c4:
+        metric_card(
+            "Research Date",
+            date_text,
+            "Latest synchronized context",
+        )
+
+    st.markdown("###")
+
+    cols = st.columns(4)
+
+    layers = [
+        (
+            "Macro",
+            layer_status("macro"),
+        ),
+        (
+            "Sentiment",
+            layer_status("sentiment"),
+        ),
+        (
+            "Technical",
+            layer_status("technical"),
+        ),
+        (
+            "Research Context",
+            (
+                "AVAILABLE"
+                if context is not None
+                else "N/A"
+            ),
+        ),
+    ]
+
+    for col, (
+        name,
+        status,
+    ) in zip(
+        cols,
+        layers,
+    ):
+
+        with col:
+
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">
+                        {name}
+                    </div>
+
+                    <div class="metric-value"
+                         style="font-size:20px;">
+                        {status}
+                    </div>
+
+                    <div class="metric-sub">
+                        Research layer
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("###")
 
     st.subheader(
-        "Technical Factors"
+        "Research State"
     )
 
-    technical_rows = []
+    if context is not None:
 
-    for factor in technical_info[
-        "factors"
+        context_row = context.iloc[-1]
+
+        important_fields = [
+            "context_date",
+            "asof_date",
+            "available_layer_count",
+            "completeness_status",
+            "context_state",
+            "point_in_time_safe",
+            "research_only",
+        ]
+
+        rows = []
+
+        for field in important_fields:
+
+            column = find_column(
+                context,
+                [field],
+            )
+
+            if column:
+
+                rows.append(
+                    [
+                        friendly_name(
+                            field
+                        ),
+                        context_row.get(
+                            column,
+                            "",
+                        ),
+                    ]
+                )
+
+        if rows:
+
+            st.dataframe(
+                pd.DataFrame(
+                    rows,
+                    columns=[
+                        "Research Field",
+                        "Current Value",
+                    ],
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    st.subheader(
+        "Research Coverage"
+    )
+
+    coverage = []
+
+    for label in [
+        "Macro Context",
+        "Financial Stress",
+        "Technical",
+        "Liquidity",
+        "Market Breadth",
+        "Cross Asset",
+        "Historical Edge",
+        "Event News",
+        "Earnings",
     ]:
 
-        technical_rows.append(
+        coverage.append(
             [
-                factor["factor"],
-                factor["status"],
-                factor["value"],
+                label,
+                (
+                    "Available"
+                    if label in RESEARCH
+                    else "Not available"
+                ),
             ]
         )
 
-    if technical_rows:
-
-        st.dataframe(
-            pd.DataFrame(
-                technical_rows,
-                columns=[
-                    "Factor",
-                    "Status",
-                    "Value",
-                ],
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    st.divider()
-
-    st.subheader(
-        "Daily Technical Values"
-    )
-
-    values = technical_info.get(
-        "values",
-        {}
-    )
-
-    if values:
-
-        technical_values = pd.DataFrame(
-            [
-                [
-                    "Close",
-                    values.get(
-                        "close",
-                        np.nan
-                    ),
-                ],
-                [
-                    "SMA20",
-                    values.get(
-                        "sma20",
-                        np.nan
-                    ),
-                ],
-                [
-                    "SMA50",
-                    values.get(
-                        "sma50",
-                        np.nan
-                    ),
-                ],
-                [
-                    "SMA200",
-                    values.get(
-                        "sma200",
-                        np.nan
-                    ),
-                ],
-                [
-                    "RSI(14)",
-                    values.get(
-                        "rsi14",
-                        np.nan
-                    ),
-                ],
-                [
-                    "Recent Swing Low",
-                    values.get(
-                        "recent_low",
-                        np.nan
-                    ),
-                ],
-                [
-                    "Previous Swing Low",
-                    values.get(
-                        "previous_low",
-                        np.nan
-                    ),
-                ],
-            ],
+    st.dataframe(
+        pd.DataFrame(
+            coverage,
             columns=[
-                "Indicator",
-                "Value",
+                "Research Module",
+                "Current Availability",
             ],
-        )
-
-        st.dataframe(
-            technical_values,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    st.divider()
-
-    if technical_status == "STRONG":
-
-        st.success(
-            "🟢 Technical confirmation is STRONG."
-        )
-
-    elif technical_status == "PARTIAL":
-
-        st.warning(
-            "🟡 Technical confirmation is PARTIAL."
-        )
-
-    elif technical_status == "WEAK":
-
-        st.warning(
-            "🟠 Technical confirmation is WEAK."
-        )
-
-    else:
-
-        st.error(
-            "Technical data is unavailable."
-        )
-
-    st.info(
-        f"**Impact on final decision:** "
-        f"{decision_info['reason']}"
+        ),
+        use_container_width=True,
+        hide_index=True,
     )
 
 
 # ============================================================
-# MACRO TAB
+# MARKET REGIME
 # ============================================================
 
-with tab_macro:
+elif page == "Market Regime":
 
     st.subheader(
-        "🌐 Macro Intelligence"
+        "Current Market Research State"
     )
 
-    st.write(
-        f"**Macro Score:** {macro_score:+d}/10"
+    st.caption(
+        "This page describes the current research environment. "
+        "It does not convert the state into a trade direction."
     )
 
-    st.write(
-        f"**Regime:** {regime}"
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        metric_card(
+            "Macro",
+            layer_status("macro"),
+            "Current research availability",
+        )
+
+    with c2:
+        metric_card(
+            "Financial Stress",
+            (
+                "AVAILABLE"
+                if "Financial Stress"
+                in RESEARCH
+                else "N/A"
+            ),
+            "Stress research",
+        )
+
+    with c3:
+        metric_card(
+            "Technical",
+            layer_status("technical"),
+            "Technical research",
+        )
+
+    st.markdown("###")
+
+    for label in [
+        "Macro Context",
+        "Financial Stress",
+        "Sentiment",
+        "Technical",
+        "Liquidity",
+        "Market Breadth",
+        "Cross Asset",
+    ]:
+
+        df = RESEARCH.get(
+            label
+        )
+
+        if df is None:
+            continue
+
+        st.markdown(
+            f"### {label}"
+        )
+
+        display_research_dataset(
+            df,
+            label,
+        )
+
+
+# ============================================================
+# MACRO
+# ============================================================
+
+elif page == "Macro":
+
+    st.subheader(
+        "Macro Intelligence"
     )
 
-    macro_rows = []
+    df = RESEARCH.get(
+        "Macro Context"
+    )
 
-    macro_display = [
+    if df is None:
+        df = context
+
+    display_research_dataset(
+        df,
+        "Macro Intelligence",
+    )
+
+    if df is not None:
+
+        st.markdown(
+            "### Macro Evidence"
+        )
+
+        numeric = numeric_columns(
+            df
+        )
+
+        if numeric:
+
+            latest = df.iloc[-1]
+
+            for column in numeric[:8]:
+
+                value = latest.get(
+                    column
+                )
+
+                evidence_card(
+                    friendly_name(
+                        column
+                    ),
+                    (
+                        "Latest research observation: "
+                        f"{format_value(value)}"
+                    ),
+                )
+
+
+# ============================================================
+# FINANCIAL STRESS
+# ============================================================
+
+elif page == "Financial Stress":
+
+    st.subheader(
+        "Financial Stress Intelligence"
+    )
+
+    df = RESEARCH.get(
+        "Financial Stress"
+    )
+
+    display_research_dataset(
+        df,
+        "Financial Stress",
+    )
+
+    if df is not None:
+
+        st.markdown(
+            "### Stress Structure"
+        )
+
+        preferred = [
+            "VIX",
+            "NFCI",
+            "ANFCI",
+            "YIELD_10Y_2Y_SPREAD",
+            "VIX_Z",
+            "NFCI_Z",
+            "ANFCI_Z",
+            "YIELD_CURVE_STRESS_Z",
+            "composite_stress_score",
+            "research_regime",
+        ]
+
+        available = [
+            x
+            for x in preferred
+            if x in df.columns
+        ]
+
+        if available:
+
+            latest = df.iloc[-1]
+
+            rows = [
+                [
+                    friendly_name(
+                        column
+                    ),
+                    format_value(
+                        latest.get(
+                            column
+                        )
+                    ),
+                ]
+                for column in available
+            ]
+
+            st.dataframe(
+                pd.DataFrame(
+                    rows,
+                    columns=[
+                        "Stress Component",
+                        "Latest Observation",
+                    ],
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        numeric = [
+            c
+            for c in numeric_columns(df)
+            if c not in {
+                "record_id"
+            }
+        ]
+
+        if numeric:
+
+            chart_columns = [
+                c
+                for c in [
+                    "VIX",
+                    "NFCI",
+                    "ANFCI",
+                    "composite_stress_score",
+                ]
+                if c in df.columns
+            ]
+
+            if chart_columns:
+
+                chart = (
+                    df.copy()
+                    .tail(500)
+                )
+
+                chart[
+                    chart_columns
+                ] = chart[
+                    chart_columns
+                ].apply(
+                    pd.to_numeric,
+                    errors="coerce",
+                )
+
+                st.line_chart(
+                    chart[
+                        chart_columns
+                    ],
+                    use_container_width=True,
+                )
+
+
+# ============================================================
+# SENTIMENT
+# ============================================================
+
+elif page == "Sentiment":
+
+    st.subheader(
+        "Sentiment Intelligence"
+    )
+
+    sentiment_datasets = [
         (
-            "US10Y",
-            "10-Year Treasury"
+            "Research Context",
+            RESEARCH.get(
+                "Research Context"
+            ),
         ),
         (
-            "US2Y",
-            "2-Year Treasury"
-        ),
-        (
-            "T10Y2Y",
-            "10Y − 2Y Yield Curve"
+            "AAII",
+            None,
         ),
         (
             "VIX",
-            "VIX"
-        ),
-        (
-            "DXY",
-            "Dollar Index"
-        ),
-        (
-            "HY_SPREAD",
-            "High Yield Spread"
-        ),
-        (
-            "CORP_OAS",
-            "Corporate OAS"
-        ),
-        (
-            "NFCI",
-            "Chicago Fed NFCI"
-        ),
-        (
-            "INITIAL_CLAIMS_4W",
-            "Initial Claims 4W"
-        ),
-        (
-            "INDPRO",
-            "Industrial Production"
-        ),
-        (
-            "RETAIL",
-            "Retail Sales"
-        ),
-        (
-            "PCE",
-            "PCE"
-        ),
-        (
-            "CORE_PCE",
-            "Core PCE"
-        ),
-        (
-            "CPI",
-            "CPI"
-        ),
-        (
-            "UNRATE",
-            "Unemployment Rate"
-        ),
-        (
-            "FEDFUNDS",
-            "Federal Funds Rate"
+            None,
         ),
     ]
 
-    for key, label in macro_display:
+    for label, df in sentiment_datasets:
 
-        value = latest(
-            macro_data.get(key)
-        )
+        if label == "Research Context":
 
-        if np.isnan(value):
+            if df is not None:
 
-            display = "DATA UNAVAILABLE"
+                sentiment_columns = [
+                    c
+                    for c in df.columns
+                    if any(
+                        word in c.lower()
+                        for word in [
+                            "sentiment",
+                            "vix",
+                            "aaii",
+                            "fear",
+                            "greed",
+                        ]
+                    )
+                ]
 
-        else:
+                if sentiment_columns:
 
-            display = f"{value:.4f}"
+                    st.markdown(
+                        "### Sentiment fields"
+                    )
 
-        macro_rows.append(
-            [
+                    latest = df.iloc[-1]
+
+                    rows = [
+                        [
+                            friendly_name(c),
+                            format_value(
+                                latest.get(c)
+                            ),
+                        ]
+                        for c in sentiment_columns
+                    ]
+
+                    st.dataframe(
+                        pd.DataFrame(
+                            rows,
+                            columns=[
+                                "Indicator",
+                                "Latest",
+                            ],
+                        ),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+        elif label in RESEARCH:
+
+            display_research_dataset(
+                df,
                 label,
-                display,
-            ]
-        )
+            )
 
-    st.dataframe(
-        pd.DataFrame(
-            macro_rows,
-            columns=[
-                "Indicator",
-                "Latest",
+    st.info(
+        "Sentiment observations are displayed as research evidence. "
+        "They are not transformed into a directional signal."
+    )
+
+
+# ============================================================
+# TECHNICAL
+# ============================================================
+
+elif page == "Technical":
+
+    st.subheader(
+        "Technical Intelligence"
+    )
+
+    df = RESEARCH.get(
+        "Technical"
+    )
+
+    display_research_dataset(
+        df,
+        "Technical Intelligence",
+    )
+
+    if df is not None:
+
+        date_col = find_column(
+            df,
+            [
+                "date",
+                "asof_date",
+                "context_date",
             ],
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.divider()
-
-    st.subheader(
-        "Federal Reserve"
-    )
-
-    st.write(
-        f"**Manual Fed Stance:** {fed_stance}"
-    )
-
-    st.write(
-        "Official FOMC calendar:"
-    )
-
-    st.link_button(
-        "Open Federal Reserve FOMC Calendar",
-        FED_URL,
-    )
-
-
-# ============================================================
-# FED INTELLIGENCE TAB
-# ============================================================
-
-with tab_fed:
-
-    st.subheader(
-        "🏛️ Fed Intelligence"
-    )
-
-    st.caption(
-        "Automated analysis of FOMC communication, Minutes, "
-        "Chair communication, SEP and Beige Book."
-    )
-
-    # --------------------------------------------------------
-    # AVAILABILITY
-    # --------------------------------------------------------
-
-    fed_available = fed_get(
-        "available",
-        True,
-    )
-
-    if fed_available is False:
-
-        st.error(
-            "Fed Intelligence is currently unavailable."
         )
 
-        st.code(
-            str(
-                fed_get(
-                    "error",
-                    "Unknown error."
+        numeric = numeric_columns(
+            df
+        )
+
+        if date_col and numeric:
+
+            chart_df = df.copy()
+
+            chart_df[date_col] = pd.to_datetime(
+                chart_df[date_col],
+                errors="coerce",
+            )
+
+            chart_df = (
+                chart_df
+                .dropna(
+                    subset=[
+                        date_col
+                    ]
+                )
+                .tail(500)
+                .set_index(
+                    date_col
                 )
             )
-        )
 
-        st.stop()
+            selected = numeric[:6]
 
-    # --------------------------------------------------------
-    # TOP FED INFORMATION
-    # --------------------------------------------------------
-
-    latest_fomc = fed_get(
-        "latest_fomc",
-        fed_get(
-            "fomc_date",
-            "N/A",
-        ),
-    )
-
-    fed_chair = fed_get(
-        "fed_chair",
-        fed_get(
-            "chair",
-            "N/A",
-        ),
-    )
-
-    statement_tone = fed_get(
-        "statement_tone",
-        "N/A",
-    )
-
-    minutes_tone = fed_get(
-        "minutes_tone",
-        "N/A",
-    )
-
-    press_tone = fed_get(
-        "press_conference_tone",
-        fed_get(
-            "chair_tone",
-            "N/A",
-        ),
-    )
-
-    latest_sep = fed_get(
-        "latest_sep",
-        "N/A",
-    )
-
-    previous_sep = fed_get(
-        "previous_sep",
-        "N/A",
-    )
-
-    sep_shift = fed_get(
-        "sep_shift",
-        "N/A",
-    )
-
-    fed_score = fed_get(
-        "fed_score",
-        fed_get(
-            "score",
-            None,
-        ),
-    )
-
-    fed_classification = fed_get(
-        "overall_tone",
-        fed_get(
-            "classification",
-            "N/A",
-        ),
-    )
-
-    # --------------------------------------------------------
-    # MAIN FED METRICS
-    # --------------------------------------------------------
-
-    fc1, fc2, fc3, fc4 = st.columns(4)
-
-    with fc1:
-
-        st.metric(
-            "Fed Intelligence Score",
-            (
-                f"{safe_number(fed_score):.1f}/100"
-                if safe_number(fed_score) is not None
-                else "N/A"
-            ),
-        )
-
-    with fc2:
-
-        st.metric(
-            "Overall Tone",
-            str(
-                fed_classification
-            ),
-        )
-
-    with fc3:
-
-        st.metric(
-            "Latest FOMC",
-            format_date(
-                latest_fomc
-            ),
-        )
-
-    with fc4:
-
-        st.metric(
-            "Fed Chair",
-            str(
-                fed_chair
-            ),
-        )
-
-    st.divider()
-
-    # --------------------------------------------------------
-    # FOMC COMMUNICATION
-    # --------------------------------------------------------
-
-    st.subheader(
-        "FOMC Communication"
-    )
-
-    communication_rows = [
-        [
-            "Statement",
-            str(statement_tone),
-        ],
-        [
-            "Minutes",
-            str(minutes_tone),
-        ],
-        [
-            "Chair / Press Conference",
-            str(press_tone),
-        ],
-    ]
-
-    st.dataframe(
-        pd.DataFrame(
-            communication_rows,
-            columns=[
-                "Source",
-                "Tone",
-            ],
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.divider()
-
-    # --------------------------------------------------------
-    # POLICY DIMENSIONS
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Fed Policy Dimensions"
-    )
-
-    dimensions = fed_get(
-        "dimensions",
-        {},
-    )
-
-    if not isinstance(
-        dimensions,
-        dict
-    ):
-
-        dimensions = {}
-
-    dimension_rows = []
-
-    dimension_order = [
-        (
-            "inflation",
-            "Inflation",
-        ),
-        (
-            "labor",
-            "Labor",
-        ),
-        (
-            "growth",
-            "Growth",
-        ),
-        (
-            "financial",
-            "Financial Conditions",
-        ),
-        (
-            "policy",
-            "Monetary Policy",
-        ),
-    ]
-
-    for key, label in dimension_order:
-
-        dimension = dimensions.get(
-            key,
-            {},
-        )
-
-        if not isinstance(
-            dimension,
-            dict
-        ):
-
-            dimension = {}
-
-        score = dimension.get(
-            "score_100",
-            dimension.get(
-                "score",
-                None,
-            ),
-        )
-
-        classification = dimension.get(
-            "classification",
-            dimension.get(
-                "tone",
-                None,
-            ),
-        )
-
-        if classification is None:
-
-            numeric_score = safe_number(
-                score
+            chart_df[
+                selected
+            ] = chart_df[
+                selected
+            ].apply(
+                pd.to_numeric,
+                errors="coerce",
             )
 
-            if numeric_score is None:
+            st.markdown(
+                "### Technical Research History"
+            )
 
-                classification = "N/A"
-
-            elif numeric_score >= 70:
-
-                classification = "POSITIVE"
-
-            elif numeric_score >= 55:
-
-                classification = "SLIGHTLY POSITIVE"
-
-            elif numeric_score >= 45:
-
-                classification = "NEUTRAL"
-
-            elif numeric_score >= 30:
-
-                classification = "SLIGHTLY NEGATIVE"
-
-            else:
-
-                classification = "NEGATIVE"
-
-        dimension_rows.append(
-            [
-                label,
-                (
-                    f"{safe_number(score):.1f}/100"
-                    if safe_number(score) is not None
-                    else "N/A"
-                ),
-                str(
-                    classification
-                ),
-            ]
-        )
-
-    if dimension_rows:
-
-        st.dataframe(
-            pd.DataFrame(
-                dimension_rows,
-                columns=[
-                    "Dimension",
-                    "Score",
-                    "Classification",
+            st.line_chart(
+                chart_df[
+                    selected
                 ],
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    else:
-
-        st.info(
-            "No policy-dimension data available."
-        )
-
-    st.divider()
-
-    # --------------------------------------------------------
-    # SEP
-    # --------------------------------------------------------
-
-    st.subheader(
-        "📊 Summary of Economic Projections"
-    )
-
-    sep_col1, sep_col2 = st.columns(2)
-
-    with sep_col1:
-
-        st.write(
-            f"**Latest SEP:** {latest_sep}"
-        )
-
-    with sep_col2:
-
-        st.write(
-            f"**Previous SEP:** {previous_sep}"
-        )
-
-    st.write(
-        f"**SEP Shift:** {sep_shift}"
-    )
-
-    sep_data = fed_get(
-        "sep",
-        {},
-    )
-
-    if not isinstance(
-        sep_data,
-        dict
-    ):
-
-        sep_data = {}
-
-    previous_sep_data = fed_get(
-        "previous_sep_data",
-        fed_get(
-            "sep_previous",
-            {},
-        ),
-    )
-
-    if not isinstance(
-        previous_sep_data,
-        dict
-    ):
-
-        previous_sep_data = {}
-
-    sep_rows = []
-
-    sep_keys = [
-        (
-            "gdp",
-            "GDP Growth",
-        ),
-        (
-            "unemployment",
-            "Unemployment",
-        ),
-        (
-            "pce",
-            "PCE Inflation",
-        ),
-        (
-            "core_pce",
-            "Core PCE",
-        ),
-        (
-            "fed_funds",
-            "Federal Funds Rate",
-        ),
-    ]
-
-    for key, label in sep_keys:
-
-        current_value = sep_data.get(
-            key,
-            None,
-        )
-
-        previous_value = previous_sep_data.get(
-            key,
-            None,
-        )
-
-        current_number = safe_number(
-            current_value
-        )
-
-        previous_number = safe_number(
-            previous_value
-        )
-
-        if (
-            current_number is not None
-            and previous_number is not None
-        ):
-
-            change = (
-                current_number
-                - previous_number
+                use_container_width=True,
             )
-
-        else:
-
-            change = None
-
-        sep_rows.append(
-            [
-                label,
-                (
-                    f"{current_number:.1f}"
-                    if current_number is not None
-                    else "N/A"
-                ),
-                (
-                    f"{previous_number:.1f}"
-                    if previous_number is not None
-                    else "N/A"
-                ),
-                (
-                    f"{change:+.1f}"
-                    if change is not None
-                    else "N/A"
-                ),
-            ]
-        )
-
-    if sep_rows:
-
-        st.dataframe(
-            pd.DataFrame(
-                sep_rows,
-                columns=[
-                    "Indicator",
-                    "Latest SEP",
-                    "Previous SEP",
-                    "Change",
-                ],
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    st.divider()
-
-    # --------------------------------------------------------
-    # BEIGE BOOK
-    # --------------------------------------------------------
-
-    st.subheader(
-        "📕 Beige Book"
-
-    )
-
-    beige = fed_get(
-        "beige_book",
-        fed_get(
-            "beige",
-            {},
-        ),
-    )
-
-    if not isinstance(
-        beige,
-        dict
-    ):
-
-        beige = {}
-
-    beige_title = beige.get(
-        "title",
-        beige.get(
-            "name",
-            "N/A",
-        ),
-    )
-
-    beige_issue = beige.get(
-        "issue",
-        beige.get(
-            "issue_date",
-            "N/A",
-        ),
-    )
-
-    beige_publication = beige.get(
-        "publication",
-        beige.get(
-            "publication_date",
-            "N/A",
-        ),
-    )
-
-    beige_score = beige.get(
-        "score",
-        beige.get(
-            "score_100",
-            None,
-        ),
-    )
-
-    beige_tone = beige.get(
-        "tone",
-        beige.get(
-            "classification",
-            "N/A",
-        ),
-    )
-
-    bc1, bc2, bc3, bc4 = st.columns(4)
-
-    with bc1:
-
-        st.write(
-            "**Beige Book**"
-        )
-
-        st.write(
-            str(
-                beige_title
-            )
-        )
-
-    with bc2:
-
-        st.write(
-            "**Issue**"
-        )
-
-        st.write(
-            str(
-                beige_issue
-            )
-        )
-
-    with bc3:
-
-        st.write(
-            "**Publication**"
-        )
-
-        st.write(
-            str(
-                beige_publication
-            )
-        )
-
-    with bc4:
-
-        st.write(
-            "**Score / Tone**"
-        )
-
-        if safe_number(
-            beige_score
-        ) is not None:
-
-            st.write(
-                f"{safe_number(beige_score):.1f}/100"
-            )
-
-        else:
-
-            st.write(
-                "N/A"
-            )
-
-        st.write(
-            str(
-                beige_tone
-            )
-        )
-
-    beige_dimensions = beige.get(
-        "dimensions",
-        {},
-    )
-
-    if not isinstance(
-        beige_dimensions,
-        dict
-    ):
-
-        beige_dimensions = {}
-
-    beige_rows = []
-
-    beige_order = [
-        (
-            "growth",
-            "Growth",
-        ),
-        (
-            "labor",
-            "Labor",
-        ),
-        (
-            "inflation",
-            "Inflation",
-        ),
-        (
-            "consumer",
-            "Consumer Spending",
-        ),
-        (
-            "manufacturing",
-            "Manufacturing",
-        ),
-        (
-            "financial",
-            "Financial Conditions",
-        ),
-        (
-            "housing",
-            "Housing",
-        ),
-    ]
-
-    for key, label in beige_order:
-
-        item = beige_dimensions.get(
-            key,
-            {},
-        )
-
-        if not isinstance(
-            item,
-            dict
-        ):
-
-            item = {}
-
-        score = item.get(
-            "score_100",
-            item.get(
-                "score",
-                None,
-            ),
-        )
-
-        classification = item.get(
-            "classification",
-            item.get(
-                "tone",
-                None,
-            ),
-        )
-
-        if classification is None:
-
-            numeric_score = safe_number(
-                score
-            )
-
-            if numeric_score is None:
-
-                classification = "N/A"
-
-            elif numeric_score >= 70:
-
-                classification = "POSITIVE"
-
-            elif numeric_score >= 55:
-
-                classification = "SLIGHTLY POSITIVE"
-
-            elif numeric_score >= 45:
-
-                classification = "NEUTRAL"
-
-            elif numeric_score >= 30:
-
-                classification = "SLIGHTLY NEGATIVE"
-
-            else:
-
-                classification = "NEGATIVE"
-
-        beige_rows.append(
-            [
-                label,
-                (
-                    f"{safe_number(score):.1f}/100"
-                    if safe_number(score) is not None
-                    else "N/A"
-                ),
-                str(
-                    classification
-                ),
-            ]
-        )
-
-    if beige_rows:
-
-        st.dataframe(
-            pd.DataFrame(
-                beige_rows,
-                columns=[
-                    "Dimension",
-                    "Score",
-                    "Classification",
-                ],
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    # --------------------------------------------------------
-    # FED REASONS
-    # --------------------------------------------------------
-
-    st.divider()
-
-    st.subheader(
-        "🧠 Fed Intelligence Reasons"
-    )
-
-    reasons = fed_get(
-        "reasons",
-        [],
-    )
-
-    if reasons is None:
-
-        reasons = []
-
-    if isinstance(
-        reasons,
-        dict
-    ):
-
-        for key, value in reasons.items():
-
-            st.write(
-                f"• **{key}:** {display_reason(value)}"
-            )
-
-    elif isinstance(
-        reasons,
-        list
-    ):
-
-        if reasons:
-
-            for reason in reasons:
-
-                if isinstance(
-                    reason,
-                    dict
-                ):
-
-                    dimension = reason.get(
-                        "dimension",
-                        "",
-                    )
-
-                    text = reason.get(
-                        "reason",
-                        reason.get(
-                            "text",
-                            "",
-                        ),
-                    )
-
-                    st.write(
-                        f"• **{dimension}:** "
-                        f"{display_reason(text)}"
-                    )
-
-                else:
-
-                    st.write(
-                        f"• {display_reason(reason)}"
-                    )
-
-        else:
-
-            st.info(
-                "No additional reasons returned."
-            )
-
-    else:
-
-        st.write(
-            f"• {display_reason(reasons)}"
-        )
-
-    # --------------------------------------------------------
-    # IMPORTANT ARCHITECTURE NOTE
-    # --------------------------------------------------------
-
-    st.divider()
-
-    st.warning(
-        """
-        **Important architecture rule**
-
-        Fed Intelligence is currently an independent analytical layer.
-
-        It does **not** automatically modify:
-
-        - Final Decision
-        - Early Warning Score
-        - Technical Confirmation
-        - Position Size
-        - SL / TP
-
-        This is intentional. We should first validate the Fed Intelligence
-        model through historical event studies and backtesting before
-        allowing it to influence the trading engine.
-        """
-    )
 
 
 # ============================================================
-# TRADING TAB
+# HISTORICAL EDGE
 # ============================================================
 
-with tab_trading:
+elif page == "Historical Edge":
 
     st.subheader(
-        "🎯 Trading Framework"
+        "Historical Edge Finder"
     )
 
     st.caption(
-        "This section calculates hypothetical levels only. "
-        "No order is sent to a broker."
+        "Historical analogues and observed outcomes from completed "
+        "research. This is a distributional research view, not a forecast."
     )
 
-    st.write(
-        "**Strategy:** Daily US500 pullback swing"
+    df = RESEARCH.get(
+        "Historical Edge"
     )
 
-    st.write(
-        "**Risk/Reward:** 1 : 4"
-    )
+    if df is None:
 
-    st.write(
-        "**Stop:** Lowest Low of previous 5 completed Daily candles "
-        "− 0.5 × ATR(14)"
-    )
+        df = RESEARCH.get(
+            "Historical Edge v1"
+        )
 
-    st.write(
-        "**TP:** Entry + 4 × Risk"
-    )
+    if df is None:
 
-    st.divider()
+        st.warning(
+            "Historical Event Study artifact is not currently available."
+        )
+
+    else:
+
+        st.metric(
+            "Historical Observations",
+            f"{len(df):,}",
+        )
+
+        st.write("")
+
+        columns = df.columns.tolist()
+
+        outcome_columns = [
+            c
+            for c in columns
+            if any(
+                word in c.lower()
+                for word in [
+                    "return",
+                    "mfe",
+                    "mae",
+                    "recovery",
+                    "drawdown",
+                    "horizon",
+                    "forward",
+                    "outcome",
+                ]
+            )
+        ]
+
+        if outcome_columns:
+
+            st.markdown(
+                "### Historical Outcome Fields"
+            )
+
+            latest = df.iloc[-1]
+
+            rows = [
+                [
+                    friendly_name(c),
+                    format_value(
+                        latest.get(c)
+                    ),
+                ]
+                for c in outcome_columns[:20]
+            ]
+
+            st.dataframe(
+                pd.DataFrame(
+                    rows,
+                    columns=[
+                        "Historical Field",
+                        "Observed Value",
+                    ],
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        st.markdown(
+            "### Historical Distribution"
+        )
+
+        numeric = numeric_columns(
+            df
+        )
+
+        selected = [
+            c
+            for c in numeric
+            if any(
+                word in c.lower()
+                for word in [
+                    "return",
+                    "mfe",
+                    "mae",
+                ]
+            )
+        ][:6]
+
+        if selected:
+
+            plot_df = df[
+                selected
+            ].copy()
+
+            plot_df = plot_df.apply(
+                pd.to_numeric,
+                errors="coerce",
+            )
+
+            st.line_chart(
+                plot_df.tail(300),
+                use_container_width=True,
+            )
+
+        with st.expander(
+            "Inspect historical research sample"
+        ):
+
+            st.dataframe(
+                df.tail(100),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+# ============================================================
+# EVENT STUDIES
+# ============================================================
+
+elif page == "Event Studies":
 
     st.subheader(
-        "Entry / SL / TP Calculator"
+        "Event Study Research"
     )
 
-    entry = st.number_input(
-        "Entry",
-        min_value=0.0,
-        value=float(price),
-        step=1.0,
-    )
-
-    risk_dollars = st.number_input(
-        "Risk in USD",
-        min_value=1.0,
-        value=250.0,
-        step=50.0,
-    )
-
-    point_value = st.number_input(
-        "Point Value",
-        min_value=0.0001,
-        value=1.0,
-        step=0.1,
-        help=(
-            "Set according to your broker/instrument specification."
+    datasets = [
+        (
+            "Historical Edge",
+            RESEARCH.get(
+                "Historical Edge"
+            ),
         ),
-    )
+        (
+            "Event News",
+            RESEARCH.get(
+                "Event News"
+            ),
+        ),
+        (
+            "Earnings",
+            RESEARCH.get(
+                "Earnings"
+            ),
+        ),
+    ]
 
-    sl, tp, risk_points = sl_tp(
-        market,
-        entry,
-    )
+    for label, df in datasets:
 
-    if (
-        not np.isnan(sl)
-        and not np.isnan(tp)
-        and risk_points > 0
-    ):
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-
-            st.metric(
-                "Entry",
-                f"{entry:.2f}",
-            )
-
-        with c2:
-
-            st.metric(
-                "Stop Loss",
-                f"{sl:.2f}",
-            )
-
-        with c3:
-
-            st.metric(
-                "Take Profit 1:4",
-                f"{tp:.2f}",
-            )
-
-        st.write(
-            f"**Price Risk:** {risk_points:.2f} points"
+        st.markdown(
+            f"### {label}"
         )
 
-        quantity = position_size(
-            risk_dollars,
-            entry,
-            sl,
-            point_value,
+        display_research_dataset(
+            df,
+            label,
         )
-
-        if not np.isnan(quantity):
-
-            st.metric(
-                "Calculated Position Size",
-                f"{quantity:.4f}",
-            )
-
-            st.caption(
-                "Position size is generic. "
-                "For futures/CFDs, verify the broker's contract "
-                "size and point value before using it."
-            )
-
-    else:
-
-        st.warning(
-            "Unable to calculate SL/TP from the available data."
-        )
-
-    st.divider()
-
-    st.subheader(
-        "Pullback Decision"
-    )
-
-    if ew_score >= 75:
-
-        st.error(
-            "CRITICAL: No new trade."
-        )
-
-    elif regime.startswith("E"):
-
-        st.error(
-            "DEFENSIVE: Recession / bear risk."
-        )
-
-    elif regime.startswith("F"):
-
-        st.error(
-            "DEFENSIVE: Financial/liquidity shock."
-        )
-
-    elif technical_score <= 2:
-
-        st.warning(
-            "CAUTION: Technical confirmation is weak."
-        )
-
-    elif technical_score == 3:
-
-        st.warning(
-            "SUPPORTIVE / CONFIRM: Technical structure is partial."
-        )
-
-    else:
-
-        st.success(
-            "Technical confirmation is strong."
-        )
-
-
-# ============================================================
-# EVENTS TAB
-# ============================================================
-
-with tab_events:
-
-    st.subheader(
-        "📅 Macro Events"
-    )
 
     st.info(
-        "The current version uses the latest available macro "
-        "observations. A dedicated economic-calendar parser can "
-        "be added later without changing the decision framework."
+        "Event-study results describe historical observations "
+        "and distributions. They do not establish a deterministic "
+        "future outcome."
     )
 
-    event_rows = [
 
-        [
-            "Federal Reserve",
-            "FOMC",
-            "See official calendar",
-        ],
+# ============================================================
+# CROSS ASSET
+# ============================================================
 
-        [
-            "Inflation",
-            "CPI / Core CPI",
-            "BLS release",
-        ],
+elif page == "Cross-Asset":
 
-        [
-            "Inflation",
-            "PCE / Core PCE",
-            "BEA release",
-        ],
+    st.subheader(
+        "Cross-Asset Intelligence"
+    )
 
-        [
-            "Labor",
-            "NFP",
-            "BLS release",
-        ],
+    df = RESEARCH.get(
+        "Cross Asset"
+    )
 
-        [
-            "Labor",
-            "Initial Claims",
-            "Weekly",
-        ],
+    display_research_dataset(
+        df,
+        "Cross-Asset Intelligence",
+    )
 
-        [
-            "Growth",
-            "GDP",
-            "BEA release",
-        ],
+    if df is not None:
 
-        [
-            "Growth",
-            "ISM",
-            "ISM release",
-        ],
-    ]
+        numeric = numeric_columns(
+            df
+        )
 
-    st.dataframe(
-        pd.DataFrame(
-            event_rows,
-            columns=[
-                "Category",
-                "Event",
-                "Status",
-            ],
-        ),
-        use_container_width=True,
-        hide_index=True,
+        if numeric:
+
+            selected = numeric[:8]
+
+            chart_df = df[
+                selected
+            ].copy()
+
+            chart_df = chart_df.apply(
+                pd.to_numeric,
+                errors="coerce",
+            )
+
+            st.markdown(
+                "### Cross-Asset Research History"
+            )
+
+            st.line_chart(
+                chart_df.tail(300),
+                use_container_width=True,
+            )
+
+
+# ============================================================
+# EARNINGS
+# ============================================================
+
+elif page == "Earnings":
+
+    st.subheader(
+        "Corporate Earnings Intelligence"
+    )
+
+    df = RESEARCH.get(
+        "Earnings"
+    )
+
+    display_research_dataset(
+        df,
+        "Earnings Market Reaction V3",
+    )
+
+    if df is not None:
+
+        horizon_columns = [
+            c
+            for c in df.columns
+            if any(
+                word in c.lower()
+                for word in [
+                    "1d",
+                    "3d",
+                    "5d",
+                    "20d",
+                    "1m",
+                    "3m",
+                    "mfe",
+                    "mae",
+                ]
+            )
+        ]
+
+        if horizon_columns:
+
+            st.markdown(
+                "### Earnings Reaction Fields"
+            )
+
+            latest = df.iloc[-1]
+
+            rows = [
+                [
+                    friendly_name(
+                        column
+                    ),
+                    format_value(
+                        latest.get(column)
+                    ),
+                ]
+                for column in horizon_columns[:25]
+            ]
+
+            st.dataframe(
+                pd.DataFrame(
+                    rows,
+                    columns=[
+                        "Field",
+                        "Observed Result",
+                    ],
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    st.info(
+        "Earnings research summarizes historical market reactions "
+        "around corporate reporting events."
+    )
+
+
+# ============================================================
+# EVIDENCE
+# ============================================================
+
+elif page == "Evidence":
+
+    st.subheader(
+        "Evidence Desk"
     )
 
     st.caption(
-        "Actual / Forecast / Previous should only be displayed "
-        "when a verified economic-calendar source is connected."
+        "A compact explanation of what the research stack currently contains."
     )
 
+    evidence_sources = [
+        (
+            "Macro",
+            "Economic Intelligence and Macro Context research.",
+            "Macro Context" in RESEARCH,
+        ),
+        (
+            "Financial Stress",
+            "VIX, NFCI/ANFCI and yield-curve stress research.",
+            "Financial Stress" in RESEARCH,
+        ),
+        (
+            "Sentiment",
+            "Sentiment observations incorporated into the unified research context.",
+            context is not None,
+        ),
+        (
+            "Technical",
+            "Technical structure and market-state observations.",
+            "Technical" in RESEARCH,
+        ),
+        (
+            "Historical",
+            "Historical event-study distributions and observed outcomes.",
+            (
+                "Historical Edge" in RESEARCH
+                or "Historical Edge v1" in RESEARCH
+            ),
+        ),
+        (
+            "Cross-Asset",
+            "Relationships across relevant market assets.",
+            "Cross Asset" in RESEARCH,
+        ),
+        (
+            "Earnings",
+            "Historical corporate earnings reaction research.",
+            "Earnings" in RESEARCH,
+        ),
+    ]
 
-# ============================================================
-# HISTORY TAB
-# ============================================================
+    for (
+        name,
+        description,
+        available,
+    ) in evidence_sources:
 
-with tab_history:
+        status = (
+            "AVAILABLE"
+            if available
+            else "NOT CURRENTLY AVAILABLE"
+        )
 
-    st.subheader(
-        "📚 Historical Framework"
-    )
-
-    st.write(
-        "The historical event-study module is intentionally "
-        "kept separate from the live decision engine."
-    )
-
-    st.write(
-        "Target historical analysis:"
-    )
+        evidence_card(
+            name,
+            f"{description}  Status: {status}.",
+        )
 
     st.markdown(
-        """
-        - Pullback date
-        - Reference high
-        - Drawdown
-        - Trough
-        - Recovery date
-        - Recovery duration
-        - Macro regime
-        - Early Warning score
-        - VIX
-        - 10Y / 2Y
-        - Credit spreads
-        - ISM
-        - Initial Claims
-        - Inflation
-        - Fed stance
-        - Fed Intelligence
-        - FOMC Statement
-        - FOMC Minutes
-        - SEP Shift
-        - Beige Book
-        - 1:4 TP result
-        - Stop result
-        - R multiple
-        - Maximum drawdown
-        - Recovery time
-        """
+        "### Research Interpretation"
     )
 
-    st.divider()
-
-    st.subheader(
-        "Current Snapshot"
+    evidence_card(
+        "Current State",
+        "The dashboard displays the latest available research observations "
+        "without converting them into an executable market decision.",
     )
 
-    history_snapshot = pd.DataFrame(
-        [
-            [
-                datetime.utcnow().strftime(
-                    "%Y-%m-%d %H:%M UTC"
-                ),
-                price,
-                ath,
-                drawdown,
-                macro_score,
-                regime,
-                ew_score,
-                ew_level,
-                technical_score,
-                technical_status,
-                final_decision,
-            ]
-        ],
-        columns=[
-            "Timestamp",
-            "US500",
-            "ATH",
-            "Drawdown %",
-            "Macro Score",
-            "Regime",
-            "Early Warning",
-            "EW Level",
-            "Technical",
-            "Technical Status",
-            "Decision",
-        ],
+    evidence_card(
+        "Historical Evidence",
+        "Historical event studies are shown as observed distributions, "
+        "including forward outcomes, MFE/MAE and recovery characteristics "
+        "where those fields exist.",
     )
 
-    st.dataframe(
-        history_snapshot,
-        use_container_width=True,
-        hide_index=True,
+    evidence_card(
+        "Point-in-Time Discipline",
+        "The application preserves the point-in-time fields supplied by "
+        "the research artifacts instead of reconstructing unavailable "
+        "information inside the dashboard.",
     )
 
-    st.info(
-        "Historical probabilities and win rates should not be "
-        "assumed until the event-study/backtest is completed."
+    evidence_card(
+        "Architecture Boundary",
+        "The visualization layer does not create trading signals, "
+        "forecasts, position sizing or execution instructions.",
     )
 
 
@@ -2364,13 +2196,13 @@ with tab_history:
 
 st.divider()
 
-st.caption(
-    f"{APP_NAME} | Daily Macro + Early Warning + Technical "
-    f"+ Fed Intelligence Decision Support | "
-    f"Data refresh: {REFRESH_MINUTES} min"
-)
-
-st.caption(
-    "Market proxy: Yahoo Finance S&P 500 (^GSPC). "
-    "It may differ from a broker's US500 CFD or futures feed."
+st.markdown(
+    """
+    <div class="footer">
+        US500 Macro Intelligence · Research Terminal<br>
+        Research-only visualization layer ·
+        No trading signals · No forecasting · No execution
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
