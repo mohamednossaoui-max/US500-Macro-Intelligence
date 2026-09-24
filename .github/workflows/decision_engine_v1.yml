@@ -8,75 +8,91 @@ permissions:
   actions: read
 
 jobs:
+
   decision-engine-v1:
-    name: Decision Engine V1 — Research Only
+
+    name: Decision Engine V1 — Contract-First / Research Only
+
     runs-on: ubuntu-latest
 
     steps:
 
       # ============================================================
-      # 1. CHECKOUT
+      # CHECKOUT
       # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       # ============================================================
-      # 2. PYTHON
+      # PYTHON
       # ============================================================
+
       - name: Setup Python
         uses: actions/setup-python@v5
+
         with:
           python-version: "3.11"
 
+
       # ============================================================
-      # 3. VERIFY DECISION ENGINE FILES
+      # VERIFY SOURCE FILES
       # ============================================================
+
       - name: Verify Decision Engine files
         shell: bash
+
         run: |
-          set -e
 
-          echo "============================================================"
-          echo "VERIFYING DECISION ENGINE FILES"
-          echo "============================================================"
+          set -euo pipefail
 
-          test -f tests/decision_engine/decision_engine_v1.py
-          test -f tests/decision_engine/decision_engine_validation_v1.py
+          echo "=============================================="
+          echo "VERIFY DECISION ENGINE FILES"
+          echo "=============================================="
 
-          echo "Decision Engine source:"
-          ls -lh tests/decision_engine/decision_engine_v1.py
+          test -f \
+            tests/decision_engine/decision_engine_v1.py
 
-          echo "Decision Engine validator:"
-          ls -lh tests/decision_engine/decision_engine_validation_v1.py
+          test -f \
+            tests/decision_engine/decision_engine_validation_v1.py
+
+          echo "Decision Engine source: PASS"
+          echo "Decision Engine validator: PASS"
+
 
       # ============================================================
-      # 4. DOWNLOAD LATEST RESEARCH CONTEXT ARTIFACT
+      # DOWNLOAD LATEST RESEARCH CONTEXT ARTIFACT
       # ============================================================
+
       - name: Download latest research-context-v1 artifact
         shell: bash
+
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
 
-          echo "============================================================"
-          echo "DOWNLOADING RESEARCH CONTEXT ARTIFACT"
-          echo "============================================================"
+        run: |
+
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "LOCATE LATEST RESEARCH CONTEXT"
+          echo "=============================================="
 
           rm -rf decision_engine_input
-          mkdir -p decision_engine_input
 
-          echo "Searching for latest non-expired artifact:"
-          echo "research-context-v1"
+          mkdir -p decision_engine_input
 
           ARTIFACT_JSON="$(
             gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
               --jq '
                 [
                   .artifacts[]
-                  | select(.name == "research-context-v1")
-                  | select(.expired == false)
+                  | select(
+                      .name == "research-context-v1"
+                      and .expired == false
+                    )
                 ]
                 | sort_by(.created_at)
                 | reverse
@@ -84,184 +100,314 @@ jobs:
               '
           )"
 
-          if [ -z "$ARTIFACT_JSON" ] || [ "$ARTIFACT_JSON" = "null" ]; then
-            echo "ERROR: No valid research-context-v1 artifact found."
+          if [ -z "$ARTIFACT_JSON" ] || \
+             [ "$ARTIFACT_JSON" = "null" ]; then
+
+            echo "ERROR:"
+            echo "No valid research-context-v1 artifact found."
+
             exit 1
+
           fi
 
-          echo "Selected artifact:"
-          echo "$ARTIFACT_JSON"
 
           ARTIFACT_ID="$(
-            echo "$ARTIFACT_JSON" | python -c \
-              'import json,sys; print(json.load(sys.stdin)["id"])'
+            echo "$ARTIFACT_JSON" |
+            python -c '
+            import json
+            import sys
+            print(json.load(sys.stdin)["id"])
+            '
           )"
+
 
           ARTIFACT_CREATED_AT="$(
-            echo "$ARTIFACT_JSON" | python -c \
-              'import json,sys; print(json.load(sys.stdin)["created_at"])'
+            echo "$ARTIFACT_JSON" |
+            python -c '
+            import json
+            import sys
+            print(json.load(sys.stdin)["created_at"])
+            '
           )"
+
 
           ARTIFACT_RUN_ID="$(
-            echo "$ARTIFACT_JSON" | python -c \
-              'import json,sys; print(json.load(sys.stdin)["workflow_run"]["id"])'
+            echo "$ARTIFACT_JSON" |
+            python -c '
+            import json
+            import sys
+            print(
+                json.load(sys.stdin)
+                ["workflow_run"]["id"]
+            )
+            '
           )"
 
-          echo "Artifact ID      : $ARTIFACT_ID"
-          echo "Created at       : $ARTIFACT_CREATED_AT"
-          echo "Source Run ID    : $ARTIFACT_RUN_ID"
 
-          gh run download "$ARTIFACT_RUN_ID" \
+          echo "Artifact ID   : $ARTIFACT_ID"
+          echo "Created at    : $ARTIFACT_CREATED_AT"
+          echo "Source Run ID : $ARTIFACT_RUN_ID"
+
+
+          echo "Downloading artifact..."
+
+
+          gh run download \
+            "$ARTIFACT_RUN_ID" \
             --name research-context-v1 \
             --dir decision_engine_input
 
-          echo ""
+
+          echo
           echo "Downloaded files:"
-          find decision_engine_input -type f -print
+
+          find \
+            decision_engine_input \
+            -type f \
+            -print
+
 
       # ============================================================
-      # 5. SELECT CANONICAL RESEARCH CONTEXT SUMMARY
+      # PREPARE CANONICAL INPUT
       # ============================================================
-      - name: Prepare Decision Engine input
+
+      - name: Prepare canonical Research Context input
         shell: bash
-        run: |
-          set -e
 
-          echo "============================================================"
-          echo "PREPARING DECISION ENGINE INPUT"
-          echo "============================================================"
+        run: |
+
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "PREPARE CANONICAL INPUT"
+          echo "=============================================="
+
 
           SUMMARY_FILE="$(
-            find decision_engine_input \
+            find \
+              decision_engine_input \
               -type f \
               -name "research_context_summary_v1.csv" \
-              -print -quit
+              -print \
+              -quit
           )"
 
+
           if [ -z "$SUMMARY_FILE" ]; then
-            echo "ERROR: research_context_summary_v1.csv not found."
-            echo ""
-            echo "Available files:"
-            find decision_engine_input -type f -print
+
+            echo "ERROR:"
+            echo "research_context_summary_v1.csv not found."
+
+            find \
+              decision_engine_input \
+              -type f \
+              -print
+
             exit 1
+
           fi
+
+
+          rm -rf decision_engine_source
 
           mkdir -p decision_engine_source
 
-          cp "$SUMMARY_FILE" \
+
+          cp \
+            "$SUMMARY_FILE" \
             decision_engine_source/research_context_summary_v1.csv
 
+
+          echo
           echo "Canonical input:"
-          ls -lh decision_engine_source/research_context_summary_v1.csv
+          echo
 
-          echo ""
-          echo "Input header:"
-          head -n 1 decision_engine_source/research_context_summary_v1.csv
+          cat \
+            decision_engine_source/research_context_summary_v1.csv
 
-          echo ""
-          echo "Input row:"
-          tail -n 1 decision_engine_source/research_context_summary_v1.csv
 
       # ============================================================
-      # 6. RUN DECISION ENGINE
+      # RUN DECISION ENGINE
       # ============================================================
+
       - name: Run Decision Engine V1
         shell: bash
-        run: |
-          set -e
 
-          echo "============================================================"
-          echo "US500 MACRO INTELLIGENCE"
+        run: |
+
+          set -euo pipefail
+
+          echo "=============================================="
           echo "DECISION ENGINE V1"
-          echo "RESEARCH-ONLY"
-          echo "============================================================"
+          echo "CONTRACT-FIRST / RESEARCH-ONLY"
+          echo "=============================================="
+
 
           rm -rf decision_engine_artifacts
+
           mkdir -p decision_engine_artifacts
 
-          python tests/decision_engine/decision_engine_v1.py \
+
+          python \
+            tests/decision_engine/decision_engine_v1.py \
             --artifacts-dir decision_engine_source \
-            --output decision_engine_artifacts/decision_engine_research_v1.csv \
-            --summary-output decision_engine_artifacts/decision_engine_summary_v1.csv
+            --output \
+              decision_engine_artifacts/decision_engine_research_v1.csv \
+            --summary-output \
+              decision_engine_artifacts/decision_engine_summary_v1.csv
 
-          echo ""
-          echo "Decision Engine outputs:"
-          ls -lh decision_engine_artifacts/
 
       # ============================================================
-      # 7. DISPLAY ENGINE RESULT
+      # DISPLAY ENGINE OUTPUT
       # ============================================================
+
       - name: Display Decision Engine result
         shell: bash
+
         run: |
-          set -e
 
-          echo "============================================================"
+          set -euo pipefail
+
+          echo
+          echo "=============================================="
           echo "DECISION ENGINE RESULT"
-          echo "============================================================"
+          echo "=============================================="
 
-          echo ""
-          echo "Research output:"
-          cat decision_engine_artifacts/decision_engine_research_v1.csv
+          cat \
+            decision_engine_artifacts/decision_engine_research_v1.csv
 
-          echo ""
-          echo "Summary:"
-          cat decision_engine_artifacts/decision_engine_summary_v1.csv
+
+          echo
+          echo "=============================================="
+          echo "DECISION ENGINE SUMMARY"
+          echo "=============================================="
+
+          cat \
+            decision_engine_artifacts/decision_engine_summary_v1.csv
+
 
       # ============================================================
-      # 8. RUN VALIDATOR
+      # RUN INDEPENDENT VALIDATOR
       # ============================================================
+
       - name: Run Decision Engine Validator
         shell: bash
+
         run: |
-          set -e
 
-          echo "============================================================"
-          echo "DECISION ENGINE VALIDATION V1"
-          echo "============================================================"
+          set -euo pipefail
 
-          python tests/decision_engine/decision_engine_validation_v1.py \
-            --input decision_engine_artifacts/decision_engine_research_v1.csv \
-            --summary-output decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
-            --events-output decision_engine_artifacts/decision_engine_validation_v1_events.csv \
-            --output decision_engine_artifacts/decision_engine_validation_v1.csv
+          echo "=============================================="
+          echo "DECISION ENGINE VALIDATION"
+          echo "=============================================="
+
+
+          python \
+            tests/decision_engine/decision_engine_validation_v1.py \
+            --input \
+              decision_engine_artifacts/decision_engine_research_v1.csv \
+            --summary-output \
+              decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
+            --events-output \
+              decision_engine_artifacts/decision_engine_validation_v1_events.csv \
+            --output \
+              decision_engine_artifacts/decision_engine_validation_v1.csv
+
 
       # ============================================================
-      # 9. DISPLAY VALIDATION
+      # DISPLAY VALIDATION
       # ============================================================
+
       - name: Display validation results
         shell: bash
+
         run: |
-          set -e
 
-          echo "============================================================"
-          echo "DECISION ENGINE VALIDATION RESULTS"
-          echo "============================================================"
+          set -euo pipefail
 
-          echo ""
-          echo "Validation summary:"
-          cat decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+          echo
+          echo "=============================================="
+          echo "VALIDATION SUMMARY"
+          echo "=============================================="
 
-          echo ""
-          echo "Validation:"
-          cat decision_engine_artifacts/decision_engine_validation_v1.csv
+          cat \
+            decision_engine_artifacts/decision_engine_validation_v1_summary.csv
 
-          echo ""
-          echo "Validation events:"
-          cat decision_engine_artifacts/decision_engine_validation_v1_events.csv
+
+          echo
+          echo "=============================================="
+          echo "VALIDATION RESULTS"
+          echo "=============================================="
+
+          cat \
+            decision_engine_artifacts/decision_engine_validation_v1.csv
+
+
+          echo
+          echo "=============================================="
+          echo "VALIDATION EVENTS"
+          echo "=============================================="
+
+          cat \
+            decision_engine_artifacts/decision_engine_validation_v1_events.csv
+
 
       # ============================================================
-      # 10. UPLOAD DECISION ENGINE ARTIFACTS
+      # UPLOAD ARTIFACTS
       # ============================================================
+
       - name: Upload Decision Engine artifacts
         uses: actions/upload-artifact@v4
+
         with:
+
           name: decision-engine-v1
+
           path: |
+
             decision_engine_artifacts/decision_engine_research_v1.csv
+
             decision_engine_artifacts/decision_engine_summary_v1.csv
+
             decision_engine_artifacts/decision_engine_validation_v1.csv
+
             decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+
             decision_engine_artifacts/decision_engine_validation_v1_events.csv
+
           if-no-files-found: error
+
           retention-days: 30
+
+
+      # ============================================================
+      # FINAL STATUS
+      # ============================================================
+
+      - name: Final status
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          echo
+          echo "============================================================"
+          echo "DECISION ENGINE V1 PASSED"
+          echo "============================================================"
+
+          echo "Mode                  : RESEARCH-ONLY"
+
+          echo "Architecture version  : 1.0"
+
+          echo "Scoring               : DISABLED"
+
+          echo "Trading signal        : FALSE"
+
+          echo "Forecast              : FALSE"
+
+          echo "Execution             : FALSE"
+
+          echo "Unified decision      : FALSE"
+
+          echo "============================================================"
