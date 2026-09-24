@@ -1,87 +1,284 @@
 name: Decision Engine V1
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   decision-engine-v1:
     runs-on: ubuntu-latest
+
     steps:
+
+      # ==========================================================
+      # 1. CHECKOUT
+      # ==========================================================
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # ==========================================================
+      # 2. PYTHON
+      # ==========================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      # ==========================================================
+      # 3. VERIFY DECISION ENGINE FILES
+      # ==========================================================
       - name: Verify Decision Engine files
         shell: bash
         run: |
           set -euo pipefail
+
           echo "============================================================"
           echo "US500 MACRO INTELLIGENCE — DECISION ENGINE V1"
           echo "============================================================"
-          ENGINE="tests/decision engine/decision_engine_v1.py"
-          VALIDATOR="tests/decision engine/decision_engine_validation_v1.py"
-          echo "Engine    : $ENGINE"
-          echo "Validator : $VALIDATOR"
           echo
+
+          ENGINE="tests/decision_engine/decision_engine_v1.py"
+          VALIDATOR="tests/decision_engine/decision_engine_validation_v1.py"
+
+          echo "Repository root:"
+          pwd
+          echo
+
+          echo "Engine:"
+          echo "$ENGINE"
+          echo
+
+          echo "Validator:"
+          echo "$VALIDATOR"
+          echo
+
+          echo "Checking files..."
           test -f "$ENGINE"
           test -f "$VALIDATOR"
+
+          echo
           echo "Decision Engine files found successfully."
+          echo
+
+          echo "============================================================"
+          echo "FILE CHECK PASSED"
+          echo "============================================================"
+
+      # ==========================================================
+      # 4. DISCOVER RESEARCH ARTIFACTS
+      # ==========================================================
       - name: Discover existing research artifacts
         shell: bash
         run: |
           set -euo pipefail
+
           echo
           echo "============================================================"
           echo "EXISTING RESEARCH ARTIFACTS"
           echo "============================================================"
+
           find . \
             -type f \
             -name "*.csv" \
             -not -path "./.git/*" \
             | sort \
             | head -300 || true
+
+          echo
+          echo "============================================================"
+          echo "ARTIFACT DISCOVERY COMPLETE"
+          echo "============================================================"
+
+      # ==========================================================
+      # 5. CREATE OUTPUT DIRECTORY
+      # ==========================================================
+      - name: Prepare Decision Engine artifacts directory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf decision_engine_artifacts
+          mkdir -p decision_engine_artifacts
+
+          echo "Output directory:"
+          echo "decision_engine_artifacts/"
+          echo
+
+      # ==========================================================
+      # 6. RUN DECISION ENGINE
+      # ==========================================================
       - name: Run Decision Engine V1
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p decision_engine_artifacts
-          python "tests/decision engine/decision_engine_v1.py" \
+
+          ENGINE="tests/decision_engine/decision_engine_v1.py"
+
+          echo
+          echo "============================================================"
+          echo "RUNNING DECISION ENGINE V1"
+          echo "============================================================"
+
+          python "$ENGINE" \
             --artifacts-dir . \
             --output decision_engine_artifacts/decision_engine_research_v1.csv \
             --summary-output decision_engine_artifacts/decision_engine_summary_v1.csv
+
+          echo
+          echo "Decision Engine execution completed."
+
+          echo
+          echo "Generated files:"
+          find decision_engine_artifacts \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
+
+      # ==========================================================
+      # 7. VERIFY ENGINE OUTPUT
+      # ==========================================================
+      - name: Verify Decision Engine output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RESEARCH_OUTPUT="decision_engine_artifacts/decision_engine_research_v1.csv"
+          SUMMARY_OUTPUT="decision_engine_artifacts/decision_engine_summary_v1.csv"
+
+          echo
+          echo "============================================================"
+          echo "VERIFYING DECISION ENGINE OUTPUT"
+          echo "============================================================"
+
+          test -f "$RESEARCH_OUTPUT"
+          test -f "$SUMMARY_OUTPUT"
+
+          test -s "$RESEARCH_OUTPUT"
+          test -s "$SUMMARY_OUTPUT"
+
+          echo
+          echo "Research output:"
+          echo "$RESEARCH_OUTPUT"
+
+          echo
+          echo "Summary output:"
+          echo "$SUMMARY_OUTPUT"
+
+          echo
+          echo "Decision Engine output verification PASSED."
+
+      # ==========================================================
+      # 8. RUN VALIDATOR
+      # ==========================================================
       - name: Validate Decision Engine V1
         shell: bash
         run: |
           set -euo pipefail
-          python "tests/decision engine/decision_engine_validation_v1.py" \
+
+          VALIDATOR="tests/decision_engine/decision_engine_validation_v1.py"
+
+          echo
+          echo "============================================================"
+          echo "VALIDATING DECISION ENGINE V1"
+          echo "============================================================"
+
+          python "$VALIDATOR" \
             --input decision_engine_artifacts/decision_engine_research_v1.csv \
             --output decision_engine_artifacts/decision_engine_validation_v1.csv \
             --summary-output decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
             --events-output decision_engine_artifacts/decision_engine_validation_v1_events.csv
+
+          echo
+          echo "Decision Engine validation completed."
+
+      # ==========================================================
+      # 9. VERIFY VALIDATION OUTPUT
+      # ==========================================================
+      - name: Verify validation output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VALIDATION="decision_engine_artifacts/decision_engine_validation_v1.csv"
+          SUMMARY="decision_engine_artifacts/decision_engine_validation_v1_summary.csv"
+          EVENTS="decision_engine_artifacts/decision_engine_validation_v1_events.csv"
+
+          echo
+          echo "============================================================"
+          echo "VERIFYING VALIDATION OUTPUT"
+          echo "============================================================"
+
+          test -f "$VALIDATION"
+          test -f "$SUMMARY"
+          test -f "$EVENTS"
+
+          test -s "$VALIDATION"
+          test -s "$SUMMARY"
+
+          echo
+          echo "Validation output verified."
+
+      # ==========================================================
+      # 10. PRINT RESEARCH SUMMARY
+      # ==========================================================
       - name: Print Decision Engine result
         shell: bash
         run: |
           set -euo pipefail
+
           echo
           echo "============================================================"
           echo "DECISION ENGINE V1 RESULT"
           echo "============================================================"
+
           cat decision_engine_artifacts/decision_engine_summary_v1.csv
+
           echo
           echo "============================================================"
           echo "VALIDATION SUMMARY"
           echo "============================================================"
+
           cat decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+
           echo
           echo "============================================================"
           echo "VALIDATION EVENTS"
           echo "============================================================"
+
           cat decision_engine_artifacts/decision_engine_validation_v1_events.csv || true
+
+      # ==========================================================
+      # 11. PRINT ARTIFACT LIST
+      # ==========================================================
+      - name: List final artifacts
+        if: always()
+        shell: bash
+        run: |
+          echo
+          echo "============================================================"
+          echo "FINAL DECISION ENGINE ARTIFACTS"
+          echo "============================================================"
+
+          if [ -d "decision_engine_artifacts" ]; then
+            find decision_engine_artifacts \
+              -maxdepth 1 \
+              -type f \
+              -printf '%f\n' \
+              | sort
+          else
+            echo "decision_engine_artifacts directory not found."
+          fi
+
+      # ==========================================================
+      # 12. UPLOAD ARTIFACTS
+      # ==========================================================
       - name: Upload Decision Engine V1 artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: decision-engine-v1-artifacts
           path: decision_engine_artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
