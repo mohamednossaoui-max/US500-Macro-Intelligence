@@ -2,34 +2,23 @@
 
 """
 US500 MACRO INTELLIGENCE
-RESEARCH TERMINAL / EDGE FINDER STYLE
+RESEARCH TERMINAL — EDGE FINDER STYLE
 
-Purpose
--------
-Professional visualization layer for the completed research stack.
+Research-only visualization layer.
 
-IMPORTANT ARCHITECTURE RULES
-----------------------------
-- Research-only.
+IMPORTANT:
 - No BUY / SELL signals.
-- No trade execution.
-- No deterministic market forecast.
-- No directional Decision Engine.
+- No trading execution.
+- No deterministic forecast.
 - No position sizing.
 - No SL / TP.
-- No trading recommendation.
+- No directional recommendation.
+- No Decision Engine output as a trading decision.
 
-The application visualizes existing research artifacts produced by
-GitHub Actions and committed research files.
+The application visualizes the actual research artifacts produced
+by GitHub Actions.
 
-Primary data sources
---------------------
-1. Latest GitHub Actions artifacts.
-2. Repository CSV fallback files.
-3. Public Yahoo Finance US500 proxy for current market visualization.
-
-Repository
-----------
+Repository:
 mohamednossaoui-max/US500-Macro-Intelligence
 """
 
@@ -39,9 +28,8 @@ import io
 import json
 import os
 import zipfile
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -51,41 +39,101 @@ import yfinance as yf
 
 
 # ============================================================
-# CONFIGURATION
+# CONFIG
 # ============================================================
 
 APP_TITLE = "US500 Research Terminal"
-APP_VERSION = "1.0"
+APP_VERSION = "2.0"
 
 GITHUB_OWNER = "mohamednossaoui-max"
 GITHUB_REPO = "US500-Macro-Intelligence"
 
 GITHUB_API = (
-    f"https://api.github.com/repos/"
-    f"{GITHUB_OWNER}/{GITHUB_REPO}"
+f"https://api.github.com/repos/"
+f"{GITHUB_OWNER}/{GITHUB_REPO}"
 )
 
 US500_TICKER = os.getenv(
-    "US500_TICKER",
-    "^GSPC",
+"US500_TICKER",
+"^GSPC",
 )
 
 CACHE_TTL = 900
+MARKET_CACHE_TTL = 300
 
 
-ARTIFACT_MAP = {
-    "Research Context": "research-context-v1",
-    "Macro Context": "macro-context-v1",
-    "Financial Stress": "financial-stress-research-v1",
-    "Technical": "technical-intelligence-v1",
-    "Liquidity": "liquidity-intelligence-v1",
-    "Market Breadth": "market-breadth-analysis-v1",
-    "Cross Asset": "cross-asset-intelligence-v1",
-    "Historical Edge": "historical-event-study-v2",
-    "Historical Edge v1": "historical-event-study-v1",
-    "Event News": "event-news-intelligence-v2.1",
-    "Earnings": "earnings-market-reaction-v3-results",
-    "Decision Context": "decision-engine-v1",
+# ============================================================
+# EXACT ARTIFACT / FILE CONTRACT
+# ============================================================
+#
+# These mappings are intentionally explicit.
+# Do NOT replace them with "first CSV" heuristics.
+#
+
+DATASETS = {
+
+"Research Context": {
+"artifact": "research-context-v1",
+"file": "research_context_v1.csv",
+},
+
+"Macro Context": {
+"artifact": "macro-context-v1",
+"file": "macro_context_v1.csv",
+},
+
+"Financial Stress": {
+"artifact": "financial-stress-research-v1",
+"file": "financial_stress_research_v1.csv",
+},
+
+"Sentiment": {
+"artifact": "sentiment-engine-v1",
+"file": "sentiment_engine_research_v1.csv",
+},
+
+"Technical": {
+"artifact": "technical-intelligence-v1",
+"file": "technical_intelligence_research_v1.csv",
+},
+
+"Liquidity": {
+"artifact": "liquidity-intelligence-v1",
+"file": "liquidity_intelligence_research_v1.csv",
+},
+
+"Market Breadth": {
+"artifact": "market-breadth-full-validation-v1",
+"file": "market_breadth_analysis_v1.csv",
+},
+
+"Historical Edge": {
+"artifact": "historical-event-study-v2",
+"files": [
+"historical_event_study_summary_v2.csv",
+"historical_event_study_event_overlap_v2.csv",
+"historical_event_study_feature_redundancy_v2.csv",
+"historical_event_study_conditional_events_v2.csv",
+"historical_event_study_controlled_associations_v2.csv",
+"historical_event_study_sample_adequacy_v2.csv",
+"historical_event_study_baseline_v2.csv",
+],
+},
+
+"Event News": {
+"artifact": "event-news-intelligence-v2.1",
+"file": "event_news_research_v2.csv",
+},
+
+"Cross Asset": {
+"artifact": "cross-asset-intelligence-v1",
+"file": "cross_asset_intelligence_v1.csv",
+},
+
+"Earnings": {
+"artifact": "earnings-market-reaction-v3-results",
+"file": "earnings_market_reaction_v3.csv",
+},
 }
 
 
@@ -94,178 +142,260 @@ ARTIFACT_MAP = {
 # ============================================================
 
 st.set_page_config(
-    page_title=APP_TITLE,
-    page_icon="◈",
-    layout="wide",
-    initial_sidebar_state="expanded",
+page_title=APP_TITLE,
+page_icon="◈",
+layout="wide",
+initial_sidebar_state="expanded",
 )
 
 
 # ============================================================
-# GLOBAL CSS
+# CSS
 # ============================================================
 
 st.markdown(
-    """
+"""
 <style>
 
+:root {
+--bg: #070a0f;
+--panel: #0d121a;
+--panel2: #101722;
+--border: #1d2735;
+--text: #e8edf5;
+--muted: #7e8a9c;
+--accent: #65d6bd;
+--blue: #78a9ff;
+--amber: #d8b36a;
+--red: #e27d8a;
+}
+
 html, body, [class*="css"] {
-    font-family:
-        Inter,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
+font-family:
+Inter,
+-apple-system,
+BlinkMacSystemFont,
+"Segoe UI",
+sans-serif;
 }
 
 .stApp {
-    background:
-        radial-gradient(
-            circle at top right,
-            rgba(35, 47, 72, 0.35),
-            transparent 38%
-        ),
-        #080b11;
-    color: #e8edf5;
+background:
+radial-gradient(
+circle at 80% -10%,
+rgba(50, 72, 105, 0.22),
+transparent 34%
+),
+linear-gradient(
+180deg,
+#070a0f 0%,
+#080c12 100%
+);
+color: var(--text);
 }
 
 section[data-testid="stSidebar"] {
-    background: #0b0f16;
-    border-right: 1px solid #1c2533;
+background: #090d13;
+border-right: 1px solid var(--border);
 }
 
 section[data-testid="stSidebar"] * {
-    color: #d8dee9 !important;
+color: #dce3ed !important;
 }
 
 .block-container {
-    max-width: 1500px;
-    padding-top: 1.2rem;
-    padding-bottom: 3rem;
-}
-
-h1, h2, h3 {
-    letter-spacing: -0.025em;
+max-width: 1550px;
+padding-top: 1rem;
+padding-bottom: 4rem;
 }
 
 .hero {
-    background:
-        linear-gradient(
-            135deg,
-            rgba(20, 27, 40, 0.98),
-            rgba(11, 15, 23, 0.98)
-        );
-    border: 1px solid #202b3a;
-    border-radius: 18px;
-    padding: 26px 30px;
-    margin-bottom: 18px;
-    box-shadow: 0 12px 45px rgba(0,0,0,0.25);
+background:
+linear-gradient(
+135deg,
+rgba(17, 24, 35, 0.98),
+rgba(9, 13, 20, 0.98)
+);
+border: 1px solid #202b3b;
+border-radius: 18px;
+padding: 27px 30px;
+margin-bottom: 18px;
+box-shadow:
+0 15px 50px rgba(0, 0, 0, 0.24);
 }
 
 .hero-title {
-    font-size: 31px;
-    font-weight: 750;
-    margin-bottom: 4px;
+font-size: 31px;
+font-weight: 780;
+letter-spacing: -0.035em;
 }
 
 .hero-subtitle {
-    color: #8d99aa;
-    font-size: 14px;
-}
-
-.metric-card {
-    background: #10151e;
-    border: 1px solid #202a38;
-    border-radius: 14px;
-    padding: 18px;
-    min-height: 110px;
-}
-
-.metric-label {
-    color: #8490a2;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.metric-value {
-    font-size: 26px;
-    font-weight: 720;
-    margin-top: 8px;
-}
-
-.metric-sub {
-    color: #7f8b9d;
-    font-size: 12px;
-    margin-top: 4px;
-}
-
-.section-card {
-    background: #0f141d;
-    border: 1px solid #1e2937;
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 18px;
+color: var(--muted);
+margin-top: 5px;
+font-size: 13px;
 }
 
 .badge {
-    display: inline-block;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: #17202d;
-    border: 1px solid #293547;
-    color: #aeb9c9;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.05em;
+display: inline-block;
+border: 1px solid #263446;
+background: #121a25;
+border-radius: 999px;
+padding: 5px 11px;
+font-size: 10px;
+font-weight: 750;
+letter-spacing: 0.07em;
+text-transform: uppercase;
 }
 
 .research-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: #101f1c;
-    border: 1px solid #23463f;
-    color: #7bd8c2;
-    font-size: 11px;
-    font-weight: 700;
+display: inline-block;
+border: 1px solid #245046;
+background: #0d1c19;
+color: #6ed8c1;
+border-radius: 999px;
+padding: 6px 12px;
+font-size: 10px;
+font-weight: 750;
+letter-spacing: 0.07em;
+text-transform: uppercase;
 }
 
-.small-muted {
-    color: #768295;
-    font-size: 12px;
+.section {
+background: rgba(13, 18, 26, 0.96);
+border: 1px solid var(--border);
+border-radius: 15px;
+padding: 19px;
+margin-bottom: 17px;
+}
+
+.section-title {
+font-size: 17px;
+font-weight: 730;
+margin-bottom: 3px;
+}
+
+.section-subtitle {
+color: var(--muted);
+font-size: 11px;
+margin-bottom: 15px;
+}
+
+.metric-card {
+background:
+linear-gradient(
+145deg,
+#111821,
+#0d131b
+);
+border: 1px solid #202b39;
+border-radius: 14px;
+padding: 17px;
+min-height: 106px;
+}
+
+.metric-label {
+color: #778498;
+text-transform: uppercase;
+font-size: 10px;
+letter-spacing: 0.09em;
+}
+
+.metric-value {
+margin-top: 8px;
+font-size: 25px;
+font-weight: 760;
+letter-spacing: -0.02em;
+}
+
+.metric-sub {
+color: #697688;
+margin-top: 4px;
+font-size: 11px;
+}
+
+.state-card {
+border: 1px solid #243042;
+background: #0e151f;
+border-radius: 12px;
+padding: 14px;
+min-height: 90px;
+}
+
+.state-label {
+color: #758296;
+font-size: 10px;
+text-transform: uppercase;
+letter-spacing: .08em;
+}
+
+.state-value {
+font-size: 16px;
+font-weight: 720;
+margin-top: 7px;
+}
+
+.state-source {
+color: #667386;
+font-size: 10px;
+margin-top: 4px;
 }
 
 .evidence {
-    background: #0c1118;
-    border-left: 3px solid #43536a;
-    border-radius: 8px;
-    padding: 13px 16px;
-    margin-bottom: 10px;
-    color: #b7c1cf;
+background: #0b1118;
+border-left: 3px solid #405168;
+border-radius: 7px;
+padding: 12px 14px;
+margin-bottom: 9px;
+}
+
+.evidence-title {
+font-weight: 700;
+font-size: 12px;
+}
+
+.evidence-text {
+color: #aab5c4;
+font-size: 11px;
+line-height: 1.55;
+margin-top: 3px;
+}
+
+.warning-box {
+background: #19150d;
+border: 1px solid #4b3b1e;
+border-radius: 10px;
+padding: 13px;
+color: #cdbd95;
+font-size: 11px;
+}
+
+.info-box {
+background: #0c141d;
+border: 1px solid #233348;
+border-radius: 10px;
+padding: 13px;
+color: #9eabbc;
+font-size: 11px;
 }
 
 .footer {
-    text-align: center;
-    color: #5f6b7c;
-    font-size: 11px;
-    padding-top: 25px;
+color: #586577;
+text-align: center;
+font-size: 10px;
+padding-top: 30px;
 }
 
 div[data-testid="stMetric"] {
-    background: #10151e;
-    border: 1px solid #202a38;
-    border-radius: 13px;
-    padding: 12px;
-}
-
-button[kind="secondary"] {
-    border-color: #273344;
+background: #101720;
+border: 1px solid #202b39;
+border-radius: 13px;
+padding: 10px;
 }
 
 </style>
 """,
-    unsafe_allow_html=True,
+unsafe_allow_html=True,
 )
 
 
@@ -274,412 +404,563 @@ button[kind="secondary"] {
 # ============================================================
 
 def clean(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+if value is None:
+return ""
+return str(value).strip()
 
 
-def safe_number(value: Any) -> Optional[float]:
-    try:
-        if value is None:
-            return None
+def number(value: Any) -> Optional[float]:
+try:
+if value is None:
+return None
 
-        text = str(value).strip()
+x = float(value)
 
-        if text == "":
-            return None
+if not np.isfinite(x):
+return None
 
-        value = float(text)
+return x
 
-        if not np.isfinite(value):
-            return None
-
-        return value
-
-    except Exception:
-        return None
+except Exception:
+return None
 
 
-def format_value(value: Any) -> str:
-    number = safe_number(value)
+def fmt(value: Any, digits: int = 2) -> str:
+x = number(value)
 
-    if number is not None:
-        if abs(number) >= 1000:
-            return f"{number:,.2f}"
+if x is None:
+text = clean(value)
+return text if text else "N/A"
 
-        if abs(number) >= 100:
-            return f"{number:,.1f}"
+if abs(x) >= 1000:
+return f"{x:,.{digits}f}"
 
-        return f"{number:.3f}"
-
-    text = clean(value)
-
-    if len(text) > 60:
-        return text[:57] + "..."
-
-    return text
+return f"{x:.{digits}f}"
 
 
-def friendly_name(name: str) -> str:
-    text = str(name)
+def fmt_pct(value: Any, digits: int = 2) -> str:
+x = number(value)
 
-    replacements = {
-        "_": " ",
-        "-": " ",
-    }
+if x is None:
+return "N/A"
 
-    for a, b in replacements.items():
-        text = text.replace(a, b)
-
-    return text.strip().title()
+return f"{x:.{digits}f}%"
 
 
-def is_true(value: Any) -> bool:
-    return clean(value).lower() in {
-        "true",
-        "1",
-        "yes",
-        "y",
-        "pass",
-        "passed",
-    }
+def date_value(value: Any) -> str:
+if value is None:
+return "N/A"
 
-
-def latest_date(df: pd.DataFrame) -> str:
-    candidates = [
-        "asof_date",
-        "context_date",
-        "date",
-        "event_date",
-        "reported_date",
-        "observation_date",
-    ]
-
-    for column in candidates:
-        if column in df.columns:
-            parsed = pd.to_datetime(
-                df[column],
-                errors="coerce",
-            )
-
-            if parsed.notna().any():
-                return str(
-                    parsed.dropna().max().date()
-                )
-
-    return "N/A"
+try:
+return str(
+pd.to_datetime(value).date()
+)
+except Exception:
+return clean(value) or "N/A"
 
 
 def find_column(
-    df: pd.DataFrame,
-    candidates: List[str],
+df: pd.DataFrame,
+candidates: List[str],
 ) -> Optional[str]:
 
-    normalized = {
-        str(c).lower(): c
-        for c in df.columns
-    }
+normalized = {
+str(c).strip().lower(): c
+for c in df.columns
+}
 
-    for candidate in candidates:
+for candidate in candidates:
+key = candidate.strip().lower()
 
-        if candidate.lower() in normalized:
-            return normalized[candidate.lower()]
+if key in normalized:
+return normalized[key]
 
-    return None
+return None
+
+
+def row_value(
+df: Optional[pd.DataFrame],
+candidates: List[str],
+default: Any = None,
+) -> Any:
+
+if df is None or df.empty:
+return default
+
+column = find_column(
+df,
+candidates,
+)
+
+if column is None:
+return default
+
+return df.iloc[-1].get(
+column,
+default,
+)
+
+
+def latest_date(
+df: Optional[pd.DataFrame],
+) -> Optional[pd.Timestamp]:
+
+if df is None or df.empty:
+return None
+
+candidates = [
+"context_date",
+"asof_date",
+"study_date",
+"observation_date",
+"date",
+"event_date",
+"reported_date",
+]
+
+column = find_column(
+df,
+candidates,
+)
+
+if column is None:
+return None
+
+dates = pd.to_datetime(
+df[column],
+errors="coerce",
+)
+
+if dates.notna().any():
+return dates.max()
+
+return None
+
+
+def true_value(value: Any) -> bool:
+return clean(value).lower() in {
+"true",
+"1",
+"yes",
+"y",
+"pass",
+"passed",
+}
+
+
+def safe_read_csv(
+raw: bytes,
+) -> Optional[pd.DataFrame]:
+
+try:
+return pd.read_csv(
+io.BytesIO(raw),
+low_memory=False,
+)
+except Exception:
+return None
+
+
+def safe_read_json(
+raw: bytes,
+) -> Optional[Dict[str, Any]]:
+
+try:
+return json.loads(
+raw.decode("utf-8")
+)
+except Exception:
+return None
 
 
 # ============================================================
-# GITHUB API
+# GITHUB
 # ============================================================
 
 def github_headers() -> Dict[str, str]:
 
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "US500-Research-Terminal",
-    }
+headers = {
+"Accept":
+"application/vnd.github+json",
 
-    token = None
+"User-Agent":
+"US500-Research-Terminal",
+}
 
-    try:
-        token = st.secrets.get(
-            "GITHUB_TOKEN",
-            None,
-        )
-    except Exception:
-        pass
+token = None
 
-    token = token or os.getenv(
-        "GITHUB_TOKEN"
-    )
+try:
+token = st.secrets.get(
+"GITHUB_TOKEN",
+None,
+)
+except Exception:
+pass
 
-    if token:
-        headers["Authorization"] = (
-            f"Bearer {token}"
-        )
+token = token or os.getenv(
+"GITHUB_TOKEN"
+)
 
-    return headers
+if token:
+headers["Authorization"] = (
+f"Bearer {token}"
+)
+
+return headers
 
 
 @st.cache_data(
-    ttl=CACHE_TTL,
-    show_spinner=False,
+ttl=CACHE_TTL,
+show_spinner=False,
 )
-def list_artifacts() -> List[Dict[str, Any]]:
+def github_artifacts() -> List[Dict[str, Any]]:
 
-    artifacts = []
+result = []
 
-    for page in range(1, 6):
+headers = github_headers()
 
-        url = (
-            f"{GITHUB_API}/actions/artifacts"
-            f"?per_page=100&page={page}"
-        )
+for page in range(1, 11):
 
-        response = requests.get(
-            url,
-            headers=github_headers(),
-            timeout=30,
-        )
+url = (
+f"{GITHUB_API}/actions/artifacts"
+f"?per_page=100&page={page}"
+)
 
-        response.raise_for_status()
+response = requests.get(
+url,
+headers=headers,
+timeout=30,
+)
 
-        payload = response.json()
+response.raise_for_status()
 
-        page_items = payload.get(
-            "artifacts",
-            [],
-        )
+payload = response.json()
 
-        if not page_items:
-            break
+items = payload.get(
+"artifacts",
+[],
+)
 
-        artifacts.extend(
-            page_items
-        )
+if not items:
+break
 
-        if len(page_items) < 100:
-            break
+result.extend(items)
 
-    return artifacts
+if len(items) < 100:
+break
+
+return result
 
 
 def latest_artifact(
-    artifact_name: str,
+name: str,
 ) -> Optional[Dict[str, Any]]:
 
-    try:
+try:
+items = [
+x
+for x in github_artifacts()
+if x.get("name") == name
+and not x.get(
+"expired",
+False,
+)
+]
 
-        artifacts = list_artifacts()
+if not items:
+return None
 
-        candidates = [
-            a
-            for a in artifacts
-            if a.get("name")
-            == artifact_name
-            and not a.get(
-                "expired",
-                False,
-            )
-        ]
+items.sort(
+key=lambda x:
+x.get(
+"created_at",
+"",
+),
+reverse=True,
+)
 
-        if not candidates:
-            return None
+return items[0]
 
-        candidates.sort(
-            key=lambda x: x.get(
-                "created_at",
-                "",
-            ),
-            reverse=True,
-        )
-
-        return candidates[0]
-
-    except Exception:
-        return None
+except Exception:
+return None
 
 
 @st.cache_data(
-    ttl=CACHE_TTL,
-    show_spinner=False,
+ttl=CACHE_TTL,
+show_spinner=False,
 )
 def download_artifact(
-    artifact_id: int,
+artifact_id: int,
 ) -> Dict[str, bytes]:
 
-    url = (
-        f"{GITHUB_API}/actions/artifacts/"
-        f"{artifact_id}/zip"
-    )
+url = (
+f"{GITHUB_API}/actions/artifacts/"
+f"{artifact_id}/zip"
+)
 
-    response = requests.get(
-        url,
-        headers=github_headers(),
-        timeout=90,
-        allow_redirects=True,
-    )
+response = requests.get(
+url,
+headers=github_headers(),
+timeout=90,
+allow_redirects=True,
+)
 
-    response.raise_for_status()
+response.raise_for_status()
 
-    files = {}
+files = {}
 
-    with zipfile.ZipFile(
-        io.BytesIO(
-            response.content
-        )
-    ) as archive:
+with zipfile.ZipFile(
+io.BytesIO(
+response.content
+)
+) as archive:
 
-        for name in archive.namelist():
+for name in archive.namelist():
 
-            if name.endswith("/"):
-                continue
+if name.endswith("/"):
+continue
 
-            files[
-                Path(name).name
-            ] = archive.read(name)
+files[name] = archive.read(
+name
+)
 
-    return files
+return files
 
 
-def artifact_dataframe(
-    artifact_name: str,
+def artifact_files(
+artifact_name: str,
+) -> Dict[str, bytes]:
+
+artifact = latest_artifact(
+artifact_name
+)
+
+if artifact is None:
+return {}
+
+try:
+return download_artifact(
+int(artifact["id"])
+)
+except Exception:
+return {}
+
+
+def find_artifact_file(
+files: Dict[str, bytes],
+exact_name: str,
+) -> Optional[bytes]:
+
+# First exact path/basename match.
+for name, content in files.items():
+
+if name == exact_name:
+return content
+
+# Then exact basename match.
+for name, content in files.items():
+
+if Path(name).name == exact_name:
+return content
+
+return None
+
+
+# ============================================================
+# DATA LOADING
+# ============================================================
+
+@st.cache_data(
+ttl=CACHE_TTL,
+show_spinner=False,
+)
+def load_named_csv(
+dataset_name: str,
 ) -> Optional[pd.DataFrame]:
 
-    artifact = latest_artifact(
-        artifact_name
-    )
+config = DATASETS.get(
+dataset_name
+)
 
-    if not artifact:
-        return None
+if not config:
+return None
 
-    try:
+artifact = config.get(
+"artifact"
+)
 
-        files = download_artifact(
-            int(artifact["id"])
-        )
+filename = config.get(
+"file"
+)
 
-        csv_files = [
-            name
-            for name in files
-            if name.lower().endswith(
-                ".csv"
-            )
-        ]
+if not artifact or not filename:
+return None
 
-        if not csv_files:
-            return None
+files = artifact_files(
+artifact
+)
 
-        preferred = sorted(
-            csv_files,
-            key=lambda x: (
-                0
-                if "summary" in x.lower()
-                else 1,
-                x,
-            ),
-        )
+raw = find_artifact_file(
+files,
+filename,
+)
 
-        raw = files[
-            preferred[0]
-        ]
+if raw is None:
+return None
 
-        return pd.read_csv(
-            io.BytesIO(raw)
-        )
+return safe_read_csv(
+raw
+)
 
-    except Exception:
-        return None
+
+@st.cache_data(
+ttl=CACHE_TTL,
+show_spinner=False,
+)
+def load_historical_files() -> Dict[
+str,
+pd.DataFrame,
+]:
+
+result = {}
+
+config = DATASETS[
+"Historical Edge"
+]
+
+files = artifact_files(
+config["artifact"]
+)
+
+for filename in config["files"]:
+
+raw = find_artifact_file(
+files,
+filename,
+)
+
+if raw is None:
+continue
+
+df = safe_read_csv(
+raw
+)
+
+if df is not None:
+result[filename] = df
+
+return result
 
 
 # ============================================================
 # LOCAL FALLBACK
 # ============================================================
 
-def local_csv_candidates(
-    artifact_name: str,
-) -> List[Path]:
-
-    root = Path(
-        __file__
-    ).resolve().parent
-
-    mapping = {
-        "financial-stress-research-v1": [
-            "financial_stress_research_v1.csv",
-            "financial_stress_validation_v1_2.csv",
-        ],
-        "macro-context-v1": [
-            "macro_context_v1.csv",
-        ],
-        "technical-intelligence-v1": [
-            "technical_intelligence_research_v1.csv",
-            "technical_intelligence_research_summary_v1.csv",
-        ],
-        "liquidity-intelligence-v1": [
-            "liquidity_intelligence_research_v1.csv",
-            "liquidity_intelligence_summary_v1.csv",
-        ],
-        "market-breadth-analysis-v1": [
-            "market_breadth_analysis_v1.csv",
-        ],
-        "cross-asset-intelligence-v1": [
-            "cross_asset_intelligence_v1.csv",
-        ],
-    }
-
-    names = mapping.get(
-        artifact_name,
-        [],
-    )
-
-    return [
-        root / name
-        for name in names
-        if (root / name).exists()
-    ]
-
-
-@st.cache_data(
-    ttl=CACHE_TTL,
-    show_spinner=False,
-)
-def load_dataset(
-    artifact_name: str,
+def local_file(
+filename: str,
 ) -> Optional[pd.DataFrame]:
 
-    # --------------------------------------------------------
-    # GitHub artifact
-    # --------------------------------------------------------
+root = Path(
+__file__
+).resolve().parent
 
-    df = artifact_dataframe(
-        artifact_name
-    )
+candidates = [
+root / filename,
+root / "artifacts" / filename,
+root / "data" / filename,
+]
 
-    if df is not None and not df.empty:
-        return df
+for path in candidates:
 
-    # --------------------------------------------------------
-    # Local fallback
-    # --------------------------------------------------------
+if not path.exists():
+continue
 
-    for path in local_csv_candidates(
-        artifact_name
-    ):
+try:
+return pd.read_csv(
+path,
+low_memory=False,
+)
+except Exception:
+continue
 
-        try:
+return None
 
-            df = pd.read_csv(
-                path
-            )
 
-            if not df.empty:
-                return df
+def load_dataset(
+name: str,
+) -> Optional[pd.DataFrame]:
 
-        except Exception:
-            continue
+df = load_named_csv(
+name
+)
 
-    return None
+if df is not None and not df.empty:
+return df
+
+config = DATASETS.get(
+name,
+{},
+)
+
+filename = config.get(
+"file"
+)
+
+if filename:
+return local_file(
+filename
+)
+
+return None
+
+
+# ============================================================
+# LOAD MAIN DATA
+# ============================================================
+
+research_context = load_dataset(
+"Research Context"
+)
+
+macro_context = load_dataset(
+"Macro Context"
+)
+
+financial_stress = load_dataset(
+"Financial Stress"
+)
+
+sentiment = load_dataset(
+"Sentiment"
+)
+
+technical = load_dataset(
+"Technical"
+)
+
+liquidity = load_dataset(
+"Liquidity"
+)
+
+breadth = load_dataset(
+"Market Breadth"
+)
+
+event_news = load_dataset(
+"Event News"
+)
+
+cross_asset = load_dataset(
+"Cross Asset"
+)
+
+earnings = load_dataset(
+"Earnings"
+)
+
+historical_files = (
+load_historical_files()
+)
 
 
 # ============================================================
@@ -687,37 +968,48 @@ def load_dataset(
 # ============================================================
 
 @st.cache_data(
-    ttl=300,
-    show_spinner=False,
+ttl=MARKET_CACHE_TTL,
+show_spinner=False,
 )
 def load_market_data() -> pd.DataFrame:
 
-    try:
+try:
 
-        data = yf.download(
-            US500_TICKER,
-            period="2y",
-            interval="1d",
-            auto_adjust=False,
-            progress=False,
-        )
+data = yf.download(
+US500_TICKER,
+period="2y",
+interval="1d",
+auto_adjust=False,
+progress=False,
+threads=False,
+)
 
-        if isinstance(
-            data.columns,
-            pd.MultiIndex,
-        ):
-            data.columns = [
-                col[0]
-                for col in data.columns
-            ]
+if data is None or data.empty:
+return pd.DataFrame()
 
-        data = data.reset_index()
+if isinstance(
+data.columns,
+pd.MultiIndex,
+):
 
-        return data
+data.columns = [
+str(
+col[0]
+)
+for col in data.columns
+]
 
-    except Exception:
+data = data.reset_index()
 
-        return pd.DataFrame()
+data["Date"] = pd.to_datetime(
+data["Date"],
+errors="coerce",
+)
+
+return data
+
+except Exception:
+return pd.DataFrame()
 
 
 market = load_market_data()
@@ -725,335 +1017,472 @@ market = load_market_data()
 
 def market_snapshot() -> Dict[str, Any]:
 
-    if market.empty:
-        return {
-            "price": None,
-            "change": None,
-            "change_pct": None,
-            "high": None,
-            "low": None,
-            "ath": None,
-            "drawdown": None,
-        }
+if market.empty:
+return {}
 
-    close = pd.to_numeric(
-        market["Close"],
-        errors="coerce",
-    ).dropna()
+if "Close" not in market.columns:
+return {}
 
-    if close.empty:
-        return {}
+close = pd.to_numeric(
+market["Close"],
+errors="coerce",
+).dropna()
 
-    price = float(
-        close.iloc[-1]
-    )
+if close.empty:
+return {}
 
-    previous = (
-        float(close.iloc[-2])
-        if len(close) >= 2
-        else price
-    )
+current = float(
+close.iloc[-1]
+)
 
-    change = price - previous
+previous = (
+float(close.iloc[-2])
+if len(close) > 1
+else current
+)
 
-    change_pct = (
-        change / previous * 100
-        if previous
-        else None
-    )
+change = (
+current - previous
+)
 
-    ath = float(
-        close.max()
-    )
+change_pct = (
+change / previous * 100
+if previous
+else np.nan
+)
 
-    drawdown = (
-        (price / ath - 1) * 100
-        if ath
-        else None
-    )
+ath = float(
+close.max()
+)
 
-    return {
-        "price": price,
-        "change": change,
-        "change_pct": change_pct,
-        "high": float(close.max()),
-        "low": float(close.min()),
-        "ath": ath,
-        "drawdown": drawdown,
-    }
+drawdown = (
+(current / ath - 1) * 100
+if ath
+else np.nan
+)
+
+return {
+"price": current,
+"change": change,
+"change_pct": change_pct,
+"ath": ath,
+"drawdown": drawdown,
+"high_2y": float(
+close.max()
+),
+"low_2y": float(
+close.min()
+),
+}
 
 
 SNAPSHOT = market_snapshot()
 
 
 # ============================================================
-# DATASET LOADING
+# CONTEXT HELPERS
 # ============================================================
 
-@st.cache_data(
-    ttl=CACHE_TTL,
-    show_spinner=False,
-)
-def load_all_research() -> Dict[str, pd.DataFrame]:
+def current_context() -> Dict[str, Any]:
 
-    result = {}
+if (
+research_context is None
+or research_context.empty
+):
+return {}
 
-    for label, artifact_name in (
-        ARTIFACT_MAP.items()
-    ):
+row = research_context.iloc[-1]
 
-        df = load_dataset(
-            artifact_name
-        )
-
-        if df is not None and not df.empty:
-            result[label] = df
-
-    return result
-
-
-RESEARCH = load_all_research()
-
-
-# ============================================================
-# RESEARCH CONTEXT
-# ============================================================
-
-context = RESEARCH.get(
-    "Research Context"
+def get(
+names: List[str],
+default=None,
+):
+col = find_column(
+research_context,
+names,
 )
 
-if context is None:
-    context = RESEARCH.get(
-        "Decision Context"
-    )
+if col is None:
+return default
+
+return row.get(
+col,
+default,
+)
+
+return {
+
+"date":
+get(
+["context_date"]
+),
+
+"layers":
+get(
+["available_layer_count"]
+),
+
+"macro_available":
+get(
+["macro_available"]
+),
+
+"sentiment_available":
+get(
+["sentiment_available"]
+),
+
+"technical_available":
+get(
+["technical_available"]
+),
+
+"pit":
+get(
+["point_in_time_safe"]
+),
+
+"research_only":
+get(
+["research_only"]
+),
+
+# Macro
+"economic_regime":
+get(
+[
+"macro_economic_regime",
+"economic_regime",
+]
+),
+
+"inflation_score":
+get(
+[
+"macro_inflation_score",
+"inflation_score",
+]
+),
+
+"labor_score":
+get(
+[
+"macro_labor_score",
+"labor_score",
+]
+),
+
+"growth_score":
+get(
+[
+"macro_growth_score",
+"growth_score",
+]
+),
+
+"fed_score":
+get(
+[
+"macro_fed_score",
+"fed_score",
+]
+),
+
+"financial_stress_regime":
+get(
+[
+"macro_financial_stress_regime",
+"financial_stress_regime",
+]
+),
+
+"financial_stress":
+get(
+[
+"macro_financial_stress_composite",
+"financial_stress_composite",
+]
+),
+
+"vix":
+get(
+[
+"macro_vix",
+"vix",
+]
+),
+
+"yield_spread":
+get(
+[
+"macro_yield_10y_2y_spread",
+"yield_10y_2y_spread",
+]
+),
+
+# Sentiment
+"sentiment_regime":
+get(
+[
+"sentiment_research_regime",
+"sentiment_unified_sentiment_regime",
+"research_regime",
+]
+),
+
+"sentiment_score":
+get(
+[
+"sentiment_unified_sentiment_score",
+"unified_sentiment_score",
+]
+),
+
+"cot":
+get(
+[
+"sentiment_cot_sentiment_score",
+"cot_sentiment_score",
+"cot_score",
+]
+),
+
+"aaii":
+get(
+[
+"sentiment_aaii_sentiment_score",
+"aaii_sentiment_score",
+"aaii_score",
+]
+),
+
+"vix_sentiment":
+get(
+[
+"sentiment_vix_sentiment_score",
+"vix_sentiment_score",
+"vix_score",
+]
+),
+
+# Technical
+"technical_regime":
+get(
+[
+"technical_technical_regime",
+"technical_regime",
+]
+),
+
+"trend":
+get(
+[
+"technical_trend_structure",
+"trend_structure",
+]
+),
+
+"rsi":
+get(
+[
+"technical_RSI14",
+"RSI14",
+]
+),
+
+"atr_pct":
+get(
+[
+"technical_ATR14_pct",
+"ATR14_pct",
+]
+),
+
+"roc20":
+get(
+[
+"technical_ROC20_pct",
+"ROC20_pct",
+]
+),
+
+"technical_drawdown":
+get(
+[
+"technical_drawdown_pct",
+"drawdown_pct",
+]
+),
+}
+
+
+CTX = current_context()
 
 
 # ============================================================
-# CONTEXT EXTRACTION
+# UI HELPERS
 # ============================================================
 
-def context_value(
-    names: List[str],
-    default: Any = "N/A",
-) -> Any:
+def hero(
+title: str,
+subtitle: str,
+page: str,
+):
+st.markdown(
+f"""
+<div class="hero">
+<div style="margin-bottom:10px;">
+<span class="badge">{page}</span>
+&nbsp;
+<span class="research-badge">
+RESEARCH ONLY
+</span>
+</div>
 
-    if context is None or context.empty:
-        return default
+<div class="hero-title">
+{title}
+</div>
 
-    row = context.iloc[-1]
+<div class="hero-subtitle">
+{subtitle}
+</div>
+</div>
+""",
+unsafe_allow_html=True,
+)
 
-    column = find_column(
-        context,
-        names,
-    )
-
-    if column is None:
-        return default
-
-    return row.get(
-        column,
-        default,
-    )
-
-
-def layer_status(
-    layer: str,
-) -> str:
-
-    value = context_value(
-        [
-            f"{layer}_available",
-            f"{layer}_status",
-            f"{layer}_completeness",
-        ],
-        "N/A",
-    )
-
-    if is_true(value):
-        return "AVAILABLE"
-
-    if clean(value).upper() in {
-        "COMPLETE",
-        "AVAILABLE",
-        "PASS",
-        "PASSED",
-    }:
-        return "AVAILABLE"
-
-    if clean(value).upper() in {
-        "FALSE",
-        "MISSING",
-        "UNAVAILABLE",
-    }:
-        return "UNAVAILABLE"
-
-    return clean(value) or "N/A"
-
-
-# ============================================================
-# UI COMPONENTS
-# ============================================================
 
 def metric_card(
-    label: str,
-    value: Any,
-    subtitle: str = "",
+label: str,
+value: Any,
+subtitle: str = "",
+):
+st.markdown(
+f"""
+<div class="metric-card">
+<div class="metric-label">
+{label}
+</div>
+
+<div class="metric-value">
+{value}
+</div>
+
+<div class="metric-sub">
+{subtitle}
+</div>
+</div>
+""",
+unsafe_allow_html=True,
+)
+
+
+def state_card(
+label: str,
+value: Any,
+source: str = "",
+):
+st.markdown(
+f"""
+<div class="state-card">
+<div class="state-label">
+{label}
+</div>
+
+<div class="state-value">
+{value}
+</div>
+
+<div class="state-source">
+{source}
+</div>
+</div>
+""",
+unsafe_allow_html=True,
+)
+
+
+def section(
+title: str,
+subtitle: str = "",
+):
+st.markdown(
+f"""
+<div class="section">
+<div class="section-title">
+{title}
+</div>
+
+<div class="section-subtitle">
+{subtitle}
+</div>
+""",
+unsafe_allow_html=True,
+)
+
+
+def section_end():
+st.markdown(
+"</div>",
+unsafe_allow_html=True,
+)
+
+
+def evidence(
+title: str,
+text: str,
+):
+st.markdown(
+f"""
+<div class="evidence">
+<div class="evidence-title">
+{title}
+</div>
+
+<div class="evidence-text">
+{text}
+</div>
+</div>
+""",
+unsafe_allow_html=True,
+)
+
+
+def dataset_status(
+name: str,
+df: Optional[pd.DataFrame],
 ):
 
-    st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">
-                {label}
-            </div>
-            <div class="metric-value">
-                {format_value(value)}
-            </div>
-            <div class="metric-sub">
-                {subtitle}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+if df is None or df.empty:
 
+st.markdown(
+f"""
+<div class="warning-box">
+<strong>{name}</strong><br>
+Dataset unavailable in the current deployment.
+</div>
+""",
+unsafe_allow_html=True,
+)
 
-def evidence_card(
-    title: str,
-    text: str,
-):
+return
 
-    st.markdown(
-        f"""
-        <div class="evidence">
-            <strong>{title}</strong><br>
-            <span>{text}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+latest = latest_date(
+df
+)
 
-
-def section_title(
-    title: str,
-    subtitle: str = "",
-):
-
-    st.markdown(
-        f"""
-        <div class="section-card">
-            <h3 style="margin-bottom:4px;">
-                {title}
-            </h3>
-            <div class="small-muted">
-                {subtitle}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def numeric_columns(
-    df: pd.DataFrame,
-) -> List[str]:
-
-    result = []
-
-    for column in df.columns:
-
-        converted = pd.to_numeric(
-            df[column],
-            errors="coerce",
-        )
-
-        if (
-            converted.notna().sum()
-            >= max(
-                1,
-                int(
-                    len(df) * 0.30
-                ),
-            )
-        ):
-            result.append(column)
-
-    return result
-
-
-def display_research_dataset(
-    df: Optional[pd.DataFrame],
-    title: str,
-):
-
-    if df is None or df.empty:
-
-        st.info(
-            f"No current artifact available for {title}."
-        )
-
-        return
-
-    st.caption(
-        f"{len(df):,} observations • "
-        f"latest date: {latest_date(df)}"
-    )
-
-    numeric = numeric_columns(
-        df
-    )
-
-    if numeric:
-
-        latest = df.iloc[-1]
-
-        selected = numeric[:8]
-
-        cols = st.columns(
-            min(
-                len(selected),
-                4,
-            )
-        )
-
-        for index, column in enumerate(
-            selected
-        ):
-
-            with cols[
-                index % len(cols)
-            ]:
-
-                metric_card(
-                    friendly_name(column),
-                    latest.get(
-                        column,
-                        "N/A",
-                    ),
-                    title,
-                )
-
-    with st.expander(
-        "Inspect latest research record"
-    ):
-
-        latest_row = (
-            df.tail(1)
-            .T
-            .reset_index()
-        )
-
-        latest_row.columns = [
-            "Field",
-            "Value",
-        ]
-
-        st.dataframe(
-            latest_row,
-            use_container_width=True,
-            hide_index=True,
-        )
+st.markdown(
+f"""
+<div class="info-box">
+<strong>{name}</strong>
+&nbsp;·&nbsp;
+{len(df):,} rows
+&nbsp;·&nbsp;
+latest: {date_value(latest)}
+</div>
+""",
+unsafe_allow_html=True,
+)
 
 
 # ============================================================
@@ -1062,85 +1491,62 @@ def display_research_dataset(
 
 with st.sidebar:
 
-    st.markdown(
-        "## ◈ US500 RESEARCH"
-    )
-
-    st.markdown(
-        '<span class="research-badge">'
-        'RESEARCH ONLY'
-        '</span>',
-        unsafe_allow_html=True,
-    )
-
-    st.write("")
-
-    page = st.radio(
-        "Research Desk",
-        [
-            "Overview",
-            "Market Regime",
-            "Macro",
-            "Financial Stress",
-            "Sentiment",
-            "Technical",
-            "Historical Edge",
-            "Event Studies",
-            "Cross-Asset",
-            "Earnings",
-            "Evidence",
-        ],
-    )
-
-    st.divider()
-
-    st.caption(
-        f"Ticker: {US500_TICKER}"
-    )
-
-    st.caption(
-        f"App: {APP_VERSION}"
-    )
-
-    if st.button(
-        "Refresh Research",
-        use_container_width=True,
-    ):
-
-        st.cache_data.clear()
-
-        st.rerun()
-
-
-# ============================================================
-# HERO
-# ============================================================
-
 st.markdown(
-    f"""
-    <div class="hero">
-        <div class="hero-title">
-            US500 Research Terminal
-        </div>
+"""
+<div style="
+font-size:18px;
+font-weight:780;
+margin-bottom:2px;
+">
+◈ US500
+</div>
 
-        <div class="hero-subtitle">
-            Evidence-driven market intelligence —
-            Macro · Stress · Sentiment · Technical ·
-            Historical Edge · Cross-Asset · Earnings
-        </div>
+<div style="
+color:#748196;
+font-size:10px;
+letter-spacing:.08em;
+text-transform:uppercase;
+margin-bottom:18px;
+">
+Research Intelligence Terminal
+</div>
+""",
+unsafe_allow_html=True,
+)
 
-        <div style="margin-top:14px;">
-            <span class="research-badge">
-                NO TRADING SIGNALS
-            </span>
-            &nbsp;
-            <span class="badge">
-                FULL RESEARCH OUTPUT
-            </span>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+page = st.radio(
+"RESEARCH",
+[
+"Overview",
+"Market Regime",
+"Macro",
+"Financial Stress",
+"Sentiment",
+"Technical",
+"Historical Edge",
+"Event Studies",
+"Cross-Asset",
+"Earnings",
+"Evidence",
+],
+)
+
+st.divider()
+
+st.caption(
+f"US500 proxy: {US500_TICKER}"
+)
+
+st.caption(
+"Research-only visualization"
+)
+
+if CTX.get("date"):
+st.caption(
+"Research Context: "
++ date_value(
+CTX["date"]
+)
 )
 
 
@@ -1148,1061 +1554,466 @@ st.markdown(
 # OVERVIEW
 # ============================================================
 
-if page == "Overview":
+def page_overview():
 
-    st.subheader(
-        "Market Research Overview"
-    )
+hero(
+"US500 Market Intelligence",
+(
+"Unified view of the latest available research state "
+"across macro, financial stress, sentiment and technical structure."
+),
+"OVERVIEW",
+)
 
-    date_text = latest_date(
-        context
-    ) if context is not None else "N/A"
+cols = st.columns(4)
 
-    c1, c2, c3, c4 = st.columns(4)
+with cols[0]:
+metric_card(
+"US500",
+fmt(
+SNAPSHOT.get(
+"price"
+)
+),
+"Public ^GSPC proxy",
+)
 
-    with c1:
-        metric_card(
-            "US500",
-            SNAPSHOT.get(
-                "price",
-                "N/A",
-            ),
-            "Public S&P 500 proxy",
-        )
+with cols[1]:
+metric_card(
+"Daily Change",
+fmt_pct(
+SNAPSHOT.get(
+"change_pct"
+)
+),
+"Latest market session",
+)
 
-    with c2:
-        metric_card(
-            "Daily Change",
-            (
-                f"{SNAPSHOT['change_pct']:+.2f}%"
-                if SNAPSHOT.get(
-                    "change_pct"
-                )
-                is not None
-                else "N/A"
-            ),
-            "Latest completed session",
-        )
+with cols[2]:
+metric_card(
+"2Y Drawdown",
+fmt_pct(
+SNAPSHOT.get(
+"drawdown"
+)
+),
+"From observed 2Y high",
+)
 
-    with c3:
-        metric_card(
-            "All-Time Drawdown",
-            (
-                f"{SNAPSHOT['drawdown']:.2f}%"
-                if SNAPSHOT.get(
-                    "drawdown"
-                )
-                is not None
-                else "N/A"
-            ),
-            "Against available price history",
-        )
+with cols[3]:
+metric_card(
+"Research Date",
+date_value(
+CTX.get("date")
+),
+"Latest Research Context",
+)
 
-    with c4:
-        metric_card(
-            "Research Date",
-            date_text,
-            "Latest synchronized context",
-        )
+st.markdown("")
 
-    st.markdown("###")
+cols = st.columns(5)
 
-    cols = st.columns(4)
+with cols[0]:
+state_card(
+"Economic Regime",
+clean(
+CTX.get(
+"economic_regime"
+)
+) or "N/A",
+"Macro Context",
+)
 
-    layers = [
-        (
-            "Macro",
-            layer_status("macro"),
-        ),
-        (
-            "Sentiment",
-            layer_status("sentiment"),
-        ),
-        (
-            "Technical",
-            layer_status("technical"),
-        ),
-        (
-            "Research Context",
-            (
-                "AVAILABLE"
-                if context is not None
-                else "N/A"
-            ),
-        ),
-    ]
+with cols[1]:
+state_card(
+"Financial Stress",
+clean(
+CTX.get(
+"financial_stress_regime"
+)
+) or "N/A",
+"Financial Stress Research",
+)
 
-    for col, (
-        name,
-        status,
-    ) in zip(
-        cols,
-        layers,
-    ):
+with cols[2]:
+state_card(
+"Sentiment",
+clean(
+CTX.get(
+"sentiment_regime"
+)
+) or "N/A",
+"Sentiment Engine",
+)
 
-        with col:
+with cols[3]:
+state_card(
+"Technical",
+clean(
+CTX.get(
+"technical_regime"
+)
+) or "N/A",
+"Technical Intelligence",
+)
 
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">
-                        {name}
-                    </div>
+with cols[4]:
+state_card(
+"Layer Coverage",
+(
+f"{fmt(CTX.get('layers'), 0)} / 3"
+if number(
+CTX.get("layers")
+) is not None
+else "N/A"
+),
+"Research Context",
+)
 
-                    <div class="metric-value"
-                         style="font-size:20px;">
-                        {status}
-                    </div>
+st.markdown("")
 
-                    <div class="metric-sub">
-                        Research layer
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+section(
+"Current Research State",
+(
+"Descriptive synthesis of the latest synchronized "
+"research context. This is not a trading decision."
+),
+)
 
-    st.markdown("###")
+cols = st.columns(4)
 
-    st.subheader(
-        "Research State"
-    )
+with cols[0]:
+metric_card(
+"Financial Stress",
+fmt(
+CTX.get(
+"financial_stress"
+)
+),
+"Composite research measure",
+)
 
-    if context is not None:
+with cols[1]:
+metric_card(
+"Sentiment Score",
+fmt(
+CTX.get(
+"sentiment_score"
+)
+),
+"0–100 historical sentiment scale",
+)
 
-        context_row = context.iloc[-1]
+with cols[2]:
+metric_card(
+"VIX",
+fmt(
+CTX.get(
+"vix"
+)
+),
+"Latest context observation",
+)
 
-        important_fields = [
-            "context_date",
-            "asof_date",
-            "available_layer_count",
-            "completeness_status",
-            "context_state",
-            "point_in_time_safe",
-            "research_only",
-        ]
+with cols[3]:
+metric_card(
+"10Y–2Y Spread",
+fmt(
+CTX.get(
+"yield_spread"
+)
+),
+"Yield-curve observation",
+)
 
-        rows = []
+section_end()
 
-        for field in important_fields:
+section(
+"Market Structure",
+"Observed technical conditions from the Technical Intelligence layer.",
+)
 
-            column = find_column(
-                context,
-                [field],
-            )
+cols = st.columns(5)
 
-            if column:
+with cols[0]:
+metric_card(
+"Trend",
+clean(
+CTX.get(
+"trend"
+)
+) or "N/A",
+"Technical structure",
+)
 
-                rows.append(
-                    [
-                        friendly_name(
-                            field
-                        ),
-                        context_row.get(
-                            column,
-                            "",
-                        ),
-                    ]
-                )
+with cols[1]:
+metric_card(
+"RSI 14",
+fmt(
+CTX.get(
+"rsi"
+)
+),
+"Technical oscillator",
+)
 
-        if rows:
+with cols[2]:
+metric_card(
+"ATR 14 %",
+fmt_pct(
+CTX.get(
+"atr_pct"
+)
+),
+"Observed volatility",
+)
 
-            st.dataframe(
-                pd.DataFrame(
-                    rows,
-                    columns=[
-                        "Research Field",
-                        "Current Value",
-                    ],
-                ),
-                use_container_width=True,
-                hide_index=True,
-            )
+with cols[3]:
+metric_card(
+"ROC 20",
+fmt_pct(
+CTX.get(
+"roc20"
+)
+),
+"20-session rate of change",
+)
 
-    st.subheader(
-        "Research Coverage"
-    )
+with cols[4]:
+metric_card(
+"Drawdown",
+fmt_pct(
+CTX.get(
+"technical_drawdown"
+)
+),
+"Technical layer drawdown",
+)
 
-    coverage = []
+section_end()
 
-    for label in [
-        "Macro Context",
-        "Financial Stress",
-        "Technical",
-        "Liquidity",
-        "Market Breadth",
-        "Cross Asset",
-        "Historical Edge",
-        "Event News",
-        "Earnings",
-    ]:
+section(
+"Research Integrity",
+"Controls carried through the current Research Context.",
+)
 
-        coverage.append(
-            [
-                label,
-                (
-                    "Available"
-                    if label in RESEARCH
-                    else "Not available"
-                ),
-            ]
-        )
+cols = st.columns(4)
 
-    st.dataframe(
-        pd.DataFrame(
-            coverage,
-            columns=[
-                "Research Module",
-                "Current Availability",
-            ],
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
+with cols[0]:
+metric_card(
+"PIT",
+"SAFE"
+if true_value(
+CTX.get("pit")
+)
+else "N/A",
+"Point-in-time control",
+)
+
+with cols[1]:
+metric_card(
+"Research Only",
+"TRUE"
+if true_value(
+CTX.get(
+"research_only"
+)
+)
+else "N/A",
+"Architecture boundary",
+)
+
+with cols[2]:
+metric_card(
+"Trading Signal",
+"NONE",
+"Not generated by the research stack",
+)
+
+with cols[3]:
+metric_card(
+"Forecast",
+"NONE",
+"Not generated by the research stack",
+)
+
+section_end()
 
 
 # ============================================================
 # MARKET REGIME
 # ============================================================
 
-elif page == "Market Regime":
+def page_market_regime():
 
-    st.subheader(
-        "Current Market Research State"
-    )
+hero(
+"Market Regime",
+(
+"Cross-layer description of the current US500 environment "
+"using synchronized research outputs."
+),
+"MARKET REGIME",
+)
 
-    st.caption(
-        "This page describes the current research environment. "
-        "It does not convert the state into a trade direction."
-    )
+cols = st.columns(4)
 
-    c1, c2, c3 = st.columns(3)
+with cols[0]:
+state_card(
+"Macro",
+clean(
+CTX.get(
+"economic_regime"
+)
+) or "N/A",
+"Economic Intelligence",
+)
 
-    with c1:
-        metric_card(
-            "Macro",
-            layer_status("macro"),
-            "Current research availability",
-        )
+with cols[1]:
+state_card(
+"Stress",
+clean(
+CTX.get(
+"financial_stress_regime"
+)
+) or "N/A",
+"Financial Stress",
+)
 
-    with c2:
-        metric_card(
-            "Financial Stress",
-            (
-                "AVAILABLE"
-                if "Financial Stress"
-                in RESEARCH
-                else "N/A"
-            ),
-            "Stress research",
-        )
+with cols[2]:
+state_card(
+"Sentiment",
+clean(
+CTX.get(
+"sentiment_regime"
+)
+) or "N/A",
+"Sentiment Engine",
+)
 
-    with c3:
-        metric_card(
-            "Technical",
-            layer_status("technical"),
-            "Technical research",
-        )
+with cols[3]:
+state_card(
+"Technical",
+clean(
+CTX.get(
+"technical_regime"
+)
+) or "N/A",
+"Technical Intelligence",
+)
 
-    st.markdown("###")
+st.markdown("")
 
-    for label in [
-        "Macro Context",
-        "Financial Stress",
-        "Sentiment",
-        "Technical",
-        "Liquidity",
-        "Market Breadth",
-        "Cross Asset",
-    ]:
+section(
+"Regime Matrix",
+"Each layer is shown independently; no directional score is constructed.",
+)
 
-        df = RESEARCH.get(
-            label
-        )
+matrix = pd.DataFrame(
+{
+"Layer": [
+"Economic",
+"Financial Stress",
+"Sentiment",
+"Technical",
+],
+"Current State": [
+CTX.get(
+"economic_regime"
+),
+CTX.get(
+"financial_stress_regime"
+),
+CTX.get(
+"sentiment_regime"
+),
+CTX.get(
+"technical_regime"
+),
+],
+"Research Date": [
+CTX.get("date")
+] * 4,
+}
+)
 
-        if df is None:
-            continue
+st.dataframe(
+matrix,
+use_container_width=True,
+hide_index=True,
+)
 
-        st.markdown(
-            f"### {label}"
-        )
+section_end()
 
-        display_research_dataset(
-            df,
-            label,
-        )
+if research_context is not None:
+
+section(
+"Regime History",
+"Historical Research Context states.",
+)
+
+cols_available = [
+c
+for c in [
+"context_date",
+"macro_economic_regime",
+"macro_financial_stress_regime",
+"sentiment_research_regime",
+"technical_technical_regime",
+]
+if c in research_context.columns
+]
+
+if len(cols_available) > 1:
+
+history = (
+research_context[
+cols_available
+]
+.copy()
+)
+
+date_col = (
+"context_date"
+if "context_date"
+in history.columns
+else None
+)
+
+if date_col:
+history[date_col] = pd.to_datetime(
+history[date_col],
+errors="coerce",
+)
+
+history = (
+history
+.dropna(
+subset=[date_col]
+)
+.tail(500)
+.set_index(
+date_col
+)
+)
+
+st.dataframe(
+history.tail(100),
+use_container_width=True,
+)
+
+section_end()
 
 
 # ============================================================
 # MACRO
 # ============================================================
 
-elif page == "Macro":
-
-    st.subheader(
-        "Macro Intelligence"
-    )
-
-    df = RESEARCH.get(
-        "Macro Context"
-    )
-
-    if df is None:
-        df = context
-
-    display_research_dataset(
-        df,
-        "Macro Intelligence",
-    )
-
-    if df is not None:
-
-        st.markdown(
-            "### Macro Evidence"
-        )
-
-        numeric = numeric_columns(
-            df
-        )
-
-        if numeric:
-
-            latest = df.iloc[-1]
-
-            for column in numeric[:8]:
-
-                value = latest.get(
-                    column
-                )
-
-                evidence_card(
-                    friendly_name(
-                        column
-                    ),
-                    (
-                        "Latest research observation: "
-                        f"{format_value(value)}"
-                    ),
-                )
-
-
-# ============================================================
-# FINANCIAL STRESS
-# ============================================================
-
-elif page == "Financial Stress":
-
-    st.subheader(
-        "Financial Stress Intelligence"
-    )
-
-    df = RESEARCH.get(
-        "Financial Stress"
-    )
-
-    display_research_dataset(
-        df,
-        "Financial Stress",
-    )
-
-    if df is not None:
-
-        st.markdown(
-            "### Stress Structure"
-        )
-
-        preferred = [
-            "VIX",
-            "NFCI",
-            "ANFCI",
-            "YIELD_10Y_2Y_SPREAD",
-            "VIX_Z",
-            "NFCI_Z",
-            "ANFCI_Z",
-            "YIELD_CURVE_STRESS_Z",
-            "composite_stress_score",
-            "research_regime",
-        ]
-
-        available = [
-            x
-            for x in preferred
-            if x in df.columns
-        ]
-
-        if available:
-
-            latest = df.iloc[-1]
-
-            rows = [
-                [
-                    friendly_name(
-                        column
-                    ),
-                    format_value(
-                        latest.get(
-                            column
-                        )
-                    ),
-                ]
-                for column in available
-            ]
-
-            st.dataframe(
-                pd.DataFrame(
-                    rows,
-                    columns=[
-                        "Stress Component",
-                        "Latest Observation",
-                    ],
-                ),
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        numeric = [
-            c
-            for c in numeric_columns(df)
-            if c not in {
-                "record_id"
-            }
-        ]
-
-        if numeric:
-
-            chart_columns = [
-                c
-                for c in [
-                    "VIX",
-                    "NFCI",
-                    "ANFCI",
-                    "composite_stress_score",
-                ]
-                if c in df.columns
-            ]
-
-            if chart_columns:
-
-                chart = (
-                    df.copy()
-                    .tail(500)
-                )
-
-                chart[
-                    chart_columns
-                ] = chart[
-                    chart_columns
-                ].apply(
-                    pd.to_numeric,
-                    errors="coerce",
-                )
-
-                st.line_chart(
-                    chart[
-                        chart_columns
-                    ],
-                    use_container_width=True,
-                )
-
-
-# ============================================================
-# SENTIMENT
-# ============================================================
-
-elif page == "Sentiment":
-
-    st.subheader(
-        "Sentiment Intelligence"
-    )
-
-    sentiment_datasets = [
-        (
-            "Research Context",
-            RESEARCH.get(
-                "Research Context"
-            ),
-        ),
-        (
-            "AAII",
-            None,
-        ),
-        (
-            "VIX",
-            None,
-        ),
-    ]
-
-    for label, df in sentiment_datasets:
-
-        if label == "Research Context":
-
-            if df is not None:
-
-                sentiment_columns = [
-                    c
-                    for c in df.columns
-                    if any(
-                        word in c.lower()
-                        for word in [
-                            "sentiment",
-                            "vix",
-                            "aaii",
-                            "fear",
-                            "greed",
-                        ]
-                    )
-                ]
-
-                if sentiment_columns:
-
-                    st.markdown(
-                        "### Sentiment fields"
-                    )
-
-                    latest = df.iloc[-1]
-
-                    rows = [
-                        [
-                            friendly_name(c),
-                            format_value(
-                                latest.get(c)
-                            ),
-                        ]
-                        for c in sentiment_columns
-                    ]
-
-                    st.dataframe(
-                        pd.DataFrame(
-                            rows,
-                            columns=[
-                                "Indicator",
-                                "Latest",
-                            ],
-                        ),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-
-        elif label in RESEARCH:
-
-            display_research_dataset(
-                df,
-                label,
-            )
-
-    st.info(
-        "Sentiment observations are displayed as research evidence. "
-        "They are not transformed into a directional signal."
-    )
-
-
-# ============================================================
-# TECHNICAL
-# ============================================================
-
-elif page == "Technical":
-
-    st.subheader(
-        "Technical Intelligence"
-    )
-
-    df = RESEARCH.get(
-        "Technical"
-    )
-
-    display_research_dataset(
-        df,
-        "Technical Intelligence",
-    )
-
-    if df is not None:
-
-        date_col = find_column(
-            df,
-            [
-                "date",
-                "asof_date",
-                "context_date",
-            ],
-        )
-
-        numeric = numeric_columns(
-            df
-        )
-
-        if date_col and numeric:
-
-            chart_df = df.copy()
-
-            chart_df[date_col] = pd.to_datetime(
-                chart_df[date_col],
-                errors="coerce",
-            )
-
-            chart_df = (
-                chart_df
-                .dropna(
-                    subset=[
-                        date_col
-                    ]
-                )
-                .tail(500)
-                .set_index(
-                    date_col
-                )
-            )
-
-            selected = numeric[:6]
-
-            chart_df[
-                selected
-            ] = chart_df[
-                selected
-            ].apply(
-                pd.to_numeric,
-                errors="coerce",
-            )
-
-            st.markdown(
-                "### Technical Research History"
-            )
-
-            st.line_chart(
-                chart_df[
-                    selected
-                ],
-                use_container_width=True,
-            )
-
-
-# ============================================================
-# HISTORICAL EDGE
-# ============================================================
-
-elif page == "Historical Edge":
-
-    st.subheader(
-        "Historical Edge Finder"
-    )
-
-    st.caption(
-        "Historical analogues and observed outcomes from completed "
-        "research. This is a distributional research view, not a forecast."
-    )
-
-    df = RESEARCH.get(
-        "Historical Edge"
-    )
-
-    if df is None:
-
-        df = RESEARCH.get(
-            "Historical Edge v1"
-        )
-
-    if df is None:
-
-        st.warning(
-            "Historical Event Study artifact is not currently available."
-        )
-
-    else:
-
-        st.metric(
-            "Historical Observations",
-            f"{len(df):,}",
-        )
-
-        st.write("")
-
-        columns = df.columns.tolist()
-
-        outcome_columns = [
-            c
-            for c in columns
-            if any(
-                word in c.lower()
-                for word in [
-                    "return",
-                    "mfe",
-                    "mae",
-                    "recovery",
-                    "drawdown",
-                    "horizon",
-                    "forward",
-                    "outcome",
-                ]
-            )
-        ]
-
-        if outcome_columns:
-
-            st.markdown(
-                "### Historical Outcome Fields"
-            )
-
-            latest = df.iloc[-1]
-
-            rows = [
-                [
-                    friendly_name(c),
-                    format_value(
-                        latest.get(c)
-                    ),
-                ]
-                for c in outcome_columns[:20]
-            ]
-
-            st.dataframe(
-                pd.DataFrame(
-                    rows,
-                    columns=[
-                        "Historical Field",
-                        "Observed Value",
-                    ],
-                ),
-                use_container_width=True,
-                hide_index=True,
-            )
-
-        st.markdown(
-            "### Historical Distribution"
-        )
-
-        numeric = numeric_columns(
-            df
-        )
-
-        selected = [
-            c
-            for c in numeric
-            if any(
-                word in c.lower()
-                for word in [
-                    "return",
-                    "mfe",
-                    "mae",
-                ]
-            )
-        ][:6]
-
-        if selected:
-
-            plot_df = df[
-                selected
-            ].copy()
-
-            plot_df = plot_df.apply(
-                pd.to_numeric,
-                errors="coerce",
-            )
-
-            st.line_chart(
-                plot_df.tail(300),
-                use_container_width=True,
-            )
-
-        with st.expander(
-            "Inspect historical research sample"
-        ):
-
-            st.dataframe(
-                df.tail(100),
-                use_container_width=True,
-                hide_index=True,
-            )
-
-
-# ============================================================
-# EVENT STUDIES
-# ============================================================
-
-elif page == "Event Studies":
-
-    st.subheader(
-        "Event Study Research"
-    )
-
-    datasets = [
-        (
-            "Historical Edge",
-            RESEARCH.get(
-                "Historical Edge"
-            ),
-        ),
-        (
-            "Event News",
-            RESEARCH.get(
-                "Event News"
-            ),
-        ),
-        (
-            "Earnings",
-            RESEARCH.get(
-                "Earnings"
-            ),
-        ),
-    ]
-
-    for label, df in datasets:
-
-        st.markdown(
-            f"### {label}"
-        )
-
-        display_research_dataset(
-            df,
-            label,
-        )
-
-    st.info(
-        "Event-study results describe historical observations "
-        "and distributions. They do not establish a deterministic "
-        "future outcome."
-    )
-
-
-# ============================================================
-# CROSS ASSET
-# ============================================================
-
-elif page == "Cross-Asset":
-
-    st.subheader(
-        "Cross-Asset Intelligence"
-    )
-
-    df = RESEARCH.get(
-        "Cross Asset"
-    )
-
-    display_research_dataset(
-        df,
-        "Cross-Asset Intelligence",
-    )
-
-    if df is not None:
-
-        numeric = numeric_columns(
-            df
-        )
-
-        if numeric:
-
-            selected = numeric[:8]
-
-            chart_df = df[
-                selected
-            ].copy()
-
-            chart_df = chart_df.apply(
-                pd.to_numeric,
-                errors="coerce",
-            )
-
-            st.markdown(
-                "### Cross-Asset Research History"
-            )
-
-            st.line_chart(
-                chart_df.tail(300),
-                use_container_width=True,
-            )
-
-
-# ============================================================
-# EARNINGS
-# ============================================================
-
-elif page == "Earnings":
-
-    st.subheader(
-        "Corporate Earnings Intelligence"
-    )
-
-    df = RESEARCH.get(
-        "Earnings"
-    )
-
-    display_research_dataset(
-        df,
-        "Earnings Market Reaction V3",
-    )
-
-    if df is not None:
-
-        horizon_columns = [
-            c
-            for c in df.columns
-            if any(
-                word in c.lower()
-                for word in [
-                    "1d",
-                    "3d",
-                    "5d",
-                    "20d",
-                    "1m",
-                    "3m",
-                    "mfe",
-                    "mae",
-                ]
-            )
-        ]
-
-        if horizon_columns:
-
-            st.markdown(
-                "### Earnings Reaction Fields"
-            )
-
-            latest = df.iloc[-1]
-
-            rows = [
-                [
-                    friendly_name(
-                        column
-                    ),
-                    format_value(
-                        latest.get(column)
-                    ),
-                ]
-                for column in horizon_columns[:25]
-            ]
-
-            st.dataframe(
-                pd.DataFrame(
-                    rows,
-                    columns=[
-                        "Field",
-                        "Observed Result",
-                    ],
-                ),
-                use_container_width=True,
-                hide_index=True,
-            )
-
-    st.info(
-        "Earnings research summarizes historical market reactions "
-        "around corporate reporting events."
-    )
-
-
-# ============================================================
-# EVIDENCE
-# ============================================================
-
-elif page == "Evidence":
-
-    st.subheader(
-        "Evidence Desk"
-    )
-
-    st.caption(
-        "A compact explanation of what the research stack currently contains."
-    )
-
-    evidence_sources = [
-        (
-            "Macro",
-            "Economic Intelligence and Macro Context research.",
-            "Macro Context" in RESEARCH,
-        ),
-        (
-            "Financial Stress",
-            "VIX, NFCI/ANFCI and yield-curve stress research.",
-            "Financial Stress" in RESEARCH,
-        ),
-        (
-            "Sentiment",
-            "Sentiment observations incorporated into the unified research context.",
-            context is not None,
-        ),
-        (
-            "Technical",
-            "Technical structure and market-state observations.",
-            "Technical" in RESEARCH,
-        ),
-        (
-            "Historical",
-            "Historical event-study distributions and observed outcomes.",
-            (
-                "Historical Edge" in RESEARCH
-                or "Historical Edge v1" in RESEARCH
-            ),
-        ),
-        (
-            "Cross-Asset",
-            "Relationships across relevant market assets.",
-            "Cross Asset" in RESEARCH,
-        ),
-        (
-            "Earnings",
-            "Historical corporate earnings reaction research.",
-            "Earnings" in RESEARCH,
-        ),
-    ]
-
-    for (
-        name,
-        description,
-        available,
-    ) in evidence_sources:
-
-        status = (
-            "AVAILABLE"
-            if available
-            else "NOT CURRENTLY AVAILABLE"
-        )
-
-        evidence_card(
-            name,
-            f"{description}  Status: {status}.",
-        )
-
-    st.markdown(
-        "### Research Interpretation"
-    )
-
-    evidence_card(
-        "Current State",
-        "The dashboard displays the latest available research observations "
-        "without converting them into an executable market decision.",
-    )
-
-    evidence_card(
-        "Historical Evidence",
-        "Historical event studies are shown as observed distributions, "
-        "including forward outcomes, MFE/MAE and recovery characteristics "
-        "where those fields exist.",
-    )
-
-    evidence_card(
-        "Point-in-Time Discipline",
-        "The application preserves the point-in-time fields supplied by "
-        "the research artifacts instead of reconstructing unavailable "
-        "information inside the dashboard.",
-    )
-
-    evidence_card(
-        "Architecture Boundary",
-        "The visualization layer does not create trading signals, "
-        "forecasts, position sizing or execution instructions.",
-    )
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
-
-st.markdown(
-    """
-    <div class="footer">
-        US500 Macro Intelligence · Research Terminal<br>
-        Research-only visualization layer ·
-        No trading signals · No forecasting · No execution
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+def page_macro():
+
+hero(
+"Macro Intelligence",
+(
+"Economic and Federal Reserve context preserved "
+"through the Macro Context research layer."
+),
+"MACRO",
