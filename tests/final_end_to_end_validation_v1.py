@@ -499,6 +499,63 @@ def classify_artifact(
 
 
 # ---------------------------------------------------------------------
+# PRIMARY ARTIFACT CROSS-CHECK
+# ---------------------------------------------------------------------
+
+def layer_has_nonempty_primary(
+    target_path: Path,
+    csv_files: List[Path],
+) -> bool:
+
+    """
+    Returns True when another PRIMARY artifact belonging to the
+    same research layer contains at least one data row.
+
+    This prevents an older/placeholder empty PRIMARY artifact from
+    invalidating an otherwise valid research layer.
+    """
+
+    target_classification, target_layer = classify_artifact(
+        target_path
+    )
+
+    if (
+        target_classification != "PRIMARY"
+        or target_layer is None
+    ):
+        return False
+
+    for candidate in csv_files:
+
+        if candidate == target_path:
+            continue
+
+        classification, layer = classify_artifact(
+            candidate
+        )
+
+        if (
+            classification != "PRIMARY"
+            or layer != target_layer
+        ):
+            continue
+
+        df, error = read_csv_safe(
+            candidate
+        )
+
+        if (
+            error is None
+            and df is not None
+            and not df.empty
+        ):
+
+            return True
+
+    return False
+
+
+# ---------------------------------------------------------------------
 # BASIC CSV VALIDATION
 # ---------------------------------------------------------------------
 
@@ -507,6 +564,7 @@ def validate_basic_dataframe(
     df: pd.DataFrame,
     results: List[CheckResult],
     strict: bool,
+    allow_empty_primary: bool = False,
 ):
 
     classification, layer = classify_artifact(
@@ -528,6 +586,7 @@ def validate_basic_dataframe(
         if (
             classification == "PRIMARY"
             and strict
+            and not allow_empty_primary
         ):
 
             add_check(
@@ -545,6 +604,21 @@ def validate_basic_dataframe(
 
         else:
 
+            status_message = (
+                f"{name} contains zero rows; "
+                f"artifact classification="
+                f"{classification}."
+            )
+
+            if allow_empty_primary:
+
+                status_message = (
+                    f"{name} is an empty PRIMARY artifact, "
+                    f"but another non-empty PRIMARY artifact "
+                    f"for the same research layer exists; "
+                    f"treated as historical/placeholder evidence."
+                )
+
             add_check(
                 results,
                 "NONEMPTY",
@@ -552,11 +626,7 @@ def validate_basic_dataframe(
                 layer,
                 "REVIEW",
                 "WARNING",
-                (
-                    f"{name} contains zero rows; "
-                    f"artifact classification="
-                    f"{classification}."
-                ),
+                status_message,
             )
 
     else:
@@ -615,11 +685,13 @@ def validate_basic_dataframe(
             (
                 "FAIL"
                 if classification == "PRIMARY"
+                and not allow_empty_primary
                 else "REVIEW"
             ),
             (
                 "ERROR"
                 if classification == "PRIMARY"
+                and not allow_empty_primary
                 else "WARNING"
             ),
             (
@@ -686,13 +758,31 @@ def validate_dates(
 
         series = df[column]
 
+        # Empty and placeholder values are not invalid dates.
+        # They represent unavailable/non-applicable metadata.
+        normalized = (
+            series.astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        empty_or_placeholder = normalized.isin({
+            "",
+            "nan",
+            "nat",
+            "none",
+            "null",
+            "na",
+            "n/a",
+            "not available",
+            "not_available",
+            "unknown",
+            "-",
+        })
+
         non_empty = (
             series.notna()
-            & (
-                series.astype(str)
-                .str.strip()
-                != ""
-            )
+            & ~empty_or_placeholder
         )
 
         if not non_empty.any():
@@ -912,6 +1002,15 @@ def validate_pit(
 
             continue
 
+        # Correct point-in-time invariant:
+        #
+        # The information must have been available by the
+        # context/as-of date.
+        #
+        # Therefore:
+        #
+        #     availability_date <= asof_date
+        #
         bad = int(
             (
                 avail[valid]
@@ -1804,6 +1903,9 @@ def find_research_context(
     if not candidates:
         return None
 
+    # Prefer a populated canonical artifact.
+    populated = []
+
     for candidate in candidates:
 
         df, error = read_csv_safe(
@@ -1811,20 +1913,23 @@ def find_research_context(
         )
 
         if (
-            error
-            or df is None
+            error is None
+            and df is not None
+            and not df.empty
         ):
 
-            continue
+            populated.append(candidate)
 
-        if {
-            "context_date",
-            "available_layer_count",
-        }.issubset(
-            df.columns
-        ):
+    if populated:
 
-            return candidate
+        return sorted(
+            populated,
+            key=lambda p: (
+                p.stat().st_mtime,
+                p.name,
+            ),
+            reverse=True,
+        )[0]
 
     return candidates[0]
 
@@ -2408,11 +2513,21 @@ def main() -> int:
             classification == "PRIMARY"
         )
 
+        allow_empty_primary = (
+            classification == "PRIMARY"
+            and layer is not None
+            and layer_has_nonempty_primary(
+                path,
+                csv_files,
+            )
+        )
+
         validate_basic_dataframe(
             path,
             df,
             results,
             strict,
+            allow_empty_primary,
         )
 
         # Only PRIMARY and SUPPORTING research data
