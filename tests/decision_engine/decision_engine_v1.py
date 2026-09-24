@@ -120,6 +120,15 @@ def parse_args() -> argparse.Namespace:
 # ============================================================
 
 def clean(value: Any) -> str:
+    """
+    Normalize every value to a deterministic string.
+
+    This is important because CSV serialization converts
+    numeric values back to strings. Using this function before
+    hashing guarantees that the record_id calculation is
+    reproducible before and after CSV round-tripping.
+    """
+
     if value is None:
         return ""
 
@@ -188,6 +197,50 @@ def write_csv(
 
 
 # ============================================================
+# CANONICALIZATION
+# ============================================================
+
+def canonicalize_mapping(
+    mapping: Dict[str, Any],
+) -> Dict[str, str]:
+    """
+    Convert all values to normalized strings before hashing.
+
+    This prevents record_id drift caused by the CSV round-trip:
+
+        Python int 3
+            ->
+        CSV "3"
+
+    Both representations become exactly:
+
+        "3"
+    """
+
+    return {
+        str(key): clean(value)
+        for key, value in mapping.items()
+    }
+
+
+def canonical_json(
+    mapping: Dict[str, Any],
+) -> str:
+    """
+    Produce deterministic JSON representation.
+    """
+
+    normalized = canonicalize_mapping(mapping)
+
+    return json.dumps(
+        normalized,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+
+# ============================================================
 # INPUT DISCOVERY
 # ============================================================
 
@@ -209,7 +262,6 @@ def find_research_context(
 
     if len(candidates) > 1:
 
-        # Deterministic selection.
         candidates = sorted(
             candidates,
             key=lambda path: str(path),
@@ -262,7 +314,9 @@ def validate_control_flags(
 
     for field in required_true:
 
-        value = parse_boolean(row.get(field))
+        value = parse_boolean(
+            row.get(field)
+        )
 
         if value is not True:
 
@@ -273,7 +327,9 @@ def validate_control_flags(
 
     for field in required_false:
 
-        value = parse_boolean(row.get(field))
+        value = parse_boolean(
+            row.get(field)
+        )
 
         if value is not False:
 
@@ -370,13 +426,14 @@ def context_state(
 def source_snapshot_id(
     row: Dict[str, str],
 ) -> str:
+    """
+    Deterministic snapshot hash.
 
-    canonical = json.dumps(
-        row,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
+    All input values are canonicalized to strings so that
+    the hash remains stable across CSV serialization.
+    """
+
+    canonical = canonical_json(row)
 
     return hashlib.sha256(
         canonical.encode("utf-8")
@@ -386,6 +443,15 @@ def source_snapshot_id(
 def record_id(
     record: Dict[str, Any],
 ) -> str:
+    """
+    Deterministic record identifier.
+
+    IMPORTANT:
+    All values are converted to normalized strings before
+    hashing. This guarantees that the record_id generated
+    before CSV serialization is identical to the record_id
+    reconstructed by the validator after CSV deserialization.
+    """
 
     deterministic = {
         key: value
@@ -396,12 +462,8 @@ def record_id(
         }
     }
 
-    canonical = json.dumps(
-        deterministic,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        default=str,
+    canonical = canonical_json(
+        deterministic
     )
 
     return hashlib.sha256(
@@ -570,10 +632,10 @@ def build_record(
         # ----------------------------------------------------
 
         "available_layer_count":
-            available_count,
+            str(available_count),
 
         "total_layer_count":
-            TOTAL_LAYER_COUNT,
+            str(TOTAL_LAYER_COUNT),
 
         "completeness_status":
             completeness,
@@ -768,16 +830,18 @@ def build_record(
         # ----------------------------------------------------
 
         "economic_regime":
-            clean(row.get("economic_regime")),
+            clean(
+                row.get("economic_regime")
+            ),
 
         "fed_score":
-            clean(row.get("fed_score")),
+            clean(
+                row.get("fed_score")
+            ),
 
         "financial_stress_regime":
             clean(
-                row.get(
-                    "financial_stress_regime"
-                )
+                row.get("financial_stress_regime")
             ),
 
         "sentiment_regime":
@@ -805,6 +869,10 @@ def build_record(
             ).isoformat(),
     }
 
+    # --------------------------------------------------------
+    # Deterministic record ID
+    # --------------------------------------------------------
+
     record["record_id"] = record_id(
         record
     )
@@ -823,49 +891,75 @@ def build_summary(
     return {
 
         "context_date":
-            record["context_date"],
+            clean(record["context_date"]),
 
         "asof_date":
-            record["asof_date"],
+            clean(record["asof_date"]),
 
         "available_layer_count":
-            record["available_layer_count"],
+            clean(
+                record["available_layer_count"]
+            ),
 
         "total_layer_count":
-            record["total_layer_count"],
+            clean(
+                record["total_layer_count"]
+            ),
 
         "completeness_status":
-            record["completeness_status"],
+            clean(
+                record["completeness_status"]
+            ),
 
         "context_state":
-            record["context_state"],
+            clean(
+                record["context_state"]
+            ),
 
         "point_in_time_safe":
-            record["point_in_time_safe"],
+            clean(
+                record["point_in_time_safe"]
+            ),
 
         "research_only":
-            record["research_only"],
+            clean(
+                record["research_only"]
+            ),
 
         "decision_engine_ready":
-            record["decision_engine_ready"],
+            clean(
+                record["decision_engine_ready"]
+            ),
 
         "trading_signal_generated":
-            record["trading_signal_generated"],
+            clean(
+                record["trading_signal_generated"]
+            ),
 
         "forecast_generated":
-            record["forecast_generated"],
+            clean(
+                record["forecast_generated"]
+            ),
 
         "unified_decision_generated":
-            record["unified_decision_generated"],
+            clean(
+                record["unified_decision_generated"]
+            ),
 
         "architecture_version":
-            record["architecture_version"],
+            clean(
+                record["architecture_version"]
+            ),
 
         "source_snapshot_id":
-            record["source_snapshot_id"],
+            clean(
+                record["source_snapshot_id"]
+            ),
 
         "record_id":
-            record["record_id"],
+            clean(
+                record["record_id"]
+            ),
     }
 
 
@@ -955,6 +1049,10 @@ def main() -> int:
     )
     print(
         "No execution generated."
+    )
+
+    print(
+        "Deterministic record_id enabled."
     )
 
     print("=" * 70)
