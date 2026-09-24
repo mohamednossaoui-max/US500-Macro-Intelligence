@@ -54,6 +54,195 @@ jobs:
           echo "Top-level files:"
           find . -maxdepth 2 -type f | sort | head -200
 
+      - name: Prepare artifacts directory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "PREPARING ARTIFACTS DIRECTORY"
+          echo "============================================================"
+
+          rm -rf artifacts
+          mkdir -p artifacts
+
+          echo "Artifacts directory:"
+          pwd
+          echo "/artifacts"
+
+      - name: Download latest available research artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DOWNLOADING RESEARCH ARTIFACTS"
+          echo "============================================================"
+
+          REPO="${GITHUB_REPOSITORY}"
+
+          echo
+          echo "Repository:"
+          echo "$REPO"
+
+          echo
+          echo "Collecting non-expired artifacts from GitHub Actions..."
+
+          gh api \
+            --paginate \
+            "repos/${REPO}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired == false) |
+              [
+                .name,
+                .id,
+                .created_at,
+                .archive_download_url
+              ] | @tsv' \
+            > /tmp/all_artifacts.tsv
+
+          if [ ! -s /tmp/all_artifacts.tsv ]; then
+            echo "No downloadable artifacts were found."
+            exit 1
+          fi
+
+          echo
+          echo "Total available artifact records:"
+          wc -l < /tmp/all_artifacts.tsv
+
+          echo
+          echo "Selecting the latest artifact for each artifact name..."
+
+          python - <<'PY'
+          from pathlib import Path
+          from datetime import datetime
+
+          source = Path("/tmp/all_artifacts.tsv")
+          output = Path("/tmp/latest_artifacts.tsv")
+
+          latest = {}
+
+          for line in source.read_text().splitlines():
+              parts = line.split("\t")
+
+              if len(parts) != 4:
+                  continue
+
+              name, artifact_id, created_at, url = parts
+
+              try:
+                  dt = datetime.fromisoformat(
+                      created_at.replace("Z", "+00:00")
+                  )
+              except Exception:
+                  continue
+
+              previous = latest.get(name)
+
+              if previous is None or dt > previous[0]:
+                  latest[name] = (dt, artifact_id, url)
+
+          with output.open("w", encoding="utf-8") as f:
+              for name, (dt, artifact_id, url) in sorted(latest.items()):
+                  f.write(
+                      f"{name}\t{artifact_id}\t"
+                      f"{dt.isoformat()}\t{url}\n"
+                  )
+
+          print(f"Unique artifact names selected: {len(latest)}")
+          PY
+
+          echo
+          echo "Latest artifact set:"
+          cat /tmp/latest_artifacts.tsv
+
+          echo
+          echo "Downloading artifacts..."
+
+          count=0
+
+          while IFS=$'\t' read -r name artifact_id created_at archive_url; do
+
+            [ -z "$name" ] && continue
+
+            count=$((count + 1))
+
+            safe_name="$(printf '%s' "$name" | tr '/:' '__')"
+            zip_path="/tmp/${count}_${safe_name}.zip"
+            extract_dir="artifacts/${safe_name}"
+
+            mkdir -p "$extract_dir"
+
+            echo
+            echo "------------------------------------------------------------"
+            echo "Artifact #$count"
+            echo "Name      : $name"
+            echo "Artifact ID: $artifact_id"
+            echo "Created   : $created_at"
+            echo "------------------------------------------------------------"
+
+            gh api \
+              --method GET \
+              -H "Accept: application/vnd.github+json" \
+              "$archive_url" \
+              > "$zip_path"
+
+            if [ ! -s "$zip_path" ]; then
+              echo "WARNING: empty artifact archive: $name"
+              rm -f "$zip_path"
+              continue
+            fi
+
+            unzip -q -o "$zip_path" -d "$extract_dir"
+
+            rm -f "$zip_path"
+
+          done < /tmp/latest_artifacts.tsv
+
+          echo
+          echo "============================================================"
+          echo "ARTIFACT DOWNLOAD COMPLETE"
+          echo "============================================================"
+
+          echo
+          echo "Files available under artifacts/:"
+
+          find artifacts -type f | sort
+
+          echo
+          echo "CSV count:"
+          find artifacts -type f -name "*.csv" | wc -l
+
+          echo
+          echo "JSON count:"
+          find artifacts -type f -name "*.json" | wc -l
+
+      - name: Verify required research layers
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "VERIFYING RESEARCH ARTIFACTS"
+          echo "============================================================"
+
+          csv_count="$(find artifacts -type f -name "*.csv" | wc -l)"
+          json_count="$(find artifacts -type f -name "*.json" | wc -l)"
+
+          echo "CSV artifacts : $csv_count"
+          echo "JSON artifacts: $json_count"
+
+          if [ "$csv_count" -eq 0 ] && [ "$json_count" -eq 0 ]; then
+            echo
+            echo "ERROR: No research artifacts were downloaded."
+            exit 1
+          fi
+
+          echo
+          echo "Artifact tree:"
+          find artifacts -maxdepth 3 -type f | sort | head -500
+
       - name: Locate final validator
         shell: bash
         run: |
@@ -69,12 +258,17 @@ jobs:
             echo
             echo "Searching repository:"
             find tests -type f \
-              \( -name "*final*validation*.py" -o -name "*end*to*end*.py" \) \
+              \( \
+                -name "*final*validation*.py" \
+                -o \
+                -name "*end*to*end*.py" \
+              \) \
               -print
 
             exit 1
           fi
 
+          echo
           echo "Final validator found:"
           echo "tests/final_end_to_end_validation_v1.py"
 
@@ -113,12 +307,22 @@ jobs:
 
           echo
           echo "CSV / validation files:"
+
           find . -type f \
-            \( -name "*.csv" -o -name "*validation*" -o -name "*summary*" \) \
+            \( \
+              -name "*.csv" \
+              -o \
+              -name "*validation*" \
+              -o \
+              -name "*summary*" \
+              -o \
+              -name "*events*" \
+            \) \
             -print | sort
 
           echo
           echo "Exit code:"
+
           if [ -f "final_end_to_end_validation_exit_code.txt" ]; then
             cat final_end_to_end_validation_exit_code.txt
           else
