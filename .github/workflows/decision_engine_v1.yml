@@ -1,0 +1,47 @@
+name: Decision Engine V1
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  decision-engine-v1:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Discover existing research artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '============================================================'
+          echo 'US500 MACRO INTELLIGENCE — DECISION ENGINE V1'
+          echo '============================================================'
+          find . -type f -name '*.csv' -not -path './.git/*' | sort | head -200 || true
+      - name: Run Decision Engine V1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p decision_engine_artifacts
+          python decision_engine/decision_engine_v1.py --artifacts-dir . --output decision_engine_artifacts/decision_engine_research_v1.csv --summary-output decision_engine_artifacts/decision_engine_summary_v1.csv
+      - name: Validate Decision Engine V1
+        shell: bash
+        run: |
+          set -euo pipefail
+          python decision_engine/decision_engine_validation_v1.py --input decision_engine_artifacts/decision_engine_research_v1.csv --output decision_engine_artifacts/decision_engine_validation_v1.csv --summary-output decision_engine_artifacts/decision_engine_validation_v1_summary.csv --events-output decision_engine_artifacts/decision_engine_validation_v1_events.csv
+      - name: Print validation summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+          echo
+          cat decision_engine_artifacts/decision_engine_validation_v1_events.csv || true
+      - name: Upload Decision Engine V1 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: decision-engine-v1-artifacts
+          path: decision_engine_artifacts/
+          if-no-files-found: error
