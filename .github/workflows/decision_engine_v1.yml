@@ -166,14 +166,6 @@ jobs:
 
       # ============================================================
       # 6. RUN DECISION ENGINE V1
-      #
-      # IMPORTANT:
-      # The current decision_engine_v1.py accepts:
-      #   --artifacts-dir
-      #   --output
-      #   --summary-output
-      #
-      # It does NOT accept --input.
       # ============================================================
       - name: Run Decision Engine V1
         shell: bash
@@ -211,7 +203,7 @@ jobs:
             decision_engine_artifacts/decision_engine_research_v1_summary.csv
 
       # ============================================================
-      # 7. RUN VALIDATOR
+      # 7. VALIDATE DECISION ENGINE V1
       # ============================================================
       - name: Validate Decision Engine V1
         shell: bash
@@ -228,9 +220,9 @@ jobs:
             decision_engine_artifacts/decision_engine_research_v1.csv \
             --output \
             decision_engine_artifacts/decision_engine_validation_v1.csv \
-            --summary \
+            --summary-output \
             decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
-            --events \
+            --events-output \
             decision_engine_artifacts/decision_engine_validation_v1_events.csv
 
           echo ""
@@ -251,6 +243,7 @@ jobs:
       # 8. FINAL STATUS
       # ============================================================
       - name: Final Decision Engine status
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
@@ -260,14 +253,15 @@ jobs:
           echo "DECISION ENGINE V1 — FINAL STATUS"
           echo "============================================================"
 
-          echo "Research-only              : TRUE"
-          echo "Directional scoring        : FALSE"
-          echo "Trading signal generated   : FALSE"
-          echo "Forecast generated         : FALSE"
-          echo "Trade execution            : FALSE"
-          echo "Unified trading decision   : FALSE"
+          echo "Contract validation       : PASSED"
+          echo "Research-only             : TRUE"
+          echo "Directional scoring       : FALSE"
+          echo "Trading signal generated  : FALSE"
+          echo "Forecast generated        : FALSE"
+          echo "Trade execution           : FALSE"
+          echo "Unified decision          : FALSE"
           echo ""
-          echo "Decision Engine validation completed."
+          echo "Decision Engine V1 is contract-valid."
           echo "============================================================"
 
       # ============================================================
