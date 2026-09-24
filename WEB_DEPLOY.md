@@ -1,21 +1,17 @@
-# نشر التطبيق على الويب
+# US500 Research Terminal — Streamlit deployment
 
-هذه الحزمة جاهزة للنشر كتطبيق Streamlit.
+## Files
+- `app.py` — complete dashboard
+- `requirements.txt` — runtime dependencies
 
-## Streamlit Community Cloud
-1. ارفع هذا المجلد إلى مستودع GitHub خاص بك.
-2. افتح Streamlit Community Cloud واختر المستودع و`app.py`.
-3. في Settings > Secrets أضف:
+## Streamlit secrets
+For a private GitHub repository, add:
 
 ```toml
-FRED_API_KEY = "YOUR_FRED_API_KEY"
+GITHUB_TOKEN = "YOUR_GITHUB_TOKEN"
 US500_TICKER = "^GSPC"
-REFRESH_MINUTES = 30
 ```
 
-4. Deploy. سيعطيك Streamlit رابط HTTPS عام يمكن فتحه من iPhone والكمبيوتر.
+`^GSPC` is a public S&P 500 market-price proxy and may differ from a broker's US500 CFD/futures price.
 
-## مهم
-- لا تضع FRED API key داخل GitHub.
-- `^GSPC` هو proxy عام لـ S&P 500، وليس بالضرورة نفس سعر US500 لدى وسيطك.
-- SQLite مناسب للتجربة/تطبيق شخصي بسيط؛ للنشر العام متعدد المستخدمين استخدم PostgreSQL.
+The app is research-only. It does not generate trading signals, deterministic forecasts, execution instructions, position sizing, or SL/TP instructions.
