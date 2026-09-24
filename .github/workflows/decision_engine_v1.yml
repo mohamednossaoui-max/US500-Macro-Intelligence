@@ -117,7 +117,7 @@ jobs:
           find decision_engine_input -type f -print
 
       # ============================================================
-      # 5. LOCATE RESEARCH CONTEXT CSV
+      # 5. PREPARE RESEARCH CONTEXT
       # ============================================================
       - name: Prepare Decision Engine input
         shell: bash
@@ -156,7 +156,8 @@ jobs:
 
           echo ""
           echo "Prepared input:"
-          ls -lh decision_engine_source/research_context_summary_v1.csv
+          ls -lh \
+            decision_engine_source/research_context_summary_v1.csv
 
           echo ""
           echo "Input preview:"
@@ -164,7 +165,15 @@ jobs:
             decision_engine_source/research_context_summary_v1.csv
 
       # ============================================================
-      # 6. RUN DECISION ENGINE
+      # 6. RUN DECISION ENGINE V1
+      #
+      # IMPORTANT:
+      # The current decision_engine_v1.py accepts:
+      #   --artifacts-dir
+      #   --output
+      #   --summary-output
+      #
+      # It does NOT accept --input.
       # ============================================================
       - name: Run Decision Engine V1
         shell: bash
@@ -180,11 +189,11 @@ jobs:
 
           python \
             tests/decision_engine/decision_engine_v1.py \
-            --input \
-            decision_engine_source/research_context_summary_v1.csv \
+            --artifacts-dir \
+            decision_engine_source \
             --output \
             decision_engine_artifacts/decision_engine_research_v1.csv \
-            --summary \
+            --summary-output \
             decision_engine_artifacts/decision_engine_research_v1_summary.csv
 
           echo ""
@@ -193,11 +202,13 @@ jobs:
 
           echo ""
           echo "Decision Engine CSV:"
-          cat decision_engine_artifacts/decision_engine_research_v1.csv
+          cat \
+            decision_engine_artifacts/decision_engine_research_v1.csv
 
           echo ""
           echo "Decision Engine summary:"
-          cat decision_engine_artifacts/decision_engine_research_v1_summary.csv
+          cat \
+            decision_engine_artifacts/decision_engine_research_v1_summary.csv
 
       # ============================================================
       # 7. RUN VALIDATOR
@@ -228,14 +239,16 @@ jobs:
 
           echo ""
           echo "Validation summary:"
-          cat decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+          cat \
+            decision_engine_artifacts/decision_engine_validation_v1_summary.csv
 
           echo ""
           echo "Validation results:"
-          cat decision_engine_artifacts/decision_engine_validation_v1.csv
+          cat \
+            decision_engine_artifacts/decision_engine_validation_v1.csv
 
       # ============================================================
-      # 8. DISPLAY FINAL STATUS
+      # 8. FINAL STATUS
       # ============================================================
       - name: Final Decision Engine status
         shell: bash
