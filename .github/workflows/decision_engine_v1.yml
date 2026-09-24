@@ -12,32 +12,72 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+      - name: Verify Decision Engine files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE — DECISION ENGINE V1"
+          echo "============================================================"
+          ENGINE="tests/decision engine/decision_engine_v1.py"
+          VALIDATOR="tests/decision engine/decision_engine_validation_v1.py"
+          echo "Engine    : $ENGINE"
+          echo "Validator : $VALIDATOR"
+          echo
+          test -f "$ENGINE"
+          test -f "$VALIDATOR"
+          echo "Decision Engine files found successfully."
       - name: Discover existing research artifacts
         shell: bash
         run: |
           set -euo pipefail
-          echo '============================================================'
-          echo 'US500 MACRO INTELLIGENCE — DECISION ENGINE V1'
-          echo '============================================================'
-          find . -type f -name '*.csv' -not -path './.git/*' | sort | head -200 || true
+          echo
+          echo "============================================================"
+          echo "EXISTING RESEARCH ARTIFACTS"
+          echo "============================================================"
+          find . \
+            -type f \
+            -name "*.csv" \
+            -not -path "./.git/*" \
+            | sort \
+            | head -300 || true
       - name: Run Decision Engine V1
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p decision_engine_artifacts
-          python decision_engine/decision_engine_v1.py --artifacts-dir . --output decision_engine_artifacts/decision_engine_research_v1.csv --summary-output decision_engine_artifacts/decision_engine_summary_v1.csv
+          python "tests/decision engine/decision_engine_v1.py" \
+            --artifacts-dir . \
+            --output decision_engine_artifacts/decision_engine_research_v1.csv \
+            --summary-output decision_engine_artifacts/decision_engine_summary_v1.csv
       - name: Validate Decision Engine V1
         shell: bash
         run: |
           set -euo pipefail
-          python decision_engine/decision_engine_validation_v1.py --input decision_engine_artifacts/decision_engine_research_v1.csv --output decision_engine_artifacts/decision_engine_validation_v1.csv --summary-output decision_engine_artifacts/decision_engine_validation_v1_summary.csv --events-output decision_engine_artifacts/decision_engine_validation_v1_events.csv
-      - name: Print validation summary
+          python "tests/decision engine/decision_engine_validation_v1.py" \
+            --input decision_engine_artifacts/decision_engine_research_v1.csv \
+            --output decision_engine_artifacts/decision_engine_validation_v1.csv \
+            --summary-output decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
+            --events-output decision_engine_artifacts/decision_engine_validation_v1_events.csv
+      - name: Print Decision Engine result
         shell: bash
         run: |
           set -euo pipefail
+          echo
+          echo "============================================================"
+          echo "DECISION ENGINE V1 RESULT"
+          echo "============================================================"
+          cat decision_engine_artifacts/decision_engine_summary_v1.csv
+          echo
+          echo "============================================================"
+          echo "VALIDATION SUMMARY"
+          echo "============================================================"
           cat decision_engine_artifacts/decision_engine_validation_v1_summary.csv
           echo
+          echo "============================================================"
+          echo "VALIDATION EVENTS"
+          echo "============================================================"
           cat decision_engine_artifacts/decision_engine_validation_v1_events.csv || true
       - name: Upload Decision Engine V1 artifacts
         uses: actions/upload-artifact@v4
