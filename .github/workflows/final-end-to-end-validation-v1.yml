@@ -1,0 +1,306 @@
+name: Final End-to-End Validation V1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  final-end-to-end-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+
+      - name: Prepare artifact directory
+        run: |
+          rm -rf artifacts
+          mkdir -p artifacts
+
+      - name: Discover latest GitHub Actions artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DISCOVERING AVAILABLE GITHUB ACTIONS ARTIFACTS"
+          echo "============================================================"
+
+          gh api \
+            --paginate \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            > /tmp/all_artifacts.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("/tmp/all_artifacts.json")
+          data = json.loads(source.read_text())
+
+          artifacts = data.get("artifacts", [])
+
+          print(f"Total artifacts returned: {len(artifacts)}")
+
+          for artifact in artifacts:
+              print(
+                  artifact.get("id"),
+                  artifact.get("name"),
+                  artifact.get("expired"),
+                  artifact.get("created_at")
+              )
+          PY
+
+      - name: Download relevant research artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+
+          data = json.loads(
+              Path("/tmp/all_artifacts.json").read_text()
+          )
+
+          artifacts = data.get("artifacts", [])
+
+          patterns = [
+              r"economic",
+              r"fed",
+              r"financial[-_ ]stress",
+              r"cot",
+              r"aaii",
+              r"vix",
+              r"sentiment",
+              r"technical",
+              r"breadth",
+              r"cross[-_ ]asset",
+              r"event[-_ ]news",
+              r"earnings",
+              r"macro[-_ ]context",
+              r"research[-_ ]context",
+              r"ema19",
+          ]
+
+          selected = []
+
+          for artifact in artifacts:
+
+              if artifact.get("expired"):
+                  continue
+
+              name = str(
+                  artifact.get("name", "")
+              ).lower()
+
+              if any(
+                  re.search(pattern, name)
+                  for pattern in patterns
+              ):
+                  selected.append(artifact)
+
+          print(
+              f"Relevant non-expired artifacts selected: "
+              f"{len(selected)}"
+          )
+
+          # Keep the newest artifact for each exact artifact name.
+          newest = {}
+
+          for artifact in selected:
+              name = artifact["name"]
+
+              if (
+                  name not in newest
+                  or artifact["created_at"]
+                  > newest[name]["created_at"]
+              ):
+                  newest[name] = artifact
+
+          selected = list(newest.values())
+
+          print(
+              f"Unique latest artifact names: "
+              f"{len(selected)}"
+          )
+
+          download_root = Path("artifacts")
+          download_root.mkdir(
+              parents=True,
+              exist_ok=True,
+          )
+
+          for artifact in selected:
+
+              artifact_id = artifact["id"]
+              artifact_name = artifact["name"]
+
+              safe_name = re.sub(
+                  r"[^A-Za-z0-9._-]+",
+                  "_",
+                  artifact_name,
+              )
+
+              destination = (
+                  download_root /
+                  f"{artifact_id}_{safe_name}"
+              )
+
+              destination.mkdir(
+                  parents=True,
+                  exist_ok=True,
+              )
+
+              print()
+              print("------------------------------------------------------------")
+              print(f"Downloading artifact: {artifact_name}")
+              print(f"Artifact ID         : {artifact_id}")
+              print(f"Destination         : {destination}")
+              print("------------------------------------------------------------")
+
+              url = (
+                  f"https://api.github.com/repos/"
+                  f"{repo}/actions/artifacts/"
+                  f"{artifact_id}/zip"
+              )
+
+              archive = destination / "artifact.zip"
+
+              subprocess.run(
+                  [
+                      "curl",
+                      "-L",
+                      "-f",
+                      "-sS",
+                      "-H",
+                      f"Authorization: Bearer "
+                      f"{os.environ['GH_TOKEN']}",
+                      "-H",
+                      "Accept: application/vnd.github+json",
+                      url,
+                      "-o",
+                      str(archive),
+                  ],
+                  check=True,
+              )
+
+              subprocess.run(
+                  [
+                      "unzip",
+                      "-o",
+                      str(archive),
+                      "-d",
+                      str(destination),
+                  ],
+                  check=True,
+              )
+
+              archive.unlink(
+                  missing_ok=True
+              )
+
+          print()
+          print("Artifact download completed.")
+
+          PY
+
+      - name: Show downloaded artifact tree
+        shell: bash
+        run: |
+          echo "============================================================"
+          echo "DOWNLOADED ARTIFACT TREE"
+          echo "============================================================"
+
+          find artifacts \
+            -maxdepth 5 \
+            -type f \
+            -print \
+            | sort
+
+      - name: Run Final End-to-End Validation
+        shell: bash
+        run: |
+          set -o pipefail
+
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "FINAL END-TO-END VALIDATION V1"
+          echo "============================================================"
+
+          python tests/final_end_to_end_validation_v1.py \
+            --repo-root . \
+            --artifacts-dir artifacts \
+            --output-dir final_end_to_end_validation_output \
+            2>&1 | tee final_end_to_end_validation_run.log
+
+      - name: Display validation summary
+        if: always()
+        shell: bash
+        run: |
+          echo "============================================================"
+          echo "VALIDATION SUMMARY"
+          echo "============================================================"
+
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_summary.csv ]; then
+            cat final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
+          else
+            echo "Summary file not found."
+          fi
+
+          echo
+          echo "============================================================"
+          echo "VALIDATION EVENTS"
+          echo "============================================================"
+
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_events.csv ]; then
+            cat final_end_to_end_validation_output/final_end_to_end_validation_events.csv
+          else
+            echo "Events file not found."
+          fi
+
+      - name: Verify final JSON
+        if: always()
+        shell: bash
+        run: |
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation.json ]; then
+            cat final_end_to_end_validation_output/final_end_to_end_validation.json
+          else
+            echo "Final JSON not found."
+          fi
+
+      - name: Upload Final End-to-End Validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Final-End-to-End-Validation-V1
+          path: |
+            final_end_to_end_validation_run.log
+            final_end_to_end_validation_output/
+          if-no-files-found: warn
+          retention-days: 30
