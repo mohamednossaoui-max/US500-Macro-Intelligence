@@ -20,6 +20,22 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "INSTALLING VALIDATION DEPENDENCIES"
+          echo "============================================================"
+
+          python -m pip install --upgrade pip
+          python -m pip install pandas
+
+          echo
+          echo "Installed pandas version:"
+          python -c "import pandas as pd; print(pd.__version__)"
+
       - name: Display repository structure
         shell: bash
         run: |
