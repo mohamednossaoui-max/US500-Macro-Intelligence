@@ -34,6 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+
           python -m pip install \
             pandas \
             numpy \
@@ -55,11 +56,17 @@ jobs:
           echo "EMA19 MACRO BACKTEST — ENVIRONMENT CHECK"
           echo "============================================================"
 
+          echo
+          echo "Python:"
           python --version
+
+          echo
+          echo "Pip:"
           pip --version
 
           echo
           echo "Python packages:"
+
           python - <<'PY'
           import pandas
           import numpy
@@ -73,6 +80,7 @@ jobs:
           PY
 
           echo
+
           if [ -z "${FRED_API_KEY}" ]; then
             echo "ERROR: FRED_API_KEY is missing."
             exit 1
@@ -81,7 +89,7 @@ jobs:
           echo "FRED_API_KEY: configured"
 
       # ============================================================
-      # 5. VERIFY BACKTEST SCRIPT
+      # 5. VERIFY BACKTEST SOURCE
       # ============================================================
       - name: Verify backtest source
         run: |
@@ -93,6 +101,7 @@ jobs:
 
           test -f backtestEMA19Macro.py
 
+          echo
           echo "Found:"
           ls -lh backtestEMA19Macro.py
 
@@ -114,6 +123,7 @@ jobs:
           echo "US500 MACRO INTELLIGENCE"
           echo "EMA19 MACRO BACKTEST"
           echo "============================================================"
+
           echo
           echo "Research-only"
           echo "No trade execution"
@@ -124,7 +134,7 @@ jobs:
           python backtestEMA19Macro.py 2>&1 | tee backtestEMA19Macro_run.log
 
       # ============================================================
-      # 7. DISPLAY GENERATED FILES
+      # 7. INSPECT GENERATED OUTPUTS
       # ============================================================
       - name: Inspect generated outputs
         if: always()
@@ -139,15 +149,60 @@ jobs:
 
           echo
           echo "EMA19 generated files:"
+
           find . -maxdepth 1 -type f \
             \( \
               -name "backtestEMA19Macro*" \
+              -o -name "macro_backtest_v310_*.csv" \
             \) \
             -print \
             -exec ls -lh {} \;
 
       # ============================================================
-      # 8. BUILD GITHUB SUMMARY
+      # 8. VERIFY V3.10 OUTPUTS
+      # ============================================================
+      - name: Verify V3.10 temporal robustness outputs
+        if: always()
+        run: |
+          echo "============================================================"
+          echo "V3.10 TEMPORAL ROBUSTNESS OUTPUT CHECK"
+          echo "============================================================"
+
+          required_files=(
+            "macro_backtest_v310_year_by_year.csv"
+            "macro_backtest_v310_temporal_summary.csv"
+            "macro_backtest_v310_max_drawdown.csv"
+            "macro_backtest_v310_leave_one_year_out.csv"
+            "macro_backtest_v310_crisis_exclusion.csv"
+            "macro_backtest_v310_largest_year_exclusion.csv"
+            "macro_backtest_v310_robustness_verdict.csv"
+          )
+
+          missing=0
+
+          for f in "${required_files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "FOUND: $f"
+              wc -l "$f"
+            else
+              echo "MISSING: $f"
+              missing=$((missing + 1))
+            fi
+          done
+
+          echo
+          echo "Missing V3.10 files: $missing"
+
+          if [ "$missing" -gt 0 ]; then
+            echo
+            echo "WARNING: One or more V3.10 outputs were not generated."
+          else
+            echo
+            echo "ALL V3.10 OUTPUT FILES FOUND"
+          fi
+
+      # ============================================================
+      # 9. BUILD GITHUB SUMMARY
       # ============================================================
       - name: Publish Backtest Report to Job Summary
         if: always()
@@ -155,20 +210,28 @@ jobs:
           {
             echo "# US500 Macro Intelligence — EMA19 Macro Backtest"
             echo
+
             echo "**Mode:** Research-only"
             echo
+
             echo "**Execution:** GitHub Actions"
             echo
+
             echo "**Market:** S&P 500 (^GSPC)"
             echo
+
             echo "**Baseline:** EMA19 frozen baseline"
             echo
+
             echo "**FRED:** API data with point-in-time/as-of processing"
             echo
+
             echo "---"
             echo
+
             echo "## Execution Log"
             echo
+
             echo '```text'
 
             if [ -f backtestEMA19Macro_run.log ]; then
@@ -178,10 +241,12 @@ jobs:
             fi
 
             echo '```'
+
             echo
             echo "---"
             echo
-            echo "## Generated CSV Files"
+
+            echo "## Standard EMA19 Generated CSV Files"
             echo
 
             for f in \
@@ -193,45 +258,76 @@ jobs:
               backtestEMA19Macro_data_quality.csv \
               backtestEMA19Macro_signals.csv
             do
+
               if [ -f "$f" ]; then
                 echo "- \`$f\` — $(wc -l < "$f") lines"
               else
                 echo "- \`$f\` — NOT GENERATED"
               fi
+
             done
 
             echo
             echo "---"
             echo
-            echo "## Backtest Summary CSV"
+
+            echo "## V3.10 Temporal Robustness Outputs"
             echo
 
-            if [ -f backtestEMA19Macro_summary.csv ]; then
-              echo '```csv'
-              cat backtestEMA19Macro_summary.csv
-              echo '```'
-            else
-              echo "Summary CSV not available."
-            fi
+            for f in \
+              macro_backtest_v310_year_by_year.csv \
+              macro_backtest_v310_temporal_summary.csv \
+              macro_backtest_v310_max_drawdown.csv \
+              macro_backtest_v310_leave_one_year_out.csv \
+              macro_backtest_v310_crisis_exclusion.csv \
+              macro_backtest_v310_largest_year_exclusion.csv \
+              macro_backtest_v310_robustness_verdict.csv
+            do
+
+              if [ -f "$f" ]; then
+                echo "- \`$f\` — $(wc -l < "$f") lines"
+              else
+                echo "- \`$f\` — NOT GENERATED"
+              fi
+
+            done
 
             echo
             echo "---"
             echo
-            echo "## Data Quality"
+
+            echo "## Frozen Baseline"
             echo
 
-            if [ -f backtestEMA19Macro_data_quality.csv ]; then
-              echo '```csv'
-              cat backtestEMA19Macro_data_quality.csv
-              echo '```'
-            else
-              echo "Data-quality CSV not available."
-            fi
+            echo "- Expected signals: 119"
+            echo "- Expected valid signals: 117"
+            echo "- Expected invalid SL: 2"
+            echo "- Expected resolved: 109"
+            echo "- Expected wins: 36"
+            echo "- Expected losses: 73"
+            echo "- Expected ambiguous: 3"
+            echo "- Expected open: 5"
+            echo "- Expected total R: +71.0"
+
+            echo
+            echo "---"
+            echo
+
+            echo "## Research Safety"
+            echo
+
+            echo "- Research-only: YES"
+            echo "- Trade execution: NO"
+            echo "- Broker integration: NO"
+            echo "- Decision Engine modification: NO"
+            echo "- Forecast generation: NO"
+            echo "- Parameter optimization: NO"
+            echo "- Baseline modification: NO"
 
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ============================================================
-      # 9. UPLOAD ALL BACKTEST ARTIFACTS
+      # 10. UPLOAD ALL BACKTEST ARTIFACTS
       # ============================================================
       - name: Upload EMA19 Backtest Results
         if: always()
@@ -240,7 +336,11 @@ jobs:
           name: EMA19-Macro-Backtest-Results
           if-no-files-found: warn
           retention-days: 30
+
           path: |
+            # ----------------------------------------------------
+            # Standard EMA19 outputs
+            # ----------------------------------------------------
             backtestEMA19Macro_run.log
             backtestEMA19Macro_trades.csv
             backtestEMA19Macro_regimes.csv
@@ -250,8 +350,19 @@ jobs:
             backtestEMA19Macro_data_quality.csv
             backtestEMA19Macro_signals.csv
 
+            # ----------------------------------------------------
+            # V3.10 Temporal Robustness outputs
+            # ----------------------------------------------------
+            macro_backtest_v310_year_by_year.csv
+            macro_backtest_v310_temporal_summary.csv
+            macro_backtest_v310_max_drawdown.csv
+            macro_backtest_v310_leave_one_year_out.csv
+            macro_backtest_v310_crisis_exclusion.csv
+            macro_backtest_v310_largest_year_exclusion.csv
+            macro_backtest_v310_robustness_verdict.csv
+
       # ============================================================
-      # 10. FINAL STATUS
+      # 11. FINAL STATUS
       # ============================================================
       - name: Final status
         if: always()
@@ -259,9 +370,12 @@ jobs:
           echo "============================================================"
           echo "EMA19 MACRO BACKTEST WORKFLOW FINISHED"
           echo "============================================================"
+
           echo
           echo "Research-only: YES"
           echo "Trade execution: NO"
+          echo "Broker integration: NO"
           echo "Decision Engine integration: NO"
-          echo "Artifacts: uploaded"
+          echo "V3.10 temporal robustness outputs: REQUESTED"
+          echo "Artifacts: UPLOAD ATTEMPTED"
           echo
