@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
+
 """
 US500 MACRO INTELLIGENCE
-RESEARCH TERMINAL — EDGE FINDER STYLE
+RESEARCH TERMINAL
 
 Research-only visualization layer.
 
-IMPORTANT:
-- No trading signals.
-- No market forecasts.
-- No trade execution.
-- No position sizing.
-- No SL/TP.
-- No directional recommendations.
-- Historical statistics are presented as research evidence only.
+IMPORTANT
+---------
+This application:
+- does NOT generate trading signals
+- does NOT generate market forecasts
+- does NOT execute trades
+- does NOT provide position sizing
+- does NOT provide SL/TP
+- does NOT provide directional recommendations
+
+It visualizes existing research artifacts produced by
+the US500 Macro Intelligence GitHub repository.
 """
 
 from __future__ import annotations
@@ -21,7 +26,7 @@ import io
 import json
 import os
 import zipfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -35,7 +40,7 @@ import yfinance as yf
 # ============================================================
 
 APP_TITLE = "US500 Research Terminal"
-APP_VERSION = "4.0"
+APP_VERSION = "4.1"
 
 GITHUB_OWNER = "mohamednossaoui-max"
 GITHUB_REPO = "US500-Macro-Intelligence"
@@ -45,14 +50,17 @@ GITHUB_API = (
     f"{GITHUB_OWNER}/{GITHUB_REPO}"
 )
 
-US500_TICKER = os.getenv("US500_TICKER", "^GSPC")
+US500_TICKER = os.getenv(
+    "US500_TICKER",
+    "^GSPC",
+)
 
 CACHE_TTL = 900
 MARKET_CACHE_TTL = 300
 
 
 # ============================================================
-# EXACT RESEARCH ARTIFACT CONTRACTS
+# EXACT ARTIFACT CONTRACTS
 # ============================================================
 
 DATASETS: Dict[str, Dict[str, Any]] = {
@@ -61,6 +69,8 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "research-context-v1",
         "files": [
             "research_context_v1.csv",
+            "research_context_summary_v1.csv",
+            "research_context_extremes_v1.csv",
         ],
     },
 
@@ -75,6 +85,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "financial-stress-research-v1",
         "files": [
             "financial_stress_research_v1.csv",
+            "financial_stress_research_summary_v1.csv",
         ],
     },
 
@@ -82,6 +93,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "liquidity-intelligence-v1",
         "files": [
             "liquidity_intelligence_research_v1.csv",
+            "liquidity_intelligence_summary_v1.csv",
         ],
     },
 
@@ -89,6 +101,8 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "aaii-sentiment-v1",
         "files": [
             "aaii_sentiment_research_v1.csv",
+            "aaii_sentiment_research_summary_v1.csv",
+            "aaii_sentiment_extremes_v1.csv",
         ],
     },
 
@@ -96,6 +110,8 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "cot-positioning-v1",
         "files": [
             "cot_positioning_research_v1.csv",
+            "cot_positioning_research_summary_v1.csv",
+            "cot_positioning_extremes_v1.csv",
         ],
     },
 
@@ -103,6 +119,8 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "vix-sentiment-v1",
         "files": [
             "vix_sentiment_research_v1.csv",
+            "vix_sentiment_research_summary_v1.csv",
+            "vix_sentiment_extremes_v1.csv",
         ],
     },
 
@@ -110,6 +128,8 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "technical-intelligence-v1",
         "files": [
             "technical_intelligence_research_v1.csv",
+            "technical_intelligence_research_summary_v1.csv",
+            "technical_intelligence_extremes_v1.csv",
         ],
     },
 
@@ -117,6 +137,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "market-breadth-full-validation-v1",
         "files": [
             "market_breadth_analysis_v1.csv",
+            "market_breadth_historical_v1.csv",
         ],
     },
 
@@ -124,6 +145,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "event-news-intelligence-v2.1",
         "files": [
             "event_news_research_v2.csv",
+            "event_news_research_summary_v2.json",
         ],
     },
 
@@ -131,6 +153,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "cross-asset-intelligence-v1",
         "files": [
             "cross_asset_research_v1.csv",
+            "cross_asset_summary_v1.json",
         ],
     },
 
@@ -138,6 +161,9 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "artifact": "earnings-market-reaction-v3-results",
         "files": [
             "earnings_market_reaction_v3.csv",
+            "earnings_market_reaction_summary_v3.csv",
+            "earnings_reaction_by_eps_class_v3.csv",
+            "earnings_reaction_by_sector_v3.csv",
         ],
     },
 }
@@ -150,7 +176,6 @@ DATASETS: Dict[str, Dict[str, Any]] = {
 HISTORICAL_ARTIFACT = "historical-event-study-v2"
 
 HISTORICAL_FILES = {
-
     "Summary":
         "historical_event_study_summary_v2.csv",
 
@@ -183,7 +208,7 @@ FED_FILE = "fed_intelligence_output_v1.json"
 
 
 # ============================================================
-# STREAMLIT CONFIGURATION
+# STREAMLIT CONFIG
 # ============================================================
 
 st.set_page_config(
@@ -195,7 +220,7 @@ st.set_page_config(
 
 
 # ============================================================
-# DARK FINANCIAL TERMINAL STYLE
+# STYLE
 # ============================================================
 
 st.markdown(
@@ -272,6 +297,14 @@ st.markdown(
     margin-top: 5px;
 }
 
+.status-ok {
+    color: #9bc5a8;
+}
+
+.status-warning {
+    color: #d7bd82;
+}
+
 .sidebar-note {
     color: #778591;
     font-size: 0.75rem;
@@ -284,32 +317,58 @@ st.markdown(
 
 
 # ============================================================
-# GITHUB AUTHENTICATION
+# GITHUB TOKEN
 # ============================================================
 
-def get_github_token() -> str:
+def get_github_token() -> Optional[str]:
     """
-    Read GitHub token from Streamlit secrets first,
+    Read GITHUB_TOKEN from Streamlit Secrets first,
     then environment variables.
+
+    Never display the token.
     """
+
+    token = None
 
     try:
         token = st.secrets.get(
             "GITHUB_TOKEN",
+            None,
+        )
+    except Exception:
+        token = None
+
+    if not token:
+        token = os.getenv(
+            "GITHUB_TOKEN",
             "",
         )
 
-        if token:
-            return str(token)
+    if token is None:
+        return None
 
-    except Exception:
-        pass
+    token = str(token).strip()
 
-    return os.getenv(
-        "GITHUB_TOKEN",
+    invalid_values = {
         "",
-    )
+        "YOUR_GITHUB_TOKEN",
+        "YOUR_GITHUB_PAT",
+        "GITHUB_TOKEN",
+        "YOUR_TOKEN",
+        "your_github_token",
+        "your_github_pat",
+        "PASTE_TOKEN_HERE",
+    }
 
+    if token in invalid_values:
+        return None
+
+    return token
+
+
+# ============================================================
+# GITHUB HEADERS
+# ============================================================
 
 def github_headers() -> Dict[str, str]:
 
@@ -319,6 +378,9 @@ def github_headers() -> Dict[str, str]:
 
         "X-GitHub-Api-Version":
             "2022-11-28",
+
+        "User-Agent":
+            "US500-Research-Terminal",
     }
 
     token = get_github_token()
@@ -332,7 +394,118 @@ def github_headers() -> Dict[str, str]:
 
 
 # ============================================================
-# GITHUB ACTIONS ARTIFACT DISCOVERY
+# GITHUB API GET
+# ============================================================
+
+def github_get(
+    url: str,
+    params: Optional[Dict[str, Any]] = None,
+    timeout: int = 60,
+) -> requests.Response:
+    """
+    Centralized GitHub API GET.
+
+    Handles authentication failures explicitly.
+    """
+
+    token = get_github_token()
+
+    response = requests.get(
+        url,
+        headers=github_headers(),
+        params=params,
+        timeout=timeout,
+    )
+
+    if response.status_code == 401:
+
+        if token:
+
+            raise RuntimeError(
+                "GitHub authentication failed (HTTP 401). "
+                "The configured GITHUB_TOKEN is invalid, "
+                "expired, revoked, or unavailable to this app."
+            )
+
+        raise RuntimeError(
+            "GitHub returned HTTP 401 because no valid "
+            "GITHUB_TOKEN is configured in Streamlit Secrets."
+        )
+
+    if response.status_code == 403:
+
+        raise RuntimeError(
+            "GitHub returned HTTP 403 Forbidden. "
+            "The token may not have permission to read "
+            "GitHub Actions artifacts, or the API rate limit "
+            "may have been reached."
+        )
+
+    if response.status_code == 404:
+
+        raise RuntimeError(
+            "GitHub returned HTTP 404. "
+            "The repository or requested artifact is not "
+            "accessible with the current credentials."
+        )
+
+    response.raise_for_status()
+
+    return response
+
+
+# ============================================================
+# GITHUB AUTH TEST
+# ============================================================
+
+@st.cache_data(
+    ttl=300,
+    show_spinner=False,
+)
+def test_github_connection() -> Tuple[bool, str]:
+
+    token = get_github_token()
+
+    if not token:
+
+        return (
+            False,
+            "No GITHUB_TOKEN configured.",
+        )
+
+    try:
+
+        response = github_get(
+            f"{GITHUB_API}/actions/artifacts",
+            params={
+                "per_page": 1,
+                "page": 1,
+            },
+            timeout=30,
+        )
+
+        if response.ok:
+
+            return (
+                True,
+                "GitHub API authentication successful.",
+            )
+
+    except Exception as error:
+
+        return (
+            False,
+            str(error),
+        )
+
+    return (
+        False,
+        "Unknown GitHub API error.",
+    )
+
+
+# ============================================================
+# ARTIFACT DISCOVERY
 # ============================================================
 
 @st.cache_data(
@@ -340,14 +513,22 @@ def github_headers() -> Dict[str, str]:
     show_spinner=False,
 )
 def get_artifacts() -> Dict[str, Dict[str, Any]]:
+    """
+    Discover current artifacts dynamically.
+
+    IMPORTANT:
+    No hard-coded artifact IDs are used.
+
+    If multiple artifacts have the same name, the newest
+    non-expired artifact is selected.
+    """
 
     artifacts: Dict[str, Dict[str, Any]] = {}
 
     for page in range(1, 11):
 
-        response = requests.get(
+        response = github_get(
             f"{GITHUB_API}/actions/artifacts",
-            headers=github_headers(),
             params={
                 "per_page": 100,
                 "page": page,
@@ -355,27 +536,48 @@ def get_artifacts() -> Dict[str, Dict[str, Any]]:
             timeout=30,
         )
 
-        response.raise_for_status()
-
         payload = response.json()
 
-        for artifact in payload.get(
+        page_items = payload.get(
             "artifacts",
             [],
-        ):
+        )
+
+        for artifact in page_items:
 
             if artifact.get("expired"):
                 continue
 
             name = artifact.get("name")
 
-            if name:
+            if not name:
+                continue
+
+            current = artifacts.get(name)
+
+            if current is None:
+
                 artifacts[name] = artifact
 
-        page_items = payload.get(
-            "artifacts",
-            [],
-        )
+            else:
+
+                current_time = str(
+                    current.get(
+                        "created_at",
+                        "",
+                    )
+                )
+
+                new_time = str(
+                    artifact.get(
+                        "created_at",
+                        "",
+                    )
+                )
+
+                if new_time > current_time:
+
+                    artifacts[name] = artifact
 
         if len(page_items) < 100:
             break
@@ -384,7 +586,24 @@ def get_artifacts() -> Dict[str, Dict[str, Any]]:
 
 
 # ============================================================
-# ARTIFACT DOWNLOAD
+# FIND LATEST ARTIFACT
+# ============================================================
+
+def get_latest_artifact(
+    artifact_name: str,
+) -> Optional[Dict[str, Any]]:
+
+    artifacts = get_artifacts()
+
+    artifact = artifacts.get(
+        artifact_name
+    )
+
+    return artifact
+
+
+# ============================================================
+# DOWNLOAD ARTIFACT
 # ============================================================
 
 @st.cache_data(
@@ -394,10 +613,13 @@ def get_artifacts() -> Dict[str, Dict[str, Any]]:
 def download_artifact(
     artifact_name: str,
 ) -> bytes:
+    """
+    Download the latest artifact by NAME.
 
-    artifacts = get_artifacts()
+    The artifact ID is obtained dynamically from GitHub.
+    """
 
-    artifact = artifacts.get(
+    artifact = get_latest_artifact(
         artifact_name
     )
 
@@ -408,21 +630,46 @@ def download_artifact(
             f"{artifact_name}"
         )
 
-    response = requests.get(
-        artifact[
-            "archive_download_url"
-        ],
-        headers=github_headers(),
-        timeout=60,
+    artifact_id = artifact.get(
+        "id"
     )
 
-    response.raise_for_status()
+    if not artifact_id:
+
+        raise RuntimeError(
+            "Artifact was found but GitHub did not "
+            "return an artifact ID."
+        )
+
+    url = (
+        f"{GITHUB_API}/actions/artifacts/"
+        f"{artifact_id}/zip"
+    )
+
+    response = github_get(
+        url,
+        timeout=90,
+    )
+
+    content_type = (
+        response.headers.get(
+            "content-type",
+            "",
+        )
+        .lower()
+    )
+
+    if not response.content:
+
+        raise RuntimeError(
+            "GitHub returned an empty artifact archive."
+        )
 
     return response.content
 
 
 # ============================================================
-# FILE EXTRACTION FROM ARTIFACT ZIP
+# ARTIFACT ZIP FILE
 # ============================================================
 
 @st.cache_data(
@@ -438,45 +685,59 @@ def artifact_file(
         artifact_name
     )
 
-    with zipfile.ZipFile(
-        io.BytesIO(raw)
-    ) as archive:
+    try:
 
-        names = archive.namelist()
+        with zipfile.ZipFile(
+            io.BytesIO(raw)
+        ) as archive:
 
-        exact = None
+            names = archive.namelist()
 
-        for name in names:
-
-            if name == filename:
-
-                exact = name
-                break
-
-        if exact is None:
-
+            # Exact match first.
             for name in names:
 
-                if (
-                    name.endswith(
-                        "/" + filename
+                if name == filename:
+
+                    return archive.read(
+                        name
                     )
-                    or name.endswith(
-                        filename
-                    )
+
+            # Then basename/suffix match.
+            for name in names:
+
+                normalized = name.replace(
+                    "\\",
+                    "/",
+                )
+
+                if normalized.endswith(
+                    "/" + filename
                 ):
 
-                    exact = name
-                    break
+                    return archive.read(
+                        name
+                    )
 
-        if exact is None:
-            return None
+                if normalized.endswith(
+                    filename
+                ):
 
-        return archive.read(exact)
+                    return archive.read(
+                        name
+                    )
+
+    except zipfile.BadZipFile:
+
+        raise RuntimeError(
+            f"Artifact '{artifact_name}' "
+            "did not return a valid ZIP archive."
+        )
+
+    return None
 
 
 # ============================================================
-# CSV ARTIFACT LOADER
+# CSV LOADER
 # ============================================================
 
 @st.cache_data(
@@ -494,15 +755,26 @@ def load_csv_artifact(
     )
 
     if content is None:
+
         return pd.DataFrame()
 
-    return pd.read_csv(
-        io.BytesIO(content)
-    )
+    try:
+
+        return pd.read_csv(
+            io.BytesIO(content)
+        )
+
+    except Exception as error:
+
+        raise RuntimeError(
+            f"Unable to read '{filename}' "
+            f"from artifact '{artifact_name}': "
+            f"{error}"
+        )
 
 
 # ============================================================
-# JSON ARTIFACT LOADER
+# JSON LOADER
 # ============================================================
 
 @st.cache_data(
@@ -520,11 +792,23 @@ def load_json_artifact(
     )
 
     if content is None:
+
         return {}
 
-    return json.loads(
-        content.decode("utf-8")
-    )
+    try:
+
+        return json.loads(
+            content.decode(
+                "utf-8"
+            )
+        )
+
+    except Exception as error:
+
+        raise RuntimeError(
+            f"Unable to read JSON file "
+            f"'{filename}': {error}"
+        )
 
 
 # ============================================================
@@ -537,21 +821,27 @@ def load_json_artifact(
 )
 def get_market_data() -> pd.DataFrame:
 
-    return yf.download(
-        US500_TICKER,
-        period="6mo",
-        interval="1d",
-        auto_adjust=False,
-        progress=False,
-    )
+    try:
+
+        return yf.download(
+            US500_TICKER,
+            period="6mo",
+            interval="1d",
+            auto_adjust=False,
+            progress=False,
+        )
+
+    except Exception:
+
+        return pd.DataFrame()
 
 
 # ============================================================
-# GENERIC HELPERS
+# NUMERIC HELPERS
 # ============================================================
 
 def numeric(
-    value,
+    value: Any,
 ) -> Optional[float]:
 
     try:
@@ -559,6 +849,7 @@ def numeric(
         result = float(value)
 
         if np.isfinite(result):
+
             return result
 
     except Exception:
@@ -568,17 +859,24 @@ def numeric(
 
 
 def format_number(
-    value,
+    value: Any,
     decimals: int = 2,
 ) -> str:
 
-    number = numeric(value)
+    number = numeric(
+        value
+    )
 
     if number is None:
+
         return "N/A"
 
     return f"{number:,.{decimals}f}"
 
+
+# ============================================================
+# COLUMN HELPERS
+# ============================================================
 
 def find_column(
     df: pd.DataFrame,
@@ -586,31 +884,43 @@ def find_column(
 ) -> Optional[str]:
 
     if df.empty:
+
         return None
 
     mapping = {
-        str(column).lower(): column
+        str(column).strip().lower():
+            column
         for column in df.columns
     }
 
     for candidate in candidates:
 
         found = mapping.get(
-            str(candidate).lower()
+            str(candidate)
+            .strip()
+            .lower()
         )
 
-        if found:
+        if found is not None:
+
             return found
 
     return None
 
+
+# ============================================================
+# LATEST ROW
+# ============================================================
 
 def latest_row(
     df: pd.DataFrame,
 ) -> pd.Series:
 
     if df.empty:
-        return pd.Series(dtype=object)
+
+        return pd.Series(
+            dtype=object
+        )
 
     date_column = find_column(
         df,
@@ -620,6 +930,7 @@ def latest_row(
             "context_date",
             "reported_date",
             "event_date",
+            "timestamp",
         ],
     )
 
@@ -630,18 +941,34 @@ def latest_row(
             errors="coerce",
         )
 
-        if dates.notna().any():
+        valid = dates.notna()
 
-            index = dates.idxmax()
+        if valid.any():
 
-            return df.loc[index]
+            valid_dates = dates.loc[
+                valid
+            ]
+
+            index = valid_dates.idxmax()
+
+            return df.loc[
+                index
+            ]
 
     return df.iloc[-1]
 
 
+# ============================================================
+# ROW DATE
+# ============================================================
+
 def row_date(
     row: pd.Series,
 ) -> str:
+
+    if row is None or row.empty:
+
+        return "N/A"
 
     for column in [
         "asof_date",
@@ -649,9 +976,11 @@ def row_date(
         "context_date",
         "reported_date",
         "event_date",
+        "timestamp",
     ]:
 
         if column not in row.index:
+
             continue
 
         value = pd.to_datetime(
@@ -668,33 +997,56 @@ def row_date(
     return "N/A"
 
 
+# ============================================================
+# ROW VALUE
+# ============================================================
+
 def row_value(
     row: pd.Series,
     candidates,
 ) -> str:
 
+    if row is None or row.empty:
+
+        return "N/A"
+
+    lower_map = {
+        str(column).lower():
+            column
+        for column in row.index
+    }
+
     for candidate in candidates:
 
-        if candidate not in row.index:
+        actual = lower_map.get(
+            str(candidate).lower()
+        )
+
+        if actual is None:
+
             continue
 
-        value = row[candidate]
+        value = row[actual]
 
         try:
 
             if pd.isna(value):
+
                 continue
 
         except Exception:
+
             pass
 
-        text = str(value).strip()
+        text = str(
+            value
+        ).strip()
 
-        if text in {
+        if text.lower() in {
             "",
             "nan",
-            "None",
-            "NaN",
+            "none",
+            "nat",
         }:
 
             continue
@@ -705,7 +1057,40 @@ def row_value(
 
 
 # ============================================================
-# UI HELPERS
+# SAFE ROW JSON
+# ============================================================
+
+def safe_row_dict(
+    row: pd.Series,
+) -> Dict[str, str]:
+
+    result = {}
+
+    if row is None:
+
+        return result
+
+    for key, value in row.items():
+
+        try:
+
+            if pd.isna(value):
+
+                continue
+
+        except Exception:
+
+            pass
+
+        result[str(key)] = str(
+            value
+        )
+
+    return result
+
+
+# ============================================================
+# METRIC CARD
 # ============================================================
 
 def metric_card(
@@ -717,7 +1102,6 @@ def metric_card(
     st.markdown(
         f"""
         <div class="metric-card">
-
             <div class="metric-label">
                 {label}
             </div>
@@ -729,34 +1113,36 @@ def metric_card(
             <div class="metric-note">
                 {note}
             </div>
-
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+
+# ============================================================
+# RESEARCH BOUNDARY
+# ============================================================
 
 def research_boundary():
 
     st.markdown(
         """
         <div class="research-note">
-
-        <strong>Research-only terminal.</strong>
-
-        The terminal presents current-state evidence,
+        <strong>Research-only terminal.</strong><br>
+        This interface presents current-state evidence,
         historical distributions, research classifications,
-        analogues and risk factors.
-
-        It does not generate trading signals,
-        forecasts, execution instructions,
-        position sizing or SL/TP.
-
+        historical analogues and risk factors.
+        It does not generate trading signals, forecasts,
+        execution instructions, position sizing or SL/TP.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+
+# ============================================================
+# DATAFRAME DISPLAY
+# ============================================================
 
 def show_dataframe(
     df: pd.DataFrame,
@@ -778,6 +1164,10 @@ def show_dataframe(
     )
 
 
+# ============================================================
+# PLOT RESEARCH
+# ============================================================
+
 def plot_research(
     df: pd.DataFrame,
     preferred_columns=None,
@@ -785,6 +1175,7 @@ def plot_research(
 ):
 
     if df.empty:
+
         return
 
     columns = []
@@ -794,19 +1185,39 @@ def plot_research(
         for column in preferred_columns:
 
             if column in df.columns:
-                columns.append(column)
+
+                numeric_series = pd.to_numeric(
+                    df[column],
+                    errors="coerce",
+                )
+
+                if numeric_series.notna().any():
+
+                    columns.append(
+                        column
+                    )
 
     if not columns:
 
-        numeric_columns = list(
-            df.select_dtypes(
-                include=np.number
-            ).columns
-        )
+        numeric_columns = []
+
+        for column in df.columns:
+
+            series = pd.to_numeric(
+                df[column],
+                errors="coerce",
+            )
+
+            if series.notna().any():
+
+                numeric_columns.append(
+                    column
+                )
 
         columns = numeric_columns[:4]
 
     if not columns:
+
         return
 
     date_column = find_column(
@@ -817,6 +1228,7 @@ def plot_research(
             "context_date",
             "reported_date",
             "event_date",
+            "timestamp",
         ],
     )
 
@@ -841,6 +1253,23 @@ def plot_research(
             ]
         )
 
+    for column in columns:
+
+        plot_df[column] = pd.to_numeric(
+            plot_df[column],
+            errors="coerce",
+        )
+
+    plot_df = plot_df[
+        columns
+    ].dropna(
+        how="all"
+    ).tail(500)
+
+    if plot_df.empty:
+
+        return
+
     st.markdown(
         f"""
         <div class="section-title">
@@ -851,14 +1280,13 @@ def plot_research(
     )
 
     st.line_chart(
-        plot_df[
-            columns
-        ].tail(500)
+        plot_df,
+        use_container_width=True,
     )
 
 
 # ============================================================
-# DATASET LOADER
+# LOAD DATASET
 # ============================================================
 
 def load_dataset(
@@ -877,15 +1305,89 @@ def load_dataset(
         "files"
     ]:
 
-        dataframe = load_csv_artifact(
-            artifact,
-            filename,
-        )
+        try:
 
-        if not dataframe.empty:
-            return dataframe
+            dataframe = load_csv_artifact(
+                artifact,
+                filename,
+            )
+
+            if not dataframe.empty:
+
+                return dataframe
+
+        except Exception:
+
+            continue
 
     return pd.DataFrame()
+
+
+# ============================================================
+# MARKET SNAPSHOT
+# ============================================================
+
+def market_snapshot():
+
+    market = get_market_data()
+
+    price = None
+    daily_change = None
+
+    if market.empty:
+
+        return price, daily_change
+
+    try:
+
+        close = market[
+            "Close"
+        ]
+
+        if isinstance(
+            close,
+            pd.DataFrame,
+        ):
+
+            close = close.iloc[:, 0]
+
+        close = pd.to_numeric(
+            close,
+            errors="coerce",
+        ).dropna()
+
+        if len(close) >= 1:
+
+            price = numeric(
+                close.iloc[-1]
+            )
+
+        if len(close) >= 2:
+
+            previous = numeric(
+                close.iloc[-2]
+            )
+
+            current = numeric(
+                close.iloc[-1]
+            )
+
+            if (
+                previous is not None
+                and current is not None
+                and previous != 0
+            ):
+
+                daily_change = (
+                    current /
+                    previous - 1
+                ) * 100
+
+    except Exception:
+
+        pass
+
+    return price, daily_change
 
 
 # ============================================================
@@ -914,64 +1416,10 @@ def render_overview():
 
     research_boundary()
 
-    # --------------------------------------------------------
-    # MARKET DATA
-    # --------------------------------------------------------
-
-    market = get_market_data()
-
-    price = None
-    daily_change = None
-
-    if not market.empty:
-
-        close = market["Close"]
-
-        if isinstance(
-            close,
-            pd.DataFrame,
-        ):
-
-            close = close.iloc[:, 0]
-
-        close = close.dropna()
-
-        if len(close) >= 1:
-
-            price = numeric(
-                close.iloc[-1]
-            )
-
-        if len(close) >= 2:
-
-            previous = numeric(
-                close.iloc[-2]
-            )
-
-            current = numeric(
-                close.iloc[-1]
-            )
-
-            if (
-                previous is not None
-                and current is not None
-                and previous != 0
-            ):
-
-                daily_change = (
-                    current / previous - 1
-                ) * 100
-
-    # --------------------------------------------------------
-    # RESEARCH DATA
-    # --------------------------------------------------------
+    price, daily_change = market_snapshot()
 
     context = load_dataset(
         "Research Context"
-    )
-
-    macro = load_dataset(
-        "Macro"
     )
 
     stress = load_dataset(
@@ -990,10 +1438,6 @@ def render_overview():
         context
     )
 
-    macro_row = latest_row(
-        macro
-    )
-
     stress_row = latest_row(
         stress
     )
@@ -1005,10 +1449,6 @@ def render_overview():
     technical_row = latest_row(
         technical
     )
-
-    # --------------------------------------------------------
-    # SNAPSHOT CARDS
-    # --------------------------------------------------------
 
     columns = st.columns(5)
 
@@ -1023,23 +1463,27 @@ def render_overview():
             )
 
         metric_card(
-            "US500 proxy",
-            format_number(price),
+            "US500 Proxy",
+            format_number(
+                price
+            ),
             note,
         )
 
     with columns[1]:
 
         metric_card(
-            "Research update",
-            row_date(context_row),
+            "Research Update",
+            row_date(
+                context_row
+            ),
             "latest unified context",
         )
 
     with columns[2]:
 
         metric_card(
-            "Macro state",
+            "Macro State",
             row_value(
                 context_row,
                 [
@@ -1054,84 +1498,51 @@ def render_overview():
     with columns[3]:
 
         metric_card(
-            "Financial stress",
+            "Financial Stress",
             row_value(
                 stress_row,
                 [
                     "research_regime",
                     "RESEARCH_REGIME",
                     "financial_stress_regime",
+                    "stress_regime",
                 ],
             ),
-            "research classification",
+            row_date(
+                stress_row
+            ),
         )
 
     with columns[4]:
 
         metric_card(
-            "Technical state",
+            "Technical State",
             row_value(
                 technical_row,
                 [
                     "technical_regime",
-                    "technical_technical_regime",
                     "research_regime",
+                    "trend_regime",
                 ],
             ),
-            "research classification",
+            row_date(
+                technical_row
+            ),
         )
 
-    # --------------------------------------------------------
-    # CURRENT RESEARCH SNAPSHOT
-    # --------------------------------------------------------
-
     st.markdown(
-        """
-        <div class="section-title">
-            Current Research Snapshot
-        </div>
-        """,
-        unsafe_allow_html=True,
+        "### Research Snapshot"
     )
 
     left, right = st.columns(2)
 
     with left:
 
-        st.write("### Macro")
-
-        st.write(
-            row_value(
-                macro_row,
-                [
-                    "economic_regime",
-                    "macro_economic_regime",
-                    "macro_regime",
-                    "research_regime",
-                ],
-            )
+        st.markdown(
+            "#### Current Context"
         )
 
-        st.write("### Sentiment")
-
-        st.write(
-            row_value(
-                sentiment_row,
-                [
-                    "research_regime",
-                    "sentiment_regime",
-                    "regime",
-                ],
-            )
-        )
-
-    with right:
-
-        if not context.empty:
-
-            st.write(
-                "### Latest Unified Context Record"
-            )
+        if not context_row.empty:
 
             st.dataframe(
                 context_row.to_frame(
@@ -1139,6 +1550,46 @@ def render_overview():
                 ),
                 use_container_width=True,
             )
+
+        else:
+
+            st.info(
+                "Research Context unavailable."
+            )
+
+    with right:
+
+        st.markdown(
+            "#### Sentiment Context"
+        )
+
+        if not sentiment_row.empty:
+
+            st.dataframe(
+                sentiment_row.to_frame(
+                    "value"
+                ),
+                use_container_width=True,
+            )
+
+        else:
+
+            st.info(
+                "Sentiment research unavailable."
+            )
+
+    if not stress.empty:
+
+        plot_research(
+            stress,
+            [
+                "composite_stress_score",
+                "VIX",
+                "NFCI",
+                "ANFCI",
+            ],
+            "Financial Stress Context",
+        )
 
 
 # ============================================================
@@ -1153,11 +1604,11 @@ def render_market_regime():
 
     research_boundary()
 
-    df = load_dataset(
+    context = load_dataset(
         "Research Context"
     )
 
-    if df.empty:
+    if context.empty:
 
         st.warning(
             "Research Context artifact unavailable."
@@ -1165,73 +1616,84 @@ def render_market_regime():
 
         return
 
-    row = latest_row(df)
+    row = latest_row(
+        context
+    )
 
     columns = st.columns(4)
 
-    states = [
-
+    values = [
+        (
+            "Context Date",
+            row_date(row),
+        ),
         (
             "Macro",
-            [
-                "macro_economic_regime",
-                "economic_regime",
-                "macro_regime",
-            ],
+            row_value(
+                row,
+                [
+                    "macro_economic_regime",
+                    "economic_regime",
+                    "macro_regime",
+                ],
+            ),
         ),
-
-        (
-            "Financial Stress",
-            [
-                "financial_stress_regime",
-                "macro_financial_stress_regime",
-                "stress_regime",
-            ],
-        ),
-
         (
             "Sentiment",
-            [
-                "sentiment_research_regime",
-                "sentiment_regime",
-            ],
+            row_value(
+                row,
+                [
+                    "sentiment_regime",
+                    "sentiment_research_regime",
+                ],
+            ),
         ),
-
         (
             "Technical",
-            [
-                "technical_technical_regime",
-                "technical_regime",
-            ],
+            row_value(
+                row,
+                [
+                    "technical_regime",
+                    "technical_technical_regime",
+                ],
+            ),
         ),
     ]
 
     for column, (
         label,
-        candidates,
+        value,
     ) in zip(
         columns,
-        states,
+        values,
     ):
 
         with column:
 
             metric_card(
                 label,
-                row_value(
-                    row,
-                    candidates,
-                ),
-                row_date(row),
+                value,
+                "research state",
             )
 
     st.markdown(
-        "### Unified Research Context"
+        "### Current Unified Research Record"
     )
 
-    show_dataframe(
-        df,
-        100,
+    st.dataframe(
+        row.to_frame(
+            "value"
+        ),
+        use_container_width=True,
+    )
+
+    st.markdown(
+        "### Context History"
+    )
+
+    plot_research(
+        context,
+        title="Unified Research Context",
     )
 
 
@@ -1242,7 +1704,7 @@ def render_market_regime():
 def render_macro():
 
     st.title(
-        "Macro Research"
+        "Macro"
     )
 
     research_boundary()
@@ -1254,40 +1716,76 @@ def render_macro():
     if df.empty:
 
         st.warning(
-            "Macro artifact unavailable."
+            "Macro Context artifact unavailable."
         )
 
         return
 
-    row = latest_row(df)
-
-    st.write(
-        f"Latest research record: **{row_date(row)}**"
+    row = latest_row(
+        df
     )
+
+    columns = st.columns(4)
+
+    with columns[0]:
+
+        metric_card(
+            "Date",
+            row_date(row),
+        )
+
+    with columns[1]:
+
+        metric_card(
+            "Economic Regime",
+            row_value(
+                row,
+                [
+                    "macro_economic_regime",
+                    "economic_regime",
+                    "macro_regime",
+                ],
+            ),
+        )
+
+    with columns[2]:
+
+        metric_card(
+            "Financial Stress",
+            row_value(
+                row,
+                [
+                    "financial_stress_regime",
+                    "stress_regime",
+                ],
+            ),
+        )
+
+    with columns[3]:
+
+        metric_card(
+            "Research State",
+            row_value(
+                row,
+                [
+                    "research_regime",
+                    "macro_regime",
+                ],
+            ),
+        )
 
     plot_research(
         df,
-        [
-            "macro_score",
-            "economic_score",
-            "growth_score",
-            "inflation_score",
-            "labor_score",
-        ],
-        "Macro Research History",
+        title="Macro Research History",
     )
 
     with st.expander(
-        "Latest Macro Record",
+        "Latest Macro Research Record",
         expanded=True,
     ):
 
         st.json(
-            {
-                str(key): str(value)
-                for key, value in row.items()
-                if pd.notna(value)
-            },
+            safe_row_dict(row),
             expanded=False,
         )
 
@@ -1350,10 +1848,6 @@ def render_fed_intelligence():
         or {}
     )
 
-    # --------------------------------------------------------
-    # TOP METRICS
-    # --------------------------------------------------------
-
     columns = st.columns(5)
 
     with columns[0]:
@@ -1382,7 +1876,8 @@ def render_fed_intelligence():
 
         score = (
             fed.get("fed_score")
-            or phase.get("fed_score")
+            if fed.get("fed_score") is not None
+            else phase.get("fed_score")
         )
 
         metric_card(
@@ -1413,12 +1908,7 @@ def render_fed_intelligence():
             "Available"
             if beige
             else "N/A",
-            "research artifact",
         )
-
-    # --------------------------------------------------------
-    # FOMC COMMUNICATIONS
-    # --------------------------------------------------------
 
     st.markdown(
         "### FOMC & Fed Communications"
@@ -1431,7 +1921,7 @@ def render_fed_intelligence():
         "fed_chair_statement",
     ]
 
-    found_communications = False
+    found = False
 
     for key in communication_keys:
 
@@ -1442,12 +1932,13 @@ def render_fed_intelligence():
         )
 
         if value is None:
+
             continue
 
-        found_communications = True
+        found = True
 
-        st.write(
-            f"**{key.replace('_', ' ').title()}**"
+        st.markdown(
+            f"#### {key.replace('_', ' ').title()}"
         )
 
         if isinstance(
@@ -1464,16 +1955,11 @@ def render_fed_intelligence():
 
             st.write(value)
 
-    if not found_communications:
+    if not found:
 
         st.info(
-            "No separate FOMC communication fields "
-            "were found in the artifact."
+            "No separate FOMC communication fields were found."
         )
-
-    # --------------------------------------------------------
-    # SEP
-    # --------------------------------------------------------
 
     st.markdown(
         "### Summary of Economic Projections"
@@ -1508,12 +1994,8 @@ def render_fed_intelligence():
     else:
 
         st.info(
-            "SEP data is not available in the current artifact."
+            "SEP data is not available."
         )
-
-    # --------------------------------------------------------
-    # BEIGE BOOK
-    # --------------------------------------------------------
 
     if beige:
 
@@ -1525,25 +2007,6 @@ def render_fed_intelligence():
             beige,
             expanded=False,
         )
-
-    # --------------------------------------------------------
-    # FED DIMENSIONS
-    # --------------------------------------------------------
-
-    if phase:
-
-        st.markdown(
-            "### Fed Intelligence Dimensions"
-        )
-
-        st.json(
-            phase,
-            expanded=False,
-        )
-
-    # --------------------------------------------------------
-    # FULL ARTIFACT
-    # --------------------------------------------------------
 
     with st.expander(
         "Full Fed Intelligence Artifact"
@@ -1579,71 +2042,70 @@ def render_financial_stress():
 
         return
 
-    row = latest_row(df)
+    row = latest_row(
+        df
+    )
 
     columns = st.columns(5)
 
-    # Composite
     with columns[0]:
 
-        value = row.get(
-            "composite_stress_score"
+        value = row_value(
+            row,
+            [
+                "composite_stress_score",
+                "FINANCIAL_STRESS_COMPOSITE",
+            ],
         )
-
-        if value is None:
-
-            value = row.get(
-                "FINANCIAL_STRESS_COMPOSITE"
-            )
 
         metric_card(
             "Composite Stress",
-            format_number(value),
+            value,
             row_date(row),
         )
 
-    # VIX
     with columns[1]:
 
         metric_card(
             "VIX",
             format_number(
-                row.get("VIX")
+                row_value(
+                    row,
+                    ["VIX"],
+                )
             ),
             row_date(row),
         )
 
-    # Yield Curve
     with columns[2]:
-
-        value = row.get(
-            "YIELD_10Y_2Y_SPREAD"
-        )
-
-        if value is None:
-
-            value = row.get(
-                "YIELD_CURVE"
-            )
 
         metric_card(
             "10Y - 2Y",
-            format_number(value),
+            format_number(
+                row_value(
+                    row,
+                    [
+                        "YIELD_10Y_2Y_SPREAD",
+                        "YIELD_CURVE",
+                    ],
+                )
+            ),
             row_date(row),
         )
 
-    # NFCI
     with columns[3]:
 
         metric_card(
             "NFCI",
             format_number(
-                row.get("NFCI")
+                row_value(
+                    row,
+                    ["NFCI"],
+                )
             ),
             row_date(row),
         )
 
-    # Regime
     with columns[4]:
 
         metric_card(
@@ -1700,10 +2162,13 @@ def render_liquidity():
 
         return
 
-    row = latest_row(df)
+    row = latest_row(
+        df
+    )
 
     st.write(
-        f"Latest research record: **{row_date(row)}**"
+        f"Latest research record: "
+        f"**{row_date(row)}**"
     )
 
     plot_research(
@@ -1717,13 +2182,14 @@ def render_liquidity():
     ):
 
         st.json(
-            {
-                str(key): str(value)
-                for key, value in row.items()
-                if pd.notna(value)
-            },
+            safe_row_dict(row),
             expanded=False,
         )
+
+    show_dataframe(
+        df,
+        100,
+    )
 
 
 # ============================================================
@@ -1752,7 +2218,7 @@ def render_sentiment():
         "VIX Sentiment",
     ]
 
-    for tab, page in zip(
+    for tab, page_name in zip(
         tabs,
         pages,
     ):
@@ -1760,27 +2226,39 @@ def render_sentiment():
         with tab:
 
             df = load_dataset(
-                page
+                page_name
             )
 
             if df.empty:
 
                 st.warning(
-                    f"{page} artifact unavailable."
+                    f"{page_name} artifact unavailable."
                 )
 
                 continue
 
-            row = latest_row(df)
+            row = latest_row(
+                df
+            )
 
             st.write(
-                f"Latest record: **{row_date(row)}**"
+                f"Latest record: "
+                f"**{row_date(row)}**"
             )
 
             plot_research(
                 df,
-                title=f"{page} History",
+                title=f"{page_name} History",
             )
+
+            with st.expander(
+                "Latest Research Record"
+            ):
+
+                st.json(
+                    safe_row_dict(row),
+                    expanded=False,
+                )
 
             show_dataframe(
                 df,
@@ -1795,7 +2273,7 @@ def render_sentiment():
 def render_technical():
 
     st.title(
-        "Technical Research"
+        "Technical"
     )
 
     research_boundary()
@@ -1812,10 +2290,13 @@ def render_technical():
 
         return
 
-    row = latest_row(df)
+    row = latest_row(
+        df
+    )
 
     st.write(
-        f"Latest research record: **{row_date(row)}**"
+        f"Latest research record: "
+        f"**{row_date(row)}**"
     )
 
     plot_research(
@@ -1835,13 +2316,14 @@ def render_technical():
     ):
 
         st.json(
-            {
-                str(key): str(value)
-                for key, value in row.items()
-                if pd.notna(value)
-            },
+            safe_row_dict(row),
             expanded=False,
         )
+
+    show_dataframe(
+        df,
+        100,
+    )
 
 
 # ============================================================
@@ -1868,6 +2350,15 @@ def render_market_breadth():
 
         return
 
+    row = latest_row(
+        df
+    )
+
+    st.write(
+        f"Latest research record: "
+        f"**{row_date(row)}**"
+    )
+
     plot_research(
         df,
         [
@@ -1878,6 +2369,15 @@ def render_market_breadth():
         ],
         "Market Breadth History",
     )
+
+    with st.expander(
+        "Latest Breadth Record"
+    ):
+
+        st.json(
+            safe_row_dict(row),
+            expanded=False,
+        )
 
     show_dataframe(
         df,
@@ -1899,7 +2399,7 @@ def render_historical_edge():
 
     st.caption(
         "Historical distributions and event-study evidence "
-        "are presented descriptively. They are not converted "
+        "are displayed descriptively. They are not converted "
         "into forecasts or trading recommendations."
     )
 
@@ -1949,13 +2449,7 @@ def render_event_studies():
         "Event News"
     )
 
-    if event_news.empty:
-
-        st.warning(
-            "Event News artifact unavailable."
-        )
-
-    else:
+    if not event_news.empty:
 
         plot_research(
             event_news,
@@ -1965,6 +2459,12 @@ def render_event_studies():
         show_dataframe(
             event_news,
             100,
+        )
+
+    else:
+
+        st.warning(
+            "Event News artifact unavailable."
         )
 
     conditional = load_csv_artifact(
@@ -2010,10 +2510,29 @@ def render_cross_asset():
 
         return
 
+    row = latest_row(
+        df
+    )
+
+    metric_card(
+        "Latest Record",
+        row_date(row),
+        "cross-asset research",
+    )
+
     plot_research(
         df,
         title="Cross-Asset Research History",
     )
+
+    with st.expander(
+        "Latest Cross-Asset Record"
+    ):
+
+        st.json(
+            safe_row_dict(row),
+            expanded=False,
+        )
 
     show_dataframe(
         df,
@@ -2045,10 +2564,55 @@ def render_earnings():
 
         return
 
-    st.metric(
-        "Research Events",
-        f"{len(df):,}",
-    )
+    columns = st.columns(4)
+
+    with columns[0]:
+
+        metric_card(
+            "Research Events",
+            f"{len(df):,}",
+        )
+
+    with columns[1]:
+
+        metric_card(
+            "Latest Date",
+            row_date(
+                latest_row(df)
+            ),
+        )
+
+    with columns[2]:
+
+        symbol_column = find_column(
+            df,
+            [
+                "ticker",
+                "symbol",
+            ],
+        )
+
+        unique_symbols = 0
+
+        if symbol_column:
+
+            unique_symbols = (
+                df[symbol_column]
+                .dropna()
+                .nunique()
+            )
+
+        metric_card(
+            "Symbols",
+            str(unique_symbols),
+        )
+
+    with columns[3]:
+
+        metric_card(
+            "Research Mode",
+            "Descriptive",
+        )
 
     plot_research(
         df,
@@ -2162,7 +2726,9 @@ def render_evidence():
     )
 
     st.dataframe(
-        row.to_frame("value"),
+        row.to_frame(
+            "value"
+        ),
         use_container_width=True,
     )
 
@@ -2172,7 +2738,9 @@ def render_evidence():
 
     historical = load_csv_artifact(
         HISTORICAL_ARTIFACT,
-        HISTORICAL_FILES["Summary"],
+        HISTORICAL_FILES[
+            "Summary"
+        ],
     )
 
     show_dataframe(
@@ -2196,6 +2764,38 @@ def render_data_status():
         "artifacts used by this terminal."
     )
 
+    token = get_github_token()
+
+    if not token:
+
+        st.error(
+            "GITHUB_TOKEN is not configured."
+        )
+
+        st.info(
+            "Add GITHUB_TOKEN to Streamlit Secrets."
+        )
+
+        return
+
+    connected, message = (
+        test_github_connection()
+    )
+
+    if connected:
+
+        st.success(
+            message
+        )
+
+    else:
+
+        st.error(
+            message
+        )
+
+        return
+
     try:
 
         artifacts = get_artifacts()
@@ -2203,89 +2803,84 @@ def render_data_status():
     except Exception as error:
 
         st.error(
-            f"GitHub artifact access failed: {error}"
+            f"GitHub artifact discovery failed: {error}"
         )
 
         return
 
     rows = []
 
-    for page, specification in DATASETS.items():
+    artifact_names = []
 
-        artifact_name = specification[
-            "artifact"
+    for page_name, specification in DATASETS.items():
+
+        artifact_names.append(
+            (
+                page_name,
+                specification[
+                    "artifact"
+                ],
+            )
+        )
+
+    artifact_names.extend(
+        [
+            (
+                "Fed Intelligence",
+                FED_ARTIFACT,
+            ),
+            (
+                "Historical Event Study",
+                HISTORICAL_ARTIFACT,
+            ),
         ]
+    )
+
+    for label, artifact_name in artifact_names:
 
         artifact = artifacts.get(
             artifact_name
         )
 
-        rows.append(
-            {
-                "Dataset": page,
-                "Artifact": artifact_name,
-                "Available": bool(artifact),
-                "Created": (
-                    artifact.get(
+        if artifact:
+
+            rows.append(
+                {
+                    "Dataset": label,
+                    "Artifact": artifact_name,
+                    "Available": True,
+                    "Artifact ID": artifact.get(
+                        "id",
+                        "",
+                    ),
+                    "Created": artifact.get(
                         "created_at",
                         "",
-                    )
-                    if artifact
-                    else ""
-                ),
-                "Expired": (
-                    artifact.get(
-                        "expired",
-                        False,
-                    )
-                    if artifact
-                    else ""
-                ),
-            }
-        )
-
-    additional_artifacts = [
-
-        (
-            "Fed Intelligence",
-            FED_ARTIFACT,
-        ),
-
-        (
-            "Historical Event Study",
-            HISTORICAL_ARTIFACT,
-        ),
-    ]
-
-    for label, artifact_name in additional_artifacts:
-
-        artifact = artifacts.get(
-            artifact_name
-        )
-
-        rows.append(
-            {
-                "Dataset": label,
-                "Artifact": artifact_name,
-                "Available": bool(artifact),
-                "Created": (
-                    artifact.get(
-                        "created_at",
+                    ),
+                    "Updated": artifact.get(
+                        "updated_at",
                         "",
-                    )
-                    if artifact
-                    else ""
-                ),
-                "Expired": (
-                    artifact.get(
+                    ),
+                    "Expired": artifact.get(
                         "expired",
                         False,
-                    )
-                    if artifact
-                    else ""
-                ),
-            }
-        )
+                    ),
+                }
+            )
+
+        else:
+
+            rows.append(
+                {
+                    "Dataset": label,
+                    "Artifact": artifact_name,
+                    "Available": False,
+                    "Artifact ID": "",
+                    "Created": "",
+                    "Updated": "",
+                    "Expired": "",
+                }
+            )
 
     st.dataframe(
         pd.DataFrame(rows),
@@ -2390,6 +2985,18 @@ st.sidebar.caption(
 try:
 
     PAGES[page]()
+
+except RuntimeError as error:
+
+    st.error(
+        f"GitHub/API error: {error}"
+    )
+
+    st.info(
+        "Check Streamlit Secrets and make sure "
+        "GITHUB_TOKEN is a valid GitHub token with "
+        "permission to read Actions artifacts."
+    )
 
 except requests.HTTPError as error:
 
