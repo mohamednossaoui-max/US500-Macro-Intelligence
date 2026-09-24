@@ -47,7 +47,7 @@ jobs:
           echo "LOCATING FINAL VALIDATOR"
           echo "============================================================"
 
-          if [ ! -f "tests/final_validation/final_end_to_end_validation_v1.py" ]; then
+          if [ ! -f "tests/final_end_to_end_validation_v1.py" ]; then
             echo "Final validator not found at expected path."
 
             echo
@@ -60,7 +60,7 @@ jobs:
           fi
 
           echo "Final validator found:"
-          echo "tests/final_validation/final_end_to_end_validation_v1.py"
+          echo "tests/final_end_to_end_validation_v1.py"
 
       - name: Run final end-to-end validator
         shell: bash
@@ -71,7 +71,7 @@ jobs:
           echo "RUNNING FINAL END-TO-END VALIDATION V1"
           echo "============================================================"
 
-          python tests/final_validation/final_end_to_end_validation_v1.py
+          python tests/final_end_to_end_validation_v1.py
 
           rc=$?
 
