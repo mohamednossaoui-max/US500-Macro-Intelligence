@@ -150,6 +150,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
 HISTORICAL_ARTIFACT = "historical-event-study-v2"
 
 HISTORICAL_FILES = {
+
     "Summary":
         "historical_event_study_summary_v2.csv",
 
@@ -178,12 +179,11 @@ HISTORICAL_FILES = {
 # ============================================================
 
 FED_ARTIFACT = "fed-intelligence-v1"
-
 FED_FILE = "fed_intelligence_output_v1.json"
 
 
 # ============================================================
-# STREAMLIT CONFIG
+# STREAMLIT CONFIGURATION
 # ============================================================
 
 st.set_page_config(
@@ -294,26 +294,39 @@ def get_github_token() -> str:
     """
 
     try:
-        token = st.secrets.get("GITHUB_TOKEN", "")
+        token = st.secrets.get(
+            "GITHUB_TOKEN",
+            "",
+        )
+
         if token:
             return str(token)
+
     except Exception:
         pass
 
-    return os.getenv("GITHUB_TOKEN", "")
+    return os.getenv(
+        "GITHUB_TOKEN",
+        "",
+    )
 
 
 def github_headers() -> Dict[str, str]:
 
     headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+        "Accept":
+            "application/vnd.github+json",
+
+        "X-GitHub-Api-Version":
+            "2022-11-28",
     }
 
     token = get_github_token()
 
     if token:
-        headers["Authorization"] = f"Bearer {token}"
+        headers["Authorization"] = (
+            f"Bearer {token}"
+        )
 
     return headers
 
@@ -346,7 +359,10 @@ def get_artifacts() -> Dict[str, Dict[str, Any]]:
 
         payload = response.json()
 
-        for artifact in payload.get("artifacts", []):
+        for artifact in payload.get(
+            "artifacts",
+            [],
+        ):
 
             if artifact.get("expired"):
                 continue
@@ -356,7 +372,10 @@ def get_artifacts() -> Dict[str, Dict[str, Any]]:
             if name:
                 artifacts[name] = artifact
 
-        page_items = payload.get("artifacts", [])
+        page_items = payload.get(
+            "artifacts",
+            [],
+        )
 
         if len(page_items) < 100:
             break
@@ -378,18 +397,21 @@ def download_artifact(
 
     artifacts = get_artifacts()
 
-    artifact = artifacts.get(artifact_name)
+    artifact = artifacts.get(
+        artifact_name
+    )
 
     if not artifact:
+
         raise FileNotFoundError(
-            f"GitHub Actions artifact not found: "
+            "GitHub Actions artifact not found: "
             f"{artifact_name}"
         )
 
-    url = artifact["archive_download_url"]
-
     response = requests.get(
-        url,
+        artifact[
+            "archive_download_url"
+        ],
         headers=github_headers(),
         timeout=60,
     )
@@ -412,7 +434,9 @@ def artifact_file(
     filename: str,
 ) -> Optional[bytes]:
 
-    raw = download_artifact(artifact_name)
+    raw = download_artifact(
+        artifact_name
+    )
 
     with zipfile.ZipFile(
         io.BytesIO(raw)
@@ -425,6 +449,7 @@ def artifact_file(
         for name in names:
 
             if name == filename:
+
                 exact = name
                 break
 
@@ -433,9 +458,14 @@ def artifact_file(
             for name in names:
 
                 if (
-                    name.endswith("/" + filename)
-                    or name.endswith(filename)
+                    name.endswith(
+                        "/" + filename
+                    )
+                    or name.endswith(
+                        filename
+                    )
                 ):
+
                     exact = name
                     break
 
@@ -446,7 +476,7 @@ def artifact_file(
 
 
 # ============================================================
-# CSV LOADER
+# CSV ARTIFACT LOADER
 # ============================================================
 
 @st.cache_data(
@@ -472,7 +502,7 @@ def load_csv_artifact(
 
 
 # ============================================================
-# JSON LOADER
+# JSON ARTIFACT LOADER
 # ============================================================
 
 @st.cache_data(
@@ -507,7 +537,7 @@ def load_json_artifact(
 )
 def get_market_data() -> pd.DataFrame:
 
-    data = yf.download(
+    return yf.download(
         US500_TICKER,
         period="6mo",
         interval="1d",
@@ -515,14 +545,14 @@ def get_market_data() -> pd.DataFrame:
         progress=False,
     )
 
-    return data
-
 
 # ============================================================
 # GENERIC HELPERS
 # ============================================================
 
-def numeric(value) -> Optional[float]:
+def numeric(
+    value,
+) -> Optional[float]:
 
     try:
 
@@ -630,6 +660,7 @@ def row_date(
         )
 
         if pd.notna(value):
+
             return value.strftime(
                 "%Y-%m-%d"
             )
@@ -649,8 +680,13 @@ def row_value(
 
         value = row[candidate]
 
-        if pd.isna(value):
-            continue
+        try:
+
+            if pd.isna(value):
+                continue
+
+        except Exception:
+            pass
 
         text = str(value).strip()
 
@@ -660,6 +696,7 @@ def row_value(
             "None",
             "NaN",
         }:
+
             continue
 
         return text
@@ -792,21 +829,31 @@ def plot_research(
             errors="coerce",
         )
 
+        valid = dates.notna()
+
         plot_df = plot_df.loc[
-            dates.notna()
+            valid
         ].copy()
 
         plot_df.index = pd.DatetimeIndex(
-            dates.loc[plot_df.index]
+            dates.loc[
+                plot_df.index
+            ]
         )
 
     st.markdown(
-        f'<div class="section-title">{title}</div>',
+        f"""
+        <div class="section-title">
+            {title}
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     st.line_chart(
-        plot_df[columns].tail(500)
+        plot_df[
+            columns
+        ].tail(500)
     )
 
 
@@ -848,23 +895,27 @@ def load_dataset(
 def render_overview():
 
     st.markdown(
-        '<div class="terminal-title">'
-        'US500 Research Terminal'
-        '</div>',
+        """
+        <div class="terminal-title">
+            US500 Research Terminal
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     st.markdown(
-        '<div class="terminal-subtitle">'
-        'Unified view of the project\\'s existing research evidence.'
-        '</div>',
+        """
+        <div class="terminal-subtitle">
+            Unified view of the project's existing research evidence.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     research_boundary()
 
     # --------------------------------------------------------
-    # MARKET
+    # MARKET DATA
     # --------------------------------------------------------
 
     market = get_market_data()
@@ -880,6 +931,7 @@ def render_overview():
             close,
             pd.DataFrame,
         ):
+
             close = close.iloc[:, 0]
 
         close = close.dropna()
@@ -955,7 +1007,7 @@ def render_overview():
     )
 
     # --------------------------------------------------------
-    # SNAPSHOT
+    # SNAPSHOT CARDS
     # --------------------------------------------------------
 
     columns = st.columns(5)
@@ -1030,13 +1082,15 @@ def render_overview():
         )
 
     # --------------------------------------------------------
-    # RESEARCH SNAPSHOT
+    # CURRENT RESEARCH SNAPSHOT
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="section-title">'
-        'Current Research Snapshot'
-        '</div>',
+        """
+        <div class="section-title">
+            Current Research Snapshot
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -1116,6 +1170,7 @@ def render_market_regime():
     columns = st.columns(4)
 
     states = [
+
         (
             "Macro",
             [
@@ -1124,6 +1179,7 @@ def render_market_regime():
                 "macro_regime",
             ],
         ),
+
         (
             "Financial Stress",
             [
@@ -1132,6 +1188,7 @@ def render_market_regime():
                 "stress_regime",
             ],
         ),
+
         (
             "Sentiment",
             [
@@ -1139,6 +1196,7 @@ def render_market_regime():
                 "sentiment_regime",
             ],
         ),
+
         (
             "Technical",
             [
@@ -1204,8 +1262,7 @@ def render_macro():
     row = latest_row(df)
 
     st.write(
-        f"Latest research record: "
-        f"**{row_date(row)}**"
+        f"Latest research record: **{row_date(row)}**"
     )
 
     plot_research(
@@ -1360,7 +1417,7 @@ def render_fed_intelligence():
         )
 
     # --------------------------------------------------------
-    # FOMC
+    # FOMC COMMUNICATIONS
     # --------------------------------------------------------
 
     st.markdown(
@@ -1410,8 +1467,8 @@ def render_fed_intelligence():
     if not found_communications:
 
         st.info(
-            "No separate FOMC communication "
-            "fields were found in the artifact."
+            "No separate FOMC communication fields "
+            "were found in the artifact."
         )
 
     # --------------------------------------------------------
@@ -1470,7 +1527,7 @@ def render_fed_intelligence():
         )
 
     # --------------------------------------------------------
-    # PHASE 2B
+    # FED DIMENSIONS
     # --------------------------------------------------------
 
     if phase:
@@ -1646,8 +1703,7 @@ def render_liquidity():
     row = latest_row(df)
 
     st.write(
-        f"Latest research record: "
-        f"**{row_date(row)}**"
+        f"Latest research record: **{row_date(row)}**"
     )
 
     plot_research(
@@ -1703,7 +1759,9 @@ def render_sentiment():
 
         with tab:
 
-            df = load_dataset(page)
+            df = load_dataset(
+                page
+            )
 
             if df.empty:
 
@@ -1716,8 +1774,7 @@ def render_sentiment():
             row = latest_row(df)
 
             st.write(
-                f"Latest record: "
-                f"**{row_date(row)}**"
+                f"Latest record: **{row_date(row)}**"
             )
 
             plot_research(
@@ -1758,8 +1815,7 @@ def render_technical():
     row = latest_row(df)
 
     st.write(
-        f"Latest research record: "
-        f"**{row_date(row)}**"
+        f"Latest research record: **{row_date(row)}**"
     )
 
     plot_research(
@@ -2046,6 +2102,7 @@ def render_evidence():
     columns = st.columns(4)
 
     evidence = [
+
         (
             "Macro",
             [
@@ -2054,6 +2111,7 @@ def render_evidence():
                 "macro_regime",
             ],
         ),
+
         (
             "Financial Stress",
             [
@@ -2062,6 +2120,7 @@ def render_evidence():
                 "stress_regime",
             ],
         ),
+
         (
             "Sentiment",
             [
@@ -2069,6 +2128,7 @@ def render_evidence():
                 "sentiment_regime",
             ],
         ),
+
         (
             "Technical",
             [
@@ -2184,16 +2244,20 @@ def render_data_status():
             }
         )
 
-    for label, artifact_name in [
+    additional_artifacts = [
+
         (
             "Fed Intelligence",
             FED_ARTIFACT,
         ),
+
         (
             "Historical Event Study",
             HISTORICAL_ARTIFACT,
         ),
-    ]:
+    ]
+
+    for label, artifact_name in additional_artifacts:
 
         artifact = artifacts.get(
             artifact_name
