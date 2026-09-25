@@ -1,0 +1,27 @@
+{
+  "engine": "decision-engine-v1",
+  "engine_version": "decision-engine-v1",
+  "as_of_date": "2026-09-25",
+  "state": "INSUFFICIENT_DATA",
+  "confidence": 0.0,
+  "confidence_type": "evidence_coverage",
+  "evidence_count": 0,
+  "supportive_count": 0,
+  "contradictory_count": 0,
+  "mixed_count": 0,
+  "missing": [
+    "usable research evidence"
+  ],
+  "point_in_time_safe": true,
+  "research_only": true,
+  "decision_engine_enabled": true,
+  "trading_signal": null,
+  "forecast": null,
+  "unified_decision": null,
+  "execution": false,
+  "broker_integration": false,
+  "position_sizing": false,
+  "stop_loss": null,
+  "take_profit": null,
+  "evidence": []
+}
