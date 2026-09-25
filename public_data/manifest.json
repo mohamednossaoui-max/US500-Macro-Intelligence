@@ -386,11 +386,11 @@
     },
     "vix_historical_collection_summary_v1.csv": {
       "bytes": 389,
-      "sha256": "db32a59ae1a44405e41eb457d0e60252065918513c44bb5664617ebea2db4624"
+      "sha256": "700f459436208e67e09970c527c6d1a9ead3ad2258e5f649ea4a150b5a255311"
     },
     "vix_historical_records_input_v1.csv": {
-      "bytes": 3013899,
-      "sha256": "45f5b576fc54252f955c49fdf747105500776c49bb76f312fbad6d1e7cccb4af"
+      "bytes": 3014549,
+      "sha256": "0adaab527fae5245dcd22689012f79637d56bcaaf29917d7a990d9279a4217ce"
     },
     "vix_sentiment_extremes_v1.csv": {
       "bytes": 822010,
@@ -408,6 +408,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36119935875",
-  "source_workflow": "COT Positioning Analyzer v1"
+  "source_run_id": "36120009402",
+  "source_workflow": "VIX Historical Collector v1"
 }
