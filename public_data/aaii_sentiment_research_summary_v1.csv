@@ -1,0 +1,2 @@
+dataset,records,first_observation_date,last_observation_date,rolling_window_observations,minimum_observations,insufficient_data_rows,extreme_bullish_rows,bullish_rows,neutral_rows,bearish_rows,extreme_bearish_rows,extreme_observations,point_in_time_safe,research_only,decision_engine_ready,sentiment_score_generated
+AAII Sentiment Research v1,2041,1987-07-24,2026-09-17,52,26,25,145,409,926,429,107,252,True,True,False,False

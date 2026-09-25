@@ -1,0 +1,9 @@
+indicator,rows,first_observation,last_observation,latest_actual,unit,source_unit,unit_conversion_factor,frequency,source,vintage,point_in_time_safe,research_only,decision_engine_ready,trading_signal_generated,forecast_generated,liquidity_score_generated
+EFFR,1938,2019-01-02,2026-09-18,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+FED_TOTAL_ASSETS,403,2019-01-02,2026-09-16,6746548.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
+MBS,403,2019-01-02,2026-09-16,1913523.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
+ON_RRP,1924,2019-01-02,2026-09-21,0.582,Billions of U.S. Dollars,Billions of U.S. Dollars,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+RESERVE_BALANCES,403,2019-01-02,2026-09-16,3013794.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
+SOFR,1867,2019-03-29,2026-09-18,3.85,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+TREASURY_GENERAL_ACCOUNT,403,2019-01-02,2026-09-16,877028.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
+TREASURY_SECURITIES,403,2019-01-02,2026-09-16,4554450.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False

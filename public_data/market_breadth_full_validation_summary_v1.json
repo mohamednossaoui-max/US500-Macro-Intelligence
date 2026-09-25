@@ -1,0 +1,61 @@
+{
+  "validator": "Market Breadth Full Validation v1",
+  "research_only": true,
+  "pit_perfect": false,
+  "decision_engine_ready": false,
+  "trading_signal": false,
+  "forecast": false,
+  "stages": {
+    "historical_collector": true,
+    "analyzer": true,
+    "validation_robustness": true
+  },
+  "final_status": "PASS",
+  "collector": {
+    "row_count": 1916,
+    "date_start": "2019-01-03",
+    "date_end": "2026-08-18",
+    "duplicate_dates": 0,
+    "duplicate_record_ids": 0,
+    "invalid_breadth_count_rows": 0,
+    "invalid_net_advances_rows": 0,
+    "coverage_min_pct": 82.9703,
+    "coverage_mean_pct": 92.18743851774529,
+    "coverage_max_pct": 100.0,
+    "research_only": true,
+    "decision_engine_ready": false,
+    "trading_signal": false,
+    "forecast": false,
+    "validation_pass": true,
+    "file_found": true
+  },
+  "analyzer": {
+    "missing_output_columns": [],
+    "duplicate_analysis_dates": 0,
+    "duplicate_analysis_record_ids": 0,
+    "analysis_research_only_all_true": true,
+    "analysis_decision_engine_ready_all_false": true,
+    "analysis_trading_signal_all_false": true,
+    "analysis_forecast_all_false": true,
+    "pit_perfect_all_false": true,
+    "validation_pass": true,
+    "file_found": true
+  },
+  "robustness": {
+    "validation_pass": true,
+    "errors": [],
+    "warnings": [],
+    "duplicate_dates": 0,
+    "accounting_identity_pass": true,
+    "ad_line_continuity_pass": true,
+    "twenty_day_identity_pass": true,
+    "metadata_audit_pass": true,
+    "lookahead_audit_pass": true,
+    "research_only_all_true": true,
+    "decision_engine_ready_all_false": true,
+    "trading_signal_all_false": true,
+    "forecast_all_false": true,
+    "pit_perfect_all_false": true,
+    "file_found": true
+  }
+}

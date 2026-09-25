@@ -1,0 +1,14 @@
+metric,value
+total_observations,9276
+first_observation_date,1990-01-02
+last_observation_date,2026-09-18
+rolling_window_observations,252
+minimum_observations,126
+latest_VIX,14.81
+latest_VIX_percentile,6.746031746031746
+latest_VIX_z,-1.0299123510741595
+latest_research_regime,LOW_FEAR
+point_in_time_safe,True
+research_only,True
+decision_engine_ready,False
+sentiment_score_generated,False

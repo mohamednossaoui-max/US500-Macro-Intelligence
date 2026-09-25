@@ -1,0 +1,2 @@
+context_date,asof_date,available_layer_count,total_layer_count,completeness_status,context_state,point_in_time_safe,research_only,decision_engine_ready,trading_signal_generated,forecast_generated,unified_decision_generated,architecture_version,source_snapshot_id,record_id
+2026-09-20,2026-09-20,3,3,COMPLETE,COMPLETE_CONTEXT,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE,1.0,97d2ac290943b30daf1f64ca1265b80922ab304d295ea6514a431dcccb6e1121,b8998357637976b2

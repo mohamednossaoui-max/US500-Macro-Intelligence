@@ -1,0 +1,15 @@
+metric,value
+total_observations,9276
+first_observation_date,1990-01-02
+last_observation_date,2026-09-18
+minimum_expected_records,5000
+minimum_vix,9.14
+maximum_vix,82.69
+mean_vix,19.426845623113408
+point_in_time_safe,True
+research_only,True
+decision_engine_ready,False
+sentiment_score_generated,False
+sentiment_signal_generated,False
+forecast_generated,False
+rows_removed_during_cleaning,0

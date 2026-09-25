@@ -1,0 +1,2 @@
+report_name,target_contract,target_code,start_year,end_year,records,first_observation_date,last_observation_date,duplicate_contract_observation_rows,missing_open_interest,point_in_time_safe_all,research_only,decision_engine_ready,sentiment_score_generated
+TFF Futures Only,E-MINI S&P 500,13874A,2006,2026,1058,2006-06-13,2026-09-15,0,0,True,True,False,False

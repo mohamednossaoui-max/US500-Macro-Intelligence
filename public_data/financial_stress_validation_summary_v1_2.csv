@@ -1,0 +1,2 @@
+start_date,end_date,raw_rows,indicators,point_in_time_safe_rows,revision_flag_true_rows,availability_before_observation_rows,duplicate_indicator_observation_vintage_rows,event_start_threshold,event_end_threshold,native_window_observations,native_method_note,research_only
+2020-01-02,2026-09-18,5778,"ANFCI,NFCI,TREASURY_10Y,TREASURY_2Y,VIX",5778,0,0,0,1.0,0.0,252,252 native observations per component; NFCI/ANFCI remain weekly; yield-curve stress is derived from daily Treasury PIT series.,True

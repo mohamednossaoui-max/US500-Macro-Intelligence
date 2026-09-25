@@ -1,0 +1,30 @@
+{
+  "validator": "Historical Event Study v2",
+  "status": "PASS",
+  "validation_pass": true,
+  "errors": [],
+  "warnings": [
+    "vix_low: fewer than 5 event observations",
+    "vix_elevated: fewer than 5 event observations",
+    "financial_stress_elevated: fewer than 5 event observations",
+    "liquidity_20d_change_positive_ge_5: limited event sample (9)"
+  ],
+  "common_sample_rows": 1916,
+  "date_start": "2019-01-03",
+  "date_end": "2026-08-18",
+  "event_definition_count": 11,
+  "outcome_horizons": [
+    "1D",
+    "5D",
+    "20D"
+  ],
+  "sample_adequacy_minimum": 10,
+  "pair_diagnostic_minimum": 10,
+  "research_only": true,
+  "decision_engine_ready": false,
+  "trading_signal": false,
+  "forecast": false,
+  "pit_perfect": false,
+  "breadth_pit_perfect": false,
+  "interpretation": "PASS means structural execution only. V2 outputs descriptive event overlap, redundancy, conditional and controlled association diagnostics. It does not establish causality, predictiveness, usefulness, or preference for any event/layer."
+}

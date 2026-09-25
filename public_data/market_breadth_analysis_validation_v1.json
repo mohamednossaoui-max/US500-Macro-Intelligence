@@ -1,0 +1,11 @@
+{
+  "missing_output_columns": [],
+  "duplicate_analysis_dates": 0,
+  "duplicate_analysis_record_ids": 0,
+  "analysis_research_only_all_true": true,
+  "analysis_decision_engine_ready_all_false": true,
+  "analysis_trading_signal_all_false": true,
+  "analysis_forecast_all_false": true,
+  "pit_perfect_all_false": true,
+  "validation_pass": true
+}

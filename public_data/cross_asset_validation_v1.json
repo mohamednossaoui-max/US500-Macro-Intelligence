@@ -1,0 +1,119 @@
+{
+  "asset_coverage": {
+    "BITCOIN": 1.0,
+    "DXY": 0.8313,
+    "GOLD": 0.8229,
+    "NASDAQ": 0.8277,
+    "SP500": 0.8277,
+    "US10Y": 0.8269,
+    "VIX": 0.8279,
+    "WTI": 0.8234
+  },
+  "asset_first_dates": {
+    "BITCOIN": "2014-09-17",
+    "DXY": "2000-01-03",
+    "GOLD": "2000-08-30",
+    "NASDAQ": "2000-01-03",
+    "SP500": "2000-01-03",
+    "US10Y": "2000-01-03",
+    "VIX": "2000-01-03",
+    "WTI": "2000-08-23"
+  },
+  "asset_last_dates": {
+    "BITCOIN": "2026-09-23",
+    "DXY": "2026-09-23",
+    "GOLD": "2026-09-23",
+    "NASDAQ": "2026-09-23",
+    "SP500": "2026-09-23",
+    "US10Y": "2026-09-23",
+    "VIX": "2026-09-23",
+    "WTI": "2026-09-23"
+  },
+  "asset_observation_counts": {
+    "BITCOIN": 4390,
+    "DXY": 6749,
+    "GOLD": 6541,
+    "NASDAQ": 6720,
+    "SP500": 6720,
+    "US10Y": 6714,
+    "VIX": 6722,
+    "WTI": 6549
+  },
+  "assets_available": [
+    "SP500",
+    "NASDAQ",
+    "GOLD",
+    "DXY",
+    "VIX",
+    "US10Y",
+    "WTI",
+    "BITCOIN"
+  ],
+  "assets_requested": {
+    "BITCOIN": "BTC-USD",
+    "DXY": "DX-Y.NYB",
+    "GOLD": "GC=F",
+    "NASDAQ": "^IXIC",
+    "SP500": "^GSPC",
+    "US10Y": "^TNX",
+    "VIX": "^VIX",
+    "WTI": "CL=F"
+  },
+  "checks": {
+    "all_requested_assets_available": true,
+    "availability_after_observation": true,
+    "availability_dates_valid": true,
+    "correlation_features_present": true,
+    "dataset_nonempty": true,
+    "date_sorted": true,
+    "dates_unique": true,
+    "decision_engine_disabled": true,
+    "forecast_disabled": true,
+    "minimum_asset_coverage": true,
+    "observation_dates_valid": true,
+    "point_in_time_safe_all": true,
+    "required_columns_present": true,
+    "research_only_all": true,
+    "trading_signals_disabled": true,
+    "unified_decision_disabled": true
+  },
+  "columns": 44,
+  "date_end": "2026-09-23",
+  "date_start": "2000-01-03",
+  "methodology": {
+    "asset_coverage_policy": "Coverage is measured within each asset's own first-to-last available observation window",
+    "correlation_definition": "60-observation rolling Pearson correlation of daily returns",
+    "frequency": "daily",
+    "historical_union_start": "2000-01-01",
+    "missing_session_policy": "No forward-fill across different asset sessions",
+    "pit_convention": "availability_date = observation_date + 1 calendar day",
+    "price_source": "Yahoo Finance via yfinance",
+    "return_definition": "1-day close-to-close percentage return",
+    "volatility_definition": "20-observation rolling standard deviation annualized by sqrt(252)"
+  },
+  "missing_required_columns": [],
+  "passed": true,
+  "research_only_flags": {
+    "decision_engine_ready": false,
+    "forecast_generated": false,
+    "research_only": true,
+    "trading_signal_generated": false,
+    "unified_decision_generated": false
+  },
+  "rolling_correlation_features": [
+    "CORR_SP500_NASDAQ_60D",
+    "CORR_SP500_GOLD_60D",
+    "CORR_SP500_DXY_60D",
+    "CORR_SP500_VIX_60D",
+    "CORR_SP500_US10Y_60D",
+    "CORR_SP500_WTI_60D",
+    "CORR_SP500_BITCOIN_60D",
+    "CORR_GOLD_DXY_60D",
+    "CORR_GOLD_US10Y_60D",
+    "CORR_DXY_US10Y_60D"
+  ],
+  "rows": 8119,
+  "validator": "Cross-Asset Intelligence v1",
+  "version": "1.0",
+  "warnings": []
+}

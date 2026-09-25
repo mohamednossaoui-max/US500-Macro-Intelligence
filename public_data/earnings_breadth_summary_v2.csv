@@ -1,0 +1,2 @@
+companies_total,companies_valid_eps,companies_unknown,eps_beats,eps_misses,eps_in_line,eps_beat_pct,eps_miss_pct,eps_in_line_pct,average_eps_surprise_pct,median_eps_surprise_pct,breadth_status,breadth_score,breadth_reason
+10,10,0,6,1,3,60.0,10.0,30.0,7.968939999999999,6.83345,POSITIVE_BREADTH,75.0,Descriptive EPS beat/miss breadth; not a trading signal.

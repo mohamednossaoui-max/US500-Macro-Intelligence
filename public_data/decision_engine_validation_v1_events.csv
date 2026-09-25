@@ -1,0 +1,4 @@
+check_id,status,detail
+PIT_DATE_MACRO,REVIEW,availability_date is empty; layer explicitly declares point_in_time_safe=TRUE
+PIT_DATE_SENTIMENT,REVIEW,availability_date is empty; layer explicitly declares point_in_time_safe=TRUE
+PIT_DATE_TECHNICAL,REVIEW,availability_date is empty; layer explicitly declares point_in_time_safe=TRUE

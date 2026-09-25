@@ -1,0 +1,22 @@
+{
+  "module": "Event / News Intelligence",
+  "version": "2.1",
+  "generated_at": "2026-09-23T09:59:56.285023+00:00",
+  "rows": 97,
+  "source_counts": {
+    "OFFICIAL_RSS": 97
+  },
+  "topic_counts": {
+    "growth": 63,
+    "fed": 31,
+    "labor": 2,
+    "inflation": 1
+  },
+  "coverage_level": "FULL",
+  "research_only": true,
+  "decision_engine_ready": false,
+  "trading_signal": false,
+  "forecast": false,
+  "pit_perfect": false,
+  "point_in_time_reconstructed": false
+}

@@ -1,0 +1,436 @@
+{
+  "available": true,
+  "as_of_date": "2026-09-20",
+  "latest_fomc": "2026-09-16",
+  "current_date": "2026-09-20",
+  "fed_chair": "Kevin Warsh",
+  "statement": {
+    "name": "FOMC Statement",
+    "available": true,
+    "tone": "NEUTRAL",
+    "tone_score": 2,
+    "inflation_mentions": 1,
+    "labor_mentions": 4,
+    "growth_mentions": 2,
+    "financial_mentions": 10,
+    "text_length": 9530
+  },
+  "statement_source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+  "minutes": {
+    "name": "FOMC Minutes",
+    "available": false,
+    "tone": "UNAVAILABLE",
+    "tone_score": null
+  },
+  "minutes_source": "",
+  "chair_press": {
+    "name": "Kevin Warsh Press Conference",
+    "available": true,
+    "tone": "NEUTRAL",
+    "tone_score": 0,
+    "inflation_mentions": 0,
+    "labor_mentions": 1,
+    "growth_mentions": 0,
+    "financial_mentions": 9,
+    "text_length": 9271
+  },
+  "chair_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
+  "chair_pdf": null,
+  "powell": {
+    "name": "Kevin Warsh Press Conference",
+    "available": true,
+    "tone": "NEUTRAL",
+    "tone_score": 0,
+    "inflation_mentions": 0,
+    "labor_mentions": 1,
+    "growth_mentions": 0,
+    "financial_mentions": 9,
+    "text_length": 9271
+  },
+  "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
+  "powell_pdf": null,
+  "latest_sep_date": "2026-09-16",
+  "previous_sep_date": "2026-06-17",
+  "sep_current": {
+    "sep_date": "2026-09-16",
+    "url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260916.htm",
+    "available": true,
+    "year": 2026,
+    "gdp": 2.3,
+    "unemployment": 4.1,
+    "pce": 3.7,
+    "core_pce": 3.4,
+    "fed_funds": 4.1
+  },
+  "sep_previous": {
+    "sep_date": "2026-06-17",
+    "url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm",
+    "available": true,
+    "year": 2026,
+    "gdp": 2.2,
+    "unemployment": 4.3,
+    "pce": 3.6,
+    "core_pce": 3.3,
+    "fed_funds": 3.8
+  },
+  "sep_shift": {
+    "classification": "HAWKISH SHIFT",
+    "hawkish_points": 5,
+    "dovish_points": 0,
+    "fields": {
+      "gdp": {
+        "current": 2.3,
+        "previous": 2.2,
+        "change": 0.1
+      },
+      "unemployment": {
+        "current": 4.1,
+        "previous": 4.3,
+        "change": -0.2
+      },
+      "pce": {
+        "current": 3.7,
+        "previous": 3.6,
+        "change": 0.1
+      },
+      "core_pce": {
+        "current": 3.4,
+        "previous": 3.3,
+        "change": 0.1
+      },
+      "fed_funds": {
+        "current": 4.1,
+        "previous": 3.8,
+        "change": 0.3
+      }
+    }
+  },
+  "phase_2b": {
+    "statement": {
+      "inflation": {
+        "score": 1,
+        "classification": "MODERATELY HAWKISH",
+        "hawkish_hits": 1,
+        "dovish_hits": 0,
+        "score_100": 55
+      },
+      "labor": {
+        "score": 1,
+        "classification": "MODERATELY HAWKISH",
+        "hawkish_hits": 1,
+        "dovish_hits": 0,
+        "score_100": 55
+      },
+      "growth": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "financial": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "policy": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      }
+    },
+    "minutes": {
+      "inflation": {
+        "score": 0,
+        "classification": "UNAVAILABLE",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "labor": {
+        "score": 0,
+        "classification": "UNAVAILABLE",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "growth": {
+        "score": 0,
+        "classification": "UNAVAILABLE",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "financial": {
+        "score": 0,
+        "classification": "UNAVAILABLE",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "policy": {
+        "score": 0,
+        "classification": "UNAVAILABLE",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      }
+    },
+    "chair": {
+      "inflation": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "labor": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "growth": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "financial": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      },
+      "policy": {
+        "score": 0,
+        "classification": "NEUTRAL",
+        "hawkish_hits": 0,
+        "dovish_hits": 0,
+        "score_100": 50
+      }
+    },
+    "combined": {
+      "inflation": {
+        "score_100": 51.8,
+        "statement": {
+          "score": 1,
+          "classification": "MODERATELY HAWKISH",
+          "hawkish_hits": 1,
+          "dovish_hits": 0,
+          "score_100": 55
+        },
+        "minutes": {
+          "score": 0,
+          "classification": "UNAVAILABLE",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "chair": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        }
+      },
+      "labor": {
+        "score_100": 51.8,
+        "statement": {
+          "score": 1,
+          "classification": "MODERATELY HAWKISH",
+          "hawkish_hits": 1,
+          "dovish_hits": 0,
+          "score_100": 55
+        },
+        "minutes": {
+          "score": 0,
+          "classification": "UNAVAILABLE",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "chair": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        }
+      },
+      "growth": {
+        "score_100": 50.0,
+        "statement": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "minutes": {
+          "score": 0,
+          "classification": "UNAVAILABLE",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "chair": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        }
+      },
+      "financial": {
+        "score_100": 50.0,
+        "statement": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "minutes": {
+          "score": 0,
+          "classification": "UNAVAILABLE",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "chair": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        }
+      },
+      "policy": {
+        "score_100": 50.0,
+        "statement": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "minutes": {
+          "score": 0,
+          "classification": "UNAVAILABLE",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        },
+        "chair": {
+          "score": 0,
+          "classification": "NEUTRAL",
+          "hawkish_hits": 0,
+          "dovish_hits": 0,
+          "score_100": 50
+        }
+      }
+    },
+    "fed_score": {
+      "score": 55.7,
+      "base_score": 50.7,
+      "sep_adjustment": 5.0,
+      "classification": "NEUTRAL"
+    },
+    "reasons": [
+      "- Inflation: None (+0.45)",
+      "- Labor: None (+0.27)",
+      "- Growth: None (+0.00)",
+      "- Financial: None (+0.00)",
+      "- Policy: None (+0.00)",
+      "- SEP: HAWKISH SHIFT"
+    ]
+  },
+  "fed_score": {
+    "score": 55.7,
+    "base_score": 50.7,
+    "sep_adjustment": 5.0,
+    "classification": "NEUTRAL"
+  },
+  "beige_book": {
+    "available": true,
+    "issue_date": "2026-08-01",
+    "publication_date": "2026-09-02",
+    "title": "Beige Book - August 2026",
+    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm"
+  },
+  "beige_analysis": {
+    "available": true,
+    "score": 53.2,
+    "tone": "NEUTRAL",
+    "dimensions": {
+      "growth": {
+        "score": 10,
+        "score_100": 100,
+        "classification": "POSITIVE",
+        "positive_hits": 14,
+        "negative_hits": 1
+      },
+      "labor": {
+        "score": 5,
+        "score_100": 75,
+        "classification": "POSITIVE",
+        "positive_hits": 5,
+        "negative_hits": 0
+      },
+      "inflation": {
+        "score": -10,
+        "score_100": 0,
+        "classification": "NEGATIVE",
+        "positive_hits": 0,
+        "negative_hits": 12
+      },
+      "consumer_spending": {
+        "score": 0,
+        "score_100": 50,
+        "classification": "NEUTRAL",
+        "positive_hits": 3,
+        "negative_hits": 3
+      },
+      "manufacturing": {
+        "score": 2,
+        "score_100": 60,
+        "classification": "SLIGHTLY POSITIVE",
+        "positive_hits": 2,
+        "negative_hits": 0
+      },
+      "financial": {
+        "score": 2,
+        "score_100": 60,
+        "classification": "SLIGHTLY POSITIVE",
+        "positive_hits": 3,
+        "negative_hits": 1
+      },
+      "housing": {
+        "score": 0,
+        "score_100": 50,
+        "classification": "NEUTRAL",
+        "positive_hits": 1,
+        "negative_hits": 1
+      }
+    },
+    "reasons": [
+      "- Growth: POSITIVE (100.0/100)",
+      "- Labor: POSITIVE (75.0/100)",
+      "- Inflation: NEGATIVE (0.0/100)",
+      "- Consumer spending: NEUTRAL (50.0/100)",
+      "- Manufacturing: SLIGHTLY POSITIVE (60.0/100)",
+      "- Financial: SLIGHTLY POSITIVE (60.0/100)",
+      "- Housing: NEUTRAL (50.0/100)"
+    ],
+    "method": "Heuristic analytical score based on directional language in the official National Summary. Not a probability."
+  }
+}

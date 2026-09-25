@@ -1,0 +1,16 @@
+{
+  "validation_pass": true,
+  "errors": [],
+  "warnings": [],
+  "duplicate_dates": 0,
+  "accounting_identity_pass": true,
+  "ad_line_continuity_pass": true,
+  "twenty_day_identity_pass": true,
+  "metadata_audit_pass": true,
+  "lookahead_audit_pass": true,
+  "research_only_all_true": true,
+  "decision_engine_ready_all_false": true,
+  "trading_signal_all_false": true,
+  "forecast_all_false": true,
+  "pit_perfect_all_false": true
+}

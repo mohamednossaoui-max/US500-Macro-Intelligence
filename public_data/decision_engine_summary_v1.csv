@@ -1,0 +1,2 @@
+run_timestamp_utc,decision_state,decision_confidence,evidence_count,supportive_count,contradictory_count,neutral_count,missing_count,fed_score,fed_score_available,point_in_time_safe,data_quality,research_only,source_csv_count
+2026-09-24T19:37:13.938653+00:00,CONFLICTED,0.4,5,2,1,2,0,55.7,TRUE,PASS,PASS,TRUE,1

@@ -1,0 +1,9 @@
+asof_date,indicator,latest_value,latest_observation_date,research_only,point_in_time_safe,decision_engine_ready,trading_signal_generated,forecast_generated,liquidity_score_generated
+2026-09-21,EFFR,3.88,2026-09-18,True,True,False,False,False,False
+2026-09-21,FED_TOTAL_ASSETS,6746548.0,2026-09-16,True,True,False,False,False,False
+2026-09-21,MBS,1913523.0,2026-09-16,True,True,False,False,False,False
+2026-09-21,ON_RRP,0.582,2026-09-21,True,True,False,False,False,False
+2026-09-21,RESERVE_BALANCES,3013794.0,2026-09-16,True,True,False,False,False,False
+2026-09-21,SOFR,3.85,2026-09-18,True,True,False,False,False,False
+2026-09-21,TREASURY_GENERAL_ACCOUNT,877028.0,2026-09-16,True,True,False,False,False,False
+2026-09-21,TREASURY_SECURITIES,4554450.0,2026-09-16,True,True,False,False,False,False

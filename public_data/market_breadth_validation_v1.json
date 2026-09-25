@@ -1,0 +1,17 @@
+{
+  "row_count": 1916,
+  "date_start": "2019-01-03",
+  "date_end": "2026-08-18",
+  "duplicate_dates": 0,
+  "duplicate_record_ids": 0,
+  "invalid_breadth_count_rows": 0,
+  "invalid_net_advances_rows": 0,
+  "coverage_min_pct": 82.9703,
+  "coverage_mean_pct": 92.18743851774529,
+  "coverage_max_pct": 100.0,
+  "research_only": true,
+  "decision_engine_ready": false,
+  "trading_signal": false,
+  "forecast": false,
+  "validation_pass": true
+}

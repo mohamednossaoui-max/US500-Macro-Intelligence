@@ -1,0 +1,267 @@
+study_date,event_name,source_layer,definition_column,operator,threshold,forward_return_1D_pct,forward_return_5D_pct,forward_return_20D_pct
+2019-05-13,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.8015944543135589,1.0085765735728947,2.626360764824076
+2019-05-22,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.191414994527018,-2.360067908440877,3.427894122049535
+2019-08-01,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.7282739927037873,-0.5237736966991147,-0.9811881219218499
+2019-08-09,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.2317322177972212,-1.0268436333887965,2.0482082914045296
+2019-08-20,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.8246798595579641,-1.080847766451365,3.6621135712511466
+2019-10-02,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.797191259701524,1.1009032985501488,5.51182140900166
+2019-10-16,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.27628315736780706,0.49604067363668847,3.490331763539567
+2020-02-26,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-4.416324258407911,0.4405810916687347,-20.563211153731142
+2020-05-12,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.7462724604228042,1.840334970736679,11.150048162591197
+2020-05-28,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.48123358249714254,2.726979556597886,1.7833282056546773
+2020-07-07,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.7827461915415501,1.6596069728160634,5.124754807237397
+2020-08-20,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.34411070444764214,2.925409724880912,-1.950667369820358
+2020-09-08,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,2.014498633677464,2.081728457897314,0.8742881424102844
+2020-09-21,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.0517945160813724,2.14991611865627,4.445510313022583
+2020-12-23,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.35365890047962534,1.790240634007012,4.4810203012634275
+2021-01-05,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.5709842747752214,1.9944358479233149,2.7720336013522084
+2021-01-27,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.9760625975629766,2.11689604881915,2.0947716855536314
+2021-06-18,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.4002289962720793,2.742142462870145,2.2090757058862875
+2021-09-09,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.7722578759925436,-0.43464431528985603,-2.081330876394516
+2021-09-17,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.697731100841482,0.507326768269345,0.8657786456394367
+2021-11-26,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.3200199537034996,-1.2229507548633944,4.278260644082943
+2022-01-21,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.2771738943381896,0.7710463694771796,-1.115745664390766
+2022-02-28,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.5473503680411893,-3.951816896705662,4.60866131737947
+2022-04-22,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.5697936985382235,-3.2738019375660454,-8.67131959895321
+2022-06-13,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.37736797459957394,0.4043107379608557,1.3908078427532278
+2022-08-31,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.29962320243361873,1.294056425805934,-7.952718819137172
+2022-12-16,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.9007516001852345,-0.19572518799511052,1.9857956646528674
+2023-02-21,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.1573556145886834,-0.6802069613552231,0.13834272729575936
+2023-05-09,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.44839652634049987,-0.22504581522654332,3.6014561299943404
+2023-06-05,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.23538963079141606,1.5241772787939478,4.0486262444985766
+2023-08-10,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.10696923700230787,-2.2034897976041523,-0.25375419409005007
+2023-09-05,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.6971599351452862,-0.7767733086284312,-5.945963671457799
+2023-09-21,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.22955984771939608,-0.6997645424364873,-1.2009237875288736
+2023-11-07,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.10049156221052513,2.679537080840011,3.9046397414854273
+2024-04-11,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.455068829580164,-3.614883061325591,0.28889875019664224
+2024-06-07,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.25808546645145203,1.5823829775731824,4.301293550438534
+2024-06-25,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.15724312002203256,0.726052005842992,-0.7710296268428674
+2024-10-25,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.26514435020339455,-1.3656796157722972,2.7757643318259806
+2024-11-12,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.023222772482434095,-1.119825589308454,1.6744630774237157
+2024-12-10,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.8165786048233592,0.2601481484358237,-3.4444608420925893
+2025-02-21,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.49691065044024096,-0.9750310396601236,-5.746921003760486
+2025-03-04,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.1159277893187936,-3.5665408756773376,-2.510839638586604
+2025-03-18,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.0798495567894584,2.8851211219512507,-3.8832318852780046
+2025-03-28,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.5538521570653376,-9.081980250687572,-0.9351460856806715
+2025-04-10,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.8092095201708958,0.2780989392310529,7.438432932312522
+2025-06-13,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.9392659896159117,0.8064237447853895,4.463625234716417
+2025-07-31,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-1.5992133140148468,0.009620220054262774,2.5628605127400172
+2025-08-11,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.134543584661274,1.1877351310743078,2.183427558139517
+2025-08-20,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.40041815293089256,1.3386970793805686,3.6927502777595933
+2025-09-16,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.09701681605103207,0.7592247641723393,0.568361712864518
+2025-09-24,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.500906134312662,1.103198388944171,0.925428790907068
+2025-10-09,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-2.711167321141361,-1.5744366642126084,-0.2195961070083352
+2025-10-29,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.9904812439519239,-1.3685302249274556,-1.1316880301543542
+2025-11-17,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.8256436690967983,0.4902270719503221,1.916093381268591
+2026-03-10,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,-0.08376012017449197,-0.9642458122279929,0.019613390127681818
+2026-05-07,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.8425703533400997,2.2369894161615944,0.6355414047581887
+2026-05-29,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,0.26252961308912415,-2.5899507748118222,-1.842068291453669
+2026-07-31,breadth_negative_20d,Market Breadth Analyzer v1,breadth_research_state,eq,NEGATIVE_BREADTH,1.479091100582064,3.5771686283289306,2.9645907245132275
+2019-01-31,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.08986100931438479,0.07211090941363629,3.6829200160274578
+2019-05-16,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.5837333350761975,-1.8801829017535798,0.37060938477042615
+2019-06-05,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.6135586748687638,1.8997642517953217,6.0035798481501645
+2019-08-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.661660635492356,-3.0798916141928645,1.3825264655529246
+2019-08-19,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.7914727601131322,-1.5484076768206512,2.806425241351551
+2019-08-28,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.2687291793508804,3.0492344155491624,3.10533382275191
+2019-10-04,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.4478294673592398,0.6185619190049785,3.892259916587215
+2019-10-15,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.19995427986508885,0.01035019096917722,3.209960958590674
+2020-04-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.4487410153376512,1.8025610626781985,4.771306041112866
+2020-05-14,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.39263632504382695,3.3658197989701932,6.619108101446103
+2020-05-29,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.3751234813537785,4.914738320576606,-1.1582266289233534
+2020-07-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.5643606159361103,1.7861574109944156,4.9789611488659125
+2020-08-21,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.0043718303008653,3.263022657871306,-3.4175563270301246
+2020-09-16,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.8412365876402483,-4.388436202379364,3.047710433002404
+2020-10-02,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.797270867614209,3.844200360361194,-2.343193588860415
+2020-12-24,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.8722529021144565,-0.06508552958537361,3.957809386688882
+2021-01-06,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.4847403800101189,1.6461550817427062,3.2976383272405707
+2021-01-28,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.9311475173124593,2.227400208907193,0.6276111788817484
+2021-06-21,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.5124491902218642,1.5579430838024821,2.3260332140211393
+2021-09-16,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.9110872450405094,-0.5536746472478371,-0.793299455155072
+2021-10-15,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.337476955709759,1.6444575874765777,4.729646057610881
+2021-11-29,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.896131033450521,-1.3661956747818005,2.8157352328662233
+2021-12-22,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.6223699921661829,1.7495767295607312,-6.3582731501769185
+2022-02-25,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.24426034406476171,-1.2721605236129307,3.612834770806317
+2022-03-18,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.043466036210393355,1.791122338348039,-1.600453805985902
+2022-05-25,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.9883256167224195,4.97872046412815,-1.6837028540067633
+2022-07-15,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.8363571580831342,2.548948864230627,10.794013184059171
+2022-10-24,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.6266654579669915,1.9655835624558637,4.018598544867036
+2023-01-06,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.07676325452631305,2.67029194983055,5.54545723496338
+2023-03-29,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.5715269388667954,1.553445254580721,2.6699381921710064
+2023-06-02,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.20035816359177394,0.3850612077542559,4.044949918440599
+2023-08-11,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.5750475751703066,-2.1133241759744292,0.5244152120663648
+2023-09-01,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.4194177587506065,-0.6269154202119598,-5.0352405421235975
+2023-09-14,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.2159612938677844,-3.886708260874039,-3.4514268496696143
+2023-10-31,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.0505999486313922,4.401261069226314,8.507327246253361
+2023-11-10,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.08358389332403515,2.2372459914456355,4.692829744983973
+2024-05-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.5090947698625836,2.3224295740312817,3.18620963846441
+2024-06-24,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.39335900157368986,0.499639785402084,1.9800420139823194
+2024-07-10,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.8763028841120457,-0.8100969921949974,-7.7106333647881335
+2024-10-31,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.4092509543626166,4.691126785466415,5.7301295482098835
+2024-11-21,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.3467959094991535,1.4065221270564976,-0.300230863473383
+2025-01-16,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.9991058969353706,2.7605020924906576,2.9860180439077677
+2025-02-24,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.46797309154723576,-2.231726656186017,-3.6047328087786767
+2025-03-05,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.7819007085749905,-4.164735453135815,-2.9380548042881927
+2025-03-17,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.0653512117636543,1.6290352472233982,-4.742629174114055
+2025-03-27,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.973722070834405,-5.212961107124514,-2.9525898980771625
+2025-04-09,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-3.4607579584726933,-3.3205613127230804,3.7940963324904597
+2025-04-24,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.7373133469998461,2.176392387692161,6.5133040186118984
+2025-06-20,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.9606504133156335,3.4389324419234146,5.659673562788048
+2025-08-04,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.48578659963033344,0.6873723022494227,1.352305052632663
+2025-08-12,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.32300788824048965,-0.5335235827574336,1.338558627295261
+2025-08-22,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-0.4266385548063467,-0.10283722000641315,3.5077005597606625
+2025-09-19,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.44100464743330736,-0.31000228667991125,-0.005253282587258656
+2025-09-30,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.3399920834961989,0.3906711405182284,3.02655883362537
+2025-10-14,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.40260011595036893,1.3701955245864594,3.0447074700532095
+2025-11-07,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.540101862170995,0.07891538978541668,1.7493455646503175
+2025-11-26,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.5354773163420257,0.6533509888207778,1.7222486019254912
+2026-04-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.6170023529293189,3.5404225482400964,8.585085732365005
+2026-05-08,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.18799566475542484,0.12934064778817866,0.09190253896107503
+2026-05-28,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,0.21722606785117282,0.27341601984312014,-2.7712866246610623
+2026-06-09,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,-1.6199450298948426,1.6881833708259686,2.1253238809272323
+2026-08-03,breadth_positive_20d,Market Breadth Analyzer v1,breadth_research_state,eq,POSITIVE_BREADTH,1.789619360979544,2.0078924186731184,1.126769774603642
+2019-01-03,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,3.4335714642623527,6.076662208173755,10.565840297920804
+2019-01-23,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.1375725554363605,1.60496071701679,5.160872177988485
+2019-05-17,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.6749377915387988,-1.1704710340585178,1.0540155993933098
+2019-08-12,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.5131688322181258,1.4205415709404035,3.3541451779240283
+2019-08-26,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.3203180635808267,0.9689526002210069,3.064926049912109
+2019-10-04,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.4478294673592398,0.6185619190049785,3.892259916587215
+2020-02-04,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.125059589785371,1.8243599266717148,-5.078556346894247
+2020-02-28,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,4.603922900611002,0.6143803326891462,-13.971539157314773
+2020-06-12,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.8312217041285264,1.8554481638980658,3.7454225289362597
+2020-07-24,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.7395138795039502,1.7256412086351869,5.645240152392872
+2020-09-11,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.2741829089357504,-0.6435256883040807,4.075760125624295
+2020-09-25,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.6110590199083896,1.5146450625188157,5.060844564357825
+2020-11-03,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,2.204704770168342,5.234839597657381,8.899847602321698
+2021-09-17,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-1.697731100841482,0.507326768269345,0.8657786456394367
+2021-11-11,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.7222656026415475,1.1887891926918526,1.3496742442661303
+2021-11-19,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.31971365563219223,-0.9086910437978934,-2.765880137052501
+2022-01-06,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.4050216740091761,-0.7883225491837287,-4.163499700026307
+2022-04-08,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-1.687729010355421,-2.1520459591098606,-11.074171368854891
+2022-06-10,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-3.8768430665237275,-5.794107281653571,-2.1036401289454165
+2022-09-02,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.4095056983834944,4.743573209245455,-6.264367741007105
+2022-09-13,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.33870120853238816,-1.9518449435191765,-8.743375619199501
+2022-09-23,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-1.0340526208282075,-2.9137059931369835,1.6115979737523878
+2023-10-27,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.2010022325859904,5.852515554931514,10.517880255311262
+2024-04-19,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.8731248071466746,2.672112646095459,6.765139532170172
+2024-07-26,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.08133101292933098,-2.0615126495082348,3.214994458525333
+2024-08-06,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.7734647858502863,3.709910030963748,5.344245176922202
+2024-08-21,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.8932805548120926,-0.5100638048852191,1.6508186030648853
+2024-09-13,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.12566297656613212,1.3602828445432147,3.359564398435033
+2024-10-08,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.7113411987488272,1.1150831944198414,0.5499768472805089
+2024-10-25,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.26514435020339455,-1.3656796157722972,2.7757643318259806
+2024-11-12,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.023222772482434095,-1.119825589308454,1.6744630774237157
+2024-11-22,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.3020480305938378,1.30349520433517,0.07923791562483018
+2024-12-19,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.0869123768910471,1.768507745647807,3.7376350099618927
+2025-01-28,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.4678895760321544,-0.49145988661465356,-1.8399085835683837
+2025-02-07,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.6712541085862833,1.4709557266100237,-6.827594466288122
+2025-11-14,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.9162266176807821,-1.9470966700617653,1.223619810437726
+2026-03-13,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,1.013088316225197,-1.8954517594959808,3.8305641909116117
+2026-04-17,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,-0.23743726176704838,0.5475679296891967,3.963479665957048
+2026-07-24,sentiment_bearish,Sentiment Engine v1,sentiment_unified_sentiment_score,lt,40.0,0.01619264104413265,1.0488457143685403,3.5400815626886795
+2019-02-08,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.07091030986317026,2.5008574151898166,2.7852109133175817
+2019-05-13,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.8015944543135589,1.0085765735728947,2.626360764824076
+2019-07-02,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.7672378673070135,0.6747390196419678,0.24789264155407054
+2019-08-02,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-2.97778200029859,-0.45702311560918973,-0.19065458629736742
+2019-09-13,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.31355866640028207,-0.5094059887797542,-1.234288681307416
+2019-10-18,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.6871616056117524,1.2172693808391921,4.496015402884779
+2019-12-12,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.007258178414493166,1.1614087122643113,3.773305051607423
+2020-02-14,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.2919942636890105,-4.563985833290896,-29.407781144784796
+2020-11-13,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,1.1648051240012336,-0.7701174018748924,1.7388418779887171
+2021-02-03,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,1.0853322230420792,2.0811076940022266,-1.6108933136227743
+2021-03-10,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,1.0395487004435822,1.931616505085998,5.087702665689631
+2021-07-21,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.20166699583279435,0.9624496322618858,0.9539581544904419
+2021-07-30,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.1842805614891363,0.9387443770432657,2.596214049848622
+2021-08-30,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.13491160395050494,-0.19343475477311411,-3.889784130651963
+2021-10-26,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.5051568068462853,1.2210366553280672,2.533671605915999
+2021-11-15,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.3865229864862485,0.0029925840222766453,-1.0401888393507863
+2022-08-08,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.4248692893594086,3.7941497442516736,-5.60064622024491
+2022-08-25,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-3.3688058719518743,-5.531397365379975,-12.047527162847317
+2022-11-04,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.9613981920559844,5.897810132015491,6.054555332940126
+2022-11-18,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.3883688698329779,-0.035309619183754304,-3.724275156933865
+2022-12-30,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.4000548879248611,1.3697118867202818,6.17528578346791
+2023-03-28,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,1.423726887983645,3.2566427739473047,2.1333218412865618
+2023-09-26,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.022931406074522265,-1.0314562448320075,-0.604877248423219
+2023-11-10,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.08358389332403515,2.2372459914456355,4.692829744983973
+2024-05-16,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.11647735102702228,-0.5523824992319182,2.539125134892406
+2024-06-03,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.15028090913065117,1.4647790844758646,4.2701644291806895
+2024-07-12,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.28262026252154904,-1.965150805152971,-4.829439601983854
+2024-08-27,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.597597320797616,-1.8793768733230465,1.714599955318863
+2024-09-24,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.18612489301417234,-0.4217769105822944,2.062994243866445
+2024-12-09,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.2963883313944371,0.3507435361230993,-2.2237474162522086
+2025-07-10,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.32975229626984737,0.26908701669721147,0.9480203589039782
+2025-07-24,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.397432777929585,-0.3765306099742127,0.10717348745690192
+2025-08-07,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.7799715348974834,2.027445411080442,2.231861198738172
+2025-08-19,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.24316693228262354,0.8511413819716873,2.9475755885958854
+2025-09-04,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.3165152978388819,1.3132741475459397,3.280027575310185
+2025-09-19,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.44100464743330736,-0.31000228667991125,-0.005253282587258656
+2025-10-27,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.22879438603986557,-0.33730038107067095,-2.473252043560348
+2025-11-12,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-1.6556854961596978,-3.0471785979927946,0.7309978615440249
+2025-12-04,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.1936641757662061,0.6399170798031317,0.6552267822665492
+2026-02-09,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.3303712975458173,-1.7459117743744312,-2.6323702317821995
+2026-02-25,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.5365580569328343,-1.1032025617907504,-5.099674011930821
+2026-04-24,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.12323767534654362,0.9077363874978595,4.30407104116346
+2026-05-08,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.18799566475542484,0.12934064778817866,0.09190253896107503
+2026-05-19,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,1.0792026370445518,2.2675937818326775,0.9041849596482576
+2026-05-29,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.26252961308912415,-2.5899507748118222,-1.842068291453669
+2026-06-22,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-1.4362785193208105,-0.43303589572428747,0.48723644127124377
+2026-07-01,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.00013702513856905796,0.8072738163556359,-0.6093638412191793
+2026-07-13,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.37589783811964317,-0.9588396545191169,3.1637959756269263
+2026-07-23,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,0.04967638835191579,0.395908358169339,3.1432360690257344
+2026-08-10,sentiment_bullish,Sentiment Engine v1,sentiment_unified_sentiment_score,gt,60.0,-0.3212861472107087,-0.10382678472833362,-1.026553797811347
+2019-05-29,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.20984713906617714,1.549751080114925,4.698493321929065
+2019-08-05,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,1.3017017169932643,1.334391229701537,2.162940356872678
+2019-08-14,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.24642680276520945,2.9511311378726646,5.948389949100563
+2019-08-23,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,1.0982987735216332,2.787031429124398,5.081290024501439
+2020-02-25,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-0.37785406053220116,-3.990775725059914,-21.76579869365436
+2020-06-09,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-0.5313091072437381,-2.570480707768652,-1.1611444018772232
+2020-07-16,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.2848612194617406,0.6247677184111344,4.909234130351026
+2020-07-24,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.7395138795039502,1.7256412086351869,5.645240152392872
+2020-09-08,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,2.014498633677464,2.081728457897314,0.8742881424102844
+2020-10-06,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,1.739675486921799,4.49155934903871,0.24367791077100076
+2020-10-26,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-0.30256189119989285,-2.667767761853901,5.193227776456522
+2021-09-30,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,1.149147763018199,2.140890757281766,6.7063771942412975
+2022-01-19,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-1.103737849414832,-4.033515987991931,-1.2740582555898383
+2022-02-03,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.5156929864423399,0.5949859086302522,-3.3181868693494487
+2022-03-31,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.34102225843584133,-0.6666106217962819,-8.795671180434306
+2023-07-20,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.03240945218980773,0.05601128581109727,-3.627672891506717
+2023-08-02,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-0.25479738404268204,-1.012103416667176,0.032790882771460694
+2023-11-27,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.09801185306033133,0.4252259374945444,4.9296399582757555
+2023-12-06,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.7968189065892917,3.467536069364452,3.2510297252949627
+2024-04-19,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.8731248071466746,2.672112646095459,6.765139532170172
+2024-08-02,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-2.996879838863975,-0.044886849066483325,5.645496177768372
+2025-03-04,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,1.1159277893187936,-3.5665408756773376,-2.510839638586604
+2025-05-23,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,2.04590558452733,2.294059116430036,4.986547236135452
+2025-11-20,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,0.9823035415319481,4.746008253070255,4.522879643472133
+2026-03-18,technical_drawdown_ge_5,Technical Intelligence v1,technical_drawdown_pct,le,-5.0,-0.2748797741878972,-0.49512116777690185,6.288278375805034
+2020-02-27,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,-0.8238340444361891,1.5167362087749936,-11.705875608075111
+2020-06-11,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,1.3060843963234703,3.7720258002983176,6.093732235946159
+2020-06-26,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,1.4685678433118632,5.671887110733409,7.6555676889111135
+2022-02-22,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,-1.8412122845487655,0.03484515005873767,4.805148461663755
+2022-03-07,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,-0.723375351819977,-0.6660171886201383,9.082174082432104
+2022-04-22,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,0.5697936985382235,-3.2738019375660454,-8.67131959895321
+2023-09-26,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,0.022931406074522265,-1.0314562448320075,-0.604877248423219
+2023-10-18,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,-0.8482848196321058,-2.96273293542173,4.363782990190135
+2025-03-13,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,2.1265869083087807,2.5603478152290027,-4.590587627087306
+2025-04-03,technical_drawdown_ge_10,Technical Intelligence v1,technical_drawdown_pct,le,-10.0,-5.974960534553109,-2.380612216368816,5.376611247500818
+2020-03-19,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-4.335951230846192,9.159172471878986,19.30655422140406
+2020-05-14,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,0.39263632504382695,3.3658197989701932,6.619108101446103
+2021-03-01,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-0.8080851690870694,-2.0623701065990097,1.7753258304495922
+2021-09-16,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-0.9110872450405094,-0.5536746472478371,-0.793299455155072
+2023-01-31,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,1.045230394459029,2.1439410354230803,-3.0714370327889595
+2023-03-16,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-1.1019457310067593,-0.2919000300037444,4.478473898558244
+2024-01-30,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-1.6105744611597972,0.5941105092739818,2.939907135780384
+2025-04-16,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,0.13268380955802073,3.9628829629953177,12.154405230200304
+2025-07-29,liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity_20d_change_pct,ge,5.0,-0.12494327466496813,-1.1249646580373418,1.4924214339260278
+2020-06-19,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,0.6495095537691675,-2.8630531189139496,4.974597549892845
+2020-07-23,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-0.6190400054688405,0.32636491104114373,4.63120666963297
+2022-01-24,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-1.2171906253646725,2.390404017030212,-2.3892746922977603
+2022-02-02,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-2.4391082077444004,-0.047930375942251136,-4.922008075284201
+2022-04-28,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-3.6284507106413955,-3.2799972667638455,-5.3564994077988315
+2022-05-20,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,1.8555039930923556,6.584373651241293,-3.500575814561868
+2022-09-23,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-1.0340526208282075,-2.9137059931369835,1.6115979737523878
+2022-12-30,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-0.4000548879248611,1.3697118867202818,6.17528578346791
+2023-02-22,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,0.5329429416074394,-0.9937273590854945,-1.3550338247669713
+2024-05-13,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,0.4837813139759728,1.6606586375907284,2.947472232581605
+2024-06-28,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,0.26755639309195,2.057879849196942,0.056040102787591195
+2024-12-31,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,-0.22238866412221947,0.6226185244078808,2.70163042404441
+2025-05-12,liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity_20d_change_pct,le,-5.0,0.7248200983532183,2.0432285303387587,3.3301470201817285

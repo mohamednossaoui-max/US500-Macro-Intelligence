@@ -1,0 +1,152 @@
+{
+  "validator": "Market Breadth Validation & Robustness v1",
+  "research_only": true,
+  "decision_engine_ready": false,
+  "trading_signal": false,
+  "forecast": false,
+  "pit_perfect": false,
+  "input": {
+    "row_count": 1916,
+    "date_start": "2019-01-03",
+    "date_end": "2026-08-18",
+    "mean_coverage_pct": 92.187439,
+    "min_coverage_pct": 82.9703,
+    "max_coverage_pct": 100.0
+  },
+  "coverage_robustness": [
+    {
+      "coverage_threshold_pct": 75.0,
+      "rows": 1916,
+      "row_share_pct": 100.0,
+      "mean_coverage_pct": 92.1874,
+      "positive_state_share_pct": 70.1461,
+      "negative_state_share_pct": 28.8622,
+      "balanced_state_share_pct": 0.9916,
+      "mean_net_advances": 19.01618,
+      "mean_net_advances_20d": 372.072219
+    },
+    {
+      "coverage_threshold_pct": 80.0,
+      "rows": 1916,
+      "row_share_pct": 100.0,
+      "mean_coverage_pct": 92.1874,
+      "positive_state_share_pct": 70.1461,
+      "negative_state_share_pct": 28.8622,
+      "balanced_state_share_pct": 0.9916,
+      "mean_net_advances": 19.01618,
+      "mean_net_advances_20d": 372.072219
+    },
+    {
+      "coverage_threshold_pct": 85.0,
+      "rows": 1735,
+      "row_share_pct": 90.5532,
+      "mean_coverage_pct": 93.0609,
+      "positive_state_share_pct": 69.7406,
+      "negative_state_share_pct": 30.2594,
+      "balanced_state_share_pct": 0.0,
+      "mean_net_advances": 16.282997,
+      "mean_net_advances_20d": 329.862248
+    },
+    {
+      "coverage_threshold_pct": 90.0,
+      "rows": 1169,
+      "row_share_pct": 61.0125,
+      "mean_coverage_pct": 95.5321,
+      "positive_state_share_pct": 64.1574,
+      "negative_state_share_pct": 35.8426,
+      "balanced_state_share_pct": 0.0,
+      "mean_net_advances": 13.578272,
+      "mean_net_advances_20d": 271.431993
+    },
+    {
+      "coverage_threshold_pct": 95.0,
+      "rows": 741,
+      "row_share_pct": 38.6743,
+      "mean_coverage_pct": 97.0362,
+      "positive_state_share_pct": 69.7706,
+      "negative_state_share_pct": 30.2294,
+      "balanced_state_share_pct": 0.0,
+      "mean_net_advances": 19.159244,
+      "mean_net_advances_20d": 387.855601
+    },
+    {
+      "coverage_threshold_pct": 100.0,
+      "rows": 1,
+      "row_share_pct": 0.0522,
+      "mean_coverage_pct": 100.0,
+      "positive_state_share_pct": 100.0,
+      "negative_state_share_pct": 0.0,
+      "balanced_state_share_pct": 0.0,
+      "mean_net_advances": -50.0,
+      "mean_net_advances_20d": 506.0
+    }
+  ],
+  "state_distribution": [
+    {
+      "breadth_research_state": "POSITIVE_BREADTH",
+      "count": 1344,
+      "share_pct": 70.1461
+    },
+    {
+      "breadth_research_state": "NEGATIVE_BREADTH",
+      "count": 553,
+      "share_pct": 28.8622
+    },
+    {
+      "breadth_research_state": "BALANCED_BREADTH",
+      "count": 19,
+      "share_pct": 0.9916
+    }
+  ],
+  "lookahead_audit": [
+    {
+      "raw_column": "net_advances",
+      "z_column": "net_advances_z_252d",
+      "recomputed_rows": 1791,
+      "compared_rows": 1791,
+      "max_abs_difference": 1.7763568394002505e-15,
+      "mean_abs_difference": 2.529767839410003e-16,
+      "no_lookahead_check": true
+    },
+    {
+      "raw_column": "net_advances_20d",
+      "z_column": "net_advances_20d_z_252d",
+      "recomputed_rows": 1772,
+      "compared_rows": 1772,
+      "max_abs_difference": 1.4654943925052066e-14,
+      "mean_abs_difference": 1.199567035049035e-15,
+      "no_lookahead_check": true
+    },
+    {
+      "raw_column": "pct_advancing_20d_avg",
+      "z_column": "pct_advancing_20d_z_252d",
+      "recomputed_rows": 1772,
+      "compared_rows": 1772,
+      "max_abs_difference": 4.263256414560601e-14,
+      "mean_abs_difference": 4.6116336883578895e-15,
+      "no_lookahead_check": true
+    },
+    {
+      "raw_column": "ad_line_change_20d",
+      "z_column": "ad_line_change_20d_z_252d",
+      "recomputed_rows": 1771,
+      "compared_rows": 1771,
+      "max_abs_difference": 9.769962616701378e-15,
+      "mean_abs_difference": 8.037927178499245e-16,
+      "no_lookahead_check": true
+    }
+  ],
+  "metadata_audit": {
+    "point_in_time_reconstructed": true,
+    "cross_validated": true,
+    "pit_perfect": true,
+    "price_pit_perfect": true,
+    "research_only": true,
+    "decision_engine_ready": true,
+    "trading_signal": true,
+    "forecast": true
+  },
+  "warnings": [],
+  "errors": [],
+  "validation_pass": true
+}
