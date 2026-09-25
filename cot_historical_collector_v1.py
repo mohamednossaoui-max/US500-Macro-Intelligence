@@ -12,6 +12,13 @@ Design:
 - No trading signal.
 - No Decision Engine integration.
 
+Network robustness:
+- Retries transient network failures.
+- Retries HTTP 429 / 500 / 502 / 503 / 504.
+- Honors Retry-After when available.
+- Does NOT retry 400 / 401 / 403.
+- No change to data logic or output schema.
+
 Outputs:
     cot_historical_records_input_v1.csv
     cot_historical_collection_summary_v1.csv
@@ -22,6 +29,7 @@ from __future__ import annotations
 import io
 import os
 import sys
+import time
 
 import pandas as pd
 import requests
@@ -61,10 +69,215 @@ SUMMARY = "cot_historical_collection_summary_v1.csv"
 
 
 # ============================================================
+# Network retry configuration
+# ============================================================
+
+# Only transient HTTP statuses are retried.
+# Configuration/auth/schema errors are NOT retried.
+RETRYABLE_HTTP_STATUS_CODES = {
+    429,
+    500,
+    502,
+    503,
+    504,
+}
+
+# Total attempts per yearly request.
+MAX_REQUEST_ATTEMPTS = int(
+    os.getenv("COT_MAX_REQUEST_ATTEMPTS", "5")
+)
+
+# Initial exponential backoff.
+RETRY_BASE_SECONDS = float(
+    os.getenv("COT_RETRY_BASE_SECONDS", "5")
+)
+
+# Maximum automatically calculated backoff.
+RETRY_MAX_SECONDS = float(
+    os.getenv("COT_RETRY_MAX_SECONDS", "60")
+)
+
+# CFTC can occasionally need more time for historical queries.
+REQUEST_TIMEOUT_SECONDS = int(
+    os.getenv("COT_REQUEST_TIMEOUT_SECONDS", "90")
+)
+
+
+# ============================================================
+# Retry-After helper
+# ============================================================
+
+def retry_after_seconds(
+    response: requests.Response,
+) -> float | None:
+    """
+    Read Retry-After from the response if supplied.
+
+    Supports the standard integer-seconds form.
+    Invalid values are ignored.
+    """
+
+    value = response.headers.get(
+        "Retry-After"
+    )
+
+    if value is None:
+        return None
+
+    try:
+        seconds = float(value)
+
+    except (TypeError, ValueError):
+        return None
+
+    if seconds < 0:
+        return None
+
+    return min(
+        seconds,
+        RETRY_MAX_SECONDS,
+    )
+
+
+# ============================================================
+# CFTC request with safe retry
+# ============================================================
+
+def request_cftc(
+    params: dict,
+) -> requests.Response:
+    """
+    Execute one CFTC request with conservative retry logic.
+
+    Retry:
+        - network RequestException
+        - HTTP 429
+        - HTTP 500
+        - HTTP 502
+        - HTTP 503
+        - HTTP 504
+
+    Do not retry:
+        - HTTP 400
+        - HTTP 401
+        - HTTP 403
+        - other non-transient HTTP errors
+    """
+
+    last_exception = None
+
+    for attempt in range(
+        1,
+        MAX_REQUEST_ATTEMPTS + 1,
+    ):
+
+        try:
+
+            response = requests.get(
+                BASE_URL,
+                params=params,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+
+            # ------------------------------------------------
+            # Successful request
+            # ------------------------------------------------
+
+            if response.ok:
+                return response
+
+            # ------------------------------------------------
+            # Permanent / configuration errors
+            # ------------------------------------------------
+
+            if (
+                response.status_code
+                not in RETRYABLE_HTTP_STATUS_CODES
+            ):
+
+                response.raise_for_status()
+
+            # ------------------------------------------------
+            # Transient HTTP error
+            # ------------------------------------------------
+
+            if attempt >= MAX_REQUEST_ATTEMPTS:
+
+                response.raise_for_status()
+
+            retry_after = retry_after_seconds(
+                response
+            )
+
+            if retry_after is not None:
+
+                sleep_seconds = retry_after
+
+            else:
+
+                sleep_seconds = min(
+                    RETRY_BASE_SECONDS
+                    * (2 ** (attempt - 1)),
+                    RETRY_MAX_SECONDS,
+                )
+
+            print(
+                "CFTC transient HTTP error "
+                f"{response.status_code}. "
+                f"Retry {attempt}/{MAX_REQUEST_ATTEMPTS} "
+                f"in {sleep_seconds:.1f}s...",
+                file=sys.stderr,
+            )
+
+            time.sleep(
+                sleep_seconds
+            )
+
+        except requests.RequestException as exc:
+
+            last_exception = exc
+
+            # ----------------------------------------------
+            # Last attempt: fail normally
+            # ----------------------------------------------
+
+            if attempt >= MAX_REQUEST_ATTEMPTS:
+                raise
+
+            sleep_seconds = min(
+                RETRY_BASE_SECONDS
+                * (2 ** (attempt - 1)),
+                RETRY_MAX_SECONDS,
+            )
+
+            print(
+                "CFTC network error: "
+                f"{exc}. "
+                f"Retry {attempt}/{MAX_REQUEST_ATTEMPTS} "
+                f"in {sleep_seconds:.1f}s...",
+                file=sys.stderr,
+            )
+
+            time.sleep(
+                sleep_seconds
+            )
+
+    # Defensive fallback.
+    if last_exception is not None:
+        raise last_exception
+
+    raise RuntimeError(
+        "CFTC request failed without a captured exception."
+    )
+
+
+# ============================================================
 # Fetch one year
 # ============================================================
 
-def fetch_year(year: int) -> pd.DataFrame:
+def fetch_year(
+    year: int,
+) -> pd.DataFrame:
     """
     Fetch one calendar year of CFTC TFF Futures-Only data
     for the target E-mini S&P 500 contract.
@@ -83,13 +296,9 @@ def fetch_year(year: int) -> pd.DataFrame:
         "$limit": 5000,
     }
 
-    response = requests.get(
-        BASE_URL,
-        params=params,
-        timeout=60,
+    response = request_cftc(
+        params
     )
-
-    response.raise_for_status()
 
     text = response.text
 
@@ -114,6 +323,7 @@ def numeric_column(
     """
 
     if column not in df.columns:
+
         return pd.Series(
             [pd.NA] * len(df),
             index=df.index,
@@ -141,6 +351,12 @@ def main() -> int:
         f"Period: {START_YEAR}-{END_YEAR}"
     )
 
+    print(
+        "Network retry configuration: "
+        f"max_attempts={MAX_REQUEST_ATTEMPTS}, "
+        f"timeout={REQUEST_TIMEOUT_SECONDS}s"
+    )
+
     frames = []
 
     # --------------------------------------------------------
@@ -154,7 +370,9 @@ def main() -> int:
 
         try:
 
-            part = fetch_year(year)
+            part = fetch_year(
+                year
+            )
 
             if not part.empty:
                 frames.append(part)
