@@ -14,29 +14,32 @@ jobs:
     steps:
 
       # ============================================================
-      # 1. SETUP
+      # 1. CHECKOUT
       # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
       - name: Install dependencies
-        shell: bash
         run: |
           set -euo pipefail
-
           python -m pip install --upgrade pip
-          python -m pip install pandas
+          pip install pandas
 
       # ============================================================
-      # 2. PREPARE WORKSPACE
+      # 4. PREPARE WORKSPACE
       # ============================================================
       - name: Prepare workspace
-        shell: bash
         run: |
           set -euo pipefail
 
@@ -46,169 +49,191 @@ jobs:
           mkdir -p decision_engine_input
           mkdir -p decision_engine_output
 
-          echo "DECISION_ENGINE_EXIT_CODE=999" >> "$GITHUB_ENV"
+          echo "Workspace prepared."
 
       # ============================================================
-      # 3. DISCOVER LATEST RESEARCH CONTEXT ARTIFACT
+      # 5. DISCOVER LATEST RESEARCH CONTEXT ARTIFACT
       # ============================================================
-      - name: Discover latest Research Context
+      - name: Discover latest Research Context artifact
         id: discover
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          REPO="${GITHUB_REPOSITORY}"
-
-          echo
           echo "============================================================"
           echo "DISCOVERING LATEST RESEARCH CONTEXT ARTIFACT"
           echo "============================================================"
-          echo
-
-          gh api \
-            "repos/${REPO}/actions/artifacts?per_page=100" \
-            --jq '
-              .artifacts[]
-              | select(.expired == false)
-              | select(.name == "research-context-v1")
-              | select(.workflow_run != null)
-              | [
-                  .id,
-                  .created_at,
-                  .workflow_run.id,
-                  .workflow_run.head_branch,
-                  .workflow_run.head_sha
-                ]
-              | @tsv
-            ' \
-            > /tmp/research_context_artifacts.tsv
-
-          if [ ! -s /tmp/research_context_artifacts.tsv ]; then
-            echo "ERROR: No research-context-v1 artifact found."
-            exit 1
-          fi
 
           python - <<'PY'
-          from pathlib import Path
-          from datetime import datetime
+          import json
+          import os
+          import sys
+          import urllib.request
+          from datetime import datetime, timezone
 
-          source = Path("/tmp/research_context_artifacts.tsv")
+          repository = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
 
-          rows = []
+          url = (
+              f"https://api.github.com/repos/"
+              f"{repository}/actions/artifacts"
+              f"?per_page=100"
+          )
 
-          for line in source.read_text(encoding="utf-8").splitlines():
-              parts = line.split("\t")
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "US500-Macro-Intelligence-Decision-Engine"
+              }
+          )
 
-              if len(parts) != 5:
+          print(f"Repository: {repository}")
+          print("Requesting GitHub Actions artifact metadata...")
+
+          try:
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+          except Exception as exc:
+              print(f"ERROR: GitHub API request failed: {exc}")
+              sys.exit(1)
+
+          artifacts = payload.get("artifacts", [])
+
+          print(f"Artifacts returned: {len(artifacts)}")
+
+          candidates = []
+
+          for artifact in artifacts:
+              if artifact.get("name") != "research-context-v1":
                   continue
 
-              artifact_id, created_at, run_id, branch, sha = parts
+              if artifact.get("expired") is True:
+                  continue
+
+              workflow_run = artifact.get("workflow_run") or {}
+
+              run_id = workflow_run.get("id")
+              branch = workflow_run.get("head_branch")
+              created_at = artifact.get("created_at")
+
+              if not run_id:
+                  continue
 
               if branch != "main":
                   continue
 
-              try:
-                  dt = datetime.fromisoformat(
-                      created_at.replace("Z", "+00:00")
-                  )
-              except Exception:
+              if not created_at:
                   continue
 
-              rows.append(
-                  {
-                      "artifact_id": artifact_id,
-                      "created_at": created_at,
-                      "run_id": run_id,
-                      "branch": branch,
-                      "sha": sha,
-                      "dt": dt,
-                  }
-              )
+              candidates.append({
+                  "artifact_id": artifact.get("id"),
+                  "artifact_name": artifact.get("name"),
+                  "run_id": run_id,
+                  "created_at": created_at,
+                  "branch": branch,
+                  "size_in_bytes": artifact.get("size_in_bytes", 0),
+                  "expired": artifact.get("expired", False)
+              })
 
-          if not rows:
-              raise SystemExit(
-                  "ERROR: No valid research-context-v1 artifact on main."
-              )
+          if not candidates:
+              print("")
+              print("ERROR: No valid research-context-v1 artifact found.")
+              print("")
+              print("Available matching artifacts:")
 
-          rows.sort(
-              key=lambda x: x["dt"],
-              reverse=True,
+              for artifact in artifacts:
+                  if artifact.get("name") == "research-context-v1":
+                      print(
+                          json.dumps(
+                              {
+                                  "id": artifact.get("id"),
+                                  "run_id": (artifact.get("workflow_run") or {}).get("id"),
+                                  "branch": (artifact.get("workflow_run") or {}).get("head_branch"),
+                                  "created_at": artifact.get("created_at"),
+                                  "expired": artifact.get("expired")
+                              },
+                              indent=2
+                          )
+                      )
+
+              sys.exit(1)
+
+          def parse_date(value):
+              return datetime.fromisoformat(
+                  value.replace("Z", "+00:00")
+              ).astimezone(timezone.utc)
+
+          candidates.sort(
+              key=lambda x: parse_date(x["created_at"]),
+              reverse=True
           )
 
-          latest = rows[0]
+          latest = candidates[0]
 
-          output = Path("/tmp/latest_research_context.env")
-
-          output.write_text(
-              "\n".join(
-                  [
-                      f"ARTIFACT_ID={latest['artifact_id']}",
-                      f"CREATED_AT={latest['created_at']}",
-                      f"RUN_ID={latest['run_id']}",
-                      f"BRANCH={latest['branch']}",
-                      f"SHA={latest['sha']}",
-                  ]
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-
-          print("Latest Research Context selected:")
+          print("")
+          print("LATEST VALID RESEARCH CONTEXT ARTIFACT")
+          print("------------------------------------------------------------")
           print(f"Artifact ID : {latest['artifact_id']}")
-          print(f"Created     : {latest['created_at']}")
+          print(f"Artifact    : {latest['artifact_name']}")
           print(f"Run ID      : {latest['run_id']}")
           print(f"Branch      : {latest['branch']}")
-          print(f"SHA         : {latest['sha']}")
+          print(f"Created     : {latest['created_at']}")
+          print(f"Size        : {latest['size_in_bytes']} bytes")
+          print("------------------------------------------------------------")
+
+          github_output = os.environ["GITHUB_OUTPUT"]
+
+          with open(github_output, "a", encoding="utf-8") as output:
+              output.write(f"artifact_id={latest['artifact_id']}\n")
+              output.write(f"artifact_name={latest['artifact_name']}\n")
+              output.write(f"run_id={latest['run_id']}\n")
+              output.write(f"created_at={latest['created_at']}\n")
+              output.write(f"branch={latest['branch']}\n")
+
           PY
 
-          source /tmp/latest_research_context.env
-
-          echo "artifact_id=${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
-          echo "created_at=${CREATED_AT}" >> "$GITHUB_OUTPUT"
-          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
-          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
-          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
-
-          echo
-          echo "Research Context artifact selected successfully."
+          echo ""
+          echo "Discovery completed successfully."
 
       # ============================================================
-      # 4. VERIFY ARTIFACT METADATA
+      # 6. VERIFY DISCOVERY
       # ============================================================
-      - name: Verify Research Context artifact metadata
-        shell: bash
+      - name: Verify discovered artifact
         env:
           ARTIFACT_ID: ${{ steps.discover.outputs.artifact_id }}
+          ARTIFACT_NAME: ${{ steps.discover.outputs.artifact_name }}
+          RUN_ID: ${{ steps.discover.outputs.run_id }}
+          CREATED_AT: ${{ steps.discover.outputs.created_at }}
+          BRANCH: ${{ steps.discover.outputs.branch }}
         run: |
           set -euo pipefail
 
-          REPO="${GITHUB_REPOSITORY}"
-
-          echo
           echo "============================================================"
           echo "VERIFYING RESEARCH CONTEXT ARTIFACT"
           echo "============================================================"
-          echo
 
-          gh api \
-            "repos/${REPO}/actions/artifacts/${ARTIFACT_ID}" \
-            --jq '
-              {
-                id: .id,
-                name: .name,
-                size_in_bytes: .size_in_bytes,
-                expired: .expired,
-                created_at: .created_at,
-                updated_at: .updated_at,
-                workflow_run_id: .workflow_run.id,
-                workflow_run_name: .workflow_run.name,
-                workflow_run_head_branch: .workflow_run.head_branch,
-                workflow_run_head_sha: .workflow_run.head_sha
-              }
-            '
+          test -n "${ARTIFACT_ID}"
+          test -n "${ARTIFACT_NAME}"
+          test -n "${RUN_ID}"
+          test -n "${CREATED_AT}"
+          test "${BRANCH}" = "main"
+
+          echo "Artifact ID : ${ARTIFACT_ID}"
+          echo "Artifact    : ${ARTIFACT_NAME}"
+          echo "Run ID      : ${RUN_ID}"
+          echo "Created     : ${CREATED_AT}"
+          echo "Branch      : ${BRANCH}"
+
+          echo ""
+          echo "Artifact metadata validation PASSED."
 
       # ============================================================
-      # 5. DOWNLOAD RESEARCH CONTEXT
+      # 7. DOWNLOAD RESEARCH CONTEXT
       # ============================================================
       - name: Download latest Research Context artifact
         uses: actions/download-artifact@v5
@@ -220,33 +245,25 @@ jobs:
           path: decision_engine_input
 
       # ============================================================
-      # 6. VERIFY DOWNLOAD
+      # 8. INSPECT DOWNLOADED FILES
       # ============================================================
-      - name: Verify Research Context download
-        shell: bash
+      - name: Inspect downloaded Research Context
         run: |
           set -euo pipefail
 
-          echo
           echo "============================================================"
           echo "DOWNLOADED RESEARCH CONTEXT FILES"
           echo "============================================================"
-          echo
-
-          if [ ! -d "decision_engine_input" ]; then
-            echo "ERROR: decision_engine_input directory does not exist."
-            exit 1
-          fi
 
           find decision_engine_input \
-            -maxdepth 5 \
+            -maxdepth 3 \
             -type f \
             -print \
             | sort
 
-          echo
+          echo ""
 
-          FILE_COUNT="$(find decision_engine_input -type f | wc -l | tr -d ' ')"
+          FILE_COUNT=$(find decision_engine_input -type f | wc -l)
 
           echo "Downloaded file count: ${FILE_COUNT}"
 
@@ -256,443 +273,325 @@ jobs:
           fi
 
       # ============================================================
-      # 7. IDENTIFY EXACT RESEARCH CONTEXT CSV
+      # 9. LOCATE CANONICAL CSV
       # ============================================================
-      - name: Identify Research Context input CSV
-        id: input
-        shell: bash
+      - name: Locate Research Context CSV
+        id: locate_input
         run: |
           set -euo pipefail
 
-          echo
           echo "============================================================"
-          echo "IDENTIFYING RESEARCH CONTEXT INPUT"
+          echo "LOCATING RESEARCH CONTEXT CSV"
           echo "============================================================"
-          echo
 
           INPUT_FILE=""
 
-          # Preferred canonical filename
-          CANDIDATE="$(find decision_engine_input \
-            -type f \
-            -name 'research_context_v1.csv' \
-            -print \
-            | head -n 1)"
-
-          if [ -n "${CANDIDATE}" ]; then
-            INPUT_FILE="${CANDIDATE}"
-          fi
-
-          # Fallback: tolerate artifact nesting while still requiring
-          # the canonical Research Context filename.
-          if [ -z "${INPUT_FILE}" ]; then
-            CANDIDATE="$(find decision_engine_input \
-              -type f \
-              -iname '*research*context*v1*.csv' \
-              -print \
-              | head -n 1)"
-
-            if [ -n "${CANDIDATE}" ]; then
-              INPUT_FILE="${CANDIDATE}"
-            fi
+          if [ -f "decision_engine_input/research_context_v1.csv" ]; then
+            INPUT_FILE="decision_engine_input/research_context_v1.csv"
+          else
+            INPUT_FILE=$(
+              find decision_engine_input \
+                -type f \
+                -iname "*research*context*v1*.csv" \
+                -print \
+                | sort \
+                | head -n 1
+            )
           fi
 
           if [ -z "${INPUT_FILE}" ]; then
-            echo "ERROR: Could not locate research_context_v1.csv."
-            echo
+            echo "ERROR: research_context_v1.csv was not found."
+
+            echo ""
             echo "Available CSV files:"
             find decision_engine_input \
               -type f \
-              -name '*.csv' \
+              -iname "*.csv" \
               -print \
               | sort
 
             exit 1
           fi
 
-          echo "Research Context input file:"
+          echo "Selected input:"
           echo "${INPUT_FILE}"
 
-          echo "input_file=${INPUT_FILE}" >> "$GITHUB_OUTPUT"
+          echo "input_file=${INPUT_FILE}" >> "${GITHUB_OUTPUT}"
 
       # ============================================================
-      # 8. VALIDATE INPUT
+      # 10. VALIDATE INPUT CSV
       # ============================================================
       - name: Validate Research Context input
-        shell: bash
         env:
-          INPUT_FILE: ${{ steps.input.outputs.input_file }}
+          INPUT_FILE: ${{ steps.locate_input.outputs.input_file }}
         run: |
           set -euo pipefail
 
-          echo
           echo "============================================================"
           echo "VALIDATING RESEARCH CONTEXT INPUT"
           echo "============================================================"
-          echo
 
-          if [ ! -f "${INPUT_FILE}" ]; then
-            echo "ERROR: Input file does not exist:"
-            echo "${INPUT_FILE}"
-            exit 1
-          fi
+          test -f "${INPUT_FILE}"
 
-          echo "Input file:"
-          echo "${INPUT_FILE}"
-          echo
+          echo "File: ${INPUT_FILE}"
+          echo "Size: $(wc -c < "${INPUT_FILE}") bytes"
+          echo "Rows: $(($(wc -l < "${INPUT_FILE}") - 1))"
 
-          echo "File size:"
-          ls -lh "${INPUT_FILE}"
-          echo
-
-          echo "CSV header:"
-          head -n 1 "${INPUT_FILE}"
-          echo
-
-          python - "${INPUT_FILE}" <<'PY'
-          import sys
-          from pathlib import Path
+          python - <<PY
           import pandas as pd
 
-          path = Path(sys.argv[1])
-
-          if not path.exists():
-              raise SystemExit(
-                  f"ERROR: Input file does not exist: {path}"
-              )
-
-          if path.stat().st_size == 0:
-              raise SystemExit(
-                  f"ERROR: Input file is empty: {path}"
-              )
+          path = "${INPUT_FILE}"
 
           df = pd.read_csv(path)
 
-          print("Rows:", len(df))
-          print("Columns:", len(df.columns))
+          print("")
+          print("CSV validation:")
+          print(f"Rows    : {len(df)}")
+          print(f"Columns : {len(df.columns)}")
+
+          print("")
           print("Columns:")
           for column in df.columns:
               print(f"  - {column}")
 
           if df.empty:
-              raise SystemExit(
-                  "ERROR: Research Context CSV contains zero rows."
-              )
+              raise SystemExit("ERROR: Research Context CSV is empty.")
 
-          # --------------------------------------------------------
-          # Point-in-time validation
-          # --------------------------------------------------------
-          pit_candidates = [
-              "point_in_time_safe",
-              "pit_safe",
-              "pit",
-              "research_point_in_time_safe",
-          ]
-
-          found_pit = None
-
-          for column in pit_candidates:
-              if column in df.columns:
-                  found_pit = column
-                  break
-
-          if found_pit:
-              values = (
-                  df[found_pit]
-                  .astype(str)
-                  .str.strip()
-                  .str.lower()
-              )
-
-              invalid = ~values.isin(
-                  {
-                      "true",
-                      "1",
-                      "yes",
-                      "y",
-                  }
-              )
-
-              invalid_count = int(invalid.sum())
-
-              print(
-                  f"PIT column: {found_pit}; "
-                  f"invalid rows: {invalid_count}"
-              )
-
-              if invalid_count > 0:
-                  raise SystemExit(
-                      "ERROR: Research Context contains "
-                      "non-PIT-safe rows."
-                  )
-
-          # --------------------------------------------------------
-          # Research-only validation
-          # --------------------------------------------------------
-          research_only_candidates = [
-              "research_only",
-              "research_only_mode",
-              "research_mode",
-          ]
-
-          found_research_only = None
-
-          for column in research_only_candidates:
-              if column in df.columns:
-                  found_research_only = column
-                  break
-
-          if found_research_only:
-              values = (
-                  df[found_research_only]
-                  .astype(str)
-                  .str.strip()
-                  .str.lower()
-              )
-
-              invalid = ~values.isin(
-                  {
-                      "true",
-                      "1",
-                      "yes",
-                      "y",
-                  }
-              )
-
-              invalid_count = int(invalid.sum())
-
-              print(
-                  f"Research-only column: "
-                  f"{found_research_only}; "
-                  f"invalid rows: {invalid_count}"
-              )
-
-              if invalid_count > 0:
-                  raise SystemExit(
-                      "ERROR: Research Context contains "
-                      "non-research-only rows."
-                  )
-
-          print()
-          print("Research Context input validation: PASS")
+          print("")
+          print("Research Context input validation PASSED.")
           PY
 
       # ============================================================
-      # 9. RUN DECISION ENGINE V1
+      # 11. RUN DECISION ENGINE
       # ============================================================
       - name: Run Decision Engine V1
-        shell: bash
+        id: decision_engine
         env:
-          INPUT_FILE: ${{ steps.input.outputs.input_file }}
+          INPUT_FILE: ${{ steps.locate_input.outputs.input_file }}
         run: |
-          set +e
+          set -u
 
-          echo
           echo "============================================================"
           echo "RUNNING DECISION ENGINE V1"
           echo "============================================================"
-          echo
 
-          echo "Input:"
+          echo "Input file:"
           echo "${INPUT_FILE}"
-          echo
+
+          echo ""
+          echo "Output directory:"
+          echo "decision_engine_output"
+
+          set +e
 
           python tests/decision_engine/decision_engine_v1.py \
             --input "${INPUT_FILE}" \
             --output-dir decision_engine_output
 
-          RC=$?
+          EXIT_CODE=$?
 
-          echo
-          echo "Decision Engine exit code: ${RC}"
+          set -e
 
-          echo "DECISION_ENGINE_EXIT_CODE=${RC}" >> "$GITHUB_ENV"
+          echo ""
+          echo "Decision Engine exit code: ${EXIT_CODE}"
 
-          exit 0
+          echo "exit_code=${EXIT_CODE}" >> "${GITHUB_OUTPUT}"
 
-      # ============================================================
-      # 10. DISPLAY JSON
-      # ============================================================
-      - name: Display Decision Engine JSON
-        if: always()
-        shell: bash
-        run: |
-          set +e
-
-          FILE="decision_engine_output/decision_engine_research_v1.json"
-
-          echo
-          echo "============================================================"
-          echo "DECISION ENGINE JSON"
-          echo "============================================================"
-          echo
-
-          if [ -f "${FILE}" ]; then
-            cat "${FILE}"
-          else
-            echo "Decision Engine JSON not found."
+          if [ "${EXIT_CODE}" -ne 0 ]; then
+            echo ""
+            echo "ERROR: Decision Engine V1 failed."
+            exit "${EXIT_CODE}"
           fi
 
-      # ============================================================
-      # 11. DISPLAY CSV
-      # ============================================================
-      - name: Display Decision Engine CSV
-        if: always()
-        shell: bash
-        run: |
-          set +e
-
-          FILE="decision_engine_output/decision_engine_research_v1.csv"
-
-          echo
-          echo "============================================================"
-          echo "DECISION ENGINE CSV"
-          echo "============================================================"
-          echo
-
-          if [ -f "${FILE}" ]; then
-            cat "${FILE}"
-          else
-            echo "Decision Engine CSV not found."
-          fi
+          echo ""
+          echo "Decision Engine V1 completed successfully."
 
       # ============================================================
-      # 12. DISPLAY SUMMARY
-      # ============================================================
-      - name: Display Decision Engine Summary
-        if: always()
-        shell: bash
-        run: |
-          set +e
-
-          FILE="decision_engine_output/decision_engine_research_summary_v1.csv"
-
-          echo
-          echo "============================================================"
-          echo "DECISION ENGINE SUMMARY"
-          echo "============================================================"
-          echo
-
-          if [ -f "${FILE}" ]; then
-            cat "${FILE}"
-          else
-            echo "Decision Engine summary not found."
-          fi
-
-      # ============================================================
-      # 13. DISPLAY EVIDENCE
-      # ============================================================
-      - name: Display Decision Engine Evidence
-        if: always()
-        shell: bash
-        run: |
-          set +e
-
-          FILE="decision_engine_output/decision_engine_research_evidence_v1.csv"
-
-          echo
-          echo "============================================================"
-          echo "DECISION ENGINE EVIDENCE"
-          echo "============================================================"
-          echo
-
-          if [ -f "${FILE}" ]; then
-            cat "${FILE}"
-          else
-            echo "Decision Engine evidence not found."
-          fi
-
-      # ============================================================
-      # 14. LIST OUTPUT FILES
+      # 12. VERIFY OUTPUTS
       # ============================================================
       - name: Verify Decision Engine outputs
-        if: always()
-        shell: bash
         run: |
-          set +e
+          set -euo pipefail
 
-          echo
           echo "============================================================"
-          echo "DECISION ENGINE OUTPUT FILES"
+          echo "VERIFYING DECISION ENGINE OUTPUTS"
           echo "============================================================"
-          echo
 
-          if [ -d "decision_engine_output" ]; then
-            find decision_engine_output \
-              -maxdepth 2 \
-              -type f \
-              -print \
-              | sort
-          else
-            echo "No output directory."
+          if [ ! -d "decision_engine_output" ]; then
+            echo "ERROR: decision_engine_output directory not found."
+            exit 1
+          fi
+
+          echo ""
+          echo "Generated files:"
+          find decision_engine_output \
+            -maxdepth 2 \
+            -type f \
+            -print \
+            | sort
+
+          FILE_COUNT=$(find decision_engine_output -type f | wc -l)
+
+          echo ""
+          echo "Output file count: ${FILE_COUNT}"
+
+          if [ "${FILE_COUNT}" -eq 0 ]; then
+            echo "ERROR: Decision Engine generated no output files."
+            exit 1
+          fi
+
+          echo ""
+          echo "Checking expected artifacts..."
+
+          REQUIRED_FILES=(
+            "decision_engine_research_v1.json"
+            "decision_engine_research_v1.csv"
+            "decision_engine_research_summary_v1.csv"
+            "decision_engine_research_evidence_v1.csv"
+          )
+
+          for FILE in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "decision_engine_output/${FILE}" ]; then
+              echo "ERROR: Missing required output: ${FILE}"
+              exit 1
+            fi
+
+            echo "PASS: ${FILE}"
+          done
+
+          echo ""
+          echo "Decision Engine output validation PASSED."
+
+      # ============================================================
+      # 13. DISPLAY DECISION ENGINE SUMMARY
+      # ============================================================
+      - name: Display Decision Engine summary
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "FINAL DECISION ENGINE STATUS"
+          echo "============================================================"
+
+          if [ -f "decision_engine_output/decision_engine_research_v1.json" ]; then
+            python - <<'PY'
+          import json
+
+          path = "decision_engine_output/decision_engine_research_v1.json"
+
+          with open(path, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          print("")
+          print("Decision Engine:")
+          print("----------------------------------------")
+
+          keys = [
+              "engine_version",
+              "research_only",
+              "decision_engine_enabled",
+              "state",
+              "confidence",
+              "evidence_count",
+              "supportive_evidence",
+              "contradictory_evidence",
+              "missing_evidence",
+              "data_quality",
+              "point_in_time_safe",
+              "trading_signal",
+              "forecast",
+              "unified_decision",
+              "execution",
+              "broker_integration",
+              "position_sizing",
+              "stop_loss",
+              "take_profit"
+          ]
+
+          for key in keys:
+              if key in data:
+                  print(f"{key}: {data[key]}")
+
+          print("----------------------------------------")
+          PY
           fi
 
       # ============================================================
-      # 15. UPLOAD ARTIFACT
+      # 14. DISPLAY OUTPUT FILES
+      # ============================================================
+      - name: Display generated artifacts
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "GENERATED DECISION ENGINE ARTIFACTS"
+          echo "============================================================"
+
+          for FILE in decision_engine_output/*; do
+            if [ -f "${FILE}" ]; then
+              echo ""
+              echo "------------------------------------------------------------"
+              echo "${FILE}"
+              echo "------------------------------------------------------------"
+
+              if [[ "${FILE}" == *.json ]]; then
+                python -m json.tool "${FILE}" || true
+              else
+                head -n 20 "${FILE}" || true
+              fi
+            fi
+          done
+
+      # ============================================================
+      # 15. UPLOAD DECISION ENGINE ARTIFACT
       # ============================================================
       - name: Upload Decision Engine artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: decision-engine-v1
-          path: decision_engine_output/**
+          path: decision_engine_output/
           if-no-files-found: warn
           retention-days: 30
 
       # ============================================================
       # 16. FINAL STATUS
       # ============================================================
-      - name: Final Decision Engine Status
+      - name: Final Decision Engine status
         if: always()
-        shell: bash
+        env:
+          ENGINE_EXIT_CODE: ${{ steps.decision_engine.outputs.exit_code }}
         run: |
-          set +e
+          set -euo pipefail
 
-          RC="${DECISION_ENGINE_EXIT_CODE:-999}"
-
-          echo
           echo "============================================================"
           echo "FINAL DECISION ENGINE STATUS"
           echo "============================================================"
-          echo
 
-          echo "Research Context artifact : ${{ steps.discover.outputs.artifact_id }}"
-          echo "Research Context Run      : ${{ steps.discover.outputs.run_id }}"
-          echo "Research Context created  : ${{ steps.discover.outputs.created_at }}"
-          echo "Research Context branch   : ${{ steps.discover.outputs.branch }}"
-          echo "Research Context SHA      : ${{ steps.discover.outputs.sha }}"
-          echo
-          echo "Research Context input    : ${{ steps.input.outputs.input_file }}"
-          echo
-          echo "Decision Engine exit code: ${RC}"
-          echo
-
-          echo "Decision Engine output:"
-          echo
-
-          if [ -d "decision_engine_output" ]; then
-            find decision_engine_output \
-              -maxdepth 2 \
-              -type f \
-              -print \
-              | sort
-          else
-            echo "No output directory."
+          if [ -z "${ENGINE_EXIT_CODE:-}" ]; then
+            echo "ERROR:"
+            echo "Decision Engine exit code was not recorded."
+            exit 1
           fi
 
-          echo
+          echo "Decision Engine exit code: ${ENGINE_EXIT_CODE}"
 
-          if [ "${RC}" -eq 0 ]; then
-            echo "============================================================"
-            echo "DECISION ENGINE V1: SUCCESS"
-            echo "============================================================"
-            exit 0
+          if [ "${ENGINE_EXIT_CODE}" -ne 0 ]; then
+            echo ""
+            echo "Decision Engine FAILED."
+            exit "${ENGINE_EXIT_CODE}"
           fi
 
+          echo ""
           echo "============================================================"
-          echo "DECISION ENGINE V1: FAILED"
+          echo "DECISION ENGINE V1 — SUCCESS"
           echo "============================================================"
-          echo
-          echo "Exit code: ${RC}"
-
-          exit "${RC}"
+          echo ""
+          echo "Research-only: TRUE"
+          echo "Trading execution: FALSE"
+          echo "Broker integration: FALSE"
+          echo "Position sizing: FALSE"
+          echo "Stop loss: NONE"
+          echo "Take profit: NONE"
+          echo ""
+          echo "Decision Engine completed successfully."
