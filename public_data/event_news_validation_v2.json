@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-09-25T10:08:08.040489+00:00",
+  "generated_at": "2026-09-25T13:16:59.334524+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "HTTP 429",
+    "error": "ParseError('syntax error: line 1, column 0')",
     "query_requests": 1,
     "fallback_required": true
   },
@@ -773,6 +773,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Advance Monthly Manufacturers' Shipments, Inventories, and Orders",
+        "description": "New orders for manufactured durable goods in August, down following two consecutive monthly increases, decreased $0.1 billion or virtually unchanged to $338.6 billion.<p><br>August 2026: -0.0° % Change<br>July 2026 (r): +0.9° % Change<br></p>",
+        "published_at": "2026-09-25T12:30:00+00:00",
+        "url": "https://www.census.gov/manufacturing/m3/",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "New Home Sales",
         "description": "Sales of new single-family houses in August 2026 were at a seasonally adjusted annual rate of 684,000. This is 6.4 percent (+/- 19.5%)* above the revised July 2026 estimate of 643,000.<p><br>August 2026: +6.4* % Change<br>July 2026 (r): -4.3* % Change<br></p>",
         "published_at": "2026-09-24T14:00:00+00:00",
@@ -903,15 +912,6 @@
         "description": "July 2026 end-of-month inventories were $838.5 billion, up 0.7 percent (+/-0.2 percent) from last month.<p><br>July 2026: +0.7 % Change in Inventories<br>June 2026 (r): -0.2* % Change in Inventories<br></p>",
         "published_at": "2026-08-27T12:30:00+00:00",
         "url": "https://www.census.gov/econ/indicators/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance Monthly Manufacturers' Shipments, Inventories, and Orders",
-        "description": "New orders for manufactured durable goods in July, up four of the last five months, increased $3.6 billion or 1.1 percent to $339.3 billion.<p><br>July 2026: +1.1° % Change<br>June 2026 (r): +0.5° % Change<br></p>",
-        "published_at": "2026-08-26T12:30:00+00:00",
-        "url": "https://www.census.gov/manufacturing/m3/",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"
