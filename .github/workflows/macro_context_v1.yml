@@ -41,18 +41,90 @@ jobs:
 
 
       # ============================================================
-      # 4. VERIFY MACRO CONTEXT SOURCE FILE
+      # 4. LOCATE MACRO CONTEXT SOURCE
       # ============================================================
-      - name: Verify Macro Context source
+      - name: Locate Macro Context source
         run: |
           set -euo pipefail
 
-          echo "Checking Macro Context source file..."
+          echo "============================================================"
+          echo "LOCATING MACRO CONTEXT SOURCE"
+          echo "============================================================"
 
-          test -f macro-context-v1.py
+          echo "Repository root:"
+          pwd
 
-          echo "Macro Context source found:"
-          ls -lh macro-context-v1.py
+          echo ""
+          echo "Searching for Macro Context Python files..."
+
+          find . -type f \( \
+            -iname "*macro*context*.py" -o \
+            -iname "*macro_context*.py" \
+          \) -print | sort
+
+          MACRO_FILES=$(find . -type f \( \
+            -iname "*macro*context*.py" -o \
+            -iname "*macro_context*.py" \
+          \) -print)
+
+          if [ -z "$MACRO_FILES" ]; then
+            echo ""
+            echo "ERROR: No Macro Context Python file was found."
+            echo ""
+            echo "Python files available in repository:"
+            find . -type f -name "*.py" -print | sort
+            exit 1
+          fi
+
+          MACRO_COUNT=$(printf '%s\n' "$MACRO_FILES" | sed '/^$/d' | wc -l)
+
+          if [ "$MACRO_COUNT" -gt 1 ]; then
+            echo ""
+            echo "WARNING: Multiple Macro Context files found:"
+            printf '%s\n' "$MACRO_FILES"
+            echo ""
+            echo "Trying to select the canonical macro-context-v1.py file."
+
+            MACRO_SOURCE=$(printf '%s\n' "$MACRO_FILES" \
+              | grep -E '/macro-context-v1\.py$|^\./macro-context-v1\.py$' \
+              | head -1 || true)
+
+            if [ -z "$MACRO_SOURCE" ]; then
+              MACRO_SOURCE=$(printf '%s\n' "$MACRO_FILES" \
+                | grep -E '/macro_context_v1\.py$|^\./macro_context_v1\.py$' \
+                | head -1 || true)
+            fi
+
+            if [ -z "$MACRO_SOURCE" ]; then
+              echo ""
+              echo "ERROR: Multiple Macro Context files exist and"
+              echo "no canonical macro-context-v1.py was identified."
+              exit 1
+            fi
+          else
+            MACRO_SOURCE=$(printf '%s\n' "$MACRO_FILES" | head -1)
+          fi
+
+          if [ -z "$MACRO_SOURCE" ]; then
+            echo "ERROR: Macro Context source could not be selected."
+            exit 1
+          fi
+
+          echo ""
+          echo "Selected Macro Context source:"
+          echo "$MACRO_SOURCE"
+
+          test -f "$MACRO_SOURCE"
+
+          cp "$MACRO_SOURCE" macro_context_runner.py
+
+          echo ""
+          echo "Runner copy:"
+          ls -lh macro_context_runner.py
+
+          echo "MACRO_CONTEXT_SOURCE=$MACRO_SOURCE" >> "$GITHUB_ENV"
+
+          echo "============================================================"
 
 
       # ============================================================
@@ -397,9 +469,6 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Event News schema
-          # --------------------------------------------------------
           required_event_columns = {
               "published_at",
               "availability_date",
@@ -409,10 +478,12 @@ jobs:
               "point_in_time_safe",
           }
 
+
           missing_event_columns = (
               required_event_columns
               - set(event_news.columns)
           )
+
 
           assert not missing_event_columns, (
               "Event / News file missing columns: "
@@ -420,9 +491,6 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Explicit PIT normalization
-          # --------------------------------------------------------
           event_news["_pit_normalized"] = (
               event_news["point_in_time_safe"]
               .map(parse_bool)
@@ -464,25 +532,36 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -f macro-context-v1.py
+          test -f macro_context_runner.py
 
-          echo "Running:"
-          echo "python macro-context-v1.py"
+          echo "============================================================"
+          echo "RUNNING MACRO CONTEXT V1"
+          echo "============================================================"
 
-          python macro-context-v1.py
+          echo "Source:"
+          echo "$MACRO_CONTEXT_SOURCE"
+
+          echo ""
+          echo "Runner:"
+          ls -lh macro_context_runner.py
+
+          python macro_context_runner.py
 
 
       # ============================================================
-      # 11. VERIFY OUTPUT FILES
+      # 11. VERIFY OUTPUTS
       # ============================================================
       - name: Verify Macro Context outputs
         run: |
           set -euo pipefail
 
+          echo "Checking Macro Context outputs..."
+
           test -f macro_context_v1.json
           test -f macro_context_v1.csv
 
-          echo "Macro Context outputs:"
+          echo ""
+          echo "Outputs:"
           ls -lh \
             macro_context_v1.json \
             macro_context_v1.csv
@@ -513,9 +592,9 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Research-only constraints
-          # --------------------------------------------------------
+          # ========================================================
+          # RESEARCH-ONLY
+          # ========================================================
           assert data.get("research_only") is True, (
               "research_only must be TRUE"
           )
@@ -533,9 +612,9 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Anti-lookahead
-          # --------------------------------------------------------
+          # ========================================================
+          # ANTI LOOKAHEAD
+          # ========================================================
           assert (
               data["temporal_alignment"]["anti_lookahead"]
               is True
@@ -544,9 +623,9 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Component PIT
-          # --------------------------------------------------------
+          # ========================================================
+          # PIT
+          # ========================================================
           assert data["economic"]["pit_safe"] is True, (
               "Economic PIT validation failed."
           )
@@ -563,18 +642,18 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Temporal metadata
-          # --------------------------------------------------------
+          # ========================================================
+          # TEMPORAL METADATA
+          # ========================================================
           assert (
               "event_news_age_days"
               in data["temporal_alignment"]
           )
 
 
-          # --------------------------------------------------------
-          # CSV structure
-          # --------------------------------------------------------
+          # ========================================================
+          # CSV
+          # ========================================================
           assert len(df) == 1, (
               "Macro Context CSV must contain exactly one row."
           )
@@ -602,20 +681,24 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # Display result
-          # --------------------------------------------------------
+          # ========================================================
+          # FINAL OUTPUT
+          # ========================================================
           print("")
           print("============================================================")
           print("MACRO CONTEXT VALIDATION PASSED")
           print("============================================================")
 
-          print("Context date:",
-                data.get("context_date"))
+          print(
+              "Context date:",
+              data.get("context_date")
+          )
 
           print(
               "Economic regime:",
-              data["economic"].get("economic_regime")
+              data["economic"].get(
+                  "economic_regime"
+              )
           )
 
           print(
@@ -650,19 +733,26 @@ jobs:
 
           print(
               "Event / News latest topic:",
-              data["event_news"].get("latest_topic")
+              data["event_news"].get(
+                  "latest_topic"
+              )
           )
 
           print(
               "Event / News latest source:",
-              data["event_news"].get("latest_source")
+              data["event_news"].get(
+                  "latest_source"
+              )
           )
 
           print(
               "Event / News events available:",
-              data["event_news"].get("events_available")
+              data["event_news"].get(
+                  "events_available"
+              )
           )
 
+          print("")
           print("Research-only: TRUE")
           print("Decision Engine: FALSE")
           print("Trade signal: NONE")
