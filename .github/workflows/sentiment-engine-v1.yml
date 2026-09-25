@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   sentiment-engine:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -37,7 +38,7 @@ jobs:
           pip install pandas numpy
 
       # ============================================================
-      # 3. LOCATE SENTIMENT ENGINE SOURCE
+      # 3. LOCATE EXISTING SENTIMENT ENGINE
       # ============================================================
 
       - name: Locate Sentiment Engine source
@@ -48,17 +49,6 @@ jobs:
           echo "============================================================"
           echo "LOCATING SENTIMENT ENGINE V1 SOURCE"
           echo "============================================================"
-
-          echo
-          echo "Repository Python files:"
-          find . \
-            -type f \
-            -name "*.py" \
-            -not -path "./.git/*" \
-            | sort
-
-          echo
-          echo "Searching for sentiment-engine-v1.py..."
 
           SOURCE=""
 
@@ -76,10 +66,10 @@ jobs:
           )
 
           if [[ -z "$SOURCE" ]]; then
+            echo "ERROR: sentiment-engine-v1.py not found."
+
             echo
-            echo "ERROR: sentiment-engine-v1.py was not found."
-            echo
-            echo "Possible sentiment files:"
+            echo "Available sentiment Python files:"
             find . \
               -type f \
               \( \
@@ -93,18 +83,17 @@ jobs:
             exit 1
           fi
 
-          echo
           echo "Found:"
           echo "$SOURCE"
 
           cp "$SOURCE" sentiment_engine_runner.py
 
           echo
-          echo "Runner:"
+          echo "Runner created:"
           ls -lh sentiment_engine_runner.py
 
       # ============================================================
-      # 4. DISCOVER AVAILABLE GITHUB ARTIFACTS
+      # 4. DISCOVER GITHUB ACTIONS ARTIFACTS
       # ============================================================
 
       - name: Discover GitHub Actions artifacts
@@ -116,7 +105,7 @@ jobs:
           set -euo pipefail
 
           echo "============================================================"
-          echo "DISCOVERING ARTIFACTS"
+          echo "DISCOVERING GITHUB ACTIONS ARTIFACTS"
           echo "============================================================"
 
           gh api \
@@ -149,10 +138,10 @@ jobs:
           PY
 
       # ============================================================
-      # 5. SELECT LATEST COT / AAII / VIX ARTIFACTS
+      # 5. SELECT SOURCE ARTIFACTS
       # ============================================================
 
-      - name: Select source artifacts
+      - name: Select COT AAII VIX artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -179,37 +168,38 @@ jobs:
               reverse=True,
           )
 
-          def select(patterns, label):
-              for artifact in artifacts:
-                  name = artifact.get("name", "")
+          def normalize(name):
+              return re.sub(
+                  r"[^a-z0-9]+",
+                  "-",
+                  name.lower(),
+              )
 
-                  normalized = re.sub(
-                      r"[^a-z0-9]+",
-                      "-",
-                      name.lower(),
+          def find_artifact(required_words):
+              for artifact in artifacts:
+
+                  name = normalize(
+                      artifact.get("name", "")
                   )
 
                   if all(
-                      re.search(pattern, normalized)
-                      for pattern in patterns
+                      word in name
+                      for word in required_words
                   ):
                       return artifact
 
               return None
 
-          cot = select(
-              [r"cot", r"position"],
-              "COT",
+          cot = find_artifact(
+              ["cot", "position"]
           )
 
-          aaii = select(
-              [r"aaii", r"sentiment"],
-              "AAII",
+          aaii = find_artifact(
+              ["aaii", "sentiment"]
           )
 
-          vix = select(
-              [r"vix", r"sentiment"],
-              "VIX",
+          vix = find_artifact(
+              ["vix", "sentiment"]
           )
 
           missing = []
@@ -225,12 +215,13 @@ jobs:
 
           if missing:
               print()
-              print("ERROR: Required source artifacts were not found:")
+              print("ERROR: Required artifacts not found:")
+
               for item in missing:
                   print(f"  - {item}")
 
               print()
-              print("Available non-expired artifacts:")
+              print("Available artifacts:")
 
               for artifact in artifacts:
                   print(
@@ -240,7 +231,7 @@ jobs:
 
               sys.exit(1)
 
-          selections = {
+          selected = {
               "cot": cot,
               "aaii": aaii,
               "vix": vix,
@@ -252,24 +243,24 @@ jobs:
               encoding="utf-8",
           ) as f:
               json.dump(
-                  selections,
+                  selected,
                   f,
                   indent=2,
               )
 
           print()
-          print("Selected artifacts:")
+          print("Selected:")
           print(
-              f"COT  : {cot.get('name')} "
-              f"(id={cot.get('id')})"
+              f"COT  : {cot['name']} "
+              f"(id={cot['id']})"
           )
           print(
-              f"AAII : {aaii.get('name')} "
-              f"(id={aaii.get('id')})"
+              f"AAII : {aaii['name']} "
+              f"(id={aaii['id']})"
           )
           print(
-              f"VIX  : {vix.get('name')} "
-              f"(id={vix.get('id')})"
+              f"VIX  : {vix['name']} "
+              f"(id={vix['id']})"
           )
           PY
 
@@ -301,7 +292,6 @@ jobs:
           echo "Downloading COT artifact ID: $COT_ID"
 
           gh api \
-            -L \
             -H "Accept: application/vnd.github+json" \
             "/repos/${REPO}/actions/artifacts/${COT_ID}/zip" \
             > cot_artifact.zip
@@ -310,8 +300,11 @@ jobs:
             -d inputs/cot
 
           echo
-          echo "COT files:"
-          find inputs/cot -type f -print
+          echo "COT artifact contents:"
+          find inputs/cot \
+            -type f \
+            -print \
+            | sort
 
       # ============================================================
       # 7. DOWNLOAD AAII ARTIFACT
@@ -341,7 +334,6 @@ jobs:
           echo "Downloading AAII artifact ID: $AAII_ID"
 
           gh api \
-            -L \
             -H "Accept: application/vnd.github+json" \
             "/repos/${REPO}/actions/artifacts/${AAII_ID}/zip" \
             > aaii_artifact.zip
@@ -350,8 +342,11 @@ jobs:
             -d inputs/aaii
 
           echo
-          echo "AAII files:"
-          find inputs/aaii -type f -print
+          echo "AAII artifact contents:"
+          find inputs/aaii \
+            -type f \
+            -print \
+            | sort
 
       # ============================================================
       # 8. DOWNLOAD VIX ARTIFACT
@@ -381,7 +376,6 @@ jobs:
           echo "Downloading VIX artifact ID: $VIX_ID"
 
           gh api \
-            -L \
             -H "Accept: application/vnd.github+json" \
             "/repos/${REPO}/actions/artifacts/${VIX_ID}/zip" \
             > vix_artifact.zip
@@ -390,14 +384,17 @@ jobs:
             -d inputs/vix
 
           echo
-          echo "VIX files:"
-          find inputs/vix -type f -print
+          echo "VIX artifact contents:"
+          find inputs/vix \
+            -type f \
+            -print \
+            | sort
 
       # ============================================================
-      # 9. INSTALL INPUT FILES WITH EXACT NAMES EXPECTED BY SCRIPT
+      # 9. PREPARE EXACT INPUT FILES
       # ============================================================
 
-      - name: Prepare exact Sentiment Engine inputs
+      - name: Prepare Sentiment Engine input files
         shell: bash
         run: |
           set -euo pipefail
@@ -411,9 +408,6 @@ jobs:
             -name "*.csv" \
             -print \
             | sort
-
-          echo
-          echo "Searching required files..."
 
           find_one() {
             local root="$1"
@@ -445,47 +439,17 @@ jobs:
           )"
 
           if [[ -z "$COT_FILE" ]]; then
-            echo
-            echo "ERROR: cot_positioning_research_v1.csv not found."
-
-            echo
-            echo "COT CSV files:"
-            find inputs/cot \
-              -type f \
-              -name "*.csv" \
-              -print \
-              | sort
-
+            echo "ERROR: COT input file not found."
             exit 1
           fi
 
           if [[ -z "$AAII_FILE" ]]; then
-            echo
-            echo "ERROR: aaii_sentiment_research_v1.csv not found."
-
-            echo
-            echo "AAII CSV files:"
-            find inputs/aaii \
-              -type f \
-              -name "*.csv" \
-              -print \
-              | sort
-
+            echo "ERROR: AAII input file not found."
             exit 1
           fi
 
           if [[ -z "$VIX_FILE" ]]; then
-            echo
-            echo "ERROR: vix_sentiment_research_v1.csv not found."
-
-            echo
-            echo "VIX CSV files:"
-            find inputs/vix \
-              -type f \
-              -name "*.csv" \
-              -print \
-              | sort
-
+            echo "ERROR: VIX input file not found."
             exit 1
           fi
 
@@ -499,7 +463,7 @@ jobs:
             vix_sentiment_research_v1.csv
 
           echo
-          echo "Prepared inputs:"
+          echo "Prepared files:"
           ls -lh \
             cot_positioning_research_v1.csv \
             aaii_sentiment_research_v1.csv \
@@ -509,7 +473,7 @@ jobs:
       # 10. VALIDATE INPUT SCHEMAS
       # ============================================================
 
-      - name: Validate Sentiment Engine input schemas
+      - name: Validate input schemas
         shell: bash
         run: |
           set -euo pipefail
@@ -557,13 +521,13 @@ jobs:
           for name, (path, required) in files.items():
 
               print()
-              print(f"Validating {name}: {path}")
+              print(f"Validating {name}")
 
               df = pd.read_csv(path)
 
               if df.empty:
                   raise SystemExit(
-                      f"{name}: input is empty."
+                      f"{name}: zero rows."
                   )
 
               missing = [
@@ -581,19 +545,15 @@ jobs:
                   f"{name}: {len(df):,} rows"
               )
 
-              print(
-                  f"{name}: columns OK"
-              )
-
           print()
           print("INPUT SCHEMA VALIDATION: PASS")
           PY
 
       # ============================================================
-      # 11. NORMALIZE BOOLEAN PIT FLAGS
+      # 11. NORMALIZE BOOLEAN FLAGS
       # ============================================================
 
-      - name: Normalize input boolean flags
+      - name: Normalize PIT boolean flags
         shell: bash
         run: |
           set -euo pipefail
@@ -603,39 +563,34 @@ jobs:
           import pandas as pd
 
           files = [
-              Path("cot_positioning_research_v1.csv"),
-              Path("aaii_sentiment_research_v1.csv"),
-              Path("vix_sentiment_research_v1.csv"),
+              Path(
+                  "cot_positioning_research_v1.csv"
+              ),
+              Path(
+                  "aaii_sentiment_research_v1.csv"
+              ),
+              Path(
+                  "vix_sentiment_research_v1.csv"
+              ),
           ]
 
           def normalize_bool(value):
+
               if pd.isna(value):
                   return False
 
               if isinstance(value, bool):
                   return value
 
-              text = str(value).strip().lower()
+              value = str(value).strip().lower()
 
-              if text in {
+              return value in {
                   "true",
                   "1",
                   "yes",
                   "y",
                   "t",
-              }:
-                  return True
-
-              if text in {
-                  "false",
-                  "0",
-                  "no",
-                  "n",
-                  "f",
-              }:
-                  return False
-
-              return False
+              }
 
           for path in files:
 
@@ -646,6 +601,7 @@ jobs:
                   "research_only",
                   "decision_engine_ready",
               ]:
+
                   if column in df.columns:
                       df[column] = df[column].map(
                           normalize_bool
@@ -662,7 +618,7 @@ jobs:
           PY
 
       # ============================================================
-      # 12. HARD PIT VALIDATION BEFORE ENGINE
+      # 12. HARD PIT VALIDATION
       # ============================================================
 
       - name: Validate point-in-time safety
@@ -707,15 +663,16 @@ jobs:
                   availability > observation
               ).all():
                   raise SystemExit(
-                      f"{path}: availability_date "
-                      f"must be after observation_date."
+                      f"{path}: "
+                      "availability_date must be "
+                      "after observation_date."
                   )
 
               if not df[
                   "point_in_time_safe"
               ].all():
                   raise SystemExit(
-                      f"{path}: point_in_time_safe violation."
+                      f"{path}: PIT violation."
                   )
 
               if not df[
@@ -729,7 +686,8 @@ jobs:
                   "decision_engine_ready"
               ].any():
                   raise SystemExit(
-                      f"{path}: Decision Engine flag detected."
+                      f"{path}: "
+                      "Decision Engine flag detected."
                   )
 
           print()
@@ -739,7 +697,7 @@ jobs:
           PY
 
       # ============================================================
-      # 13. RUN SENTIMENT ENGINE
+      # 13. RUN EXISTING SENTIMENT ENGINE
       # ============================================================
 
       - name: Run Sentiment Engine v1
@@ -763,7 +721,7 @@ jobs:
           set -euo pipefail
 
           echo "============================================================"
-          echo "VERIFYING OUTPUTS"
+          echo "VERIFYING OUTPUT FILES"
           echo "============================================================"
 
           required_outputs=(
@@ -780,7 +738,8 @@ jobs:
               echo "$file"
 
               echo
-              echo "CSV files currently present:"
+              echo "Available CSV files:"
+
               find . \
                 -type f \
                 -name "*.csv" \
@@ -790,17 +749,16 @@ jobs:
               exit 1
             fi
 
-            echo
             echo "FOUND: $file"
             ls -lh "$file"
 
           done
 
           echo
-          echo "OUTPUT FILE VALIDATION: PASS"
+          echo "OUTPUT VALIDATION: PASS"
 
       # ============================================================
-      # 15. VALIDATE FINAL SENTIMENT OUTPUT
+      # 15. FINAL OUTPUT VALIDATION
       # ============================================================
 
       - name: Validate final Sentiment Engine dataset
@@ -811,7 +769,9 @@ jobs:
           python - <<'PY'
           import pandas as pd
 
-          path = "sentiment_engine_research_v1.csv"
+          path = (
+              "sentiment_engine_research_v1.csv"
+          )
 
           df = pd.read_csv(path)
 
@@ -841,21 +801,21 @@ jobs:
 
           if df.empty:
               raise SystemExit(
-                  "Sentiment output is empty."
+                  "Output is empty."
               )
 
           if not df[
               "point_in_time_safe"
           ].all():
               raise SystemExit(
-                  "Output contains non-PIT-safe rows."
+                  "Non-PIT-safe output detected."
               )
 
           if not df[
               "research_only"
           ].all():
               raise SystemExit(
-                  "Output contains non-research rows."
+                  "Non-research output detected."
               )
 
           if df[
@@ -890,10 +850,10 @@ jobs:
               (scores > 100)
           ).any():
               raise SystemExit(
-                  "Unified sentiment score outside 0-100."
+                  "Score outside 0-100."
               )
 
-          allowed = {
+          allowed_regimes = {
               "EXTREME_BULLISH",
               "BULLISH",
               "NEUTRAL",
@@ -902,22 +862,28 @@ jobs:
               "INSUFFICIENT_DATA",
           }
 
-          actual = set(
+          actual_regimes = set(
               df["research_regime"]
               .dropna()
               .unique()
           )
 
-          unexpected = actual - allowed
+          unexpected = (
+              actual_regimes
+              -
+              allowed_regimes
+          )
 
           if unexpected:
               raise SystemExit(
                   f"Unexpected regimes: {unexpected}"
               )
 
+          latest = df.iloc[-1]
+
           print()
           print("============================================================")
-          print("SENTIMENT ENGINE FINAL VALIDATION")
+          print("SENTIMENT ENGINE V1 — FINAL RESULT")
           print("============================================================")
 
           print(
@@ -931,34 +897,39 @@ jobs:
               f"{df['asof_date'].max()}"
           )
 
-          latest = df.iloc[-1]
-
           print()
           print("Latest state:")
+
           print(
-              f"  asof_date: "
+              f"  As-of date: "
               f"{latest['asof_date']}"
           )
+
           print(
               f"  COT score: "
               f"{latest.get('cot_sentiment_score')}"
           )
+
           print(
               f"  AAII score: "
               f"{latest.get('aaii_sentiment_score')}"
           )
+
           print(
               f"  VIX score: "
               f"{latest.get('vix_sentiment_score')}"
           )
+
           print(
               f"  Components: "
               f"{latest['available_component_count']}"
           )
+
           print(
               f"  Unified score: "
               f"{latest['unified_sentiment_score']}"
           )
+
           print(
               f"  Research regime: "
               f"{latest['research_regime']}"
@@ -988,19 +959,22 @@ jobs:
           echo "SENTIMENT ENGINE SUMMARY"
           echo "============================================================"
 
-          cat sentiment_engine_research_summary_v1.csv
+          cat \
+            sentiment_engine_research_summary_v1.csv
 
           echo
           echo "============================================================"
-          echo "EXTREME SENTIMENT ROWS"
+          echo "EXTREME SENTIMENT"
           echo "============================================================"
 
           python - <<'PY'
           import pandas as pd
 
-          df = pd.read_csv(
+          path = (
               "sentiment_engine_extremes_v1.csv"
           )
+
+          df = pd.read_csv(path)
 
           print(
               f"Extreme rows: {len(df):,}"
@@ -1016,7 +990,7 @@ jobs:
           PY
 
       # ============================================================
-      # 17. UPLOAD ARTIFACT
+      # 17. UPLOAD FINAL ARTIFACT
       # ============================================================
 
       - name: Upload Sentiment Engine v1 artifact
