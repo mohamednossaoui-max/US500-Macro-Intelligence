@@ -1,4 +1,4 @@
-name: Research Context v1
+name: Sentiment Engine v1
 
 on:
   workflow_dispatch:
@@ -8,868 +8,1024 @@ permissions:
   actions: read
 
 jobs:
-  research-context:
-    name: Build Unified Research Context v1
+  sentiment-engine:
     runs-on: ubuntu-latest
 
     steps:
 
-      # ====================================================
-      # Checkout
-      # ====================================================
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
 
-      # ====================================================
-      # Python
-      # ====================================================
-      - name: Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-
-      # ====================================================
-      # Dependencies
-      # ====================================================
       - name: Install dependencies
         run: |
-          set -e
+          set -euo pipefail
 
           python -m pip install --upgrade pip
           pip install pandas numpy
 
+      # ============================================================
+      # 3. LOCATE SENTIMENT ENGINE SOURCE
+      # ============================================================
 
-      # ====================================================
-      # Verify Research Context source
-      # ====================================================
-      - name: Verify Research Context source
+      - name: Locate Sentiment Engine source
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          if [ ! -f "research-context-v1.py" ]; then
-            echo "ERROR: research-context-v1.py not found."
-            exit 1
-          fi
+          echo "============================================================"
+          echo "LOCATING SENTIMENT ENGINE V1 SOURCE"
+          echo "============================================================"
 
-          echo "Research Context source found."
-
-
-      # ====================================================
-      # Find latest Macro Context artifact
-      # ====================================================
-      - name: Find latest Macro Context artifact
-        id: macro
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-
-          ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '
-              .artifacts
-              | map(
-                  select(
-                    .name == "macro-context-v1"
-                    and .expired == false
-                  )
-                )
-              | sort_by(.created_at)
-              | last
-              | .id
-            ')
-
-          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
-            echo "ERROR: macro-context-v1 artifact not found."
-            exit 1
-          fi
-
-          echo "Macro artifact ID: $ARTIFACT_ID"
-          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
-
-
-      # ====================================================
-      # Download Macro Context
-      # ====================================================
-      - name: Download Macro Context artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-
-          mkdir -p input/macro
-
-          gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.macro.outputs.artifact_id }}/zip" \
-            > /tmp/macro.zip
-
-          unzip -o /tmp/macro.zip -d input/macro
-
-          echo "Macro files:"
-          find input/macro -maxdepth 3 -type f -print
-
-
-      # ====================================================
-      # Locate Macro Context CSV
-      # ====================================================
-      - name: Locate Macro Context CSV
-        run: |
-          set -e
-
-          MACRO_FILE=$(find input/macro \
+          echo
+          echo "Repository Python files:"
+          find . \
             -type f \
-            -name "*.csv" \
-            | head -n 1)
+            -name "*.py" \
+            -not -path "./.git/*" \
+            | sort
 
-          if [ -z "$MACRO_FILE" ]; then
-            echo "ERROR: No CSV found in Macro Context artifact."
-            exit 1
-          fi
+          echo
+          echo "Searching for sentiment-engine-v1.py..."
 
-          echo "Macro CSV: $MACRO_FILE"
-          echo "MACRO_FILE=$MACRO_FILE" >> "$GITHUB_ENV"
+          SOURCE=""
 
-
-      # ====================================================
-      # Determine Research Context cutoff
-      # ====================================================
-      #
-      # The cutoff is derived from the latest Macro Context date.
-      #
-      # IMPORTANT:
-      # Other source layers are allowed to contain newer rows.
-      # Those rows are NOT automatically used. The Python layer
-      # applies the explicit as-of cutoff and performs PIT merges.
-      #
-      # Therefore:
-      #
-      # Macro       -> 2026-09-20
-      # Sentiment   -> 2026-09-22
-      #
-      # is VALID.
-      #
-      # Sentiment data after 2026-09-20 simply cannot enter the
-      # final Research Context because the Python layer filters
-      # context dates to the cutoff.
-      # ====================================================
-      - name: Determine Research Context cutoff
-        run: |
-          set -e
-
-          python - <<'PY'
-          import os
-          import pandas as pd
-
-          macro_file = os.environ["MACRO_FILE"]
-
-          df = pd.read_csv(macro_file)
-
-          if df.empty:
-              raise SystemExit(
-                  "ERROR: Macro Context dataset is empty."
-              )
-
-          date_candidates = [
-              "context_date",
-              "asof_date",
-              "date",
-          ]
-
-          date_column = None
-
-          for column in date_candidates:
-              if column in df.columns:
-                  date_column = column
-                  break
-
-          if date_column is None:
-              raise SystemExit(
-                  "ERROR: Macro Context date column not found. "
-                  f"Available columns: {list(df.columns)}"
-              )
-
-          dates = pd.to_datetime(
-              df[date_column],
-              errors="coerce",
+          while IFS= read -r candidate; do
+            if [[ "$(basename "$candidate")" == "sentiment-engine-v1.py" ]]; then
+              SOURCE="$candidate"
+              break
+            fi
+          done < <(
+            find . \
+              -type f \
+              -name "*.py" \
+              -not -path "./.git/*" \
+              | sort
           )
 
-          if dates.isna().any():
-              raise SystemExit(
-                  "ERROR: Macro Context contains invalid dates."
-              )
+          if [[ -z "$SOURCE" ]]; then
+            echo
+            echo "ERROR: sentiment-engine-v1.py was not found."
+            echo
+            echo "Possible sentiment files:"
+            find . \
+              -type f \
+              \( \
+                -iname "*sentiment*.py" \
+                -o \
+                -iname "*sentiment*engine*.py" \
+              \) \
+              -not -path "./.git/*" \
+              | sort || true
 
-          latest_date = dates.max()
-
-          cutoff = latest_date.strftime("%Y-%m-%d")
-
-          print("=" * 70)
-          print("RESEARCH CONTEXT CUTOFF")
-          print("=" * 70)
-          print("Macro date column:", date_column)
-          print("Latest Macro Context date:", cutoff)
-          print()
-          print("Source layers may contain newer rows.")
-          print("They will be constrained by the Research Context")
-          print("as-of cutoff and PIT merge logic.")
-          print("=" * 70)
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(
-                  f"RESEARCH_CONTEXT_AS_OF_DATE={cutoff}\n"
-              )
-
-          PY
-
-
-      # ====================================================
-      # Find latest Sentiment Engine artifact
-      # ====================================================
-      - name: Find latest Sentiment Engine artifact
-        id: sentiment
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-
-          ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '
-              .artifacts
-              | map(
-                  select(
-                    .name == "sentiment-engine-v1"
-                    and .expired == false
-                  )
-                )
-              | sort_by(.created_at)
-              | last
-              | .id
-            ')
-
-          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
-            echo "ERROR: sentiment-engine-v1 artifact not found."
             exit 1
           fi
 
-          echo "Sentiment artifact ID: $ARTIFACT_ID"
-          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+          echo
+          echo "Found:"
+          echo "$SOURCE"
 
+          cp "$SOURCE" sentiment_engine_runner.py
 
-      # ====================================================
-      # Download Sentiment Engine
-      # ====================================================
-      - name: Download Sentiment Engine artifact
+          echo
+          echo "Runner:"
+          ls -lh sentiment_engine_runner.py
+
+      # ============================================================
+      # 4. DISCOVER AVAILABLE GITHUB ARTIFACTS
+      # ============================================================
+
+      - name: Discover GitHub Actions artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          mkdir -p input/sentiment
+          echo "============================================================"
+          echo "DISCOVERING ARTIFACTS"
+          echo "============================================================"
 
           gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.sentiment.outputs.artifact_id }}/zip" \
-            > /tmp/sentiment.zip
-
-          unzip -o /tmp/sentiment.zip -d input/sentiment
-
-          echo "Sentiment files:"
-          find input/sentiment -maxdepth 3 -type f -print
-
-
-      # ====================================================
-      # Locate Sentiment CSV
-      # ====================================================
-      - name: Locate Sentiment Engine CSV
-        run: |
-          set -e
-
-          SENTIMENT_FILE=$(find input/sentiment \
-            -type f \
-            -name "sentiment_engine_research_v1.csv" \
-            | head -n 1)
-
-          if [ -z "$SENTIMENT_FILE" ]; then
-            echo "ERROR: sentiment_engine_research_v1.csv not found."
-            exit 1
-          fi
-
-          echo "Sentiment CSV: $SENTIMENT_FILE"
-          echo "SENTIMENT_FILE=$SENTIMENT_FILE" >> "$GITHUB_ENV"
-
-
-      # ====================================================
-      # Find latest Technical Intelligence artifact
-      # ====================================================
-      - name: Find latest Technical Intelligence artifact
-        id: technical
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-
-          ARTIFACT_ID=$(gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '
-              .artifacts
-              | map(
-                  select(
-                    .name == "technical-intelligence-v1"
-                    and .expired == false
-                  )
-                )
-              | sort_by(.created_at)
-              | last
-              | .id
-            ')
-
-          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
-            echo "ERROR: technical-intelligence-v1 artifact not found."
-            exit 1
-          fi
-
-          echo "Technical artifact ID: $ARTIFACT_ID"
-          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
-
-
-      # ====================================================
-      # Download Technical Intelligence
-      # ====================================================
-      - name: Download Technical Intelligence artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-
-          mkdir -p input/technical
-
-          gh api \
-            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${{ steps.technical.outputs.artifact_id }}/zip" \
-            > /tmp/technical.zip
-
-          unzip -o /tmp/technical.zip -d input/technical
-
-          echo "Technical files:"
-          find input/technical -maxdepth 3 -type f -print
-
-
-      # ====================================================
-      # Locate Technical Intelligence CSV
-      # ====================================================
-      - name: Locate Technical Intelligence CSV
-        run: |
-          set -e
-
-          TECHNICAL_FILE=$(find input/technical \
-            -type f \
-            -name "technical_intelligence_research_v1.csv" \
-            | head -n 1)
-
-          if [ -z "$TECHNICAL_FILE" ]; then
-            echo "ERROR: technical_intelligence_research_v1.csv not found."
-            exit 1
-          fi
-
-          echo "Technical CSV: $TECHNICAL_FILE"
-          echo "TECHNICAL_FILE=$TECHNICAL_FILE" >> "$GITHUB_ENV"
-
-
-      # ====================================================
-      # Validate source datasets
-      # ====================================================
-      #
-      # IMPORTANT:
-      # We validate that each source is non-empty and has valid
-      # dates.
-      #
-      # We DO NOT reject rows that are newer than the Macro
-      # Context cutoff.
-      #
-      # Future rows are expected because individual research
-      # layers can update at different times.
-      #
-      # The actual anti-lookahead control happens inside
-      # research-context-v1.py.
-      # ====================================================
-      - name: Validate source datasets
-        env:
-          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
-        run: |
-          set -e
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/actions/artifacts?per_page=100" \
+            > artifacts.json
 
           python - <<'PY'
-          import os
+          import json
+
+          with open("artifacts.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          artifacts = data.get("artifacts", [])
+
+          print(f"Artifacts discovered: {len(artifacts)}")
+          print()
+
+          for artifact in sorted(
+              artifacts,
+              key=lambda x: x.get("created_at", ""),
+              reverse=True,
+          ):
+              print(
+                  f"{artifact.get('name')} | "
+                  f"id={artifact.get('id')} | "
+                  f"created={artifact.get('created_at')} | "
+                  f"expired={artifact.get('expired')}"
+              )
+          PY
+
+      # ============================================================
+      # 5. SELECT LATEST COT / AAII / VIX ARTIFACTS
+      # ============================================================
+
+      - name: Select source artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "SELECTING SOURCE ARTIFACTS"
+          echo "============================================================"
+
+          python - <<'PY'
+          import json
+          import re
+          import sys
+
+          with open("artifacts.json", "r", encoding="utf-8") as f:
+              artifacts = json.load(f).get("artifacts", [])
+
+          artifacts = [
+              a for a in artifacts
+              if not a.get("expired", False)
+          ]
+
+          artifacts.sort(
+              key=lambda x: x.get("created_at", ""),
+              reverse=True,
+          )
+
+          def select(patterns, label):
+              for artifact in artifacts:
+                  name = artifact.get("name", "")
+
+                  normalized = re.sub(
+                      r"[^a-z0-9]+",
+                      "-",
+                      name.lower(),
+                  )
+
+                  if all(
+                      re.search(pattern, normalized)
+                      for pattern in patterns
+                  ):
+                      return artifact
+
+              return None
+
+          cot = select(
+              [r"cot", r"position"],
+              "COT",
+          )
+
+          aaii = select(
+              [r"aaii", r"sentiment"],
+              "AAII",
+          )
+
+          vix = select(
+              [r"vix", r"sentiment"],
+              "VIX",
+          )
+
+          missing = []
+
+          if cot is None:
+              missing.append("COT Positioning")
+
+          if aaii is None:
+              missing.append("AAII Sentiment")
+
+          if vix is None:
+              missing.append("VIX Sentiment")
+
+          if missing:
+              print()
+              print("ERROR: Required source artifacts were not found:")
+              for item in missing:
+                  print(f"  - {item}")
+
+              print()
+              print("Available non-expired artifacts:")
+
+              for artifact in artifacts:
+                  print(
+                      f"  - {artifact.get('name')} "
+                      f"(id={artifact.get('id')})"
+                  )
+
+              sys.exit(1)
+
+          selections = {
+              "cot": cot,
+              "aaii": aaii,
+              "vix": vix,
+          }
+
+          with open(
+              "selected_artifacts.json",
+              "w",
+              encoding="utf-8",
+          ) as f:
+              json.dump(
+                  selections,
+                  f,
+                  indent=2,
+              )
+
+          print()
+          print("Selected artifacts:")
+          print(
+              f"COT  : {cot.get('name')} "
+              f"(id={cot.get('id')})"
+          )
+          print(
+              f"AAII : {aaii.get('name')} "
+              f"(id={aaii.get('id')})"
+          )
+          print(
+              f"VIX  : {vix.get('name')} "
+              f"(id={vix.get('id')})"
+          )
+          PY
+
+      # ============================================================
+      # 6. DOWNLOAD COT ARTIFACT
+      # ============================================================
+
+      - name: Download COT artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p inputs/cot
+
+          COT_ID="$(
+            python - <<'PY'
+          import json
+
+          with open("selected_artifacts.json", "r") as f:
+              data = json.load(f)
+
+          print(data["cot"]["id"])
+          PY
+          )"
+
+          echo "Downloading COT artifact ID: $COT_ID"
+
+          gh api \
+            -L \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/actions/artifacts/${COT_ID}/zip" \
+            > cot_artifact.zip
+
+          unzip -o cot_artifact.zip \
+            -d inputs/cot
+
+          echo
+          echo "COT files:"
+          find inputs/cot -type f -print
+
+      # ============================================================
+      # 7. DOWNLOAD AAII ARTIFACT
+      # ============================================================
+
+      - name: Download AAII artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p inputs/aaii
+
+          AAII_ID="$(
+            python - <<'PY'
+          import json
+
+          with open("selected_artifacts.json", "r") as f:
+              data = json.load(f)
+
+          print(data["aaii"]["id"])
+          PY
+          )"
+
+          echo "Downloading AAII artifact ID: $AAII_ID"
+
+          gh api \
+            -L \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/actions/artifacts/${AAII_ID}/zip" \
+            > aaii_artifact.zip
+
+          unzip -o aaii_artifact.zip \
+            -d inputs/aaii
+
+          echo
+          echo "AAII files:"
+          find inputs/aaii -type f -print
+
+      # ============================================================
+      # 8. DOWNLOAD VIX ARTIFACT
+      # ============================================================
+
+      - name: Download VIX artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p inputs/vix
+
+          VIX_ID="$(
+            python - <<'PY'
+          import json
+
+          with open("selected_artifacts.json", "r") as f:
+              data = json.load(f)
+
+          print(data["vix"]["id"])
+          PY
+          )"
+
+          echo "Downloading VIX artifact ID: $VIX_ID"
+
+          gh api \
+            -L \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/actions/artifacts/${VIX_ID}/zip" \
+            > vix_artifact.zip
+
+          unzip -o vix_artifact.zip \
+            -d inputs/vix
+
+          echo
+          echo "VIX files:"
+          find inputs/vix -type f -print
+
+      # ============================================================
+      # 9. INSTALL INPUT FILES WITH EXACT NAMES EXPECTED BY SCRIPT
+      # ============================================================
+
+      - name: Prepare exact Sentiment Engine inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "PREPARING SENTIMENT ENGINE INPUTS"
+          echo "============================================================"
+
+          find inputs \
+            -type f \
+            -name "*.csv" \
+            -print \
+            | sort
+
+          echo
+          echo "Searching required files..."
+
+          find_one() {
+            local root="$1"
+            local filename="$2"
+
+            find "$root" \
+              -type f \
+              -name "$filename" \
+              -print \
+              -quit
+          }
+
+          COT_FILE="$(
+            find_one \
+              "inputs/cot" \
+              "cot_positioning_research_v1.csv"
+          )"
+
+          AAII_FILE="$(
+            find_one \
+              "inputs/aaii" \
+              "aaii_sentiment_research_v1.csv"
+          )"
+
+          VIX_FILE="$(
+            find_one \
+              "inputs/vix" \
+              "vix_sentiment_research_v1.csv"
+          )"
+
+          if [[ -z "$COT_FILE" ]]; then
+            echo
+            echo "ERROR: cot_positioning_research_v1.csv not found."
+
+            echo
+            echo "COT CSV files:"
+            find inputs/cot \
+              -type f \
+              -name "*.csv" \
+              -print \
+              | sort
+
+            exit 1
+          fi
+
+          if [[ -z "$AAII_FILE" ]]; then
+            echo
+            echo "ERROR: aaii_sentiment_research_v1.csv not found."
+
+            echo
+            echo "AAII CSV files:"
+            find inputs/aaii \
+              -type f \
+              -name "*.csv" \
+              -print \
+              | sort
+
+            exit 1
+          fi
+
+          if [[ -z "$VIX_FILE" ]]; then
+            echo
+            echo "ERROR: vix_sentiment_research_v1.csv not found."
+
+            echo
+            echo "VIX CSV files:"
+            find inputs/vix \
+              -type f \
+              -name "*.csv" \
+              -print \
+              | sort
+
+            exit 1
+          fi
+
+          cp "$COT_FILE" \
+            cot_positioning_research_v1.csv
+
+          cp "$AAII_FILE" \
+            aaii_sentiment_research_v1.csv
+
+          cp "$VIX_FILE" \
+            vix_sentiment_research_v1.csv
+
+          echo
+          echo "Prepared inputs:"
+          ls -lh \
+            cot_positioning_research_v1.csv \
+            aaii_sentiment_research_v1.csv \
+            vix_sentiment_research_v1.csv
+
+      # ============================================================
+      # 10. VALIDATE INPUT SCHEMAS
+      # ============================================================
+
+      - name: Validate Sentiment Engine input schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
           import pandas as pd
 
           files = {
-              "Macro Context": os.environ["MACRO_FILE"],
-              "Sentiment Engine": os.environ["SENTIMENT_FILE"],
-              "Technical Intelligence": os.environ["TECHNICAL_FILE"],
+              "COT": (
+                  "cot_positioning_research_v1.csv",
+                  [
+                      "observation_date",
+                      "availability_date",
+                      "point_in_time_safe",
+                      "research_only",
+                      "decision_engine_ready",
+                      "asset_manager_net_percentile",
+                      "leveraged_money_net_percentile",
+                  ],
+              ),
+              "AAII": (
+                  "aaii_sentiment_research_v1.csv",
+                  [
+                      "observation_date",
+                      "availability_date",
+                      "point_in_time_safe",
+                      "research_only",
+                      "decision_engine_ready",
+                      "bull_bear_spread_percentile",
+                  ],
+              ),
+              "VIX": (
+                  "vix_sentiment_research_v1.csv",
+                  [
+                      "observation_date",
+                      "availability_date",
+                      "point_in_time_safe",
+                      "research_only",
+                      "decision_engine_ready",
+                      "VIX_percentile",
+                  ],
+              ),
           }
 
-          cutoff = pd.Timestamp(
-              os.environ["RESEARCH_CONTEXT_AS_OF_DATE"]
-          )
+          for name, (path, required) in files.items():
 
-          print("=" * 70)
-          print("SOURCE DATASET VALIDATION")
-          print("=" * 70)
-          print("Research Context cutoff:", cutoff.date())
-          print()
-
-          candidates = [
-              "context_date",
-              "asof_date",
-              "observation_date",
-              "date",
-              "event_date",
-              "session_date",
-          ]
-
-          for name, path in files.items():
+              print()
+              print(f"Validating {name}: {path}")
 
               df = pd.read_csv(path)
 
               if df.empty:
                   raise SystemExit(
-                      f"ERROR: {name} dataset is empty."
+                      f"{name}: input is empty."
                   )
 
-              date_column = None
+              missing = [
+                  col
+                  for col in required
+                  if col not in df.columns
+              ]
 
-              for column in candidates:
-                  if column in df.columns:
-                      date_column = column
-                      break
-
-              if date_column is None:
+              if missing:
                   raise SystemExit(
-                      f"ERROR: No recognized date column for {name}. "
-                      f"Columns: {list(df.columns)}"
+                      f"{name}: missing columns: {missing}"
                   )
 
-              dates = pd.to_datetime(
-                  df[date_column],
-                  errors="coerce",
-              )
-
-              if dates.isna().any():
-                  raise SystemExit(
-                      f"ERROR: Invalid dates detected in {name}."
-                  )
-
-              latest = dates.max()
-              earliest = dates.min()
-
-              future_rows = int(
-                  (dates > cutoff).sum()
+              print(
+                  f"{name}: {len(df):,} rows"
               )
 
               print(
-                  f"{name}: PASS | "
-                  f"date_column={date_column} | "
-                  f"range={earliest.date()} -> {latest.date()} | "
-                  f"rows={len(df):,} | "
-                  f"rows_after_cutoff={future_rows:,}"
+                  f"{name}: columns OK"
               )
 
           print()
-          print("Source datasets are structurally valid.")
-          print("Future source rows are permitted.")
-          print("Final PIT filtering is enforced by research-context-v1.py.")
-          print("=" * 70)
-
+          print("INPUT SCHEMA VALIDATION: PASS")
           PY
 
+      # ============================================================
+      # 11. NORMALIZE BOOLEAN PIT FLAGS
+      # ============================================================
 
-      # ====================================================
-      # Prepare Research Context inputs
-      # ====================================================
-      - name: Prepare Research Context inputs
+      - name: Normalize input boolean flags
+        shell: bash
         run: |
-          set -e
-
-          mkdir -p context_input
-
-          cp "$MACRO_FILE" \
-            context_input/macro_context_v1.csv
-
-          cp "$SENTIMENT_FILE" \
-            context_input/sentiment_engine_research_v1.csv
-
-          cp "$TECHNICAL_FILE" \
-            context_input/technical_intelligence_research_v1.csv
-
-          echo "Prepared files:"
-          ls -lh context_input
-
-
-      # ====================================================
-      # Run Research Context
-      # ====================================================
-      - name: Run Research Context v1
-        env:
-          MACRO_CONTEXT_FILE: context_input/macro_context_v1.csv
-          SENTIMENT_ENGINE_FILE: context_input/sentiment_engine_research_v1.csv
-          TECHNICAL_INTELLIGENCE_FILE: context_input/technical_intelligence_research_v1.csv
-          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
-        run: |
-          set -e
-
-          echo "=============================================="
-          echo "RESEARCH CONTEXT v1"
-          echo "=============================================="
-          echo "Research cutoff:"
-          echo "$RESEARCH_CONTEXT_AS_OF_DATE"
-          echo
-
-          python research-context-v1.py
-
-
-      # ====================================================
-      # Validate output files
-      # ====================================================
-      - name: Validate Research Context outputs
-        run: |
-          set -e
-
-          test -f research_context_v1.csv
-          test -f research_context_summary_v1.csv
-          test -f research_context_extremes_v1.csv
-
-          echo "All Research Context outputs exist."
-
-
-      # ====================================================
-      # Final dataset validation
-      # ====================================================
-      - name: Validate Research Context dataset
-        env:
-          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
-        run: |
-          set -e
+          set -euo pipefail
 
           python - <<'PY'
-
-          import os
+          from pathlib import Path
           import pandas as pd
 
+          files = [
+              Path("cot_positioning_research_v1.csv"),
+              Path("aaii_sentiment_research_v1.csv"),
+              Path("vix_sentiment_research_v1.csv"),
+          ]
 
-          # ==================================================
-          # Load
-          # ==================================================
+          def normalize_bool(value):
+              if pd.isna(value):
+                  return False
 
-          df = pd.read_csv(
-              "research_context_v1.csv"
-          )
+              if isinstance(value, bool):
+                  return value
 
-          if df.empty:
-              raise SystemExit(
-                  "ERROR: Research Context dataset is empty."
+              text = str(value).strip().lower()
+
+              if text in {
+                  "true",
+                  "1",
+                  "yes",
+                  "y",
+                  "t",
+              }:
+                  return True
+
+              if text in {
+                  "false",
+                  "0",
+                  "no",
+                  "n",
+                  "f",
+              }:
+                  return False
+
+              return False
+
+          for path in files:
+
+              df = pd.read_csv(path)
+
+              for column in [
+                  "point_in_time_safe",
+                  "research_only",
+                  "decision_engine_ready",
+              ]:
+                  if column in df.columns:
+                      df[column] = df[column].map(
+                          normalize_bool
+                      )
+
+              df.to_csv(
+                  path,
+                  index=False,
               )
 
+              print(
+                  f"Normalized: {path}"
+              )
+          PY
 
-          # ==================================================
-          # Required columns
-          # ==================================================
+      # ============================================================
+      # 12. HARD PIT VALIDATION BEFORE ENGINE
+      # ============================================================
+
+      - name: Validate point-in-time safety
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import pandas as pd
+
+          files = [
+              "cot_positioning_research_v1.csv",
+              "aaii_sentiment_research_v1.csv",
+              "vix_sentiment_research_v1.csv",
+          ]
+
+          for path in files:
+
+              df = pd.read_csv(path)
+
+              observation = pd.to_datetime(
+                  df["observation_date"],
+                  errors="coerce",
+              )
+
+              availability = pd.to_datetime(
+                  df["availability_date"],
+                  errors="coerce",
+              )
+
+              if observation.isna().any():
+                  raise SystemExit(
+                      f"{path}: invalid observation_date."
+                  )
+
+              if availability.isna().any():
+                  raise SystemExit(
+                      f"{path}: invalid availability_date."
+                  )
+
+              if not (
+                  availability > observation
+              ).all():
+                  raise SystemExit(
+                      f"{path}: availability_date "
+                      f"must be after observation_date."
+                  )
+
+              if not df[
+                  "point_in_time_safe"
+              ].all():
+                  raise SystemExit(
+                      f"{path}: point_in_time_safe violation."
+                  )
+
+              if not df[
+                  "research_only"
+              ].all():
+                  raise SystemExit(
+                      f"{path}: research_only violation."
+                  )
+
+              if df[
+                  "decision_engine_ready"
+              ].any():
+                  raise SystemExit(
+                      f"{path}: Decision Engine flag detected."
+                  )
+
+          print()
+          print("PIT VALIDATION: PASS")
+          print("RESEARCH-ONLY VALIDATION: PASS")
+          print("DECISION ENGINE: DISABLED")
+          PY
+
+      # ============================================================
+      # 13. RUN SENTIMENT ENGINE
+      # ============================================================
+
+      - name: Run Sentiment Engine v1
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "RUNNING SENTIMENT ENGINE V1"
+          echo "============================================================"
+
+          python sentiment_engine_runner.py
+
+      # ============================================================
+      # 14. VERIFY OUTPUT FILES
+      # ============================================================
+
+      - name: Verify Sentiment Engine outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "VERIFYING OUTPUTS"
+          echo "============================================================"
+
+          required_outputs=(
+            "sentiment_engine_research_v1.csv"
+            "sentiment_engine_research_summary_v1.csv"
+            "sentiment_engine_extremes_v1.csv"
+          )
+
+          for file in "${required_outputs[@]}"; do
+
+            if [[ ! -f "$file" ]]; then
+              echo
+              echo "ERROR: Missing output:"
+              echo "$file"
+
+              echo
+              echo "CSV files currently present:"
+              find . \
+                -type f \
+                -name "*.csv" \
+                -not -path "./.git/*" \
+                | sort
+
+              exit 1
+            fi
+
+            echo
+            echo "FOUND: $file"
+            ls -lh "$file"
+
+          done
+
+          echo
+          echo "OUTPUT FILE VALIDATION: PASS"
+
+      # ============================================================
+      # 15. VALIDATE FINAL SENTIMENT OUTPUT
+      # ============================================================
+
+      - name: Validate final Sentiment Engine dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import pandas as pd
+
+          path = "sentiment_engine_research_v1.csv"
+
+          df = pd.read_csv(path)
 
           required = [
-              "context_date",
-              "available_layer_count",
-              "macro_available",
-              "sentiment_available",
-              "technical_available",
+              "asof_date",
+              "unified_sentiment_score",
+              "research_regime",
+              "available_component_count",
               "point_in_time_safe",
               "research_only",
               "decision_engine_ready",
+              "sentiment_score_generated",
               "trading_signal_generated",
               "forecast_generated",
-              "unified_decision_generated",
           ]
 
           missing = [
-              c
-              for c in required
-              if c not in df.columns
+              col
+              for col in required
+              if col not in df.columns
           ]
 
           if missing:
               raise SystemExit(
-                  f"ERROR: Missing columns: {missing}"
+                  f"Missing output columns: {missing}"
               )
 
-
-          # ==================================================
-          # Dates
-          # ==================================================
-
-          dates = pd.to_datetime(
-              df["context_date"],
-              errors="coerce",
-          )
-
-          if dates.isna().any():
+          if df.empty:
               raise SystemExit(
-                  "ERROR: Invalid context_date values."
+                  "Sentiment output is empty."
               )
-
-          if not dates.is_monotonic_increasing:
-              raise SystemExit(
-                  "ERROR: Context dates are not sorted."
-              )
-
-          if dates.duplicated().any():
-              raise SystemExit(
-                  "ERROR: Duplicate context dates."
-              )
-
-
-          # ==================================================
-          # Cutoff
-          # ==================================================
-
-          cutoff = pd.Timestamp(
-              os.environ["RESEARCH_CONTEXT_AS_OF_DATE"]
-          )
-
-          if dates.max() > cutoff:
-              raise SystemExit(
-                  "ERROR: Future context date detected: "
-                  f"{dates.max().date()} > "
-                  f"{cutoff.date()}."
-              )
-
-          if dates.max() != cutoff:
-              raise SystemExit(
-                  "ERROR: Latest context date is "
-                  f"{dates.max().date()}, expected "
-                  f"{cutoff.date()}."
-              )
-
-
-          # ==================================================
-          # PIT
-          # ==================================================
 
           if not df[
               "point_in_time_safe"
-          ].eq(True).all():
-
+          ].all():
               raise SystemExit(
-                  "ERROR: PIT validation failed."
+                  "Output contains non-PIT-safe rows."
               )
-
-
-          # ==================================================
-          # Research-only
-          # ==================================================
 
           if not df[
               "research_only"
-          ].eq(True).all():
-
+          ].all():
               raise SystemExit(
-                  "ERROR: research_only must be TRUE."
+                  "Output contains non-research rows."
               )
 
-
-          # ==================================================
-          # Decision Engine
-          # ==================================================
-
-          if not df[
+          if df[
               "decision_engine_ready"
-          ].eq(False).all():
-
+          ].any():
               raise SystemExit(
-                  "ERROR: Decision Engine must remain disabled."
+                  "Decision Engine integration detected."
               )
 
-
-          # ==================================================
-          # No trading signal
-          # ==================================================
-
-          if not df[
+          if df[
               "trading_signal_generated"
-          ].eq(False).all():
-
+          ].any():
               raise SystemExit(
-                  "ERROR: Trading signal detected."
+                  "Trading signal detected."
               )
 
-
-          # ==================================================
-          # No forecast
-          # ==================================================
-
-          if not df[
+          if df[
               "forecast_generated"
-          ].eq(False).all():
-
+          ].any():
               raise SystemExit(
-                  "ERROR: Forecast detected."
+                  "Forecast detected."
               )
 
-
-          # ==================================================
-          # No unified decision
-          # ==================================================
-
-          if not df[
-              "unified_decision_generated"
-          ].eq(False).all():
-
-              raise SystemExit(
-                  "ERROR: Unified decision detected."
-              )
-
-
-          # ==================================================
-          # Layer count
-          # ==================================================
+          scores = pd.to_numeric(
+              df["unified_sentiment_score"],
+              errors="coerce",
+          ).dropna()
 
           if (
-              (df["available_layer_count"] < 0)
+              (scores < 0)
               |
-              (df["available_layer_count"] > 3)
+              (scores > 100)
           ).any():
-
               raise SystemExit(
-                  "ERROR: Invalid available_layer_count."
+                  "Unified sentiment score outside 0-100."
               )
 
+          allowed = {
+              "EXTREME_BULLISH",
+              "BULLISH",
+              "NEUTRAL",
+              "BEARISH",
+              "EXTREME_BEARISH",
+              "INSUFFICIENT_DATA",
+          }
 
-          # ==================================================
-          # Layer availability flags
-          # ==================================================
+          actual = set(
+              df["research_regime"]
+              .dropna()
+              .unique()
+          )
 
-          for column in [
-              "macro_available",
-              "sentiment_available",
-              "technical_available",
-          ]:
+          unexpected = actual - allowed
 
-              invalid = ~df[column].isin([True, False])
+          if unexpected:
+              raise SystemExit(
+                  f"Unexpected regimes: {unexpected}"
+              )
 
-              if invalid.any():
+          print()
+          print("============================================================")
+          print("SENTIMENT ENGINE FINAL VALIDATION")
+          print("============================================================")
 
-                  raise SystemExit(
-                      f"ERROR: Invalid boolean values in {column}."
-                  )
+          print(
+              f"Rows: {len(df):,}"
+          )
 
-
-          # ==================================================
-          # Latest row
-          # ==================================================
+          print(
+              f"Date range: "
+              f"{df['asof_date'].min()} "
+              f"-> "
+              f"{df['asof_date'].max()}"
+          )
 
           latest = df.iloc[-1]
 
-
-          # ==================================================
-          # Output
-          # ==================================================
+          print()
+          print("Latest state:")
+          print(
+              f"  asof_date: "
+              f"{latest['asof_date']}"
+          )
+          print(
+              f"  COT score: "
+              f"{latest.get('cot_sentiment_score')}"
+          )
+          print(
+              f"  AAII score: "
+              f"{latest.get('aaii_sentiment_score')}"
+          )
+          print(
+              f"  VIX score: "
+              f"{latest.get('vix_sentiment_score')}"
+          )
+          print(
+              f"  Components: "
+              f"{latest['available_component_count']}"
+          )
+          print(
+              f"  Unified score: "
+              f"{latest['unified_sentiment_score']}"
+          )
+          print(
+              f"  Research regime: "
+              f"{latest['research_regime']}"
+          )
 
           print()
-          print("=" * 70)
-          print("RESEARCH CONTEXT VALIDATION PASSED")
-          print("=" * 70)
-
-          print(
-              "Rows:",
-              len(df)
-          )
-
-          print(
-              "Columns:",
-              len(df.columns)
-          )
-
-          print(
-              "Date range:",
-              dates.min().date(),
-              "->",
-              dates.max().date()
-          )
-
-          print(
-              "Research cutoff:",
-              cutoff.date()
-          )
-
-          print(
-              "Latest date:",
-              latest["context_date"]
-          )
-
-          print(
-              "Available layers:",
-              latest["available_layer_count"],
-              "/ 3"
-          )
-
-          for column in [
-              "economic_regime",
-              "sentiment_regime",
-              "technical_regime",
-              "financial_stress_regime",
-              "trend_structure",
-          ]:
-
-              if column in df.columns:
-
-                  print(
-                      f"{column}:",
-                      latest[column]
-                  )
+          print("PIT SAFE: TRUE")
+          print("RESEARCH ONLY: TRUE")
+          print("DECISION ENGINE: DISABLED")
+          print("TRADING SIGNAL: NONE")
+          print("FORECAST: NONE")
 
           print()
-          print("PIT safe: TRUE")
-          print("Research only: TRUE")
-          print("Decision Engine: FALSE")
-          print("Trading signal: FALSE")
-          print("Forecast: FALSE")
-          print("Unified decision: FALSE")
-          print("Future context rows: 0")
-          print("=" * 70)
-
+          print("FINAL VALIDATION: PASS")
           PY
 
+      # ============================================================
+      # 16. DISPLAY SUMMARY
+      # ============================================================
 
-      # ====================================================
-      # Upload artifact
-      # ====================================================
-      - name: Upload Research Context artifact
+      - name: Display Sentiment Engine summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "SENTIMENT ENGINE SUMMARY"
+          echo "============================================================"
+
+          cat sentiment_engine_research_summary_v1.csv
+
+          echo
+          echo "============================================================"
+          echo "EXTREME SENTIMENT ROWS"
+          echo "============================================================"
+
+          python - <<'PY'
+          import pandas as pd
+
+          df = pd.read_csv(
+              "sentiment_engine_extremes_v1.csv"
+          )
+
+          print(
+              f"Extreme rows: {len(df):,}"
+          )
+
+          if not df.empty:
+              print()
+              print(
+                  df.tail(20).to_string(
+                      index=False
+                  )
+              )
+          PY
+
+      # ============================================================
+      # 17. UPLOAD ARTIFACT
+      # ============================================================
+
+      - name: Upload Sentiment Engine v1 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: research-context-v1
-          path: |
-            research_context_v1.csv
-            research_context_summary_v1.csv
-            research_context_extremes_v1.csv
+          name: sentiment-engine-v1
           if-no-files-found: error
           retention-days: 30
-
-
-      # ====================================================
-      # Final status
-      # ====================================================
-      - name: Final status
-        env:
-          RESEARCH_CONTEXT_AS_OF_DATE: ${{ env.RESEARCH_CONTEXT_AS_OF_DATE }}
-        run: |
-          echo "=============================================="
-          echo "Research Context v1 PASSED"
-          echo "=============================================="
-          echo "Macro Context: INCLUDED"
-          echo "Sentiment Engine: INCLUDED"
-          echo "Technical Intelligence: INCLUDED"
-          echo "Research-only: TRUE"
-          echo "Decision Engine: DISABLED"
-          echo "Trading Signal: FALSE"
-          echo "Forecast: FALSE"
-          echo "Unified Decision: FALSE"
-          echo "Dynamic Cutoff: $RESEARCH_CONTEXT_AS_OF_DATE"
-          echo "Artifact: research-context-v1"
-          echo "=============================================="
+          path: |
+            sentiment_engine_research_v1.csv
+            sentiment_engine_research_summary_v1.csv
+            sentiment_engine_extremes_v1.csv
