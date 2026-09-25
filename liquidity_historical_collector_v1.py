@@ -55,6 +55,7 @@ Research-only:
 
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -99,6 +100,42 @@ SUMMARY_FILE = Path(
 
 # Keep comfortably below FRED's vintage-date limit.
 VINTAGE_BATCH_SIZE = 500
+
+
+# ================================================================
+# FRED TRANSIENT ERROR RETRY CONFIGURATION
+# ================================================================
+
+# Only transient/server-side conditions are retried.
+#
+# 429  = Too Many Requests
+# 500  = Internal Server Error
+# 502  = Bad Gateway
+# 503  = Service Unavailable
+# 504  = Gateway Timeout
+#
+# 400 / 401 / 403 are intentionally NOT retried because they
+# normally indicate configuration, authentication, or permission
+# problems rather than temporary infrastructure failures.
+
+FRED_RETRYABLE_STATUS_CODES = {
+    429,
+    500,
+    502,
+    503,
+    504,
+}
+
+# Maximum total HTTP attempts, including the first request.
+FRED_MAX_ATTEMPTS = 5
+
+# Exponential backoff:
+# 3s -> 6s -> 12s -> 24s
+FRED_RETRY_BASE_SECONDS = 3.0
+
+# Never wait longer than this when FRED does not provide
+# a usable Retry-After value.
+FRED_RETRY_MAX_SECONDS = 30.0
 
 
 # ================================================================
@@ -341,6 +378,76 @@ def validate_configuration():
 
 
 # ================================================================
+# FRED RETRY UTILITIES
+# ================================================================
+
+def get_retry_after_seconds(
+    response
+):
+    """
+    Read Retry-After when supplied by FRED / the upstream gateway.
+
+    Supports:
+        - integer seconds
+        - floating-point seconds
+
+    Invalid values are ignored and exponential backoff is used.
+    """
+
+    retry_after = response.headers.get(
+        "Retry-After"
+    )
+
+    if not retry_after:
+        return None
+
+    try:
+
+        delay = float(
+            retry_after.strip()
+        )
+
+    except (
+        TypeError,
+        ValueError
+    ):
+
+        return None
+
+    if delay < 0:
+        return None
+
+    return min(
+        delay,
+        FRED_RETRY_MAX_SECONDS
+    )
+
+
+def get_exponential_backoff_seconds(
+    retry_number
+):
+    """
+    Calculate conservative exponential backoff.
+
+    retry_number:
+        0 -> 3 seconds
+        1 -> 6 seconds
+        2 -> 12 seconds
+        3 -> 24 seconds
+    """
+
+    delay = (
+        FRED_RETRY_BASE_SECONDS *
+        (2 ** retry_number)
+    )
+
+    return min(
+        delay,
+        FRED_RETRY_MAX_SECONDS
+    )
+
+
+# ================================================================
 # FRED REQUEST HELPER
 # ================================================================
 
@@ -351,23 +458,166 @@ def fred_get(
     purpose
 ):
     """
-    Generic FRED API GET helper with diagnostics.
+    Generic FRED API GET helper with diagnostics and safe retries.
+
+    Retry policy:
+        - retries transient HTTP 429/500/502/503/504
+        - retries transient requests/network exceptions
+        - honors Retry-After when available
+        - uses exponential backoff otherwise
+        - does NOT retry 400/401/403 or other non-transient
+          HTTP responses
+
+    All requests are GET requests, so retrying them is safe and
+    does not modify remote state.
     """
 
-    try:
+    response = None
 
-        response = requests.get(
-            endpoint,
-            params=params,
-            timeout=60,
-        )
+    for attempt in range(
+        1,
+        FRED_MAX_ATTEMPTS + 1
+    ):
 
-    except requests.RequestException as exc:
+        try:
+
+            response = requests.get(
+                endpoint,
+                params=params,
+                timeout=60,
+            )
+
+        except requests.RequestException as exc:
+
+            if attempt >= FRED_MAX_ATTEMPTS:
+
+                raise RuntimeError(
+                    f"FRED network error for {series_id} "
+                    f"during {purpose} after "
+                    f"{FRED_MAX_ATTEMPTS} attempts: {exc}"
+                ) from exc
+
+            delay = get_exponential_backoff_seconds(
+                attempt - 1
+            )
+
+            print("")
+            print(
+                f"FRED transient network error "
+                f"for {series_id} during {purpose}."
+            )
+            print(
+                f"Attempt {attempt}/"
+                f"{FRED_MAX_ATTEMPTS} failed."
+            )
+            print(
+                f"Retrying in {delay:.1f} seconds..."
+            )
+            print("")
+
+            time.sleep(
+                delay
+            )
+
+            continue
+
+        # --------------------------------------------------------
+        # Successful request
+        # --------------------------------------------------------
+
+        if response.status_code == 200:
+            break
+
+        # --------------------------------------------------------
+        # Retryable transient HTTP error
+        # --------------------------------------------------------
+
+        if response.status_code in FRED_RETRYABLE_STATUS_CODES:
+
+            if attempt >= FRED_MAX_ATTEMPTS:
+                break
+
+            retry_after = (
+                get_retry_after_seconds(
+                    response
+                )
+            )
+
+            if retry_after is not None:
+
+                delay = retry_after
+
+                delay_source = (
+                    "Retry-After"
+                )
+
+            else:
+
+                delay = (
+                    get_exponential_backoff_seconds(
+                        attempt - 1
+                    )
+                )
+
+                delay_source = (
+                    "exponential backoff"
+                )
+
+            print("")
+            print(
+                "=" * 80
+            )
+            print(
+                "FRED TRANSIENT API ERROR"
+            )
+            print(
+                "=" * 80
+            )
+            print(
+                f"Series: {series_id}"
+            )
+            print(
+                f"Purpose: {purpose}"
+            )
+            print(
+                f"HTTP status: "
+                f"{response.status_code}"
+            )
+            print(
+                f"Attempt: {attempt}/"
+                f"{FRED_MAX_ATTEMPTS}"
+            )
+            print(
+                f"Retrying in {delay:.1f} seconds "
+                f"using {delay_source}..."
+            )
+            print(
+                "=" * 80
+            )
+            print("")
+
+            time.sleep(
+                delay
+            )
+
+            continue
+
+        # --------------------------------------------------------
+        # Non-retryable HTTP error
+        # --------------------------------------------------------
+
+        break
+
+    # ============================================================
+    # FINAL RESPONSE HANDLING
+    # ============================================================
+
+    if response is None:
 
         raise RuntimeError(
-            f"FRED network error for {series_id} "
-            f"during {purpose}: {exc}"
-        ) from exc
+            f"FRED request produced no response for "
+            f"{series_id} during {purpose}."
+        )
 
     if response.status_code != 200:
 
@@ -390,7 +640,18 @@ def fred_get(
         )
 
         print("")
+
+        if response.status_code in (
+            FRED_RETRYABLE_STATUS_CODES
+        ):
+
+            print(
+                f"Transient HTTP error remained after "
+                f"{FRED_MAX_ATTEMPTS} attempts."
+            )
+
         print("FRED response:")
+
         print(
             response.text
         )
