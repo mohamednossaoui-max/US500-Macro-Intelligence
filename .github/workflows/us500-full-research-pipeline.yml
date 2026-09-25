@@ -450,7 +450,51 @@ jobs:
           fi
 
       # ============================================================
-      # 22. DOWNLOAD ARTIFACTS
+      # 22. SYNCHRONIZE MAIN AFTER ALL CHILD WORKFLOWS
+      #
+      # IMPORTANT:
+      # Child workflows can push to main.
+      # Therefore we synchronize BEFORE modifying public_data.
+      # This prevents the old "unstaged changes + pull --rebase"
+      # failure.
+      # ============================================================
+
+      - name: Synchronize Main After Child Workflows
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "SYNCHRONIZING MAIN AFTER CHILD WORKFLOWS"
+          echo "============================================================"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          echo ""
+          echo "Fetching latest origin/main..."
+
+          git fetch origin main
+
+          echo ""
+          echo "Resetting local checkout to latest origin/main..."
+
+          git checkout main
+          git reset --hard origin/main
+
+          echo ""
+          echo "Repository synchronized with origin/main."
+
+          echo "Current HEAD:"
+          git rev-parse HEAD
+
+          echo ""
+          echo "Current branch:"
+          git branch --show-current
+
+      # ============================================================
+      # 23. DOWNLOAD ARTIFACTS
       # ============================================================
 
       - name: Download Research Artifacts
@@ -506,7 +550,7 @@ jobs:
           find master_artifacts -type f | sort || true
 
       # ============================================================
-      # 23. NON-DESTRUCTIVE PUBLIC DATA UPDATE
+      # 24. NON-DESTRUCTIVE PUBLIC DATA UPDATE
       # ============================================================
 
       - name: Update Public Research Data
@@ -623,7 +667,7 @@ jobs:
           find public_data -maxdepth 1 -type f | sort
 
       # ============================================================
-      # 24. BUILD COMPLETE MANIFEST
+      # 25. BUILD COMPLETE MANIFEST
       # ============================================================
 
       - name: Build Public Data Manifest
@@ -692,13 +736,15 @@ jobs:
           PY
 
       # ============================================================
-      # 25. CREATE / UPDATE README
+      # 26. CREATE / UPDATE README
       # ============================================================
 
       - name: Create Public Data README
         if: success()
         shell: bash
         run: |
+          set -euo pipefail
+
           cat > public_data/README.md <<'EOF'
           # US500 Macro Intelligence — Public Research Data
 
@@ -759,30 +805,11 @@ jobs:
           EOF
 
       # ============================================================
-      # 26. RECONCILE WITH MAIN BEFORE PUSH
-      # ============================================================
-
-      - name: Reconcile Main Before Commit
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "============================================================"
-          echo "RECONCILING WITH ORIGIN/MAIN"
-          echo "============================================================"
-
-          git fetch origin main
-
-          git checkout main
-
-          git pull --rebase origin main
-
-          echo ""
-          echo "Repository synchronized with origin/main."
-
-      # ============================================================
-      # 27. COMMIT PUBLIC RESEARCH DATA
+      # 27. STAGE AND COMMIT LOCAL PUBLIC DATA
+      #
+      # IMPORTANT:
+      # We commit BEFORE attempting rebase.
+      # This guarantees a clean working tree for Git synchronization.
       # ============================================================
 
       - name: Commit Public Research Data
@@ -800,29 +827,139 @@ jobs:
 
           git add public_data
 
+          echo ""
+          echo "Staged changes:"
+
+          git diff --cached --stat || true
+
           if git diff --cached --quiet; then
 
+            echo ""
             echo "No public_data changes detected."
             echo "Nothing to commit."
 
           else
 
             echo ""
-            echo "Changes to be committed:"
-            git diff --cached --stat
+            echo "Creating local commit..."
 
             git commit \
               -m "chore: refresh public research datasets"
 
-            git push origin main
-
             echo ""
-            echo "Public research data pushed successfully."
+            echo "Local commit created."
 
+            git log -1 --oneline
           fi
 
       # ============================================================
-      # 28. FINAL VALIDATION
+      # 28. FINAL GIT SYNCHRONIZATION AND PUSH
+      #
+      # At this point the working tree is clean.
+      # Therefore rebase is safe.
+      #
+      # Retry protects against a concurrent child/external push.
+      # ============================================================
+
+      - name: Final Git Synchronization and Push
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "FINAL GIT SYNCHRONIZATION"
+          echo "============================================================"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          MAX_PUSH_ATTEMPTS=5
+          PUSH_SUCCESS=0
+
+          for ATTEMPT in $(seq 1 ${MAX_PUSH_ATTEMPTS}); do
+
+            echo ""
+            echo "------------------------------------------------------------"
+            echo "Git synchronization attempt ${ATTEMPT}/${MAX_PUSH_ATTEMPTS}"
+            echo "------------------------------------------------------------"
+
+            echo ""
+            echo "Fetching origin/main..."
+
+            git fetch origin main
+
+            echo ""
+            echo "Rebasing local commit(s) onto origin/main..."
+
+            if git rebase origin/main; then
+
+              echo ""
+              echo "Rebase successful."
+
+            else
+
+              echo ""
+              echo "ERROR: Rebase conflict detected."
+
+              echo ""
+              echo "Aborting rebase..."
+
+              git rebase --abort || true
+
+              echo ""
+              echo "Git status after abort:"
+              git status --short
+
+              exit 1
+            fi
+
+            echo ""
+            echo "Pushing to origin/main..."
+
+            if git push origin HEAD:main; then
+
+              echo ""
+              echo "============================================================"
+              echo "PUSH SUCCESSFUL"
+              echo "============================================================"
+
+              PUSH_SUCCESS=1
+              break
+
+            fi
+
+            echo ""
+            echo "Push was rejected or failed."
+            echo "Refreshing origin/main and retrying..."
+
+            sleep 5
+          done
+
+          if [ "${PUSH_SUCCESS}" -ne 1 ]; then
+
+            echo ""
+            echo "============================================================"
+            echo "ERROR: FINAL PUSH FAILED"
+            echo "============================================================"
+
+            git status
+            git log --oneline -5
+
+            exit 1
+          fi
+
+          echo ""
+          echo "Final repository HEAD:"
+          git rev-parse HEAD
+
+          echo ""
+          echo "Final repository status:"
+
+          git status --short
+
+      # ============================================================
+      # 29. FINAL VALIDATION
       # ============================================================
 
       - name: Final Master Validation
@@ -854,6 +991,14 @@ jobs:
             | wc -l
 
           echo ""
+          echo "Git HEAD:"
+          git rev-parse HEAD
+
+          echo ""
+          echo "Git status:"
+          git status --short
+
+          echo ""
           echo "Completed:"
           date -u '+%Y-%m-%d %H:%M:%S UTC'
 
@@ -867,7 +1012,7 @@ jobs:
           echo "NO TRADE EXECUTION"
 
       # ============================================================
-      # 29. FAILURE DIAGNOSTICS
+      # 30. FAILURE DIAGNOSTICS
       # ============================================================
 
       - name: Failure Diagnostics
@@ -898,10 +1043,20 @@ jobs:
           fi
 
           echo ""
+          echo "Git status:"
+
+          git status --short || true
+
+          echo ""
+          echo "Git log:"
+
+          git log --oneline -5 || true
+
+          echo ""
           echo "The pipeline stopped at the first failed dependency."
 
       # ============================================================
-      # 30. UPLOAD MASTER DIAGNOSTICS
+      # 31. UPLOAD MASTER DIAGNOSTICS
       # ============================================================
 
       - name: Upload Master Diagnostics
