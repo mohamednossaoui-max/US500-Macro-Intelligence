@@ -408,6 +408,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36119819151",
-  "source_workflow": "COT Historical Collector v1"
+  "source_run_id": "36119935875",
+  "source_workflow": "COT Positioning Analyzer v1"
 }
