@@ -1,0 +1,12 @@
+event_name,source_layer,event_layer,event_observations,minimum_for_basic_diagnostic,sample_adequacy
+breadth_negative_20d,Market Breadth Analyzer v1,breadth,58,10,ADEQUATE_FOR_DESCRIPTIVE_ANALYSIS
+breadth_positive_20d,Market Breadth Analyzer v1,breadth,62,10,ADEQUATE_FOR_DESCRIPTIVE_ANALYSIS
+vix_low,Research Context v1,stress,0,10,INSUFFICIENT
+vix_elevated,Research Context v1,stress,0,10,INSUFFICIENT
+financial_stress_elevated,Research Context v1,stress,0,10,INSUFFICIENT
+sentiment_bearish,Sentiment Engine v1,sentiment,39,10,ADEQUATE_FOR_DESCRIPTIVE_ANALYSIS
+sentiment_bullish,Sentiment Engine v1,sentiment,50,10,ADEQUATE_FOR_DESCRIPTIVE_ANALYSIS
+technical_drawdown_ge_5,Technical Intelligence v1,technical,25,10,MODERATE
+technical_drawdown_ge_10,Technical Intelligence v1,technical,10,10,MODERATE
+liquidity_20d_change_positive_ge_5,Liquidity Intelligence v1,liquidity,9,10,LIMITED
+liquidity_20d_change_negative_le_5,Liquidity Intelligence v1,liquidity,13,10,MODERATE
