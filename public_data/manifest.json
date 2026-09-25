@@ -185,12 +185,12 @@
       "sha256": "e04b6c9eca272eb4b0206eab482daa5126de30a731ca532693e3430abd9a27f2"
     },
     "financial_stress_research_summary_v1.csv": {
-      "bytes": 472,
-      "sha256": "3d6f11fe105ceaa7059e059bdb0f63766254d4f521fc94429e356e9c70f8ab47"
+      "bytes": 471,
+      "sha256": "ffd8f0ca34d61511e387a8f21bc9717a087f88138b77cc5879b5708664995e8a"
     },
     "financial_stress_research_v1.csv": {
-      "bytes": 608675,
-      "sha256": "6bdde81e8dfa26ff70a18d66b5a516f4327e113d9fdb55e27331fd771bd48bb8"
+      "bytes": 609632,
+      "sha256": "0b0537f7e34ea633cbe5db4eca07028f0efd1a44b38d4583fe7b8e38d9a9e674"
     },
     "financial_stress_validation_events_v1.csv": {
       "bytes": 354,
@@ -408,6 +408,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36119276342",
-  "source_workflow": "Economic Intelligence Full Pipeline v2.3 Refresh"
+  "source_run_id": "36119437852",
+  "source_workflow": "financial-stress-research-v1"
 }
