@@ -56,7 +56,7 @@ jobs:
           mkdir -p final_end_to_end_validation_output
 
       # ============================================================
-      # 5. DISCOVER ALL NON-EXPIRED ARTIFACTS
+      # 5. DISCOVER LATEST NON-EXPIRED ARTIFACTS
       # ============================================================
       - name: Discover latest research artifacts
         shell: bash
@@ -147,7 +147,10 @@ jobs:
           PY
 
           echo
-          echo "Latest artifact inventory:"
+          echo "============================================================"
+          echo "LATEST ARTIFACT INVENTORY"
+          echo "============================================================"
+
           cat /tmp/latest_artifacts.tsv
 
       # ============================================================
@@ -164,19 +167,28 @@ jobs:
           echo "DOWNLOADING CANONICAL RESEARCH ARTIFACTS"
           echo "============================================================"
 
+          # --------------------------------------------------------
+          # IMPORTANT:
+          # These names were verified against the actual workflows
+          # in the repository.
+          # --------------------------------------------------------
+
           REQUIRED_NAMES=(
             "economic-intelligence-v2-3-refresh"
             "fed-intelligence-v1"
             "financial-stress-research-v1"
-            "cot-positioning-analyzer-v1"
-            "aaii-sentiment-analyzer-v1"
-            "vix-sentiment-analyzer-v1"
+
+            "cot-positioning-v1"
+            "aaii-sentiment-v1"
+            "vix-sentiment-v1"
+
             "sentiment-engine-v1"
             "technical-intelligence-v1"
             "market-breadth-full-validation-v1"
             "cross-asset-intelligence-v1"
             "event-news-intelligence-v2.1"
-            "earnings-reaction-v3"
+            "earnings-market-reaction-v3-results"
+
             "macro-context-v1"
             "research-context-v1"
           )
@@ -196,10 +208,13 @@ jobs:
             )"
 
             if [ -z "$row" ]; then
+
               echo
-              echo "WARNING: canonical artifact not found:"
+              echo "ERROR: required canonical artifact not found:"
               echo "$wanted"
-              return 0
+              echo
+
+              return 1
             fi
 
             IFS=$'\t' read -r \
@@ -209,6 +224,7 @@ jobs:
               archive_url <<< "$row"
 
             local safe_name
+
             safe_name="$(
               printf '%s' "$name" |
               tr '/:' '__'
@@ -236,9 +252,11 @@ jobs:
               > "$zip_path"
 
             if [ ! -s "$zip_path" ]; then
+
               echo "ERROR: empty artifact archive:"
               echo "$name"
-              exit 1
+
+              return 1
             fi
 
             unzip \
@@ -250,6 +268,11 @@ jobs:
             rm -f "$zip_path"
           }
 
+          # --------------------------------------------------------
+          # Download every required canonical artifact.
+          # Missing artifact = hard failure.
+          # --------------------------------------------------------
+
           for name in "${REQUIRED_NAMES[@]}"; do
             download_one "$name"
           done
@@ -259,7 +282,10 @@ jobs:
           echo "DOWNLOADED FILES"
           echo "============================================================"
 
-          find artifacts -type f -print | sort
+          find artifacts \
+            -type f \
+            -print \
+            | sort
 
           csv_count="$(
             find artifacts \
@@ -280,14 +306,16 @@ jobs:
           echo "JSON count: $json_count"
 
           if [ "$csv_count" -eq 0 ] && [ "$json_count" -eq 0 ]; then
+
             echo
             echo "ERROR:"
             echo "No research artifacts were downloaded."
+
             exit 1
           fi
 
       # ============================================================
-      # 7. VERIFY VALIDATOR
+      # 7. VERIFY FINAL VALIDATOR
       # ============================================================
       - name: Verify validator
         shell: bash
@@ -303,6 +331,9 @@ jobs:
             echo "ERROR:"
             echo "Final validator not found."
 
+            echo
+            echo "Searching for validation scripts..."
+
             find tests \
               -type f \
               \( \
@@ -315,14 +346,18 @@ jobs:
             exit 1
           fi
 
-          echo "Final validator found."
+          echo "Final validator found:"
+          echo "tests/final_end_to_end_validation_v1.py"
 
           if [ -f FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md ]; then
 
-            echo "Architecture document found."
+            echo
+            echo "Architecture document found:"
+            echo "FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md"
 
           else
 
+            echo
             echo "WARNING:"
             echo "FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md"
             echo "was not found at repository root."
@@ -330,7 +365,7 @@ jobs:
           fi
 
       # ============================================================
-      # 8. RUN VALIDATOR
+      # 8. RUN FINAL VALIDATOR
       # ============================================================
       - name: Run final end-to-end validator
         shell: bash
@@ -353,42 +388,57 @@ jobs:
             > final_end_to_end_validation_exit_code.txt
 
           echo
-          echo "Validator exit code:"
+          echo "============================================================"
+          echo "VALIDATOR EXIT CODE"
+          echo "============================================================"
+
           echo "$rc"
 
           echo
-          echo "Validator diagnostics:"
+          echo "============================================================"
+          echo "VALIDATOR OUTPUT FILES"
+          echo "============================================================"
+
           if [ -d final_end_to_end_validation_output ]; then
-            find final_end_to_end_validation_output \
+
+            find \
+              final_end_to_end_validation_output \
               -maxdepth 2 \
               -type f \
               -print \
               | sort
+
           else
+
             echo "Output directory does not exist."
+
           fi
 
           # IMPORTANT:
-          # Do not fail this step.
-          # We need to upload diagnostics before applying
-          # the final validation status.
+          #
+          # Do NOT fail this step.
+          #
+          # We need to upload the diagnostics first.
+          # The final status is applied in the final step.
 
           exit 0
 
       # ============================================================
       # 9. DISPLAY JSON RESULT
       # ============================================================
-      - name: Display final validation result
+      - name: Display final validation JSON
         if: always()
         shell: bash
         run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "FINAL VALIDATION RESULT"
+          echo "FINAL VALIDATION JSON"
           echo "============================================================"
 
-          if [ -f final_end_to_end_validation_output/final_end_to_end_validation.json ]; then
+          if [
+            -f final_end_to_end_validation_output/final_end_to_end_validation.json
+          ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation.json
@@ -399,12 +449,22 @@ jobs:
 
           fi
 
-          echo
+      # ============================================================
+      # 10. DISPLAY SUMMARY
+      # ============================================================
+      - name: Display final validation summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
           echo "============================================================"
-          echo "SUMMARY"
+          echo "FINAL VALIDATION SUMMARY"
           echo "============================================================"
 
-          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_summary.csv ]; then
+          if [
+            -f final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
+          ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
@@ -415,12 +475,22 @@ jobs:
 
           fi
 
-          echo
+      # ============================================================
+      # 11. DISPLAY EVENTS
+      # ============================================================
+      - name: Display final validation events
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
           echo "============================================================"
-          echo "EVENTS / REVIEWS"
+          echo "FINAL VALIDATION EVENTS / REVIEWS / FAILURES"
           echo "============================================================"
 
-          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_events.csv ]; then
+          if [
+            -f final_end_to_end_validation_output/final_end_to_end_validation_events.csv
+          ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation_events.csv
@@ -432,7 +502,33 @@ jobs:
           fi
 
       # ============================================================
-      # 10. UPLOAD COMPLETE VALIDATION OUTPUT
+      # 12. DISPLAY REPORT
+      # ============================================================
+      - name: Display final validation report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "FINAL VALIDATION REPORT"
+          echo "============================================================"
+
+          if [
+            -f final_end_to_end_validation_output/final_end_to_end_validation_report.csv
+          ]; then
+
+            cat \
+              final_end_to_end_validation_output/final_end_to_end_validation_report.csv
+
+          else
+
+            echo "Report not found."
+
+          fi
+
+      # ============================================================
+      # 13. UPLOAD COMPLETE VALIDATION OUTPUT
       # ============================================================
       - name: Upload final validation artifacts
         if: always()
@@ -446,7 +542,7 @@ jobs:
           retention-days: 30
 
       # ============================================================
-      # 11. APPLY REAL VALIDATION STATUS
+      # 14. APPLY REAL VALIDATION STATUS
       # ============================================================
       - name: Apply final validation status
         if: always()
