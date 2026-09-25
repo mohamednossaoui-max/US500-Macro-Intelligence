@@ -2,32 +2,17 @@
 """
 US500 MACRO INTELLIGENCE
 DECISION ENGINE V1
-====================
 
-Research-only Decision Engine.
+Research-only downstream classification.
 
-IMPORTANT:
-- No broker integration
-- No order execution
-- No position sizing
-- No stop loss
-- No take profit
-- No trade execution
-- No deterministic price forecast
-- No future-data leakage
-- Point-in-time safe
-- Decision Engine is downstream of Research Context
-
-The engine converts already-validated research evidence into a
-research classification.
-
-Possible states:
-    SUPPORTIVE
-    CONTRADICTORY
-    MIXED
-    INSUFFICIENT_DATA
-
-This is NOT a trading signal.
+This engine:
+- consumes the point-in-time Research Context CSV
+- extracts descriptive evidence from the actual Research Context schema
+- never creates a trading signal
+- never creates a forecast
+- never executes trades
+- never performs position sizing
+- never creates SL/TP
 """
 
 from __future__ import annotations
@@ -38,35 +23,22 @@ import math
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
 
-# ============================================================
-# VERSION
-# ============================================================
-
 ENGINE_VERSION = "decision-engine-v1"
-
 RESEARCH_ONLY = True
 DECISION_ENGINE_ENABLED = True
 
-# Minimum evidence requirements.
 MIN_EVIDENCE = 2
-MIN_SUPPORTIVE = 1
-MIN_CONTRADICTORY = 1
-
-# Strong majority threshold.
 MAJORITY_RATIO = 0.67
-
-# Confidence is descriptive evidence coverage, not a probability
-# of future market movement.
 HIGH_CONFIDENCE_EVIDENCE = 4
 
 
 # ============================================================
-# HELPERS
+# BASIC HELPERS
 # ============================================================
 
 def die(message: str, code: int = 1) -> None:
@@ -78,15 +50,13 @@ def is_missing(value: Any) -> bool:
     if value is None:
         return True
 
-    if isinstance(value, float) and math.isnan(value):
-        return True
+    try:
+        if pd.isna(value):
+            return True
+    except Exception:
+        pass
 
-    if pd.isna(value):
-        return True
-
-    text = str(value).strip().lower()
-
-    return text in {
+    return str(value).strip().lower() in {
         "",
         "nan",
         "none",
@@ -120,13 +90,8 @@ def as_float(value: Any) -> Optional[float]:
         return None
 
     try:
-        number = float(value)
-
-        if not math.isfinite(number):
-            return None
-
-        return number
-
+        value = float(value)
+        return value if math.isfinite(value) else None
     except (TypeError, ValueError):
         return None
 
@@ -135,11 +100,18 @@ def normalize_name(value: Any) -> str:
     if is_missing(value):
         return ""
 
-    text = str(value).strip().lower()
+    return re.sub(
+        r"[^a-z0-9]+",
+        "_",
+        str(value).strip().lower(),
+    ).strip("_")
 
-    text = re.sub(r"[^a-z0-9]+", "_", text)
 
-    return text.strip("_")
+def normalized_columns(df: pd.DataFrame) -> Dict[str, str]:
+    return {
+        normalize_name(column): column
+        for column in df.columns
+    }
 
 
 def find_column(
@@ -147,13 +119,9 @@ def find_column(
     candidates: Iterable[str],
 ) -> Optional[str]:
 
-    normalized = {
-        normalize_name(column): column
-        for column in df.columns
-    }
+    normalized = normalized_columns(df)
 
     for candidate in candidates:
-
         key = normalize_name(candidate)
 
         if key in normalized:
@@ -162,141 +130,114 @@ def find_column(
     return None
 
 
-def find_latest_date_column(df: pd.DataFrame) -> Optional[str]:
-
-    candidates = [
-        "asof_date",
-        "as_of_date",
-        "context_date",
-        "observation_date",
-        "date",
-        "availability_date",
-        "effective_date",
-    ]
-
-    return find_column(df, candidates)
-
-
-def parse_dates(
-    df: pd.DataFrame,
-    column: Optional[str],
-) -> pd.Series:
-
-    if column is None:
-        return pd.Series(
-            pd.NaT,
-            index=df.index,
-        )
-
-    return pd.to_datetime(
-        df[column],
-        errors="coerce",
-        utc=False,
-    )
-
-
-def latest_row(
-    df: pd.DataFrame,
-    date_column: Optional[str],
-) -> pd.Series:
-
-    if df.empty:
-        die("Input dataset is empty.")
-
-    if date_column is None:
-        return df.iloc[-1]
-
-    dates = parse_dates(df, date_column)
-
-    valid = dates.notna()
-
-    if not valid.any():
-        return df.iloc[-1]
-
-    idx = dates[valid].idxmax()
-
-    return df.loc[idx]
-
-
-def detect_text(
+def get_value(
     row: pd.Series,
     candidates: Iterable[str],
-) -> Optional[str]:
+) -> Any:
 
-    column = find_column(
-        pd.DataFrame([row]),
-        candidates,
-    )
+    temp = pd.DataFrame([row])
+
+    column = find_column(temp, candidates)
 
     if column is None:
         return None
 
     value = row[column]
 
-    if is_missing(value):
+    return None if is_missing(value) else value
+
+
+def get_text(
+    row: pd.Series,
+    candidates: Iterable[str],
+) -> Optional[str]:
+
+    value = get_value(row, candidates)
+
+    if value is None:
         return None
 
     return str(value).strip()
 
 
-def detect_numeric(
+def get_number(
     row: pd.Series,
     candidates: Iterable[str],
 ) -> Optional[float]:
 
-    column = find_column(
-        pd.DataFrame([row]),
-        candidates,
+    return as_float(
+        get_value(row, candidates)
     )
 
-    if column is None:
-        return None
 
-    return as_float(row[column])
-
-
-def detect_bool(
+def get_bool(
     row: pd.Series,
     candidates: Iterable[str],
 ) -> Optional[bool]:
 
-    column = find_column(
-        pd.DataFrame([row]),
-        candidates,
+    return as_bool(
+        get_value(row, candidates)
     )
 
-    if column is None:
-        return None
 
-    return as_bool(row[column])
+def date_column(
+    df: pd.DataFrame,
+) -> Optional[str]:
+
+    return find_column(
+        df,
+        [
+            "context_date",
+            "asof_date",
+            "as_of_date",
+            "observation_date",
+            "availability_date",
+            "date",
+        ],
+    )
 
 
-# ============================================================
-# SCHEMA
-# ============================================================
-
-def load_csv(path: Path) -> pd.DataFrame:
-
-    if not path.exists():
-        die(f"Required input file not found: {path}")
-
-    try:
-        df = pd.read_csv(path)
-    except Exception as exc:
-        die(f"Could not read {path}: {exc}")
+def latest_row(
+    df: pd.DataFrame,
+    column: Optional[str],
+) -> pd.Series:
 
     if df.empty:
-        die(f"Input CSV is empty: {path}")
+        die("Input Research Context CSV is empty.")
 
-    return df
+    if column is None:
+        return df.iloc[-1]
+
+    dates = pd.to_datetime(
+        df[column],
+        errors="coerce",
+    )
+
+    valid = dates.notna()
+
+    if not valid.any():
+        return df.iloc[-1]
+
+    latest_index = dates[valid].idxmax()
+
+    return df.loc[latest_index]
 
 
-def validate_required_research_flags(
+# ============================================================
+# INPUT VALIDATION
+# ============================================================
+
+def validate_input(
     df: pd.DataFrame,
-    source_name: str,
-) -> Tuple[bool, List[str]]:
+) -> List[str]:
 
     errors: List[str] = []
+
+    if df.empty:
+        errors.append(
+            "Research Context CSV is empty."
+        )
+        return errors
 
     pit_column = find_column(
         df,
@@ -308,20 +249,28 @@ def validate_required_research_flags(
     )
 
     if pit_column is None:
+
         errors.append(
-            f"{source_name}: missing point-in-time safety field."
+            "Research Context: "
+            "point_in_time_safe field is missing."
         )
+
     else:
+
         values = df[pit_column].map(as_bool)
 
         if values.isna().any():
+
             errors.append(
-                f"{source_name}: invalid PIT values."
+                "Research Context: invalid "
+                "point_in_time_safe values."
             )
-        elif not values.all():
+
+        elif not bool(values.all()):
+
             errors.append(
-                f"{source_name}: point_in_time_safe is not "
-                f"true for every row."
+                "Research Context: point_in_time_safe "
+                "is not true for every row."
             )
 
     research_column = find_column(
@@ -337,17 +286,54 @@ def validate_required_research_flags(
         values = df[research_column].map(as_bool)
 
         if values.isna().any():
+
             errors.append(
-                f"{source_name}: invalid research_only values."
+                "Research Context: invalid "
+                "research_only values."
             )
 
-        elif not values.all():
+        elif not bool(values.all()):
+
             errors.append(
-                f"{source_name}: research_only is not true "
-                f"for every row."
+                "Research Context: research_only "
+                "is not true for every row."
             )
 
-    return len(errors) == 0, errors
+    dcol = date_column(df)
+
+    if dcol is None:
+
+        errors.append(
+            "Research Context: no usable "
+            "context date column was found."
+        )
+
+    else:
+
+        dates = pd.to_datetime(
+            df[dcol],
+            errors="coerce",
+        )
+
+        if dates.isna().any():
+
+            errors.append(
+                "Research Context contains invalid dates."
+            )
+
+        valid = dates.dropna()
+
+        if (
+            not valid.empty
+            and not valid.is_monotonic_increasing
+        ):
+
+            errors.append(
+                "Research Context dates are not "
+                "monotonic increasing."
+            )
+
+    return errors
 
 
 # ============================================================
@@ -382,11 +368,31 @@ class Evidence:
         }
 
 
+def add(
+    evidence: List[Evidence],
+    source: str,
+    category: str,
+    stance: str,
+    reason: str,
+    value: Any = None,
+) -> None:
+
+    evidence.append(
+        Evidence(
+            source=source,
+            category=category,
+            stance=stance,
+            reason=reason,
+            value=value,
+        )
+    )
+
+
 # ============================================================
-# REGIME INTERPRETATION
+# REGIME CLASSIFICATION
 # ============================================================
 
-def classify_macro_regime(
+def classify_regime(
     value: Optional[str],
 ) -> Optional[str]:
 
@@ -405,6 +411,10 @@ def classify_macro_regime(
         "soft_landing",
         "low_research_stress",
         "low_stress",
+        "dovish",
+        "accommodative",
+        "supportive",
+        "strong_bullish",
     }
 
     contradictory = {
@@ -414,8 +424,13 @@ def classify_macro_regime(
         "recession",
         "high_research_stress",
         "high_stress",
+        "extreme_research_stress",
         "crisis",
         "stagflation",
+        "hawkish",
+        "restrictive",
+        "tight",
+        "strong_bearish",
     }
 
     mixed = {
@@ -438,366 +453,259 @@ def classify_macro_regime(
     return None
 
 
-def add_macro_evidence(
-    evidence: List[Evidence],
-    row: pd.Series,
-) -> None:
-
-    regime = detect_text(
-        row,
-        [
-            "economic_regime",
-            "macro_regime",
-            "research_regime",
-            "regime",
-        ],
-    )
-
-    classified = classify_macro_regime(regime)
-
-    if classified == "SUPPORTIVE":
-
-        evidence.append(
-            Evidence(
-                source="Macro Context",
-                category="macro",
-                stance="SUPPORTIVE",
-                reason=f"Macro regime classified as {regime}.",
-                value=regime,
-            )
-        )
-
-    elif classified == "CONTRADICTORY":
-
-        evidence.append(
-            Evidence(
-                source="Macro Context",
-                category="macro",
-                stance="CONTRADICTORY",
-                reason=f"Macro regime classified as {regime}.",
-                value=regime,
-            )
-        )
-
-    elif classified == "MIXED":
-
-        evidence.append(
-            Evidence(
-                source="Macro Context",
-                category="macro",
-                stance="MIXED",
-                reason=f"Macro regime classified as {regime}.",
-                value=regime,
-            )
-        )
-
-
-def add_sentiment_evidence(
-    evidence: List[Evidence],
-    row: pd.Series,
-) -> None:
-
-    regime = detect_text(
-        row,
-        [
-            "sentiment_regime",
-            "regime",
-        ],
-    )
-
-    score = detect_numeric(
-        row,
-        [
-            "sentiment_score",
-            "composite_sentiment_score",
-            "score",
-        ],
-    )
-
-    classified = classify_macro_regime(regime)
-
-    if classified == "SUPPORTIVE":
-
-        evidence.append(
-            Evidence(
-                source="Sentiment Engine",
-                category="sentiment",
-                stance="SUPPORTIVE",
-                reason=f"Sentiment regime is {regime}.",
-                value=score if score is not None else regime,
-            )
-        )
-
-    elif classified == "CONTRADICTORY":
-
-        evidence.append(
-            Evidence(
-                source="Sentiment Engine",
-                category="sentiment",
-                stance="CONTRADICTORY",
-                reason=f"Sentiment regime is {regime}.",
-                value=score if score is not None else regime,
-            )
-        )
-
-
-def add_technical_evidence(
-    evidence: List[Evidence],
-    row: pd.Series,
-) -> None:
-
-    regime = detect_text(
-        row,
-        [
-            "technical_regime",
-            "trend_regime",
-            "regime",
-        ],
-    )
-
-    classified = classify_macro_regime(regime)
-
-    if classified == "SUPPORTIVE":
-
-        evidence.append(
-            Evidence(
-                source="Technical Intelligence",
-                category="technical",
-                stance="SUPPORTIVE",
-                reason=f"Technical regime is {regime}.",
-                value=regime,
-            )
-        )
-
-    elif classified == "CONTRADICTORY":
-
-        evidence.append(
-            Evidence(
-                source="Technical Intelligence",
-                category="technical",
-                stance="CONTRADICTORY",
-                reason=f"Technical regime is {regime}.",
-                value=regime,
-            )
-        )
-
-
-def add_financial_stress_evidence(
-    evidence: List[Evidence],
-    row: pd.Series,
-) -> None:
-
-    regime = detect_text(
-        row,
-        [
-            "financial_stress_regime",
-            "stress_regime",
-            "research_regime",
-        ],
-    )
-
-    if regime is None:
-        return
-
-    normalized = normalize_name(regime)
-
-    if normalized in {
-        "low_research_stress",
-        "low_stress",
-    }:
-
-        evidence.append(
-            Evidence(
-                source="Financial Stress",
-                category="financial_stress",
-                stance="SUPPORTIVE",
-                reason=f"Financial stress regime is {regime}.",
-                value=regime,
-            )
-        )
-
-    elif normalized in {
-        "high_research_stress",
-        "high_stress",
-        "crisis",
-    }:
-
-        evidence.append(
-            Evidence(
-                source="Financial Stress",
-                category="financial_stress",
-                stance="CONTRADICTORY",
-                reason=f"Financial stress regime is {regime}.",
-                value=regime,
-            )
-        )
-
-
-def add_fed_evidence(
-    evidence: List[Evidence],
-    row: pd.Series,
-) -> None:
-
-    score = detect_numeric(
-        row,
-        [
-            "fed_score",
-            "fed_policy_score",
-            "score",
-        ],
-    )
-
-    regime = detect_text(
-        row,
-        [
-            "fed_regime",
-            "policy_regime",
-        ],
-    )
-
-    if regime is not None:
-
-        normalized = normalize_name(regime)
-
-        if normalized in {
-            "dovish",
-            "accommodative",
-            "supportive",
-        }:
-
-            evidence.append(
-                Evidence(
-                    source="Fed Intelligence",
-                    category="fed",
-                    stance="SUPPORTIVE",
-                    reason=f"Fed regime is {regime}.",
-                    value=regime,
-                )
-            )
-
-        elif normalized in {
-            "hawkish",
-            "restrictive",
-            "tight",
-        }:
-
-            evidence.append(
-                Evidence(
-                    source="Fed Intelligence",
-                    category="fed",
-                    stance="CONTRADICTORY",
-                    reason=f"Fed regime is {regime}.",
-                    value=regime,
-                )
-            )
-
-        return
-
-    # A numerical Fed score is treated only as a research
-    # classification if the dataset explicitly provides one.
-    if score is not None:
-
-        if score >= 70:
-
-            evidence.append(
-                Evidence(
-                    source="Fed Intelligence",
-                    category="fed",
-                    stance="SUPPORTIVE",
-                    reason="Fed research score is in the supportive range.",
-                    value=score,
-                )
-            )
-
-        elif score <= 30:
-
-            evidence.append(
-                Evidence(
-                    source="Fed Intelligence",
-                    category="fed",
-                    stance="CONTRADICTORY",
-                    reason="Fed research score is in the contradictory range.",
-                    value=score,
-                )
-            )
-
-
 # ============================================================
-# RESEARCH CONTEXT EXTRACTION
+# LAYER AVAILABILITY
 # ============================================================
 
-def extract_research_context(
-    path: Path,
-) -> Tuple[pd.DataFrame, List[str]]:
-
-    df = load_csv(path)
-
-    ok, errors = validate_required_research_flags(
-        df,
-        "Research Context",
-    )
-
-    if not ok:
-        return df, errors
-
-    date_column = find_latest_date_column(df)
-
-    if date_column is not None:
-
-        dates = parse_dates(
-            df,
-            date_column,
-        )
-
-        if dates.isna().any():
-
-            errors.append(
-                "Research Context contains invalid dates."
-            )
-
-        valid_dates = dates.dropna()
-
-        if not valid_dates.empty and not valid_dates.is_monotonic_increasing:
-
-            errors.append(
-                "Research Context dates are not monotonic increasing."
-            )
-
-    return df, errors
-
-
-# ============================================================
-# LAYER PRESENCE
-# ============================================================
-
-def layer_available(
+def layer_is_available(
     row: pd.Series,
-    candidates: Iterable[str],
+    names: Iterable[str],
 ) -> bool:
 
-    value = detect_bool(
+    value = get_bool(
         row,
-        candidates,
+        names,
     )
 
     if value is not None:
         return value
 
-    # Fall back to numeric layer count.
     return False
 
 
-def collect_layer_evidence(
+# ============================================================
+# MACRO EVIDENCE
+# ============================================================
+
+def collect_macro_evidence(
+    row: pd.Series,
+    evidence: List[Evidence],
+) -> None:
+
+    # --------------------------------------------------------
+    # Economic Intelligence
+    # --------------------------------------------------------
+
+    economic_regime = get_text(
+        row,
+        [
+            "macro_economic_regime",
+            "economic_regime",
+            "macro_regime",
+        ],
+    )
+
+    economic_classification = classify_regime(
+        economic_regime
+    )
+
+    if economic_classification is not None:
+
+        add(
+            evidence,
+            "Macro Context",
+            "economic",
+            economic_classification,
+            (
+                "Economic regime is "
+                f"{economic_regime}."
+            ),
+            economic_regime,
+        )
+
+    # --------------------------------------------------------
+    # Financial Stress
+    # --------------------------------------------------------
+
+    financial_regime = get_text(
+        row,
+        [
+            "macro_financial_stress_regime",
+            "financial_stress_regime",
+            "stress_regime",
+        ],
+    )
+
+    financial_classification = classify_regime(
+        financial_regime
+    )
+
+    if financial_classification is not None:
+
+        add(
+            evidence,
+            "Financial Stress",
+            "financial_stress",
+            financial_classification,
+            (
+                "Financial stress regime is "
+                f"{financial_regime}."
+            ),
+            financial_regime,
+        )
+
+    # --------------------------------------------------------
+    # Fed Intelligence
+    # --------------------------------------------------------
+
+    fed_regime = get_text(
+        row,
+        [
+            "macro_fed_regime",
+            "fed_regime",
+            "policy_regime",
+        ],
+    )
+
+    if fed_regime is not None:
+
+        fed_classification = classify_regime(
+            fed_regime
+        )
+
+        if fed_classification is not None:
+
+            add(
+                evidence,
+                "Fed Intelligence",
+                "fed",
+                fed_classification,
+                (
+                    "Fed regime is "
+                    f"{fed_regime}."
+                ),
+                fed_regime,
+            )
+
+    else:
+
+        fed_score = get_number(
+            row,
+            [
+                "macro_fed_score",
+                "fed_score",
+                "fed_policy_score",
+            ],
+        )
+
+        if fed_score is not None:
+
+            if fed_score >= 70:
+
+                add(
+                    evidence,
+                    "Fed Intelligence",
+                    "fed",
+                    "SUPPORTIVE",
+                    (
+                        "Fed research score "
+                        "is in the high range."
+                    ),
+                    fed_score,
+                )
+
+            elif fed_score <= 30:
+
+                add(
+                    evidence,
+                    "Fed Intelligence",
+                    "fed",
+                    "CONTRADICTORY",
+                    (
+                        "Fed research score "
+                        "is in the low range."
+                    ),
+                    fed_score,
+                )
+
+
+# ============================================================
+# SENTIMENT EVIDENCE
+# ============================================================
+
+def collect_sentiment_evidence(
+    row: pd.Series,
+    evidence: List[Evidence],
+) -> None:
+
+    regime = get_text(
+        row,
+        [
+            "sentiment_unified_sentiment_regime",
+            "sentiment_research_regime",
+            "unified_sentiment_regime",
+            "sentiment_regime",
+        ],
+    )
+
+    classification = classify_regime(
+        regime
+    )
+
+    if classification is not None:
+
+        add(
+            evidence,
+            "Sentiment Engine",
+            "sentiment",
+            classification,
+            (
+                "Unified sentiment regime is "
+                f"{regime}."
+            ),
+            regime,
+        )
+
+
+# ============================================================
+# TECHNICAL EVIDENCE
+# ============================================================
+
+def collect_technical_evidence(
+    row: pd.Series,
+    evidence: List[Evidence],
+) -> None:
+
+    regime = get_text(
+        row,
+        [
+            "technical_technical_regime",
+            "technical_regime",
+            "technical_trend_structure",
+            "trend_regime",
+        ],
+    )
+
+    classification = classify_regime(
+        regime
+    )
+
+    if classification is not None:
+
+        add(
+            evidence,
+            "Technical Intelligence",
+            "technical",
+            classification,
+            (
+                "Technical research regime is "
+                f"{regime}."
+            ),
+            regime,
+        )
+
+
+# ============================================================
+# COLLECT ALL EVIDENCE
+# ============================================================
+
+def collect_evidence(
     row: pd.Series,
 ) -> List[Evidence]:
 
     evidence: List[Evidence] = []
 
-    # --------------------------------------------------------
-    # Macro
-    # --------------------------------------------------------
-
-    macro_available = layer_available(
+    macro_available = layer_is_available(
         row,
         [
             "macro_available",
@@ -806,27 +714,7 @@ def collect_layer_evidence(
         ],
     )
 
-    if macro_available:
-        add_macro_evidence(
-            evidence,
-            row,
-        )
-
-        add_financial_stress_evidence(
-            evidence,
-            row,
-        )
-
-        add_fed_evidence(
-            evidence,
-            row,
-        )
-
-    # --------------------------------------------------------
-    # Sentiment
-    # --------------------------------------------------------
-
-    sentiment_available = layer_available(
+    sentiment_available = layer_is_available(
         row,
         [
             "sentiment_available",
@@ -835,17 +723,7 @@ def collect_layer_evidence(
         ],
     )
 
-    if sentiment_available:
-        add_sentiment_evidence(
-            evidence,
-            row,
-        )
-
-    # --------------------------------------------------------
-    # Technical
-    # --------------------------------------------------------
-
-    technical_available = layer_available(
+    technical_available = layer_is_available(
         row,
         [
             "technical_available",
@@ -854,17 +732,32 @@ def collect_layer_evidence(
         ],
     )
 
-    if technical_available:
-        add_technical_evidence(
-            evidence,
+    if macro_available:
+
+        collect_macro_evidence(
             row,
+            evidence,
+        )
+
+    if sentiment_available:
+
+        collect_sentiment_evidence(
+            row,
+            evidence,
+        )
+
+    if technical_available:
+
+        collect_technical_evidence(
+            row,
+            evidence,
         )
 
     return evidence
 
 
 # ============================================================
-# DECISION CLASSIFICATION
+# DECISION-ENGINE DESCRIPTIVE CLASSIFICATION
 # ============================================================
 
 def classify_evidence(
@@ -872,52 +765,45 @@ def classify_evidence(
 ) -> Dict[str, Any]:
 
     supportive = [
-        item for item in evidence
+        item
+        for item in evidence
         if item.stance == "SUPPORTIVE"
     ]
 
     contradictory = [
-        item for item in evidence
+        item
+        for item in evidence
         if item.stance == "CONTRADICTORY"
     ]
 
     mixed = [
-        item for item in evidence
+        item
+        for item in evidence
         if item.stance == "MIXED"
     ]
 
-    evidence_count = (
-        len(supportive)
-        + len(contradictory)
-        + len(mixed)
-    )
+    evidence_count = len(evidence)
 
     if evidence_count < MIN_EVIDENCE:
 
         state = "INSUFFICIENT_DATA"
 
-    elif (
-        len(supportive) > 0
-        and len(contradictory) == 0
-    ):
+    elif supportive and not contradictory:
 
         state = "SUPPORTIVE"
 
-    elif (
-        len(contradictory) > 0
-        and len(supportive) == 0
-    ):
+    elif contradictory and not supportive:
 
         state = "CONTRADICTORY"
 
     else:
 
-        total_directional = (
+        directional = (
             len(supportive)
             + len(contradictory)
         )
 
-        if total_directional == 0:
+        if directional == 0:
 
             state = "MIXED"
 
@@ -925,12 +811,12 @@ def classify_evidence(
 
             supportive_ratio = (
                 len(supportive)
-                / total_directional
+                / directional
             )
 
             contradictory_ratio = (
                 len(contradictory)
-                / total_directional
+                / directional
             )
 
             if supportive_ratio >= MAJORITY_RATIO:
@@ -946,24 +832,26 @@ def classify_evidence(
                 state = "MIXED"
 
     # --------------------------------------------------------
-    # Descriptive evidence coverage.
-    # This is NOT probability.
+    # IMPORTANT:
+    # Confidence is evidence coverage only.
+    # It is NOT probability and NOT trade confidence.
     # --------------------------------------------------------
 
-    if evidence_count == 0:
-
-        confidence = 0.0
-
-    elif evidence_count >= HIGH_CONFIDENCE_EVIDENCE:
+    if evidence_count >= HIGH_CONFIDENCE_EVIDENCE:
 
         confidence = 1.0
 
-    else:
+    elif evidence_count > 0:
 
         confidence = round(
-            evidence_count / HIGH_CONFIDENCE_EVIDENCE,
+            evidence_count
+            / HIGH_CONFIDENCE_EVIDENCE,
             4,
         )
+
+    else:
+
+        confidence = 0.0
 
     return {
         "state": state,
@@ -976,7 +864,7 @@ def classify_evidence(
 
 
 # ============================================================
-# OUTPUT
+# OUTPUT BUILD
 # ============================================================
 
 def build_output(
@@ -986,15 +874,17 @@ def build_output(
     validation_errors: List[str],
 ) -> Dict[str, Any]:
 
-    missing = []
+    missing: List[str] = []
 
     if not evidence:
-        missing.append("usable research evidence")
 
-    if validation_errors:
-        missing.extend(validation_errors)
+        missing.append(
+            "usable research evidence"
+        )
 
-    output = {
+    missing.extend(validation_errors)
+
+    return {
         "engine": ENGINE_VERSION,
         "engine_version": ENGINE_VERSION,
 
@@ -1002,29 +892,54 @@ def build_output(
 
         "state": classification["state"],
 
-        # This confidence describes evidence coverage only.
         "confidence": classification["confidence"],
+
         "confidence_type": "evidence_coverage",
 
-        "evidence_count": classification["evidence_count"],
-        "supportive_count": classification["supportive_count"],
-        "contradictory_count": classification["contradictory_count"],
-        "mixed_count": classification["mixed_count"],
+        "evidence_count": classification[
+            "evidence_count"
+        ],
+
+        "supportive_count": classification[
+            "supportive_count"
+        ],
+
+        "contradictory_count": classification[
+            "contradictory_count"
+        ],
+
+        "mixed_count": classification[
+            "mixed_count"
+        ],
 
         "missing": missing,
 
-        "point_in_time_safe": len(validation_errors) == 0,
+        "point_in_time_safe": (
+            len(validation_errors) == 0
+        ),
+
         "research_only": True,
+
         "decision_engine_enabled": True,
 
+        # ----------------------------------------------------
+        # Explicit research-only protections
+        # ----------------------------------------------------
+
         "trading_signal": None,
+
         "forecast": None,
+
         "unified_decision": None,
 
         "execution": False,
+
         "broker_integration": False,
+
         "position_sizing": False,
+
         "stop_loss": None,
+
         "take_profit": None,
 
         "evidence": [
@@ -1033,8 +948,10 @@ def build_output(
         ],
     }
 
-    return output
 
+# ============================================================
+# WRITE OUTPUT FILES
+# ============================================================
 
 def write_outputs(
     output_dir: Path,
@@ -1047,70 +964,99 @@ def write_outputs(
         exist_ok=True,
     )
 
+    # --------------------------------------------------------
+    # JSON
+    # --------------------------------------------------------
+
     json_path = (
         output_dir
         / "decision_engine_research_v1.json"
     )
 
-    csv_path = (
-        output_dir
-        / "decision_engine_research_v1.csv"
-    )
-
-    summary_path = (
-        output_dir
-        / "decision_engine_research_summary_v1.csv"
-    )
-
-    evidence_path = (
-        output_dir
-        / "decision_engine_research_evidence_v1.csv"
-    )
-
-    with json_path.open(
-        "w",
-        encoding="utf-8",
-    ) as f:
-
-        json.dump(
+    json_path.write_text(
+        json.dumps(
             output,
-            f,
             indent=2,
             ensure_ascii=False,
-        )
+        ),
+        encoding="utf-8",
+    )
 
-    row = {
+    # --------------------------------------------------------
+    # Main CSV
+    # --------------------------------------------------------
+
+    flat_output = {
         key: value
         for key, value in output.items()
         if key != "evidence"
     }
 
-    pd.DataFrame([row]).to_csv(
-        csv_path,
+    pd.DataFrame(
+        [flat_output]
+    ).to_csv(
+        output_dir
+        / "decision_engine_research_v1.csv",
         index=False,
     )
+
+    # --------------------------------------------------------
+    # Summary CSV
+    # --------------------------------------------------------
 
     pd.DataFrame(
         [
             {
-                "as_of_date": output["as_of_date"],
-                "state": output["state"],
-                "confidence": output["confidence"],
-                "evidence_count": output["evidence_count"],
-                "supportive_count": output["supportive_count"],
-                "contradictory_count": output["contradictory_count"],
-                "mixed_count": output["mixed_count"],
-                "point_in_time_safe": output["point_in_time_safe"],
-                "research_only": output["research_only"],
+                "as_of_date": output[
+                    "as_of_date"
+                ],
+
+                "state": output[
+                    "state"
+                ],
+
+                "confidence": output[
+                    "confidence"
+                ],
+
+                "evidence_count": output[
+                    "evidence_count"
+                ],
+
+                "supportive_count": output[
+                    "supportive_count"
+                ],
+
+                "contradictory_count": output[
+                    "contradictory_count"
+                ],
+
+                "mixed_count": output[
+                    "mixed_count"
+                ],
+
+                "point_in_time_safe": output[
+                    "point_in_time_safe"
+                ],
+
+                "research_only": output[
+                    "research_only"
+                ],
+
                 "decision_engine_enabled": output[
                     "decision_engine_enabled"
                 ],
             }
         ]
     ).to_csv(
-        summary_path,
+        output_dir
+        / "decision_engine_research_summary_v1.csv",
         index=False,
     )
+
+    # --------------------------------------------------------
+    # Evidence CSV
+    # --------------------------------------------------------
 
     pd.DataFrame(
         [
@@ -1118,13 +1064,14 @@ def write_outputs(
             for item in evidence
         ]
     ).to_csv(
-        evidence_path,
+        output_dir
+        / "decision_engine_research_evidence_v1.csv",
         index=False,
     )
 
 
 # ============================================================
-# VALIDATION
+# OUTPUT VALIDATION
 # ============================================================
 
 def validate_output(
@@ -1133,67 +1080,94 @@ def validate_output(
 
     errors: List[str] = []
 
-    if output.get("research_only") is not True:
+    if output["research_only"] is not True:
+
         errors.append(
             "research_only must be true."
         )
 
-    if output.get("decision_engine_enabled") is not True:
+    if (
+        output["decision_engine_enabled"]
+        is not True
+    ):
+
         errors.append(
-            "decision_engine_enabled must be true."
+            "decision_engine_enabled "
+            "must be true."
         )
 
-    if output.get("execution") is not False:
+    if output["execution"] is not False:
+
         errors.append(
             "execution must be false."
         )
 
-    if output.get("broker_integration") is not False:
+    if (
+        output["broker_integration"]
+        is not False
+    ):
+
         errors.append(
-            "broker_integration must be false."
+            "broker_integration "
+            "must be false."
         )
 
-    if output.get("position_sizing") is not False:
+    if output["position_sizing"] is not False:
+
         errors.append(
             "position_sizing must be false."
         )
 
-    if output.get("trading_signal") is not None:
+    if output["trading_signal"] is not None:
+
         errors.append(
             "trading_signal must remain null."
         )
 
-    if output.get("forecast") is not None:
+    if output["forecast"] is not None:
+
         errors.append(
             "forecast must remain null."
         )
 
-    if output.get("unified_decision") is not None:
+    if output["unified_decision"] is not None:
+
         errors.append(
             "unified_decision must remain null."
         )
 
-    allowed_states = {
+    if output["stop_loss"] is not None:
+
+        errors.append(
+            "stop_loss must remain null."
+        )
+
+    if output["take_profit"] is not None:
+
+        errors.append(
+            "take_profit must remain null."
+        )
+
+    if output["state"] not in {
         "SUPPORTIVE",
         "CONTRADICTORY",
         "MIXED",
         "INSUFFICIENT_DATA",
-    }
+    }:
 
-    if output.get("state") not in allowed_states:
         errors.append(
             "Invalid Decision Engine state."
         )
 
     confidence = as_float(
-        output.get("confidence")
+        output["confidence"]
     )
 
-    if confidence is None:
-        errors.append(
-            "Invalid confidence."
-        )
-    elif not 0 <= confidence <= 1:
+    if (
+        confidence is None
+        or not 0 <= confidence <= 1
+    ):
+
         errors.append(
             "Confidence must be between 0 and 1."
         )
@@ -1208,7 +1182,10 @@ def validate_output(
 def main() -> int:
 
     parser = argparse.ArgumentParser(
-        description="US500 Macro Intelligence Decision Engine V1"
+        description=(
+            "US500 Macro Intelligence "
+            "Decision Engine V1"
+        )
     )
 
     parser.add_argument(
@@ -1225,53 +1202,165 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    input_path = Path(args.input)
-    output_dir = Path(args.output_dir)
-
-    print("=" * 68)
-    print("US500 MACRO INTELLIGENCE — DECISION ENGINE V1")
-    print("=" * 68)
-    print("Research-only:", RESEARCH_ONLY)
-    print("Decision Engine enabled:", DECISION_ENGINE_ENABLED)
-    print()
-
-    df, validation_errors = extract_research_context(
-        input_path
+    input_path = Path(
+        args.input
     )
 
-    date_column = find_latest_date_column(df)
+    output_dir = Path(
+        args.output_dir
+    )
+
+    if not input_path.is_file():
+
+        die(
+            f"Input path is not a file: "
+            f"{input_path}"
+        )
+
+    print("=" * 70)
+    print(
+        "US500 MACRO INTELLIGENCE "
+        "— DECISION ENGINE V1"
+    )
+    print("=" * 70)
+
+    print(
+        "Research-only:",
+        RESEARCH_ONLY,
+    )
+
+    print(
+        "Decision Engine enabled:",
+        DECISION_ENGINE_ENABLED,
+    )
+
+    print()
+
+    # --------------------------------------------------------
+    # READ INPUT
+    # --------------------------------------------------------
+
+    try:
+
+        df = pd.read_csv(
+            input_path
+        )
+
+    except Exception as exc:
+
+        die(
+            f"Could not read "
+            f"{input_path}: {exc}"
+        )
+
+    # --------------------------------------------------------
+    # VALIDATE INPUT
+    # --------------------------------------------------------
+
+    validation_errors = validate_input(
+        df
+    )
+
+    dcol = date_column(
+        df
+    )
 
     row = latest_row(
         df,
-        date_column,
+        dcol,
     )
 
     context_date = None
 
-    if date_column is not None:
+    if dcol is not None:
 
-        dates = parse_dates(
-            df,
-            date_column,
-        )
+        dates = pd.to_datetime(
+            df[dcol],
+            errors="coerce",
+        ).dropna()
 
-        valid_dates = dates.dropna()
-
-        if not valid_dates.empty:
+        if not dates.empty:
 
             context_date = (
-                valid_dates.max()
+                dates.max()
                 .date()
                 .isoformat()
             )
 
-    evidence = collect_layer_evidence(
+    print(
+        "Input rows:",
+        len(df),
+    )
+
+    print(
+        "Input columns:",
+        len(df.columns),
+    )
+
+    print(
+        "Date column:",
+        dcol,
+    )
+
+    print(
+        "Latest context date:",
+        context_date,
+    )
+
+    # --------------------------------------------------------
+    # DISPLAY LAYER AVAILABILITY
+    # --------------------------------------------------------
+
+    print()
+    print(
+        "Research Context layer availability:"
+    )
+
+    macro_available = get_bool(
+        row,
+        ["macro_available"],
+    )
+
+    sentiment_available = get_bool(
+        row,
+        ["sentiment_available"],
+    )
+
+    technical_available = get_bool(
+        row,
+        ["technical_available"],
+    )
+
+    print(
+        "  macro_available:",
+        macro_available,
+    )
+
+    print(
+        "  sentiment_available:",
+        sentiment_available,
+    )
+
+    print(
+        "  technical_available:",
+        technical_available,
+    )
+
+    # --------------------------------------------------------
+    # COLLECT EVIDENCE
+    # --------------------------------------------------------
+
+    evidence = collect_evidence(
         row
     )
 
     classification = classify_evidence(
         evidence
     )
+
+    # --------------------------------------------------------
+    # BUILD OUTPUT
+    # --------------------------------------------------------
 
     output = build_output(
         context_date=context_date,
@@ -1280,34 +1369,50 @@ def main() -> int:
         validation_errors=validation_errors,
     )
 
-    output_validation_errors = validate_output(
+    # --------------------------------------------------------
+    # VALIDATE OUTPUT
+    # --------------------------------------------------------
+
+    output_errors = validate_output(
         output
     )
 
     validation_errors.extend(
-        output_validation_errors
+        output_errors
     )
 
     if validation_errors:
 
-        output["point_in_time_safe"] = False
-        output["missing"] = validation_errors
+        output[
+            "point_in_time_safe"
+        ] = False
 
-        # A validation failure must never produce a
-        # directional classification as if the evidence
-        # were safe.
-        output["state"] = "INSUFFICIENT_DATA"
+        output[
+            "state"
+        ] = "INSUFFICIENT_DATA"
+
+        output[
+            "missing"
+        ] = validation_errors
+
+    # --------------------------------------------------------
+    # WRITE OUTPUTS
+    # --------------------------------------------------------
 
     write_outputs(
-        output_dir,
-        output,
-        evidence,
+        output_dir=output_dir,
+        output=output,
+        evidence=evidence,
     )
 
+    # --------------------------------------------------------
+    # PRINT RESULT
+    # --------------------------------------------------------
+
     print()
-    print("=" * 68)
+    print("=" * 70)
     print("DECISION ENGINE RESULT")
-    print("=" * 68)
+    print("=" * 70)
 
     print(
         "Context date:",
@@ -1354,6 +1459,35 @@ def main() -> int:
         output["research_only"],
     )
 
+    # --------------------------------------------------------
+    # EVIDENCE DISPLAY
+    # --------------------------------------------------------
+
+    print()
+    print("Evidence:")
+
+    if not evidence:
+
+        print(
+            "  No usable evidence found."
+        )
+
+    else:
+
+        for item in evidence:
+
+            print(
+                f"  [{item.stance}] "
+                f"{item.source} / "
+                f"{item.category}: "
+                f"{item.reason}"
+            )
+
+    # --------------------------------------------------------
+    # RESEARCH-ONLY SAFETY DISPLAY
+    # --------------------------------------------------------
+
+    print()
     print(
         "Trading signal:",
         output["trading_signal"],
@@ -1369,27 +1503,65 @@ def main() -> int:
         output["unified_decision"],
     )
 
-    print()
+    print(
+        "Execution:",
+        output["execution"],
+    )
+
+    print(
+        "Position sizing:",
+        output["position_sizing"],
+    )
+
+    print(
+        "Stop loss:",
+        output["stop_loss"],
+    )
+
+    print(
+        "Take profit:",
+        output["take_profit"],
+    )
+
+    # --------------------------------------------------------
+    # FAIL ONLY ON REAL VALIDATION ERRORS
+    # --------------------------------------------------------
 
     if validation_errors:
 
-        print("=" * 68)
-        print("VALIDATION ERRORS")
-        print("=" * 68)
+        print()
+        print("=" * 70)
+        print(
+            "VALIDATION ERRORS"
+        )
+        print("=" * 70)
 
         for error in validation_errors:
-            print("-", error)
+
+            print(
+                "-",
+                error,
+            )
 
         return 1
 
-    print("=" * 68)
-    print("DECISION ENGINE V1 VALIDATION PASSED")
-    print("=" * 68)
+    # --------------------------------------------------------
+    # SUCCESS
+    # --------------------------------------------------------
+
+    print()
+    print("=" * 70)
+    print(
+        "DECISION ENGINE V1 "
+        "VALIDATION PASSED"
+    )
+    print("=" * 70)
 
     return 0
 
 
 if __name__ == "__main__":
+
     raise SystemExit(
         main()
     )
