@@ -41,7 +41,7 @@ DATASETS: Dict[str, Dict[str, Any]] = {
     },
     "Macro Context": {
         "artifact": "macro-context-v1",
-        "files": ["macro_context_v1.csv"],
+        "files": ["macro_context_v1.csv", "macro_context_v1.json"],
     },
     "Financial Stress": {
         "artifact": "financial-stress-research-v1",
@@ -93,7 +93,16 @@ DATASETS: Dict[str, Dict[str, Any]] = {
     },
     "Decision Engine": {
         "artifact": "decision-engine-v1",
-        "files": ["decision_engine_validation_v1.csv", "decision_engine_validation.csv"],
+        "files": ["decision_engine_validation_v1.csv", "decision_engine_validation_v1_summary.csv", "decision_engine_validation_v1_events.csv", "decision_engine_research_v1.csv", "decision_engine_research_v1_summary.csv"],
+    },
+    "Final Validation": {
+        "artifact": "final-end-to-end-validation-v1",
+        "files": [
+            "final_end_to_end_validation_report.csv",
+            "final_end_to_end_validation_summary.csv",
+            "final_end_to_end_validation_manifest.csv",
+            "final_end_to_end_validation_events.csv",
+        ],
     },
     # Historical Event Study is kept flexible across the repo's v1/v2 naming.
     # We only accept exact filenames listed here; no first-CSV heuristic is used.
@@ -114,6 +123,10 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         ],
     },
 }
+
+ARTIFACT_ERRORS: Dict[str, str] = {}
+DATASET_ERRORS: Dict[str, str] = {}
+
 
 st.set_page_config(
     page_title=APP_TITLE,
@@ -168,7 +181,7 @@ def number(value: Any) -> Optional[float]:
 def fmt(value: Any, digits: int = 2) -> str:
     x = number(value)
     if x is None:
-        return clean(value) or "N/A"
+        return clean(value) or "Not available"
     return f"{x:,.{digits}f}"
 
 
@@ -184,7 +197,7 @@ def date_value(value: Any) -> str:
         ts = pd.to_datetime(value, errors="coerce")
         return "N/A" if pd.isna(ts) else str(ts.date())
     except Exception:
-        return clean(value) or "N/A"
+        return clean(value) or "Not available"
 
 
 def find_column(df: Optional[pd.DataFrame], candidates: List[str]) -> Optional[str]:
@@ -306,12 +319,17 @@ def download_artifact(artifact_id: int) -> Dict[str, bytes]:
 
 def artifact_files(artifact_name: Optional[str] = None, artifact_names: Optional[List[str]] = None) -> Dict[str, bytes]:
     artifact = latest_artifact(artifact_name) if artifact_name else latest_from_candidates(artifact_names or [])
+    label = artifact_name or ", ".join(artifact_names or []) or "unknown artifact"
     if artifact is None:
+        ARTIFACT_ERRORS[label] = "No non-expired artifact with the requested name was found."
         return {}
     try:
         return download_artifact(int(artifact["id"]))
-    except Exception:
-        return {}
+    except requests.HTTPError as exc:
+        ARTIFACT_ERRORS[label] = f"GitHub artifact download failed: {exc}"
+    except Exception as exc:
+        ARTIFACT_ERRORS[label] = f"Artifact download failed: {type(exc).__name__}: {exc}"
+    return {}
 
 
 def find_artifact_file(files: Dict[str, bytes], exact_names: List[str]) -> Optional[bytes]:
@@ -325,27 +343,65 @@ def find_artifact_file(files: Dict[str, bytes], exact_names: List[str]) -> Optio
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
-def load_named_csv(dataset_name: str) -> Optional[pd.DataFrame]:
+def load_named_csv(dataset_name: str, file_index: int = 0) -> Optional[pd.DataFrame]:
     config = DATASETS.get(dataset_name, {})
-    artifact = config.get("artifact")
-    artifacts = config.get("artifact_candidates")
     filenames = config.get("files", [])
-    files = artifact_files(artifact, artifacts)
-    raw = find_artifact_file(files, filenames)
-    return safe_read_csv(raw) if raw is not None else None
+    if not filenames or file_index >= len(filenames):
+        DATASET_ERRORS[dataset_name] = "No configured CSV filename for this dataset."
+        return None
+    # Prefer CSV files for this loader.
+    csv_names = [x for x in filenames if x.lower().endswith('.csv')]
+    if file_index >= len(csv_names):
+        DATASET_ERRORS[dataset_name] = "Configured files do not contain the requested CSV index."
+        return None
+    files = artifact_files(config.get("artifact"), config.get("artifact_candidates"))
+    raw = find_artifact_file(files, [csv_names[file_index]])
+    if raw is None:
+        DATASET_ERRORS[dataset_name] = f"File not found in artifact: {csv_names[file_index]}"
+        return None
+    df = safe_read_csv(raw)
+    if df is None or df.empty:
+        DATASET_ERRORS[dataset_name] = f"CSV could not be read or is empty: {csv_names[file_index]}"
+        return None
+    return df
+
+
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def load_named_csvs(dataset_name: str) -> Dict[str, pd.DataFrame]:
+    config = DATASETS.get(dataset_name, {})
+    files = artifact_files(config.get("artifact"), config.get("artifact_candidates"))
+    result: Dict[str, pd.DataFrame] = {}
+    for filename in config.get("files", []):
+        if not filename.lower().endswith('.csv'):
+            continue
+        raw = find_artifact_file(files, [filename])
+        if raw is None:
+            continue
+        df = safe_read_csv(raw)
+        if df is not None and not df.empty:
+            result[filename] = df
+    if not result:
+        DATASET_ERRORS[dataset_name] = "No configured CSV files were loaded from the artifact."
+    return result
 
 
 @st.cache_data(ttl=CACHE_TTL, show_spinner=False)
 def load_named_json(dataset_name: str) -> Optional[Dict[str, Any]]:
     config = DATASETS.get(dataset_name, {})
+    json_names = [x for x in config.get("files", []) if x.lower().endswith('.json')]
+    if not json_names:
+        DATASET_ERRORS[dataset_name] = "No configured JSON filename for this dataset."
+        return None
     files = artifact_files(config.get("artifact"), config.get("artifact_candidates"))
-    raw = find_artifact_file(files, config.get("files", []))
+    raw = find_artifact_file(files, json_names)
     if raw is None:
+        DATASET_ERRORS[dataset_name] = f"JSON file not found in artifact: {json_names[0]}"
         return None
     try:
         import json
         return json.loads(raw.decode("utf-8"))
-    except Exception:
+    except Exception as exc:
+        DATASET_ERRORS[dataset_name] = f"JSON parse failed: {exc}"
         return None
 
 
@@ -397,8 +453,12 @@ cross_asset = load_dataset("Cross Asset")
 earnings = load_dataset("Earnings")
 fed_intelligence = load_named_json("Fed Intelligence")
 market_breadth = load_dataset("Market Breadth")
-earnings_summary = load_named_csv("Earnings Detail")
+earnings_detail_files = load_named_csvs("Earnings Detail")
+earnings_summary = earnings_detail_files.get("earnings_market_reaction_summary_v3.csv")
+earnings_eps = earnings_detail_files.get("earnings_reaction_by_eps_class_v3.csv")
+earnings_sector = earnings_detail_files.get("earnings_reaction_by_sector_v3.csv")
 historical_files = load_historical_files()
+final_validation_files = load_named_csvs("Final Validation")
 
 
 @st.cache_data(ttl=MARKET_CACHE_TTL, show_spinner=False)
@@ -488,6 +548,38 @@ def current_context() -> Dict[str, Any]:
 
 
 CTX = current_context()
+
+
+def canonical_value(names: List[str], default: Any = None) -> Any:
+    """Read the canonical latest Research Context row before falling back to a standalone dataset."""
+    if research_context is None or research_context.empty:
+        return default
+    col = find_column(research_context, names)
+    if col is None:
+        return default
+    value = research_context.iloc[-1].get(col, default)
+    if pd.isna(value):
+        return default
+    return value
+
+
+def display_value(value: Any, default: str = "Not available") -> str:
+    if value is None:
+        return default
+    if isinstance(value, float) and np.isnan(value):
+        return default
+    text = clean(value)
+    return text if text else default
+
+
+def render_data_health() -> None:
+    if not secret("GITHUB_TOKEN"):
+        warning("GITHUB_TOKEN is not configured. The dashboard cannot reliably read GitHub Actions artifacts. The canonical Research Context will still be shown when available locally.")
+    if DATASET_ERRORS:
+        with st.expander("Data access diagnostics", expanded=False):
+            for name, error in DATASET_ERRORS.items():
+                st.write(f"**{name}:** {error}")
+
 
 
 def hero(title: str, subtitle: str, page: str) -> None:
@@ -591,20 +683,20 @@ def render_overview() -> None:
     st.markdown("### Current research state")
     cols = st.columns(4)
     states = [
-        ("Macro", CTX.get("economic_regime") or row_value(macro_context, ["economic_regime", "research_regime"]), "Macro research"),
-        ("Financial stress", CTX.get("financial_stress_regime") or row_value(financial_stress, ["research_regime", "stress_regime"]), "Financial Stress"),
-        ("Sentiment", CTX.get("sentiment_regime") or row_value(sentiment, ["research_regime", "sentiment_regime"]), "Sentiment research"),
-        ("Technical", CTX.get("technical_regime") or row_value(technical, ["technical_regime", "research_regime"]), "Technical research"),
+        ("Macro", canonical_value(["macro_economic_regime", "economic_regime", "research_regime"]) or row_value(macro_context, ["economic_regime", "research_regime"]), "Macro research"),
+        ("Financial stress", canonical_value(["macro_financial_stress_regime", "research_regime", "stress_regime"]) or row_value(financial_stress, ["research_regime", "stress_regime"]), "Financial Stress"),
+        ("Sentiment", canonical_value(["sentiment_research_regime", "research_regime", "sentiment_regime"]) or row_value(sentiment, ["research_regime", "sentiment_regime"]), "Sentiment research"),
+        ("Technical", canonical_value(["technical_technical_regime", "technical_regime", "research_regime"]) or row_value(technical, ["technical_regime", "research_regime"]), "Technical research"),
     ]
     for col, item in zip(cols, states):
         with col:
-            state_card(item[0], item[1] or "N/A", item[2])
+            state_card(item[0], item[1] or "Not available", item[2])
 
     section_title("Market research summary", "Evidence-oriented synthesis from the latest available research layers.")
-    evidence("Macro", f"Current macro regime: <strong>{clean(states[0][1]) or 'N/A'}</strong>. Inflation, labor, growth and Federal Reserve fields are shown in the Macro page when available.")
-    evidence("Financial stress", f"Current stress regime: <strong>{clean(states[1][1]) or 'N/A'}</strong>. The financial-stress dataset combines market stress components and point-in-time observations.")
-    evidence("Sentiment", f"Current sentiment research state: <strong>{clean(states[2][1]) or 'N/A'}</strong>. The dashboard reports observed sentiment evidence without converting it into a trading instruction.")
-    evidence("Technical", f"Current technical structure: <strong>{clean(states[3][1]) or 'N/A'}</strong>. Trend, RSI, ATR and rate-of-change evidence are displayed where the artifact provides them.")
+    evidence("Macro", f"Current macro regime: <strong>{clean(states[0][1]) or 'Not available'}</strong>. Inflation, labor, growth and Federal Reserve fields are shown in the Macro page when available.")
+    evidence("Financial stress", f"Current stress regime: <strong>{clean(states[1][1]) or 'Not available'}</strong>. The financial-stress dataset combines market stress components and point-in-time observations.")
+    evidence("Sentiment", f"Current sentiment research state: <strong>{clean(states[2][1]) or 'Not available'}</strong>. The dashboard reports observed sentiment evidence without converting it into a trading instruction.")
+    evidence("Technical", f"Current technical structure: <strong>{clean(states[3][1]) or 'Not available'}</strong>. Trend, RSI, ATR and rate-of-change evidence are displayed where the artifact provides them.")
     section_end()
 
     section_title("Market history", "Public S&P 500 proxy used only for visual market context.")
@@ -620,14 +712,14 @@ def render_regime() -> None:
     hero("Market Regime", "Current research state across the major evidence layers.", "Market Regime")
     cols = st.columns(4)
     items = [
-        ("Macro regime", CTX.get("economic_regime") or row_value(macro_context, ["economic_regime", "research_regime"])),
-        ("Stress regime", CTX.get("financial_stress_regime") or row_value(financial_stress, ["research_regime", "stress_regime"])),
-        ("Sentiment regime", CTX.get("sentiment_regime") or row_value(sentiment, ["research_regime", "sentiment_regime"])),
-        ("Technical regime", CTX.get("technical_regime") or row_value(technical, ["technical_regime", "research_regime"])),
+        ("Macro regime", canonical_value(["macro_economic_regime", "economic_regime", "research_regime"]) or row_value(macro_context, ["economic_regime", "research_regime"])),
+        ("Stress regime", canonical_value(["macro_financial_stress_regime", "research_regime", "stress_regime"]) or row_value(financial_stress, ["research_regime", "stress_regime"])),
+        ("Sentiment regime", canonical_value(["sentiment_research_regime", "research_regime", "sentiment_regime"]) or row_value(sentiment, ["research_regime", "sentiment_regime"])),
+        ("Technical regime", canonical_value(["technical_technical_regime", "technical_regime", "research_regime"]) or row_value(technical, ["technical_regime", "research_regime"])),
     ]
     for col, (label, value) in zip(cols, items):
         with col:
-            state_card(label, value or "N/A")
+            state_card(label, value or "Not available")
     section_title("Research integrity", "The dashboard exposes observed research state rather than a unified trading decision.")
     evidence("Point-in-time status", "Research Context declares point-in-time safety as <strong>TRUE</strong> when that field is present and true.")
     evidence("Coverage", f"Research Context reports {fmt(CTX.get('layers'), 0)} available layers on {date_value(CTX.get('date'))} when the fields are present.")
@@ -639,11 +731,11 @@ def render_macro() -> None:
     dataset_status("Macro Context", macro_context)
     cols = st.columns(5)
     values = [
-        ("Economic regime", CTX.get("economic_regime") or row_value(macro_context, ["economic_regime", "research_regime"])),
-        ("Inflation", CTX.get("inflation_score") or row_value(macro_context, ["inflation_score"])),
-        ("Labor", CTX.get("labor_score") or row_value(macro_context, ["labor_score"])),
-        ("Growth", CTX.get("growth_score") or row_value(macro_context, ["growth_score"])),
-        ("Fed", CTX.get("fed_score") or row_value(macro_context, ["fed_score"])),
+        ("Economic regime", canonical_value(["macro_economic_regime", "economic_regime", "research_regime"]) or row_value(macro_context, ["economic_regime", "research_regime"])),
+        ("Inflation", canonical_value(["macro_inflation_score", "inflation_score"]) or row_value(macro_context, ["inflation_score"])),
+        ("Labor", canonical_value(["macro_labor_score", "labor_score"]) or row_value(macro_context, ["labor_score"])),
+        ("Growth", canonical_value(["macro_growth_score", "growth_score"]) or row_value(macro_context, ["growth_score"])),
+        ("Fed", canonical_value(["macro_fed_score", "fed_score"]) or row_value(macro_context, ["fed_score"])),
     ]
     for col, (label, value) in zip(cols, values):
         with col:
@@ -687,10 +779,10 @@ def render_sentiment() -> None:
     dataset_status("Sentiment", sentiment)
     cols = st.columns(4)
     metrics = [
-        ("Research regime", CTX.get("sentiment_regime") or row_value(sentiment, ["research_regime", "sentiment_regime"])),
-        ("Unified score", CTX.get("sentiment_score") or row_value(sentiment, ["unified_sentiment_score", "sentiment_score"])),
-        ("COT", CTX.get("cot") or row_value(sentiment, ["cot_sentiment_score", "cot_score"])),
-        ("VIX sentiment", CTX.get("vix_sentiment") or row_value(sentiment, ["vix_sentiment_score", "vix_score"])),
+        ("Research regime", canonical_value(["sentiment_research_regime", "research_regime", "sentiment_regime"]) or row_value(sentiment, ["research_regime", "sentiment_regime"])),
+        ("Unified score", canonical_value(["sentiment_unified_sentiment_score", "unified_sentiment_score", "sentiment_score"]) or row_value(sentiment, ["unified_sentiment_score", "sentiment_score"])),
+        ("COT", canonical_value(["sentiment_cot_sentiment_score", "cot_sentiment_score", "cot_score"]) or row_value(sentiment, ["cot_sentiment_score", "cot_score"])),
+        ("VIX sentiment", canonical_value(["sentiment_vix_sentiment_score", "vix_sentiment_score", "vix_score"]) or row_value(sentiment, ["vix_sentiment_score", "vix_score"])),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
@@ -706,11 +798,11 @@ def render_technical() -> None:
     dataset_status("Technical", technical)
     cols = st.columns(5)
     metrics = [
-        ("Regime", CTX.get("technical_regime") or row_value(technical, ["technical_regime", "research_regime"])),
-        ("Trend", CTX.get("trend") or row_value(technical, ["trend_structure", "technical_trend_structure"])),
-        ("RSI 14", CTX.get("rsi") or row_value(technical, ["RSI14", "rsi14"])),
-        ("ATR 14 %", CTX.get("atr_pct") or row_value(technical, ["ATR14_pct", "atr14_pct"])),
-        ("ROC 20 %", CTX.get("roc20") or row_value(technical, ["ROC20_pct", "roc20_pct"])),
+        ("Regime", canonical_value(["technical_technical_regime", "technical_regime", "research_regime"]) or row_value(technical, ["technical_regime", "research_regime"])),
+        ("Trend", canonical_value(["technical_trend_structure", "trend_structure"]) or row_value(technical, ["trend_structure", "technical_trend_structure"])),
+        ("RSI 14", canonical_value(["technical_RSI14", "RSI14", "rsi14"]) or row_value(technical, ["RSI14", "rsi14"])),
+        ("ATR 14 %", canonical_value(["technical_ATR14_pct", "ATR14_pct", "atr14_pct"]) or row_value(technical, ["ATR14_pct", "atr14_pct"])),
+        ("ROC 20 %", canonical_value(["technical_ROC20_pct", "ROC20_pct", "roc20_pct"]) or row_value(technical, ["ROC20_pct", "roc20_pct"])),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
@@ -770,11 +862,9 @@ def render_earnings() -> None:
         table_clean(earnings, 40)
     with tabs[1]:
         table_clean(earnings_summary, 40)
+        table_clean(earnings_eps, 40)
     with tabs[2]:
-        if earnings_summary is not None and not earnings_summary.empty:
-            st.dataframe(earnings_summary, use_container_width=True, hide_index=True)
-        else:
-            info("Sector-specific earnings artifact is not available in the current deployment.")
+        table_clean(earnings_sector, 40)
 
 
 def render_historical_edge() -> None:
@@ -819,21 +909,27 @@ def render_evidence() -> None:
     with tabs[0]:
         current_date = date_value(CTX.get("date"))
         evidence("Research date", f"The consolidated Research Context date is <strong>{current_date}</strong> when available.")
-        evidence("Macro evidence", f"Macro regime is <strong>{clean(CTX.get('economic_regime')) or 'N/A'}</strong>.")
-        evidence("Financial stress", f"Stress regime is <strong>{clean(CTX.get('financial_stress_regime')) or clean(row_value(financial_stress, ['research_regime'])) or 'N/A'}</strong>; VIX is <strong>{fmt(CTX.get('vix') or row_value(financial_stress, ['VIX', 'vix']))}</strong>.")
-        evidence("Sentiment evidence", f"Sentiment regime is <strong>{clean(CTX.get('sentiment_regime')) or 'N/A'}</strong>.")
-        evidence("Technical evidence", f"Technical regime is <strong>{clean(CTX.get('technical_regime')) or 'N/A'}</strong>; RSI 14 is <strong>{fmt(CTX.get('rsi') or row_value(technical, ['RSI14', 'rsi14']))}</strong>.")
+        evidence("Macro evidence", f"Macro regime is <strong>{clean(CTX.get('economic_regime')) or 'Not available'}</strong>.")
+        evidence("Financial stress", f"Stress regime is <strong>{clean(CTX.get('financial_stress_regime')) or clean(row_value(financial_stress, ['research_regime'])) or 'Not available'}</strong>; VIX is <strong>{fmt(CTX.get('vix') or row_value(financial_stress, ['VIX', 'vix']))}</strong>.")
+        evidence("Sentiment evidence", f"Sentiment regime is <strong>{clean(CTX.get('sentiment_regime')) or 'Not available'}</strong>.")
+        evidence("Technical evidence", f"Technical regime is <strong>{clean(CTX.get('technical_regime')) or 'Not available'}</strong>; RSI 14 is <strong>{fmt(CTX.get('rsi') or row_value(technical, ['RSI14', 'rsi14']))}</strong>.")
         evidence("Historical support", f"Actual historical-event-study artifacts loaded: <strong>{len(historical_files)}</strong>. No artificial analogue score is created.")
     with tabs[1]:
         info("Research-only boundary: this application visualizes existing research artifacts and does not generate trading signals, forecasts, execution instructions, position sizing, or directional recommendations.")
         evidence("Decision Engine", "The contract-first Decision Engine is treated as a research contract layer; its outputs are not converted into trading instructions here.")
     with tabs[2]:
-        validation = load_named_csv("Decision Engine")
+        validation = load_named_csv("Decision Engine", 0)
         if validation is not None and not validation.empty:
             st.dataframe(validation, use_container_width=True, hide_index=True)
         else:
-            info("Decision Engine validation artifact is not available in the configured deployment.")
-        info("Final End-to-End Validation is a research-quality control artifact; it is not a trading decision layer.")
+            info("Decision Engine validation artifact is not available.")
+        if final_validation_files:
+            st.markdown("### Final End-to-End Validation")
+            for name, df in final_validation_files.items():
+                st.caption(name)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            info("Final End-to-End Validation artifact is not available.")
 
 def render_data_status() -> None:
     hero("Data Status", "Compact deployment diagnostics for the research artifacts used by the dashboard.", "Data Status")
@@ -874,6 +970,8 @@ with st.sidebar:
     st.caption(f"Version {APP_VERSION}")
     st.caption(f"Market proxy: {US500_TICKER}")
     st.caption(f"Research date: {date_value(CTX.get('date'))}")
+
+render_data_health()
 
 try:
     PAGES[page]()
