@@ -45,7 +45,7 @@ jobs:
           python -m pip install pandas
 
       # ==========================================================
-      # 4. PREPARE
+      # 4. PREPARE WORKSPACE
       # ==========================================================
 
       - name: Prepare workspace
@@ -59,8 +59,10 @@ jobs:
           mkdir -p decision_engine_input
           mkdir -p decision_engine_output
 
+          echo "DECISION_ENGINE_EXIT_CODE=999" >> "$GITHUB_ENV"
+
       # ==========================================================
-      # 5. DISCOVER RESEARCH-CONTEXT-V1 ARTIFACT
+      # 5. DISCOVER LATEST RESEARCH CONTEXT ARTIFACT
       # ==========================================================
 
       - name: Discover latest Research Context artifact
@@ -90,15 +92,9 @@ jobs:
             > /tmp/research_context_artifacts.tsv
 
           if [ ! -s /tmp/research_context_artifacts.tsv ]; then
-
             echo
-            echo "ERROR:"
-            echo "No valid research-context-v1 artifact found."
-
-            echo
-            echo "Decision Engine requires Research Context V1."
+            echo "ERROR: No valid research-context-v1 artifact found."
             echo "Run Research Context V1 first."
-
             exit 1
           fi
 
@@ -106,9 +102,7 @@ jobs:
           from pathlib import Path
           from datetime import datetime
 
-          source = Path(
-              "/tmp/research_context_artifacts.tsv"
-          )
+          source = Path("/tmp/research_context_artifacts.tsv")
 
           rows = []
 
@@ -163,17 +157,9 @@ jobs:
               encoding="utf-8",
           )
 
-          print(
-              "Latest research-context-v1:"
-          )
-          print(
-              "artifact_id =",
-              latest[1],
-          )
-          print(
-              "created_at  =",
-              latest[0].isoformat(),
-          )
+          print("Latest research-context-v1:")
+          print("artifact_id =", latest[1])
+          print("created_at  =", latest[0].isoformat())
           PY
 
       # ==========================================================
@@ -207,9 +193,7 @@ jobs:
             > /tmp/research_context.zip
 
           if [ ! -s /tmp/research_context.zip ]; then
-
             echo "ERROR: downloaded artifact is empty."
-
             exit 1
           fi
 
@@ -221,12 +205,7 @@ jobs:
 
           echo
           echo "Downloaded files:"
-
-          find \
-            decision_engine_input \
-            -type f \
-            -print \
-            | sort
+          find decision_engine_input -type f -print | sort
 
       # ==========================================================
       # 7. LOCATE CANONICAL CSV
@@ -334,15 +313,8 @@ jobs:
                   "Research Context is empty."
               )
 
-          print(
-              "Rows:",
-              len(df),
-          )
-
-          print(
-              "Columns:",
-              len(df.columns),
-          )
+          print("Rows:", len(df))
+          print("Columns:", len(df.columns))
 
           required = [
               "point_in_time_safe",
@@ -350,7 +322,8 @@ jobs:
           ]
 
           missing = [
-              c for c in required
+              c
+              for c in required
               if c not in df.columns
           ]
 
@@ -361,6 +334,7 @@ jobs:
               )
 
           def parse_bool(value):
+
               if isinstance(value, bool):
                   return value
 
@@ -414,13 +388,8 @@ jobs:
                   "Research Context contains non-research rows."
               )
 
-          print(
-              "PIT validation: PASS"
-          )
-
-          print(
-              "Research-only validation: PASS"
-          )
+          print("PIT validation: PASS")
+          print("Research-only validation: PASS")
           PY
 
       # ==========================================================
@@ -432,6 +401,8 @@ jobs:
         run: |
           set +e
 
+          mkdir -p decision_engine_output
+
           INPUT_FILE="$(
             cat \
               decision_engine_input/research_context_path.txt
@@ -441,6 +412,30 @@ jobs:
           echo "RUNNING DECISION ENGINE V1"
           echo "============================================================"
 
+          echo
+          echo "Input:"
+          echo "$INPUT_FILE"
+
+          echo
+          echo "Python:"
+          python --version
+
+          echo
+          echo "Decision Engine:"
+          test -f tests/decision_engine/decision_engine_v1.py
+
+          if [ "$?" -ne 0 ]; then
+
+            echo "ERROR: decision_engine_v1.py not found."
+
+            echo "1" \
+              > decision_engine_output/decision_engine_exit_code.txt
+
+            echo "DECISION_ENGINE_EXIT_CODE=1" >> "$GITHUB_ENV"
+
+            exit 0
+          fi
+
           python \
             tests/decision_engine/decision_engine_v1.py \
             --input "$INPUT_FILE" \
@@ -448,14 +443,27 @@ jobs:
 
           RC=$?
 
-          printf '%s\n' "$RC" \
-            > decision_engine_output/decision_engine_exit_code.txt
-
           echo
           echo "Decision Engine exit code: $RC"
 
-          # Do not fail yet.
-          # Upload diagnostics first.
+          echo "$RC" \
+            > decision_engine_output/decision_engine_exit_code.txt
+
+          echo "DECISION_ENGINE_EXIT_CODE=$RC" \
+            >> "$GITHUB_ENV"
+
+          echo
+          echo "Output directory:"
+          find \
+            decision_engine_output \
+            -maxdepth 2 \
+            -type f \
+            -print \
+            | sort
+
+          # Important:
+          # Do NOT fail this step yet.
+          # Diagnostics and artifact upload must execute.
 
           exit 0
 
@@ -473,7 +481,9 @@ jobs:
           echo "DECISION ENGINE JSON"
           echo "============================================================"
 
-          if [ -f "decision_engine_output/decision_engine_research_v1.json" ]; then
+          if [ -f \
+            "decision_engine_output/decision_engine_research_v1.json"
+          ]; then
 
             cat \
               decision_engine_output/decision_engine_research_v1.json
@@ -498,7 +508,9 @@ jobs:
           echo "DECISION ENGINE CSV"
           echo "============================================================"
 
-          if [ -f "decision_engine_output/decision_engine_research_v1.csv" ]; then
+          if [ -f \
+            "decision_engine_output/decision_engine_research_v1.csv"
+          ]; then
 
             cat \
               decision_engine_output/decision_engine_research_v1.csv
@@ -523,7 +535,9 @@ jobs:
           echo "DECISION ENGINE SUMMARY"
           echo "============================================================"
 
-          if [ -f "decision_engine_output/decision_engine_research_summary_v1.csv" ]; then
+          if [ -f \
+            "decision_engine_output/decision_engine_research_summary_v1.csv"
+          ]; then
 
             cat \
               decision_engine_output/decision_engine_research_summary_v1.csv
@@ -548,7 +562,9 @@ jobs:
           echo "DECISION ENGINE EVIDENCE"
           echo "============================================================"
 
-          if [ -f "decision_engine_output/decision_engine_research_evidence_v1.csv" ]; then
+          if [ -f \
+            "decision_engine_output/decision_engine_research_evidence_v1.csv"
+          ]; then
 
             cat \
               decision_engine_output/decision_engine_research_evidence_v1.csv
@@ -577,7 +593,7 @@ jobs:
       # 15. FINAL STATUS
       # ==========================================================
 
-      - name: Apply Decision Engine status
+      - name: Final Decision Engine Status
         if: always()
         shell: bash
         run: |
@@ -587,21 +603,28 @@ jobs:
           echo "FINAL DECISION ENGINE STATUS"
           echo "============================================================"
 
-          if [ ! -f "decision_engine_output/decision_engine_exit_code.txt" ]; then
-
-            echo "ERROR:"
-            echo "Decision Engine exit code file not found."
-
-            exit 1
-          fi
-
-          RC="$(
-            cat \
-              decision_engine_output/decision_engine_exit_code.txt
-          )"
+          RC="${DECISION_ENGINE_EXIT_CODE:-999}"
 
           echo
-          echo "Decision Engine exit code: $RC"
+          echo "Captured exit code: $RC"
+
+          echo
+          echo "Output files:"
+
+          if [ -d "decision_engine_output" ]; then
+
+            find \
+              decision_engine_output \
+              -maxdepth 2 \
+              -type f \
+              -print \
+              | sort
+
+          else
+
+            echo "decision_engine_output directory missing."
+
+          fi
 
           if [ "$RC" -eq 0 ]; then
 
