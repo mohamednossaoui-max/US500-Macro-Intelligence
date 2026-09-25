@@ -56,6 +56,13 @@ MIN_COMMON_SAMPLE = 500
 MIN_EVENT_OBS = 10
 MIN_STABILITY_OBS = 10
 
+EXPECTED_TEMPORAL_PERIODS = [
+    "FULL_SAMPLE",
+    "2019_2021",
+    "2022_2023",
+    "2024_2026",
+]
+
 
 HORIZONS = {
     "1D": 1,
@@ -187,10 +194,16 @@ NUMERIC_SENSITIVITY = {
 
 
 def load_csv(path: str, label: str) -> pd.DataFrame:
-    df = pd.read_csv(path, low_memory=False)
+
+    df = pd.read_csv(
+        path,
+        low_memory=False,
+    )
 
     if df.empty:
-        raise ValueError(f"{label}: empty input")
+        raise ValueError(
+            f"{label}: empty input"
+        )
 
     date_candidates = [
         "study_date",
@@ -201,7 +214,11 @@ def load_csv(path: str, label: str) -> pd.DataFrame:
     ]
 
     date_col = next(
-        (c for c in date_candidates if c in df.columns),
+        (
+            c
+            for c in date_candidates
+            if c in df.columns
+        ),
         None,
     )
 
@@ -211,7 +228,10 @@ def load_csv(path: str, label: str) -> pd.DataFrame:
         )
 
     df["study_date"] = (
-        pd.to_datetime(df[date_col], errors="coerce")
+        pd.to_datetime(
+            df[date_col],
+            errors="coerce",
+        )
         .dt.normalize()
     )
 
@@ -300,18 +320,22 @@ def validate_inputs(
         )
 
     if "point_in_time_safe" in context.columns:
+
         assert_bool_if_present(
             context,
             "point_in_time_safe",
             True,
             "Research Context",
         )
+
     else:
+
         warnings.append(
             "Research Context has no point_in_time_safe column"
         )
 
     if "analysis_pit_perfect" in breadth.columns:
+
         values = (
             breadth["analysis_pit_perfect"]
             .astype(str)
@@ -319,8 +343,10 @@ def validate_inputs(
         )
 
         if not values.eq("false").all():
+
             warnings.append(
-                "Market Breadth analysis_pit_perfect is not uniformly FALSE"
+                "Market Breadth analysis_pit_perfect "
+                "is not uniformly FALSE"
             )
 
     return {
@@ -354,12 +380,22 @@ def download_prices(
 
     close = raw["Close"]
 
-    if isinstance(close, pd.DataFrame):
+    if isinstance(
+        close,
+        pd.DataFrame,
+    ):
         close = close.iloc[:, 0]
 
-    idx = pd.to_datetime(close.index)
+    idx = pd.to_datetime(
+        close.index
+    )
 
-    if getattr(idx, "tz", None) is not None:
+    if getattr(
+        idx,
+        "tz",
+        None,
+    ) is not None:
+
         idx = idx.tz_localize(None)
 
     prices = pd.DataFrame({
@@ -372,9 +408,15 @@ def download_prices(
 
     prices = (
         prices
-        .drop_duplicates("study_date")
-        .sort_values("study_date")
-        .reset_index(drop=True)
+        .drop_duplicates(
+            "study_date"
+        )
+        .sort_values(
+            "study_date"
+        )
+        .reset_index(
+            drop=True
+        )
     )
 
     for horizon, periods in HORIZONS.items():
@@ -417,7 +459,10 @@ def merge_inputs(
             on="study_date",
             how="inner",
             validate="one_to_one",
-            suffixes=("", "_breadth"),
+            suffixes=(
+                "",
+                "_breadth",
+            ),
         )
     )
 
@@ -426,7 +471,9 @@ def merge_inputs(
             "No common dates across all research layers"
         )
 
-    liq_col = "liq_NET_LIQUIDITY_PROXY_MILLIONS"
+    liq_col = (
+        "liq_NET_LIQUIDITY_PROXY_MILLIONS"
+    )
 
     if liq_col not in panel.columns:
         raise ValueError(
@@ -438,8 +485,11 @@ def merge_inputs(
         errors="coerce",
     )
 
-    panel["liquidity_20d_change_pct"] = (
-        liq_series.pct_change(20) * 100.0
+    panel[
+        "liquidity_20d_change_pct"
+    ] = (
+        liq_series.pct_change(20)
+        * 100.0
     )
 
     return (
@@ -457,6 +507,7 @@ def event_mask(
 ) -> pd.Series:
 
     if column not in df.columns:
+
         return pd.Series(
             False,
             index=df.index,
@@ -465,6 +516,7 @@ def event_mask(
     s = df[column]
 
     if operator == "eq":
+
         return s.astype(str).eq(
             str(threshold)
         )
@@ -496,8 +548,10 @@ def onset_series(
     cooldown: int = 5,
 ) -> pd.Series:
 
-    arr = series.fillna(False).to_numpy(
-        dtype=bool
+    arr = (
+        series
+        .fillna(False)
+        .to_numpy(dtype=bool)
     )
 
     output = np.zeros(
@@ -515,6 +569,7 @@ def onset_series(
             and not previous
             and i - last_onset > cooldown
         ):
+
             output[i] = True
             last_onset = i
 
@@ -581,17 +636,24 @@ def evaluate_event(
         n = len(event_returns)
 
         if n:
+
             mean_return = (
-                event_returns.mean() * 100
+                event_returns.mean()
+                * 100
             )
+
             median_return = (
-                event_returns.median() * 100
+                event_returns.median()
+                * 100
             )
+
             positive_share = (
                 (event_returns > 0).mean()
                 * 100
             )
+
         else:
+
             mean_return = np.nan
             median_return = np.nan
             positive_share = np.nan
@@ -603,13 +665,15 @@ def evaluate_event(
         )
 
         non_event_mean = (
-            non_event_returns.mean() * 100
+            non_event_returns.mean()
+            * 100
             if len(non_event_returns)
             else np.nan
         )
 
         difference = (
-            mean_return - non_event_mean
+            mean_return
+            - non_event_mean
             if (
                 np.isfinite(mean_return)
                 and np.isfinite(non_event_mean)
@@ -624,14 +688,24 @@ def evaluate_event(
             "period": period_name,
             "horizon": horizon,
             "event_observations": n,
-            "all_observations": len(all_returns),
-            "non_event_observations": len(non_event_returns),
-            "event_mean_return_pct": mean_return,
-            "event_median_return_pct": median_return,
-            "event_positive_share_pct": positive_share,
-            "all_mean_return_pct": all_mean,
-            "non_event_mean_return_pct": non_event_mean,
-            "event_minus_non_event_pp": difference,
+            "all_observations": len(
+                all_returns
+            ),
+            "non_event_observations": len(
+                non_event_returns
+            ),
+            "event_mean_return_pct":
+                mean_return,
+            "event_median_return_pct":
+                median_return,
+            "event_positive_share_pct":
+                positive_share,
+            "all_mean_return_pct":
+                all_mean,
+            "non_event_mean_return_pct":
+                non_event_mean,
+            "event_minus_non_event_pp":
+                difference,
         })
 
     return rows
@@ -643,26 +717,32 @@ def temporal_periods(
 
     dates = panel["study_date"]
 
-    start = dates.min()
-    end = dates.max()
-
     periods = {}
 
     periods["FULL_SAMPLE"] = panel.copy()
 
-    periods["EARLY"] = panel.loc[
-        dates <= start
-        + (end - start) * 0.333333
+    periods["2019_2021"] = panel.loc[
+        (dates >= pd.Timestamp("2019-01-01"))
+        & (
+            dates
+            <= pd.Timestamp("2021-12-31")
+        )
     ].copy()
 
-    periods["MIDDLE"] = panel.loc[
-        (dates > start + (end - start) * 0.333333)
-        & (dates <= start + (end - start) * 0.666667)
+    periods["2022_2023"] = panel.loc[
+        (dates >= pd.Timestamp("2022-01-01"))
+        & (
+            dates
+            <= pd.Timestamp("2023-12-31")
+        )
     ].copy()
 
-    periods["LATE"] = panel.loc[
-        dates > start
-        + (end - start) * 0.666667
+    periods["2024_2026"] = panel.loc[
+        (dates >= pd.Timestamp("2024-01-01"))
+        & (
+            dates
+            <= pd.Timestamp("2026-12-31")
+        )
     ].copy()
 
     return periods
@@ -713,7 +793,8 @@ def classify_stability(
     if len(valid) >= 2:
 
         spread = (
-            max(valid) - min(valid)
+            max(valid)
+            - min(valid)
         )
 
         magnitude = max(
@@ -741,9 +822,15 @@ def build_temporal_analysis(
 
     rows = []
 
-    for event_name, definition in BASE_EVENTS.items():
+    for (
+        event_name,
+        definition,
+    ) in BASE_EVENTS.items():
 
-        for period_name, period_df in periods.items():
+        for (
+            period_name,
+            period_df,
+        ) in periods.items():
 
             event = add_event(
                 period_df,
@@ -771,14 +858,22 @@ def build_threshold_analysis(
 
     rows = []
 
-    for event_name, definition in NUMERIC_SENSITIVITY.items():
+    for (
+        event_name,
+        definition,
+    ) in NUMERIC_SENSITIVITY.items():
 
-        for threshold in definition["thresholds"]:
+        for threshold in definition[
+            "thresholds"
+        ]:
 
             event_definition = {
-                "column": definition["column"],
-                "operator": definition["operator"],
-                "threshold": threshold,
+                "column":
+                    definition["column"],
+                "operator":
+                    definition["operator"],
+                "threshold":
+                    threshold,
             }
 
             event = add_event(
@@ -811,47 +906,59 @@ def build_temporal_stability(
         event_name,
         horizon,
     ), group in temporal.groupby(
-        ["event_name", "horizon"]
+        [
+            "event_name",
+            "horizon",
+        ]
     ):
 
         values = (
-            group["event_minus_non_event_pp"]
-            .tolist()
+            group[
+                "event_minus_non_event_pp"
+            ].tolist()
         )
 
         observations = (
-            group["event_observations"]
-            .tolist()
+            group[
+                "event_observations"
+            ].tolist()
         )
 
         rows.append({
-            "event_name": event_name,
-            "horizon": horizon,
-            "period_count": len(group),
-            "periods_with_data": int(
-                np.isfinite(
-                    pd.to_numeric(
-                        group[
-                            "event_minus_non_event_pp"
-                        ],
-                        errors="coerce",
-                    )
-                ).sum()
-            ),
-            "minimum_event_observations": (
-                min(observations)
-                if observations
-                else 0
-            ),
-            "maximum_event_observations": (
-                max(observations)
-                if observations
-                else 0
-            ),
-            "stability_class": classify_stability(
-                values,
-                observations,
-            ),
+            "event_name":
+                event_name,
+            "horizon":
+                horizon,
+            "period_count":
+                len(group),
+            "periods_with_data":
+                int(
+                    np.isfinite(
+                        pd.to_numeric(
+                            group[
+                                "event_minus_non_event_pp"
+                            ],
+                            errors="coerce",
+                        )
+                    ).sum()
+                ),
+            "minimum_event_observations":
+                (
+                    min(observations)
+                    if observations
+                    else 0
+                ),
+            "maximum_event_observations":
+                (
+                    max(observations)
+                    if observations
+                    else 0
+                ),
+            "stability_class":
+                classify_stability(
+                    values,
+                    observations,
+                ),
         })
 
     return pd.DataFrame(rows)
@@ -867,49 +974,59 @@ def build_threshold_stability(
         event_name,
         horizon,
     ), group in threshold_df.groupby(
-        ["event_name", "horizon"]
+        [
+            "event_name",
+            "horizon",
+        ]
     ):
 
         values = (
-            group["event_minus_non_event_pp"]
-            .tolist()
+            group[
+                "event_minus_non_event_pp"
+            ].tolist()
         )
 
         observations = (
-            group["event_observations"]
-            .tolist()
+            group[
+                "event_observations"
+            ].tolist()
         )
 
         rows.append({
-            "event_name": event_name,
-            "horizon": horizon,
-            "threshold_count": len(group),
-            "thresholds_with_data": int(
-                np.isfinite(
-                    pd.to_numeric(
-                        group[
-                            "event_minus_non_event_pp"
-                        ],
-                        errors="coerce",
-                    )
-                ).sum()
-            ),
-            "minimum_event_observations": (
-                min(observations)
-                if observations
-                else 0
-            ),
-            "maximum_event_observations": (
-                max(observations)
-                if observations
-                else 0
-            ),
-            "threshold_stability_class": (
+            "event_name":
+                event_name,
+            "horizon":
+                horizon,
+            "threshold_count":
+                len(group),
+            "thresholds_with_data":
+                int(
+                    np.isfinite(
+                        pd.to_numeric(
+                            group[
+                                "event_minus_non_event_pp"
+                            ],
+                            errors="coerce",
+                        )
+                    ).sum()
+                ),
+            "minimum_event_observations":
+                (
+                    min(observations)
+                    if observations
+                    else 0
+                ),
+            "maximum_event_observations":
+                (
+                    max(observations)
+                    if observations
+                    else 0
+                ),
+            "threshold_stability_class":
                 classify_stability(
                     values,
                     observations,
-                )
-            ),
+                ),
         })
 
     return pd.DataFrame(rows)
@@ -921,7 +1038,10 @@ def build_horizon_stability(
 
     rows = []
 
-    for event_name, group in temporal.groupby(
+    for (
+        event_name,
+        group,
+    ) in temporal.groupby(
         "event_name"
     ):
 
@@ -930,7 +1050,8 @@ def build_horizon_stability(
         for horizon in HORIZONS:
 
             subset = group.loc[
-                group["horizon"] == horizon
+                group["horizon"]
+                == horizon
             ]
 
             values = pd.to_numeric(
@@ -947,13 +1068,16 @@ def build_horizon_stability(
             )
 
         valid = [
-            v for v in horizon_values.values()
+            v
+            for v in horizon_values.values()
             if np.isfinite(v)
         ]
 
         rows.append({
-            "event_name": event_name,
-            "horizons_with_data": len(valid),
+            "event_name":
+                event_name,
+            "horizons_with_data":
+                len(valid),
             "mean_1D_difference_pp":
                 horizon_values["1D"],
             "mean_5D_difference_pp":
@@ -963,7 +1087,9 @@ def build_horizon_stability(
             "horizon_stability_class":
                 classify_stability(
                     valid,
-                    [MIN_STABILITY_OBS] * len(valid),
+                    [
+                        MIN_STABILITY_OBS
+                    ] * len(valid),
                 ),
         })
 
@@ -976,7 +1102,10 @@ def build_sample_adequacy(
 
     rows = []
 
-    for event_name, definition in BASE_EVENTS.items():
+    for (
+        event_name,
+        definition,
+    ) in BASE_EVENTS.items():
 
         event = add_event(
             panel,
@@ -988,22 +1117,29 @@ def build_sample_adequacy(
 
         if n < 5:
             category = "INSUFFICIENT"
+
         elif n < MIN_EVENT_OBS:
             category = "LIMITED"
+
         elif n < 30:
             category = "MODERATE"
+
         else:
             category = (
                 "ADEQUATE_FOR_DESCRIPTIVE_ANALYSIS"
             )
 
         rows.append({
-            "event_name": event_name,
-            "event_layer": definition["layer"],
-            "event_observations": n,
+            "event_name":
+                event_name,
+            "event_layer":
+                definition["layer"],
+            "event_observations":
+                n,
             "minimum_basic_diagnostic":
                 MIN_EVENT_OBS,
-            "sample_adequacy": category,
+            "sample_adequacy":
+                category,
         })
 
     return pd.DataFrame(rows)
@@ -1015,7 +1151,11 @@ def build_overlap(
 
     events = {}
 
-    for event_name, definition in BASE_EVENTS.items():
+    for (
+        event_name,
+        definition,
+    ) in BASE_EVENTS.items():
+
         events[event_name] = add_event(
             panel,
             event_name,
@@ -1024,7 +1164,9 @@ def build_overlap(
 
     rows = []
 
-    names = list(events.keys())
+    names = list(
+        events.keys()
+    )
 
     for i, left in enumerate(names):
 
@@ -1033,23 +1175,33 @@ def build_overlap(
             a = events[left]
             b = events[right]
 
-            both = int((a & b).sum())
-            union = int((a | b).sum())
+            both = int(
+                (a & b).sum()
+            )
+
+            union = int(
+                (a | b).sum()
+            )
 
             rows.append({
-                "event_a": left,
-                "event_b": right,
+                "event_a":
+                    left,
+                "event_b":
+                    right,
                 "event_a_observations":
                     int(a.sum()),
                 "event_b_observations":
                     int(b.sum()),
-                "overlap_observations": both,
-                "union_observations": union,
-                "jaccard_overlap": (
-                    both / union
-                    if union
-                    else np.nan
-                ),
+                "overlap_observations":
+                    both,
+                "union_observations":
+                    union,
+                "jaccard_overlap":
+                    (
+                        both / union
+                        if union
+                        else np.nan
+                    ),
             })
 
     return pd.DataFrame(rows)
@@ -1064,48 +1216,77 @@ def build_pit_audit(
     rows = []
 
     datasets = [
-        ("Research Context", context),
-        ("Liquidity", liquidity),
-        ("Market Breadth", breadth),
+        (
+            "Research Context",
+            context,
+        ),
+        (
+            "Liquidity",
+            liquidity,
+        ),
+        (
+            "Market Breadth",
+            breadth,
+        ),
     ]
 
     for name, df in datasets:
 
         row = {
-            "dataset": name,
-            "rows": len(df),
+            "dataset":
+                name,
+            "rows":
+                len(df),
             "research_only_present":
-                "research_only" in df.columns,
+                "research_only"
+                in df.columns,
             "research_only_all_true":
                 False,
             "decision_engine_ready_present":
-                "decision_engine_ready" in df.columns,
+                "decision_engine_ready"
+                in df.columns,
             "decision_engine_ready_all_false":
                 False,
-            "pit_flag_present": False,
-            "pit_flag_all_safe": False,
-            "pit_perfect": False,
+            "pit_flag_present":
+                False,
+            "pit_flag_all_safe":
+                False,
+            "pit_perfect":
+                False,
         }
 
         if "research_only" in df.columns:
+
             vals = (
                 df["research_only"]
                 .astype(str)
                 .str.lower()
             )
-            row["research_only_all_true"] = (
-                vals.eq("true").all()
-            )
 
-        if "decision_engine_ready" in df.columns:
+            row[
+                "research_only_all_true"
+            ] = vals.eq(
+                "true"
+            ).all()
+
+        if (
+            "decision_engine_ready"
+            in df.columns
+        ):
+
             vals = (
-                df["decision_engine_ready"]
+                df[
+                    "decision_engine_ready"
+                ]
                 .astype(str)
                 .str.lower()
             )
+
             row[
                 "decision_engine_ready_all_false"
-            ] = vals.eq("false").all()
+            ] = vals.eq(
+                "false"
+            ).all()
 
         for pit_col in [
             "point_in_time_safe",
@@ -1115,7 +1296,9 @@ def build_pit_audit(
 
             if pit_col in df.columns:
 
-                row["pit_flag_present"] = True
+                row[
+                    "pit_flag_present"
+                ] = True
 
                 vals = (
                     df[pit_col]
@@ -1123,13 +1306,17 @@ def build_pit_audit(
                     .str.lower()
                 )
 
-                row["pit_flag_all_safe"] = (
-                    vals.eq("true").all()
-                )
+                row[
+                    "pit_flag_all_safe"
+                ] = vals.eq(
+                    "true"
+                ).all()
 
-                row["pit_perfect"] = (
-                    row["pit_flag_all_safe"]
-                )
+                row[
+                    "pit_perfect"
+                ] = row[
+                    "pit_flag_all_safe"
+                ]
 
                 break
 
@@ -1150,12 +1337,16 @@ def build_validation(
     errors = []
 
     if len(panel) < MIN_COMMON_SAMPLE:
+
         errors.append(
             "Common sample below minimum "
             f"of {MIN_COMMON_SAMPLE}"
         )
 
-    if panel["study_date"].duplicated().any():
+    if panel[
+        "study_date"
+    ].duplicated().any():
+
         errors.append(
             "Duplicate study dates detected"
         )
@@ -1163,93 +1354,182 @@ def build_validation(
     if not panel[
         "study_date"
     ].is_monotonic_increasing:
+
         errors.append(
             "Study dates are not monotonic"
         )
 
     if len(temporal) == 0:
+
         errors.append(
             "Temporal robustness output is empty"
         )
 
     if len(threshold_df) == 0:
+
         errors.append(
             "Threshold sensitivity output is empty"
         )
 
+    actual_periods = sorted(
+        temporal[
+            "period"
+        ]
+        .dropna()
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+
+    missing_periods = [
+        p
+        for p in EXPECTED_TEMPORAL_PERIODS
+        if p not in actual_periods
+    ]
+
+    if missing_periods:
+
+        errors.append(
+            "Missing expected temporal periods: "
+            + ", ".join(missing_periods)
+        )
+
+    unexpected_periods = [
+        p
+        for p in actual_periods
+        if p not in EXPECTED_TEMPORAL_PERIODS
+    ]
+
+    if unexpected_periods:
+
+        errors.append(
+            "Unexpected temporal periods found: "
+            + ", ".join(unexpected_periods)
+        )
+
     pit_perfect = bool(
-        pit_df["pit_perfect"].all()
+        pit_df[
+            "pit_perfect"
+        ].all()
     )
 
     limited_events = sample_df.loc[
-        sample_df["event_observations"]
-        < MIN_EVENT_OBS
+        sample_df[
+            "event_observations"
+        ] < MIN_EVENT_OBS
     ]
 
     if not limited_events.empty:
+
         warnings.append(
             "One or more base events have "
             "limited sample sizes"
         )
 
+    period_rows = {}
+
+    for period_name in EXPECTED_TEMPORAL_PERIODS:
+
+        subset = temporal.loc[
+            temporal["period"]
+            == period_name
+        ]
+
+        period_rows[
+            period_name
+        ] = int(len(subset))
+
     return {
-        "validator": (
+        "validator":
             "Historical Edge — "
-            "Robustness Validation v1"
-        ),
-        "version": VERSION,
-        "status": (
-            "PASS"
-            if not errors
-            else "FAIL"
-        ),
-        "validation_pass": not errors,
-        "errors": errors,
-        "warnings": warnings,
-        "common_sample_rows": int(
-            len(panel)
-        ),
-        "date_start": (
-            panel["study_date"]
-            .min()
-            .strftime("%Y-%m-%d")
-        ),
-        "date_end": (
-            panel["study_date"]
-            .max()
-            .strftime("%Y-%m-%d")
-        ),
-        "temporal_periods": [
-            "FULL_SAMPLE",
-            "EARLY",
-            "MIDDLE",
-            "LATE",
-        ],
-        "event_definition_count": len(
-            BASE_EVENTS
-        ),
-        "numeric_sensitivity_groups": len(
-            NUMERIC_SENSITIVITY
-        ),
-        "outcome_horizons": list(
-            HORIZONS.keys()
-        ),
-        "research_only": True,
-        "decision_engine_ready": False,
-        "trading_signal": False,
-        "forecast": False,
-        "optimization": False,
-        "causal_claim": False,
-        "pit_perfect": pit_perfect,
-        "interpretation": (
-            "PASS means the robustness diagnostics "
-            "executed structurally. Stability labels "
-            "describe sensitivity of descriptive "
-            "historical relationships across periods, "
-            "thresholds and horizons. They do not "
-            "establish predictiveness, causality, "
-            "economic usefulness, or a preferred event."
-        ),
+            "Robustness Validation v1",
+
+        "version":
+            VERSION,
+
+        "status":
+            (
+                "PASS"
+                if not errors
+                else "FAIL"
+            ),
+
+        "validation_pass":
+            not errors,
+
+        "errors":
+            errors,
+
+        "warnings":
+            warnings,
+
+        "common_sample_rows":
+            int(len(panel)),
+
+        "date_start":
+            (
+                panel[
+                    "study_date"
+                ]
+                .min()
+                .strftime("%Y-%m-%d")
+            ),
+
+        "date_end":
+            (
+                panel[
+                    "study_date"
+                ]
+                .max()
+                .strftime("%Y-%m-%d")
+            ),
+
+        "temporal_periods":
+            EXPECTED_TEMPORAL_PERIODS,
+
+        "temporal_period_row_counts":
+            period_rows,
+
+        "event_definition_count":
+            len(BASE_EVENTS),
+
+        "numeric_sensitivity_groups":
+            len(NUMERIC_SENSITIVITY),
+
+        "outcome_horizons":
+            list(HORIZONS.keys()),
+
+        "research_only":
+            RESEARCH_ONLY,
+
+        "decision_engine_ready":
+            DECISION_ENGINE_READY,
+
+        "trading_signal":
+            TRADING_SIGNAL,
+
+        "forecast":
+            FORECAST,
+
+        "optimization":
+            OPTIMIZATION,
+
+        "causal_claim":
+            CAUSAL_CLAIM,
+
+        "pit_perfect":
+            pit_perfect,
+
+        "interpretation":
+            (
+                "PASS means the robustness diagnostics "
+                "executed structurally. Stability labels "
+                "describe sensitivity of descriptive "
+                "historical relationships across periods, "
+                "thresholds and horizons. They do not "
+                "establish predictiveness, causality, "
+                "economic usefulness, or a preferred event."
+            ),
     }
 
 
@@ -1279,7 +1559,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    output = Path(args.output)
+    output = Path(
+        args.output
+    )
+
     output.mkdir(
         parents=True,
         exist_ok=True,
@@ -1307,7 +1590,9 @@ def main() -> None:
     )
 
     warnings = list(
-        validation_info["warnings"]
+        validation_info[
+            "warnings"
+        ]
     )
 
     panel = merge_inputs(
@@ -1317,8 +1602,12 @@ def main() -> None:
     )
 
     prices = download_prices(
-        panel["study_date"].min(),
-        panel["study_date"].max(),
+        panel[
+            "study_date"
+        ].min(),
+        panel[
+            "study_date"
+        ].max(),
     )
 
     panel = (
@@ -1329,8 +1618,12 @@ def main() -> None:
             how="left",
             validate="one_to_one",
         )
-        .sort_values("study_date")
-        .reset_index(drop=True)
+        .sort_values(
+            "study_date"
+        )
+        .reset_index(
+            drop=True
+        )
     )
 
     temporal = build_temporal_analysis(
@@ -1346,6 +1639,12 @@ def main() -> None:
             temporal
         )
     )
+
+    if temporal_stability.empty:
+
+        warnings.append(
+            "Temporal stability output is empty"
+        )
 
     threshold_stability = (
         build_threshold_stability(
@@ -1498,12 +1797,50 @@ def main() -> None:
         f"{len(pit_df):,}"
     )
 
-    print("Research-only: TRUE")
-    print("Decision Engine: FALSE")
-    print("Trading signal: FALSE")
-    print("Forecast: FALSE")
-    print("Optimization: FALSE")
-    print("Causal claim: FALSE")
+    print("")
+    print(
+        "Temporal periods:"
+    )
+
+    for period_name in EXPECTED_TEMPORAL_PERIODS:
+
+        count = int(
+            (
+                temporal["period"]
+                == period_name
+            ).sum()
+        )
+
+        print(
+            f"  {period_name}: "
+            f"{count:,} rows"
+        )
+
+    print("")
+
+    print(
+        "Research-only: TRUE"
+    )
+
+    print(
+        "Decision Engine: FALSE"
+    )
+
+    print(
+        "Trading signal: FALSE"
+    )
+
+    print(
+        "Forecast: FALSE"
+    )
+
+    print(
+        "Optimization: FALSE"
+    )
+
+    print(
+        "Causal claim: FALSE"
+    )
 
     print(
         "PIT-perfect:",
@@ -1516,6 +1853,7 @@ def main() -> None:
     )
 
     for warning in warnings:
+
         print(
             "WARNING:",
             warning,
