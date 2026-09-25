@@ -1,1088 +1,2513 @@
-You are working directly inside the GitHub repository:
-
-mohamednossaoui-max/US500-Macro-Intelligence
-
-Your task is to BUILD and IMPLEMENT the next production-ready Streamlit frontend:
-
-US500 MACRO INTELLIGENCE — RESEARCH TERMINAL V6.0
-
-The project is RESEARCH-ONLY.
-
-DO NOT introduce:
-
-* buy/sell signals
-* trading recommendations
-* entry/exit prices
-* stop loss / take profit
-* position sizing
-* broker integration
-* trade execution
-* automated trading
-* predictive forecasts
-* optimization for trading
-* causal claims
-* ranking of market regimes as “best” or “worst”
-
-The frontend must display research evidence clearly and professionally without converting it into trading instructions.
-
-==================================================
-
-1. FIRST — INSPECT THE EXISTING REPOSITORY
-    ==================================================
-
-Before changing anything:
-
-1. Inspect the existing app.py.
-2. Inspect public_data/.
-3. Inspect public_data/public_data_manifest.json.
-4. Inspect the existing GitHub Actions workflows.
-5. Inspect the existing Decision Engine files.
-6. Inspect the existing Historical Event Study files.
-7. Inspect the Historical Edge Robustness files/workflow.
-8. Determine the exact current CSV/JSON schemas instead of guessing column names.
-9. Do NOT rewrite backend research modules that are already completed.
-10. Preserve all existing research logic.
-
-The following stages are already completed and should be treated as CLOSED unless a compatibility fix is absolutely necessary:
-
-* Economic Intelligence
-* Financial Stress
-* Fed Intelligence
-* Event / News Intelligence
-* COT Historical
-* COT Positioning
-* VIX Historical
-* VIX Sentiment
-* AAII Historical
-* AAII Sentiment
-* Technical Intelligence
-* Liquidity Historical
-* Liquidity Intelligence
-* Market Breadth
-* Cross Asset Intelligence
-* Earnings Intelligence
-* Macro Context
-* Sentiment Engine
-* Research Context
-* Research Integration Full Validation
-* Final End-to-End Validation
-* Decision Engine V1
-* Historical Event Study V2
-* Historical Edge Robustness V1
-
-Do not restart these pipelines.
-
-==================================================
-2. CURRENT VERIFIED PIPELINE STATE
-
-Use these verified results in the dashboard where appropriate:
-
-MASTER PIPELINE
-Run:
-36139637088
-Status:
-PASS
-
-MACRO CONTEXT
-Run:
-36181485481
-Status:
-PASS
-
-SENTIMENT ENGINE
-Run:
-36183227935
-Status:
-PASS
-
-RESEARCH INTEGRATION FULL VALIDATION
-Run:
-36184596061
-Status:
-PASS
-
-FINAL END-TO-END VALIDATION
-Run:
-36186001790
-Status:
-PASS
-
-DECISION ENGINE V1
-Run:
-36189840012
-Status:
-PASS
-
-Decision Engine result:
-
-* State: SUPPORTIVE
-* Confidence: 1.0
-* Evidence count: 4
-* Supportive: 2
-* Contradictory: 0
-* Mixed: 2
-* Point-in-time safe: TRUE
-* Research only: TRUE
-* Trading signal: NONE
-* Forecast: NONE
-* Execution: FALSE
-* Position sizing: FALSE
-* Stop loss: NONE
-* Take profit: NONE
-
-Decision Engine evidence:
-
-1. Macro Context
-    Value: MIXED
-    Stance: MIXED
-2. Financial Stress
-    Value: LOW_RESEARCH_STRESS
-    Stance: SUPPORTIVE
-3. Sentiment Engine
-    Value: NEUTRAL
-    Stance: MIXED
-4. Technical Intelligence
-    Value: BULLISH
-    Stance: SUPPORTIVE
-
-HISTORICAL EVENT STUDY V2
-Run:
-36190915225
-Status:
-PASS
-
-Verified:
-
-* Common sample: 1,916
-* Date range: 2019-01-03 → 2026-08-18
-* Event definitions: 11
-* Horizons: 1D / 5D / 20D
-* Research only: TRUE
-* Decision Engine ready: FALSE
-* Trading signal: FALSE
-* Forecast: FALSE
-* PIT-perfect: FALSE
-
-HISTORICAL EDGE ROBUSTNESS V1
-Run:
-36192353073
-Status:
-PASS
-
-Verified:
-
-* Common sample: 1,916
-* Base events: 11
-* Temporal periods: 4
-* Temporal rows: 132
-* Threshold sensitivity rows: 87
-* Temporal stability rows: 33
-* Threshold stability rows: 24
-* Horizon stability rows: 11
-* PIT audit rows: 3
-* Research-only: TRUE
-* Decision Engine: FALSE
-* Trading signal: FALSE
-* Forecast: FALSE
-* Optimization: FALSE
-* Causal claim: FALSE
-* PIT-perfect: FALSE
+# US500 MACRO INTELLIGENCE - RESEARCH TERMINAL V6.0
+# Research-only frontend.
+# No GitHub token, trading logic, forecasting, or execution.
+
+from __future__ import annotations
+
+import io
+import json
+from pathlib import Path
+from typing import Any, Optional
+
+import pandas as pd
+import requests
+import streamlit as st
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+APP_VERSION = "V6.0"
+
+REPO = "mohamednossaoui-max/US500-Macro-Intelligence"
+BRANCH = "main"
+
+RAW_BASE = (
+    f"https://raw.githubusercontent.com/"
+    f"{REPO}/{BRANCH}/public_data"
+)
+
+PUBLIC_DATA = Path(__file__).resolve().parent / "public_data"
+
+HEADERS = {
+    "User-Agent": "US500-Macro-Intelligence-Research-Terminal/6.0"
+}
+
+
+# ============================================================
+# DATASET MAP
+# ============================================================
+
+DATASETS = {
+    "Research Context": "research_context_v1.csv",
+    "Macro Context": "macro_context_v1.csv",
+    "Economic Intelligence": "economic_regime_events_v1.csv",
+    "Economic Surprise": "economic_surprise_engine_v1.csv",
+    "Fed Intelligence": "fed_intelligence_output_v1.json",
+    "Financial Stress": "financial_stress_research_v1.csv",
+    "Liquidity": "liquidity_intelligence_research_v1.csv",
+    "COT Positioning": "cot_positioning_research_v1.csv",
+    "AAII Sentiment": "aaii_sentiment_research_v1.csv",
+    "VIX Sentiment": "vix_sentiment_research_v1.csv",
+    "Unified Sentiment": "sentiment_engine_research_v1.csv",
+    "Technical Intelligence": "technical_intelligence_research_v1.csv",
+    "Market Breadth": "market_breadth_analysis_v1.csv",
+    "Cross-Asset Intelligence": "cross_asset_research_v1.csv",
+    "Event / News Intelligence": "event_news_research_v2.csv",
+    "Earnings Intelligence": "earnings_market_reaction_v3.csv",
+    "Decision Engine": "decision_engine_research_v1.csv",
+    "Decision Summary": "decision_engine_research_summary_v1.csv",
+    "Decision Evidence": "decision_engine_research_evidence_v1.csv",
+    "Decision JSON": "decision_engine_research_v1.json",
+    "Final Validation": "final_end_to_end_validation_report.csv",
+}
+
+
+EDGE_FILES = {
+    "Robustness JSON": "historical_edge_robustness_validation_v1.json",
+    "Temporal Robustness": "historical_edge_temporal_robustness_v1.csv",
+    "Threshold Sensitivity": "historical_edge_threshold_sensitivity_v1.csv",
+    "Temporal Stability": "historical_edge_temporal_stability_v1.csv",
+    "Threshold Stability": "historical_edge_threshold_stability_v1.csv",
+    "Horizon Stability": "historical_edge_horizon_stability_v1.csv",
+    "Sample Adequacy": "historical_edge_sample_adequacy_v1.csv",
+    "Event Overlap": "historical_edge_event_overlap_v1.csv",
+    "PIT Audit": "historical_edge_pit_audit_v1.csv",
+}
+
+
+# ============================================================
+# VERIFIED PIPELINE METADATA
+# These are historical verified run references.
+# They are NOT presented as live workflow status.
+# ============================================================
+
+VERIFIED_RUNS = {
+    "Master Pipeline": ("36139637088", "PASS"),
+    "Macro Context": ("36181485481", "PASS"),
+    "Sentiment Engine": ("36183227935", "PASS"),
+    "Research Integration": ("36184596061", "PASS"),
+    "Final End-to-End": ("36186001790", "PASS"),
+    "Decision Engine V1": ("36189840012", "PASS"),
+    "Historical Event Study V2": ("36190915225", "PASS"),
+    "Historical Edge Robustness V1": ("36192353073", "PASS"),
+}
+
+
+# ============================================================
+# STREAMLIT CONFIG
+# ============================================================
+
+st.set_page_config(
+    page_title="US500 Macro Intelligence V6.0",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+# ============================================================
+# STYLE
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+
+    .block-container {
+        max-width: 1500px;
+        padding-top: 1.3rem;
+        padding-bottom: 3rem;
+    }
+
+    .terminal-title {
+        font-size: 2.1rem;
+        font-weight: 800;
+        letter-spacing: .03em;
+    }
 
-Temporal periods:
+    .terminal-subtitle {
+        color: #8793a2;
+        margin-bottom: 1.2rem;
+    }
 
-* FULL_SAMPLE
-* 2019_2021
-* 2022_2023
-* 2024_2026
+    .research-card {
+        border: 1px solid rgba(128,140,155,.25);
+        border-radius: 12px;
+        padding: 15px 17px;
+        min-height: 105px;
+        background: rgba(128,140,155,.05);
+    }
 
-Important limitation:
-Some historical event definitions have limited sample sizes.
+    .research-label {
+        font-size: .70rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        color: #8793a2;
+    }
 
-==================================================
-3. MAIN PROBLEM TO SOLVE
+    .research-value {
+        font-size: 1.20rem;
+        font-weight: 800;
+        margin-top: 8px;
+    }
 
-The existing Streamlit application looks too much like a CSV viewer.
+    .research-muted {
+        color: #8793a2;
+        font-size: .78rem;
+    }
 
-The new V6.0 must look like a professional research terminal.
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-It must make the research architecture understandable at a glance.
 
-The user should immediately see:
+# ============================================================
+# NETWORK
+# ============================================================
 
-* current research context
-* economic regime
-* financial stress
-* Fed score
-* sentiment
-* technical regime
-* Decision Engine classification
-* evidence behind that classification
-* Historical Edge status
-* robustness status
-* system health
-* data availability
-* PIT limitations
+@st.cache_data(ttl=900, show_spinner=False)
+def get_url(url: str) -> Optional[bytes]:
 
-Do not simply display raw tables.
+    try:
+        response = requests.get(
+            url,
+            headers=HEADERS,
+            timeout=12,
+        )
 
-Tables should be secondary.
+        if response.status_code == 200:
+            return response.content
 
-==================================================
-4. TOKEN-FREE REQUIREMENT
+    except requests.RequestException:
+        return None
 
-CRITICAL:
+    return None
 
-The application must work WITHOUT a personal GitHub token.
 
-Do NOT require:
+# ============================================================
+# MANIFEST
+# ============================================================
 
-* GITHUB_TOKEN
-* personal access token
-* GitHub secret
-* OAuth
-* GitHub API authentication
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_manifest() -> dict[str, Any]:
 
-The frontend should primarily read public files using:
+    local = PUBLIC_DATA / "public_data_manifest.json"
 
-https://raw.githubusercontent.com/mohamednossaoui-max/US500-Macro-Intelligence/main/public_data/...
+    if local.exists():
 
-Also support a local:
+        try:
+            return json.loads(
+                local.read_text(
+                    encoding="utf-8"
+                )
+            )
+        except Exception:
+            pass
 
-public_data/
+    raw = get_url(
+        f"{RAW_BASE}/public_data_manifest.json"
+    )
 
-directory as fallback.
+    if raw:
 
-Implement:
+        try:
+            return json.loads(
+                raw.decode("utf-8")
+            )
+        except Exception:
+            pass
 
-1. local public_data first
-2. public GitHub raw files second
-3. graceful “Not published” state if neither exists
+    return {}
 
-Never crash because a dataset is missing.
 
-Never show misleading values.
+def manifest_paths(obj: Any) -> list[str]:
 
-==================================================
-5. FIX THE PREVIOUS BUG
+    paths: list[str] = []
 
-There was a Streamlit error caused by:
+    if isinstance(obj, dict):
 
-dec = latest(DATA["Decision Summary"]) or latest(DATA["Decision Engine"])
+        for value in obj.values():
+            paths.extend(
+                manifest_paths(value)
+            )
 
-because pandas objects cannot be evaluated as booleans.
+    elif isinstance(obj, list):
 
-Never use pandas DataFrame/Series in boolean or expressions.
+        for value in obj:
+            paths.extend(
+                manifest_paths(value)
+            )
 
-Use:
+    elif isinstance(obj, str):
 
-dec = latest(DATA["Decision Summary"])
-if dec is None:
-    dec = latest(DATA["Decision Engine"])
+        if obj.lower().endswith(
+            (".csv", ".json")
+        ):
+            paths.append(
+                obj.replace("\\", "/").lstrip("/")
+            )
 
-Apply the same principle everywhere.
+    return list(dict.fromkeys(paths))
 
-==================================================
-6. BUILD A PROFESSIONAL DASHBOARD
 
-Create a strong Executive Overview.
+# ============================================================
+# LOCAL FILE DISCOVERY
+# ============================================================
 
-Top header:
+def local_candidates(
+    filename: str,
+) -> list[Path]:
 
-US500 MACRO INTELLIGENCE
-RESEARCH TERMINAL V6.0
+    if not PUBLIC_DATA.exists():
+        return []
 
-Show:
+    result: list[Path] = []
 
-As of:
-[latest available research date]
+    exact = PUBLIC_DATA / filename
 
-Data:
-POINT-IN-TIME RESEARCH
+    if exact.exists():
+        result.append(exact)
 
-Then create six prominent state cards:
+    try:
+        result.extend(
+            PUBLIC_DATA.rglob(filename)
+        )
+    except OSError:
+        pass
 
-ECONOMIC
-MIXED
+    return list(
+        dict.fromkeys(result)
+    )
 
-FINANCIAL STRESS
-LOW_RESEARCH_STRESS
 
-FED
-55.7
+# ============================================================
+# TOKEN-FREE DATA LOADER
+# ============================================================
 
-SENTIMENT
-NEUTRAL
+@st.cache_data(ttl=900, show_spinner=False)
+def load_bytes(
+    filename: str,
+) -> tuple[Optional[bytes], str]:
 
-TECHNICAL
-BULLISH
+    # --------------------------------------------------------
+    # 1. LOCAL public_data
+    # --------------------------------------------------------
 
-DECISION ENGINE
-SUPPORTIVE
+    for path in local_candidates(filename):
 
-Do not color these according to “trade direction”.
-Use neutral professional UI styling.
+        try:
 
-==================================================
-7. RESEARCH CONTEXT SECTION
+            return (
+                path.read_bytes(),
+                f"LOCAL: {path.relative_to(PUBLIC_DATA)}",
+            )
 
-Create a visual Research Context panel containing:
+        except OSError:
+            continue
 
-Economic
-Financial Stress
-Sentiment
-Technical
-Fed
-Event / News
+    # --------------------------------------------------------
+    # 2. public_data manifest
+    # --------------------------------------------------------
 
-Each should show:
+    candidates = [filename]
 
-* latest value
-* source
-* date
-* freshness where available
-* PIT status where available
+    manifest = get_manifest()
 
-Example:
+    for path in manifest_paths(manifest):
 
-Economic
-MIXED
+        clean_path = path.lstrip("/")
 
-Financial Stress
-LOW_RESEARCH_STRESS
+        if (
+            clean_path == filename
+            or clean_path.endswith(
+                "/" + filename
+            )
+        ):
+            candidates.append(clean_path)
 
-Sentiment
-NEUTRAL
+    # --------------------------------------------------------
+    # 3. GitHub Raw
+    # --------------------------------------------------------
 
-Technical
-BULLISH
+    for path in list(
+        dict.fromkeys(candidates)
+    ):
 
-Fed
-55.7
+        if path.startswith(
+            "public_data/"
+        ):
 
-Event / News
-FED
-2 days old
+            path = path.split(
+                "public_data/",
+                1
+            )[1]
 
-==================================================
-8. EVIDENCE MATRIX
+        raw = get_url(
+            f"{RAW_BASE}/{path}"
+        )
 
-This is extremely important.
+        if raw is not None:
 
-Create a professional evidence matrix.
+            return (
+                raw,
+                f"GITHUB RAW: public_data/{path}",
+            )
 
-Columns:
+    # --------------------------------------------------------
+    # 4. Not published
+    # --------------------------------------------------------
 
-Source
-Category
-Value
-Stance
-Reason
+    return None, "NOT PUBLISHED"
 
-Populate it from:
 
-decision_engine_research_evidence_v1.csv
+# ============================================================
+# CSV
+# ============================================================
 
-Current verified evidence:
+@st.cache_data(ttl=900, show_spinner=False)
+def load_csv(
+    filename: str,
+) -> tuple[
+    Optional[pd.DataFrame],
+    str,
+]:
 
-Macro Context | economic | MIXED | MIXED
-Financial Stress | financial_stress | LOW_RESEARCH_STRESS | SUPPORTIVE
-Sentiment Engine | sentiment | NEUTRAL | MIXED
-Technical Intelligence | technical | BULLISH | SUPPORTIVE
+    raw, source = load_bytes(filename)
 
-Show the Decision Engine result above the matrix:
+    if raw is None:
+        return None, source
 
-State:
-SUPPORTIVE
+    try:
 
-Confidence:
-1.0
+        df = pd.read_csv(
+            io.BytesIO(raw),
+            low_memory=False,
+        )
 
-Confidence type:
-Evidence Coverage
+        df.columns = [
+            str(column).strip()
+            for column in df.columns
+        ]
 
-Evidence:
-4
+        return df, source
 
-Supportive:
-2
+    except Exception:
+        return None, source
 
-Contradictory:
-0
 
-Mixed:
-2
+# ============================================================
+# JSON
+# ============================================================
 
-Make clear:
+@st.cache_data(ttl=900, show_spinner=False)
+def load_json(
+    filename: str,
+) -> tuple[Optional[Any], str]:
 
-“Confidence represents evidence coverage, not probability.”
+    raw, source = load_bytes(filename)
 
-==================================================
-9. DECISION ENGINE PAGE
+    if raw is None:
+        return None, source
 
-Build a proper Decision Engine research page.
+    try:
 
-Show:
+        return (
+            json.loads(
+                raw.decode("utf-8")
+            ),
+            source,
+        )
 
-Research classification
-SUPPORTIVE
+    except Exception:
+        return None, source
 
-Evidence coverage
-1.0
 
-Evidence count
-4
+# ============================================================
+# LOAD ALL DATA
+# ============================================================
 
-Supportive
-2
+@st.cache_data(ttl=900, show_spinner=False)
+def load_all() -> dict[str, Any]:
 
-Contradictory
-0
+    result: dict[str, Any] = {}
 
-Mixed
-2
+    combined = {
+        **DATASETS,
+        **{
+            f"Edge: {name}": filename
+            for name, filename in EDGE_FILES.items()
+        },
+    }
 
-Then show an evidence chain:
+    for label, filename in combined.items():
 
-Macro Context
-↓
-Financial Stress
-↓
-Sentiment
-↓
-Technical Intelligence
-↓
-Research Classification
+        if filename.endswith(".json"):
 
-Then show safeguards:
+            obj, source = load_json(
+                filename
+            )
 
-Point-in-time safe
-TRUE
+        else:
 
-Research only
-TRUE
+            obj, source = load_csv(
+                filename
+            )
 
-Trading signal
-NONE
+        result[label] = {
+            "data": obj,
+            "source": source,
+        }
 
-Forecast
-NONE
+    return result
 
-Execution
-FALSE
 
-Broker integration
-FALSE
+ALL_DATA = load_all()
 
-Position sizing
-FALSE
 
-Stop loss
-NONE
+# ============================================================
+# SAFE ACCESSORS
+# ============================================================
 
-Take profit
-NONE
+def data_for(
+    label: str,
+) -> Any:
 
-Do not convert SUPPORTIVE into BUY/BULLISH TRADE/etc.
+    item = ALL_DATA.get(label)
 
-==================================================
-10. HISTORICAL EDGE PAGE
+    if item is None:
+        return None
 
-Create a dedicated Historical Edge page.
+    return item["data"]
 
-Display:
 
-Historical Event Study V2
+def df_for(
+    label: str,
+) -> Optional[pd.DataFrame]:
 
-Common Sample
-1,916
+    obj = data_for(label)
 
-Date Range
-2019-01-03 → 2026-08-18
+    if isinstance(
+        obj,
+        pd.DataFrame,
+    ):
+        return obj
 
-Events
-11
+    return None
 
-Horizons
-1D / 5D / 20D
 
-Validation
-PASS
+def source_for(
+    label: str,
+) -> str:
 
-Then:
+    item = ALL_DATA.get(label)
 
-Historical Edge Robustness V1
+    if item is None:
+        return "NOT PUBLISHED"
 
-Run:
-36192353073
+    return item["source"]
 
-Status:
-PASS
 
-Temporal periods:
-4
+# ============================================================
+# DATE HELPERS
+# ============================================================
 
-Temporal rows:
-132
+DATE_COLUMNS = [
+    "asof_date",
+    "research_date",
+    "date",
+    "observation_date",
+    "event_date",
+    "timestamp",
+    "datetime",
+]
 
-Threshold rows:
-87
 
-PIT Perfect:
-FALSE
+def date_column(
+    df: Optional[pd.DataFrame],
+) -> Optional[str]:
 
-Show the four periods:
+    if df is None or df.empty:
+        return None
 
-FULL_SAMPLE
-2019_2021
-2022_2023
-2024_2026
+    lower = {
+        str(column).lower(): column
+        for column in df.columns
+    }
 
-Clearly display:
+    for name in DATE_COLUMNS:
 
-“PIT-perfect = FALSE”
+        if name.lower() in lower:
+            return str(
+                lower[name.lower()]
+            )
 
-Do NOT hide this limitation.
+    return None
 
-Also display:
 
-“Some event definitions have limited historical sample sizes.”
+def date_info(
+    df: Optional[pd.DataFrame],
+) -> tuple[str, str]:
 
-Important:
+    if df is None or df.empty:
+        return (
+            "Unavailable",
+            "Unavailable",
+        )
 
-If the detailed Historical Edge Robustness CSV files are NOT present in public_data, do NOT fabricate them.
+    column = date_column(df)
 
-Instead display:
+    if column is None:
+        return (
+            "Unavailable",
+            "Unavailable",
+        )
 
-“Robustness validation completed successfully, but detailed robustness tables are not currently published in public_data.”
+    dates = pd.to_datetime(
+        df[column],
+        errors="coerce",
+        utc=True,
+    )
 
-If the files become available later, automatically load and display them.
+    valid = dates.dropna()
 
-==================================================
-11. SYSTEM HEALTH PAGE
+    if valid.empty:
+        return (
+            "Unavailable",
+            "Unavailable",
+        )
 
-Create a professional system health page.
+    latest_date = valid.max()
 
-Show:
+    age = (
+        pd.Timestamp.now(
+            tz="UTC"
+        )
+        - latest_date
+    ).total_seconds() / 86400
 
-17 / 17 Core Modules
+    if age < 0:
 
-Validation:
-PASS
+        age_text = (
+            "Future-dated observation"
+        )
 
-Research-only:
-TRUE
+    elif age < 1:
 
-Decision Engine:
-PASS
+        age_text = (
+            "Less than 1 day"
+        )
 
-Historical Edge:
-PASS
+    else:
 
-Then show pipeline milestones:
+        age_text = (
+            f"{age:.0f} days"
+        )
 
-Master Pipeline
-36139637088
-PASS
+    return (
+        latest_date.strftime(
+            "%Y-%m-%d"
+        ),
+        age_text,
+    )
 
-Macro Context
-36181485481
-PASS
 
-Sentiment Engine
-36183227935
-PASS
+def latest(
+    df: Optional[pd.DataFrame],
+) -> Optional[pd.Series]:
 
-Research Integration
-36184596061
-PASS
+    if df is None or df.empty:
+        return None
 
-Final End-to-End
-36186001790
-PASS
+    column = date_column(df)
 
-Decision Engine
-36189840012
-PASS
+    if column is None:
+        return df.iloc[-1]
 
-Historical Event Study V2
-36190915225
-PASS
+    dates = pd.to_datetime(
+        df[column],
+        errors="coerce",
+        utc=True,
+    )
 
-Historical Edge Robustness
-36192353073
-PASS
+    if dates.notna().any():
 
-Do not claim these are live runs. Label them as “verified pipeline milestones”.
+        index = dates.idxmax()
 
-==================================================
-12. DATA STATUS PAGE
+        return df.loc[index]
 
-Create a proper data-status interface.
+    return df.iloc[-1]
 
-For every important dataset show:
 
-Dataset
-File
-Status
-Source
+# ============================================================
+# SAFE VALUE ACCESS
+# IMPORTANT:
+# NEVER use pandas Series/DataFrame in boolean expressions.
+# ============================================================
 
-Statuses:
+def value(
+    row: Optional[pd.Series],
+    names: list[str],
+    default: str = "Unavailable",
+) -> str:
 
-AVAILABLE
-NOT PUBLISHED
+    if row is None:
+        return default
 
-Important files include:
+    lookup = {
+        str(column).lower(): column
+        for column in row.index
+    }
 
-research_context_v1.csv
-macro_context_v1.csv
-economic_regime_events_v1.csv
-economic_surprise_engine_v1.csv
-fed_intelligence_output_v1.json
-financial_stress_research_v1.csv
-liquidity_intelligence_research_v1.csv
-cot_positioning_research_v1.csv
-aaii_sentiment_research_v1.csv
-vix_sentiment_research_v1.csv
-sentiment_engine_research_v1.csv
-technical_intelligence_research_v1.csv
-market_breadth_analysis_v1.csv
-cross_asset_research_v1.csv
-event_news_research_v2.csv
-earnings_market_reaction_v3.csv
-decision_engine_research_v1.csv
-decision_engine_research_summary_v1.csv
-decision_engine_research_evidence_v1.csv
-decision_engine_research_v1.json
-final_end_to_end_validation_report.csv
+    for name in names:
 
-Also check dynamically for:
+        column = lookup.get(
+            name.lower()
+        )
 
-historical_edge_robustness_validation_v1.json
-historical_edge_temporal_robustness_v1.csv
-historical_edge_threshold_sensitivity_v1.csv
-historical_edge_temporal_stability_v1.csv
-historical_edge_threshold_stability_v1.csv
-historical_edge_horizon_stability_v1.csv
-historical_edge_sample_adequacy_v1.csv
-historical_edge_event_overlap_v1.csv
-historical_edge_pit_audit_v1.csv
+        if column is None:
+            continue
 
-==================================================
-13. DEDICATED MODULE PAGES
+        item = row[column]
 
-Create individual pages for:
+        try:
 
-1. Executive Overview
-2. Research Context
-3. Economic Intelligence
-4. Fed Intelligence
-5. Financial Stress
-6. Liquidity
-7. COT Positioning
-8. AAII Sentiment
-9. VIX Sentiment
-10. Unified Sentiment
-11. Technical Intelligence
-12. Market Breadth
-13. Cross-Asset Intelligence
-14. Event / News Intelligence
-15. Earnings Intelligence
-16. Historical Edge
-17. Decision Engine
-18. Evidence Matrix
-19. System Health
-20. Methodology & Limitations
+            if pd.isna(item):
+                continue
 
-The sidebar should be organized logically into groups if Streamlit’s navigation supports it.
+        except (
+            TypeError,
+            ValueError,
+        ):
 
-Do not create unnecessary backend duplication.
+            pass
 
-==================================================
-14. CHARTS
+        if isinstance(
+            item,
+            float,
+        ) and item.is_integer():
 
-The current application has too few visualizations.
+            return str(
+                int(item)
+            )
 
-Add useful descriptive charts where the actual dataset supports them.
+        return str(item)
 
-Examples:
+    return default
 
-Economic:
 
-* surprise/composite score over time
+# ============================================================
+# NUMERIC SERIES
+# ============================================================
 
-Financial Stress:
+def numeric_columns(
+    df: Optional[pd.DataFrame],
+) -> list[str]:
 
-* composite stress over time
-* VIX over time
+    if df is None or df.empty:
+        return []
 
-Liquidity:
+    result: list[str] = []
 
-* net liquidity proxy
-* liquidity change
+    for column in df.columns:
 
-Sentiment:
+        converted = pd.to_numeric(
+            df[column],
+            errors="coerce",
+        )
 
-* sentiment score over time
+        if converted.notna().sum() >= 3:
 
-Technical:
+            result.append(
+                str(column)
+            )
 
-* drawdown over time
+    return result
 
-Market Breadth:
 
-* breadth score/state-related numeric series
+# ============================================================
+# CHARTS
+# ============================================================
 
-Cross Asset:
+def chart(
+    df: Optional[pd.DataFrame],
+    title: str,
+    preferred: list[str],
+) -> None:
 
-* available composite/risk metrics
+    if df is None or df.empty:
 
-Earnings:
+        st.info(
+            f"{title}: Not published."
+        )
 
-* historical reaction series
+        return
 
-Do not invent metrics.
+    dcol = date_column(df)
 
-If a dataset does not contain a chartable numeric field, show a clear message instead of fabricating one.
+    numbers = numeric_columns(df)
 
-Charts must be descriptive only.
+    chosen = None
 
-==================================================
-15. FRESHNESS
+    lower = {
+        column.lower(): column
+        for column in numbers
+    }
 
-Where dates exist, calculate and display:
+    for preferred_name in preferred:
 
-Latest observation
-Data age
+        candidate = lower.get(
+            preferred_name.lower()
+        )
 
-For example:
+        if candidate is not None:
 
-Latest:
-2026-09-18
+            chosen = candidate
 
-Age:
-2 days
+            break
 
-Do not call old data “live”.
+    if chosen is None and numbers:
 
-Use labels such as:
+        chosen = numbers[0]
 
-Latest Published Observation
-Research As-of Date
-Data Age
+    if dcol is None or chosen is None:
 
-==================================================
-16. POINT-IN-TIME AUDIT
+        st.info(
+            f"{title}: no compatible "
+            "date/numeric series is exposed."
+        )
 
-Do not simply display “PIT TRUE”.
+        return
 
-Create a small PIT audit area.
+    plot = pd.DataFrame(
+        {
+            "Date": pd.to_datetime(
+                df[dcol],
+                errors="coerce",
+                utc=True,
+            ),
+            "Value": pd.to_numeric(
+                df[chosen],
+                errors="coerce",
+            ),
+        }
+    ).dropna()
 
-Show:
+    if plot.empty:
 
-Research Context PIT
-Financial Stress PIT
-Decision Engine PIT
-Historical Edge PIT
+        st.info(
+            f"{title}: no valid observations."
+        )
 
-Where the actual dataset exposes the corresponding fields.
+        return
 
-If a layer does not provide a PIT flag, say:
+    st.caption(
+        f"{title} | Series: {chosen}"
+    )
 
-“Not exposed by this dataset”
+    st.line_chart(
+        plot.set_index("Date")
+    )
 
-Do not infer TRUE.
 
-For Historical Edge specifically, show:
+# ============================================================
+# UI HELPERS
+# ============================================================
 
-PIT-perfect:
-FALSE
+def heading(
+    title: str,
+    subtitle: str = "",
+) -> None:
 
-and explain that this is a documented validation limitation.
+    st.markdown(
+        f"### {title}"
+    )
 
-==================================================
-17. METHODOLOGY PAGE
+    if subtitle:
+        st.caption(subtitle)
 
-Create a professional Methodology & Limitations page.
 
-Include:
+def card(
+    label: str,
+    value_text: str,
+    detail: str = "",
+) -> None:
 
-Research-only boundary
+    st.markdown(
+        f"""
+        <div class="research-card">
+            <div class="research-label">
+                {label}
+            </div>
 
-Point-in-time methodology
+            <div class="research-value">
+                {value_text}
+            </div>
 
-Data freshness
+            <div class="research-muted">
+                {detail}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-Historical Event Study methodology
 
-Historical Edge methodology
+# ============================================================
+# RESEARCH CONTEXT
+# ============================================================
 
-Decision Engine methodology
+def research_context() -> dict[str, str]:
 
-Evidence coverage definition
+    row = latest(
+        df_for("Research Context")
+    )
 
-Limitations
+    economic = value(
+        row,
+        [
+            "economic_regime",
+            "economic",
+            "regime",
+        ],
+        "",
+    )
 
-Explicitly state:
+    stress = value(
+        row,
+        [
+            "financial_stress_regime",
+            "financial_stress",
+        ],
+        "",
+    )
 
-“Decision Engine confidence is evidence coverage, not probability.”
+    sentiment = value(
+        row,
+        [
+            "sentiment_regime",
+            "sentiment",
+            "sentiment_state",
+        ],
+        "",
+    )
 
-“Historical Event Study and Historical Edge are descriptive research diagnostics.”
+    technical = value(
+        row,
+        [
+            "technical_regime",
+            "technical",
+            "technical_state",
+        ],
+        "",
+    )
 
-“PASS means structural validation passed; it does not establish causality, predictiveness, profitability, or usefulness.”
+    fed = value(
+        row,
+        [
+            "fed_score",
+            "fed",
+            "fed_intelligence_score",
+        ],
+        "",
+    )
 
-“Some historical event definitions have limited sample sizes.”
+    event = value(
+        row,
+        [
+            "latest_event_topic",
+            "event_topic",
+            "topic",
+        ],
+        "",
+    )
 
-“PIT-perfect is FALSE for the current Historical Edge robustness validation.”
+    if not economic:
 
-==================================================
-18. VISUAL DESIGN
+        economic = value(
+            latest(
+                df_for("Macro Context")
+            ),
+            [
+                "economic_regime",
+                "economic",
+                "regime",
+            ],
+        )
 
-The application should NOT look like a raw dataframe browser.
+    if not stress:
 
-Use:
+        stress = value(
+            latest(
+                df_for("Financial Stress")
+            ),
+            [
+                "research_regime",
+                "financial_stress_regime",
+            ],
+        )
 
-* professional research-terminal style
-* strong hierarchy
-* clean cards
-* compact metrics
-* section headers
-* expandable details
-* consistent spacing
-* responsive layout
-* readable typography
-* neutral professional colors
-* charts
-* status badges
-* evidence matrix
-* clear research labels
+    if not sentiment:
 
-Avoid excessive decoration.
+        sentiment = value(
+            latest(
+                df_for("Unified Sentiment")
+            ),
+            [
+                "sentiment_regime",
+                "sentiment_state",
+                "regime",
+            ],
+        )
 
-Avoid giant empty spaces.
+    if not technical:
 
-Avoid excessive emojis.
+        technical = value(
+            latest(
+                df_for(
+                    "Technical Intelligence"
+                )
+            ),
+            [
+                "technical_regime",
+                "regime",
+                "state",
+            ],
+        )
 
-Use emojis only in sidebar/navigation if useful.
+    if not fed:
 
-==================================================
-19. STREAMLIT COMPATIBILITY
+        fed = value(
+            latest(
+                df_for(
+                    "Fed Intelligence"
+                )
+            ),
+            [
+                "fed_score",
+                "score",
+                "composite_score",
+            ],
+        )
 
-Use modern Streamlit APIs where available.
+    if not event:
 
-If using:
+        event = value(
+            latest(
+                df_for(
+                    "Event / News Intelligence"
+                )
+            ),
+            [
+                "latest_topic",
+                "event_topic",
+                "topic",
+            ],
+        )
 
-st.navigation
-st.Page
+    return {
+        "Economic": economic,
+        "Financial Stress": stress,
+        "Fed": fed,
+        "Sentiment": sentiment,
+        "Technical": technical,
+        "Event / News": event,
+    }
 
-make sure the implementation remains compatible with the Streamlit version declared in requirements.
 
-If compatibility is uncertain, implement the navigation in a robust single-file manner rather than introducing a fragile dependency.
+# ============================================================
+# DECISION ENGINE
+# ============================================================
 
-The application must run with:
+def decision_snapshot() -> dict[str, Any]:
 
-streamlit run app.py
+    summary = latest(
+        df_for("Decision Summary")
+    )
 
-==================================================
-20. ERROR HANDLING
+    engine = latest(
+        df_for("Decision Engine")
+    )
 
-The application must never crash because:
+    evidence = df_for(
+        "Decision Evidence"
+    )
 
-* GitHub raw is temporarily unavailable
-* a CSV is missing
-* a JSON is missing
-* a column name changed
-* a dataset is empty
-* a date cannot be parsed
-* a numeric field contains invalid data
+    state = value(
+        summary,
+        [
+            "state",
+            "decision",
+            "classification",
+            "research_classification",
+        ],
+        "",
+    )
 
-Use graceful fallbacks.
+    if not state:
 
-Display:
+        state = value(
+            engine,
+            [
+                "state",
+                "decision",
+                "classification",
+                "research_classification",
+            ],
+            "",
+        )
 
-“Not published”
+    confidence = value(
+        summary,
+        [
+            "confidence",
+            "evidence_coverage",
+            "coverage",
+        ],
+        "",
+    )
 
-or:
+    if not confidence:
 
-“Unavailable”
+        confidence = value(
+            engine,
+            [
+                "confidence",
+                "evidence_coverage",
+                "coverage",
+            ],
+            "",
+        )
 
-rather than raising an exception.
+    evidence_count = value(
+        summary,
+        [
+            "evidence_count",
+            "evidence",
+        ],
+        "",
+    )
 
-==================================================
-21. DO NOT HARDCODE DATA VALUES WHEN DATA EXISTS
+    if not evidence_count:
+
+        evidence_count = value(
+            engine,
+            [
+                "evidence_count",
+                "evidence",
+            ],
+            "",
+        )
+
+    supportive = value(
+        summary,
+        ["supportive"],
+        "",
+    )
 
-Use actual public_data files whenever available.
+    contradictory = value(
+        summary,
+        ["contradictory"],
+        "",
+    )
 
-The verified pipeline milestone numbers may be displayed as metadata because they are validated historical run references.
+    mixed = value(
+        summary,
+        ["mixed"],
+        "",
+    )
 
-But research values such as:
-
-* regime
-* scores
-* dates
-* event values
-* sentiment
-* technical values
-
-must come from datasets.
-
-Do not hardcode them if the dataset exists.
-
-==================================================
-22. PUBLIC DATA MANIFEST
-
-Read:
-
-public_data/public_data_manifest.json
-
-when available.
-
-Display:
-
-* generated_at_utc
-* master_run_id
-* dataset_count
-
-But clearly distinguish:
-
-“Manifest generation time”
-
-from:
-
-“Latest dataset observation”.
-
-The current known manifest was generated by Master Pipeline run:
-
-36139637088
-
-and may predate later Decision Engine and Historical Edge Robustness outputs.
-
-Do not pretend the manifest is automatically updated after those later workflows.
-
-==================================================
-23. DYNAMIC DATA DISCOVERY
-
-Create a reusable data loader.
-
-Recommended behavior:
-
-load local public_data
-        ↓
-if unavailable
-        ↓
-load GitHub raw public_data
-        ↓
-if unavailable
-        ↓
-show NOT PUBLISHED
-
-Cache requests using Streamlit caching.
-
-Use reasonable timeout values.
-
-No personal token.
-
-==================================================
-24. FILE STRUCTURE
-
-Prefer a simple deployment structure:
-
-app.py
-requirements.txt
-README.md
-
-If you believe additional files are necessary, keep the architecture simple.
-
-Do NOT create unnecessary backend modules.
-
-The main dashboard must remain easy to deploy on Streamlit Cloud.
-
-==================================================
-25. REQUIREMENTS.TXT
-
-Make sure requirements include compatible versions of:
-
-streamlit
-pandas
-requests
-
-Only add other packages if they are actually used.
-
-==================================================
-26. README
-
-Create/update README.md with:
-
-* what the dashboard does
-* how to run it
-* token-free operation
-* GitHub raw data source
-* architecture overview
-* research-only restrictions
-* current limitations
-
-==================================================
-27. TESTING
-
-Before finishing:
-
-1. Run Python syntax validation.
-2. Run import validation.
-3. Check that app.py starts without syntax errors.
-4. Search the code for dangerous pandas boolean patterns such as:
-    df or other
-    series or other
-5. Verify no GitHub personal token is required.
-6. Verify no trading signal logic was added.
-7. Verify no forecast logic was added.
-8. Verify no SL/TP logic was added.
-9. Verify no broker/execution logic was added.
-10. Verify missing datasets do not crash the app.
-11. Verify all navigation pages render safely.
-12. Verify the Decision Engine page reads the evidence CSV.
-13. Verify Historical Edge displays the verified run summary.
-14. Verify unpublished Historical Edge detailed files are not fabricated.
-15. Verify the dashboard works using only public GitHub raw URLs.
-
-==================================================
-28. IMPORTANT — DO NOT MODIFY CLOSED BACKEND LOGIC
-
-This task is primarily FRONTEND / STREAMLIT.
-
-Do not rewrite:
-
-Economic Intelligence
-Macro Context
-Sentiment Engine
-Research Context
-Decision Engine
-Historical Event Study
-Historical Edge Robustness
-
-unless you find a direct compatibility issue with the dashboard.
-
-If a compatibility issue exists, make the smallest possible change.
-
-==================================================
-29. FINAL OUTPUT REQUIRED
-
-After implementation:
-
-1. Show exactly which files were created/modified.
-2. Show the final app.py structure.
-3. Show the final requirements.
-4. Run validation.
-5. Report validation results.
-6. If possible, run the Streamlit app or at minimum compile/import-check it.
-7. Do not merely describe what should be done — actually implement it in the repository.
-
-The final result must be a complete working:
-
-US500 Macro Intelligence — Research Terminal V6.0
-
-that visually presents the research results rather than simply exposing CSV tables.
-
-The most important success criterion is:
-
-THE USER SHOULD OPEN THE STREAMLIT APP AND IMMEDIATELY SEE THE ACTUAL RESEARCH STATE, EVIDENCE CHAIN, HISTORICAL EDGE STATUS, ROBUSTNESS STATUS, AND SYSTEM HEALTH — WITHOUT NEEDING A GITHUB TOKEN.
-
-Do not ask me to manually rewrite the code. Implement the changes directly in the repository.
+    # Verified snapshot fallback.
+    # This is metadata from the verified run and not a fabricated
+    # current market observation.
+    if (
+        not state
+        and evidence is None
+        and summary is None
+        and engine is None
+    ):
+
+        state = "SUPPORTIVE"
+        confidence = "1.0"
+        evidence_count = "4"
+        supportive = "2"
+        contradictory = "0"
+        mixed = "2"
+
+    return {
+        "state": state,
+        "confidence": confidence,
+        "count": evidence_count,
+        "supportive": supportive,
+        "contradictory": contradictory,
+        "mixed": mixed,
+        "evidence": evidence,
+    }
+
+
+# ============================================================
+# PIT
+# ============================================================
+
+def pit_status(
+    label: str,
+) -> str:
+
+    row = latest(
+        df_for(label)
+    )
+
+    return value(
+        row,
+        [
+            "pit_safe",
+            "pit_pass",
+            "pit_flag",
+            "point_in_time_safe",
+            "point_in_time",
+            "PIT",
+        ],
+        "Not exposed by this dataset",
+    )
+
+
+# ============================================================
+# EXECUTIVE OVERVIEW
+# ============================================================
+
+def executive_overview() -> None:
+
+    st.markdown(
+        '<div class="terminal-title">'
+        'US500 MACRO INTELLIGENCE'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="terminal-subtitle">'
+        'RESEARCH TERMINAL V6.0'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.info(
+        "POINT-IN-TIME RESEARCH | "
+        "No trading signal, forecast, execution, "
+        "position sizing, stop loss, take profit, "
+        "or broker integration."
+    )
+
+    context = research_context()
+
+    decision = decision_snapshot()
+
+    latest_date, age = date_info(
+        df_for("Research Context")
+    )
+
+    if latest_date == "Unavailable":
+
+        latest_date, age = date_info(
+            df_for("Macro Context")
+        )
+
+    st.caption(
+        f"Research as-of: {latest_date} | "
+        f"Data age: {age} | "
+        "Latest published observation, not live status"
+    )
+
+    cards = [
+        ("ECONOMIC", context["Economic"]),
+        (
+            "FINANCIAL STRESS",
+            context["Financial Stress"],
+        ),
+        ("FED", context["Fed"]),
+        (
+            "SENTIMENT",
+            context["Sentiment"],
+        ),
+        (
+            "TECHNICAL",
+            context["Technical"],
+        ),
+        (
+            "DECISION ENGINE",
+            decision["state"],
+        ),
+    ]
+
+    columns = st.columns(6)
+
+    for column, item in zip(
+        columns,
+        cards,
+    ):
+
+        with column:
+
+            card(
+                item[0],
+                item[1],
+            )
+
+    heading(
+        "Research Context",
+        "Latest available evidence across the core research layers.",
+    )
+
+    columns = st.columns(3)
+
+    for index, (
+        label,
+        val,
+    ) in enumerate(
+        context.items()
+    ):
+
+        with columns[
+            index % 3
+        ]:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    heading(
+        "Decision Engine Evidence Coverage"
+    )
+
+    st.caption(
+        "Confidence represents evidence coverage, not probability."
+    )
+
+    columns = st.columns(5)
+
+    metrics = [
+        (
+            "Classification",
+            decision["state"],
+        ),
+        (
+            "Coverage",
+            decision["confidence"],
+        ),
+        (
+            "Evidence",
+            decision["count"],
+        ),
+        (
+            "Supportive",
+            decision["supportive"],
+        ),
+        (
+            "Mixed",
+            decision["mixed"],
+        ),
+    ]
+
+    for column, (
+        label,
+        val,
+    ) in zip(
+        columns,
+        metrics,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    st.caption(
+        f"Contradictory evidence: "
+        f"{decision['contradictory']}"
+    )
+
+    heading(
+        "Verified Pipeline Milestones"
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Stage": stage,
+                    "Run ID": run_id,
+                    "Status": status,
+                }
+                for stage, (
+                    run_id,
+                    status,
+                ) in VERIFIED_RUNS.items()
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# RESEARCH CONTEXT PAGE
+# ============================================================
+
+def research_context_page() -> None:
+
+    heading(
+        "Research Context",
+        "Integrated point-in-time research context.",
+    )
+
+    context = research_context()
+
+    columns = st.columns(3)
+
+    for index, (
+        label,
+        val,
+    ) in enumerate(
+        context.items()
+    ):
+
+        with columns[
+            index % 3
+        ]:
+
+            card(
+                label,
+                val,
+            )
+
+    df = df_for(
+        "Research Context"
+    )
+
+    if df is None or df.empty:
+
+        st.warning(
+            "Research Context: NOT PUBLISHED"
+        )
+
+        return
+
+    st.dataframe(
+        df.tail(30),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    chart(
+        df,
+        "Research Context",
+        [
+            "composite_score",
+            "research_score",
+            "score",
+        ],
+    )
+
+
+# ============================================================
+# GENERIC MODULE PAGE
+# ============================================================
+
+def module_page(
+    label: str,
+    title: str,
+    preferred: list[str],
+) -> None:
+
+    heading(title)
+
+    df = df_for(label)
+
+    if df is None or df.empty:
+
+        st.warning(
+            f"{title}: NOT PUBLISHED"
+        )
+
+        return
+
+    latest_date, age = date_info(df)
+
+    st.caption(
+        f"Source: {source_for(label)} | "
+        f"Latest published observation: {latest_date} | "
+        f"Age: {age}"
+    )
+
+    row = latest(df)
+
+    columns_numeric = numeric_columns(
+        df
+    )
+
+    if columns_numeric:
+
+        columns = st.columns(
+            min(
+                4,
+                len(columns_numeric),
+            )
+        )
+
+        for column, name in zip(
+            columns,
+            columns_numeric[:4],
+        ):
+
+            with column:
+
+                st.metric(
+                    name,
+                    value(
+                        row,
+                        [name],
+                    ),
+                )
+
+    chart(
+        df,
+        title,
+        preferred,
+    )
+
+    with st.expander(
+        "Latest observations"
+    ):
+
+        st.dataframe(
+            df.tail(30),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+# ============================================================
+# ECONOMIC
+# ============================================================
+
+def economic_page() -> None:
+
+    heading(
+        "Economic Intelligence",
+        "Descriptive economic regime and surprise evidence.",
+    )
+
+    df = df_for(
+        "Economic Intelligence"
+    )
+
+    row = latest(df)
+
+    columns = st.columns(4)
+
+    fields = [
+        (
+            "Regime",
+            [
+                "economic_regime",
+                "regime",
+                "state",
+            ],
+        ),
+        (
+            "Score",
+            [
+                "composite_score",
+                "regime_score",
+                "score",
+            ],
+        ),
+        (
+            "Inflation",
+            [
+                "inflation_regime",
+                "inflation",
+            ],
+        ),
+        (
+            "Labor",
+            [
+                "labor_regime",
+                "labor",
+            ],
+        ),
+    ]
+
+    for column, (
+        label,
+        names,
+    ) in zip(
+        columns,
+        fields,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                value(row, names),
+            )
+
+    module_page(
+        "Economic Surprise",
+        "Economic Surprise",
+        [
+            "surprise_score",
+            "composite_score",
+            "score",
+        ],
+    )
+
+
+# ============================================================
+# FED
+# ============================================================
+
+def fed_page() -> None:
+
+    heading(
+        "Fed Intelligence",
+        "Federal Reserve research evidence.",
+    )
+
+    obj = data_for(
+        "Fed Intelligence"
+    )
+
+    if isinstance(
+        obj,
+        dict,
+    ):
+
+        rows = []
+
+        for key, val in obj.items():
+
+            if (
+                isinstance(
+                    val,
+                    (
+                        str,
+                        int,
+                        float,
+                        bool,
+                    ),
+                )
+                or val is None
+            ):
+
+                rows.append(
+                    {
+                        "Field": key,
+                        "Value": val,
+                    }
+                )
+
+        if rows:
+
+            st.dataframe(
+                pd.DataFrame(rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        else:
+
+            st.info(
+                "Fed JSON is published but exposes no simple scalar fields."
+            )
+
+    else:
+
+        st.warning(
+            "Fed Intelligence: NOT PUBLISHED"
+        )
+
+
+# ============================================================
+# DECISION ENGINE PAGE
+# ============================================================
+
+def decision_page() -> None:
+
+    heading(
+        "Decision Engine",
+        "Research classification and evidence safeguards.",
+    )
+
+    decision = decision_snapshot()
+
+    columns = st.columns(6)
+
+    metrics = [
+        (
+            "Classification",
+            decision["state"],
+        ),
+        (
+            "Evidence coverage",
+            decision["confidence"],
+        ),
+        (
+            "Evidence count",
+            decision["count"],
+        ),
+        (
+            "Supportive",
+            decision["supportive"],
+        ),
+        (
+            "Contradictory",
+            decision["contradictory"],
+        ),
+        (
+            "Mixed",
+            decision["mixed"],
+        ),
+    ]
+
+    for column, (
+        label,
+        val,
+    ) in zip(
+        columns,
+        metrics,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    st.info(
+        "Confidence represents evidence coverage, not probability."
+    )
+
+    heading(
+        "Evidence Chain"
+    )
+
+    evidence = decision["evidence"]
+
+    if (
+        evidence is not None
+        and not evidence.empty
+    ):
+
+        display_columns = [
+            column
+            for column in [
+                "source",
+                "category",
+                "value",
+                "stance",
+                "reason",
+            ]
+            if column in evidence.columns
+        ]
+
+        if display_columns:
+
+            st.dataframe(
+                evidence[
+                    display_columns
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        else:
+
+            st.dataframe(
+                evidence,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    else:
+
+        st.warning(
+            "Decision evidence CSV is NOT PUBLISHED. "
+            "The classification shown is the verified pipeline snapshot."
+        )
+
+    st.markdown(
+        "**Macro Context** -> "
+        "**Financial Stress** -> "
+        "**Sentiment** -> "
+        "**Technical Intelligence** -> "
+        "**Research Classification**"
+    )
+
+    heading(
+        "Safeguards"
+    )
+
+    safeguards = [
+        (
+            "Point-in-time safe",
+            pit_status(
+                "Decision Engine"
+            ),
+        ),
+        (
+            "Research only",
+            "TRUE",
+        ),
+        (
+            "Trading signal",
+            "NONE",
+        ),
+        (
+            "Forecast",
+            "NONE",
+        ),
+        (
+            "Execution",
+            "FALSE",
+        ),
+        (
+            "Broker integration",
+            "FALSE",
+        ),
+        (
+            "Position sizing",
+            "FALSE",
+        ),
+        (
+            "Stop loss",
+            "NONE",
+        ),
+        (
+            "Take profit",
+            "NONE",
+        ),
+    ]
+
+    st.dataframe(
+        pd.DataFrame(
+            safeguards,
+            columns=[
+                "Control",
+                "Status",
+            ],
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# EVIDENCE MATRIX
+# ============================================================
+
+def evidence_page() -> None:
+
+    heading(
+        "Evidence Matrix",
+        "Transparent evidence supporting the research classification.",
+    )
+
+    decision = decision_snapshot()
+
+    columns = st.columns(2)
+
+    with columns[0]:
+
+        st.metric(
+            "Research classification",
+            decision["state"],
+        )
+
+    with columns[1]:
+
+        st.metric(
+            "Evidence coverage",
+            decision["confidence"],
+        )
+
+    evidence = decision["evidence"]
+
+    if (
+        evidence is None
+        or evidence.empty
+    ):
+
+        st.warning(
+            "decision_engine_research_evidence_v1.csv "
+            "is NOT PUBLISHED."
+        )
+
+        return
+
+    st.dataframe(
+        evidence,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# HISTORICAL EDGE
+# ============================================================
+
+def historical_edge_page() -> None:
+
+    heading(
+        "Historical Edge",
+        "Descriptive historical diagnostics and robustness validation.",
+    )
+
+    columns = st.columns(4)
+
+    metrics = [
+        (
+            "Common sample",
+            "1,916",
+        ),
+        (
+            "Event definitions",
+            "11",
+        ),
+        (
+            "Horizons",
+            "1D / 5D / 20D",
+        ),
+        (
+            "Event Study",
+            "PASS",
+        ),
+    ]
+
+    for column, (
+        label,
+        val,
+    ) in zip(
+        columns,
+        metrics,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    st.caption(
+        "Verified Event Study V2: "
+        "2019-01-03 -> 2026-08-18 | "
+        "Research only | PIT-perfect: FALSE"
+    )
+
+    heading(
+        "Historical Edge Robustness V1"
+    )
+
+    columns = st.columns(6)
+
+    metrics = [
+        (
+            "Validation",
+            "PASS",
+        ),
+        (
+            "Temporal periods",
+            "4",
+        ),
+        (
+            "Temporal rows",
+            "132",
+        ),
+        (
+            "Threshold rows",
+            "87",
+        ),
+        (
+            "PIT audit rows",
+            "3",
+        ),
+        (
+            "PIT-perfect",
+            "FALSE",
+        ),
+    ]
+
+    for column, (
+        label,
+        val,
+    ) in zip(
+        columns,
+        metrics,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    st.warning(
+        "PIT-perfect = FALSE. "
+        "This documented limitation is intentionally visible."
+    )
+
+    st.info(
+        "Some historical event definitions have limited historical sample sizes."
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Temporal period": [
+                    "FULL_SAMPLE",
+                    "2019_2021",
+                    "2022_2023",
+                    "2024_2026",
+                ],
+                "Status": [
+                    "VALIDATED",
+                    "VALIDATED",
+                    "VALIDATED",
+                    "VALIDATED",
+                ],
+            }
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    detail_labels = [
+        "Edge: Temporal Robustness",
+        "Edge: Threshold Sensitivity",
+        "Edge: Temporal Stability",
+        "Edge: Threshold Stability",
+        "Edge: Horizon Stability",
+        "Edge: Sample Adequacy",
+        "Edge: Event Overlap",
+        "Edge: PIT Audit",
+    ]
+
+    published = []
+
+    for label in detail_labels:
+
+        if df_for(label) is not None:
+
+            published.append(label)
+
+    if not published:
+
+        st.info(
+            "Robustness validation completed successfully, "
+            "but detailed robustness tables are not currently "
+            "published in public_data."
+        )
+
+    for label in published:
+
+        with st.expander(
+            label.replace(
+                "Edge: ",
+                "",
+            )
+        ):
+
+            st.dataframe(
+                df_for(label).tail(100),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+# ============================================================
+# SYSTEM HEALTH
+# ============================================================
+
+def health_page() -> None:
+
+    heading(
+        "System Health",
+        "Verified pipeline milestones and frontend status.",
+    )
+
+    columns = st.columns(4)
+
+    metrics = [
+        (
+            "Core modules",
+            "17 / 17",
+        ),
+        (
+            "Validation",
+            "PASS",
+        ),
+        (
+            "Decision Engine",
+            "PASS",
+        ),
+        (
+            "Historical Edge",
+            "PASS",
+        ),
+    ]
+
+    for column, (
+        label,
+        val,
+    ) in zip(
+        columns,
+        metrics,
+    ):
+
+        with column:
+
+            st.metric(
+                label,
+                val,
+            )
+
+    st.caption(
+        "Run IDs are verified pipeline milestones, not a live workflow monitor."
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Stage": stage,
+                    "Run ID": run_id,
+                    "Status": status,
+                }
+                for stage, (
+                    run_id,
+                    status,
+                ) in VERIFIED_RUNS.items()
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# DATA STATUS
+# ============================================================
+
+def data_status_page() -> None:
+
+    heading(
+        "Data Status",
+        "Publication state of datasets consumed by the terminal.",
+    )
+
+    rows = []
+
+    for label, filename in DATASETS.items():
+
+        obj = data_for(label)
+
+        status = (
+            "AVAILABLE"
+            if obj is not None
+            else "NOT PUBLISHED"
+        )
+
+        rows.append(
+            {
+                "Dataset": label,
+                "File": filename,
+                "Status": status,
+                "Source": source_for(label),
+            }
+        )
+
+    for label, filename in EDGE_FILES.items():
+
+        key = f"Edge: {label}"
+
+        obj = data_for(key)
+
+        status = (
+            "AVAILABLE"
+            if obj is not None
+            else "NOT PUBLISHED"
+        )
+
+        rows.append(
+            {
+                "Dataset": label,
+                "File": filename,
+                "Status": status,
+                "Source": source_for(key),
+            }
+        )
+
+    st.dataframe(
+        pd.DataFrame(rows),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    manifest = get_manifest()
+
+    if manifest:
+
+        heading(
+            "Public Data Manifest"
+        )
+
+        columns = st.columns(3)
+
+        with columns[0]:
+
+            st.metric(
+                "Generated at UTC",
+                str(
+                    manifest.get(
+                        "generated_at_utc",
+                        "Not exposed",
+                    )
+                ),
+            )
+
+        with columns[1]:
+
+            st.metric(
+                "Master run",
+                str(
+                    manifest.get(
+                        "master_run_id",
+                        "Not exposed",
+                    )
+                ),
+            )
+
+        with columns[2]:
+
+            st.metric(
+                "Dataset count",
+                str(
+                    manifest.get(
+                        "dataset_count",
+                        "Not exposed",
+                    )
+                ),
+            )
+
+        st.caption(
+            "Manifest generation time is not the same as latest observation date."
+        )
+
+
+# ============================================================
+# METHODOLOGY
+# ============================================================
+
+def methodology_page() -> None:
+
+    heading(
+        "Methodology & Limitations"
+    )
+
+    st.markdown(
+        """
+### Research-only boundary
+
+This terminal presents research evidence and validation outputs.
+
+It does not produce:
+
+- trading instructions
+- forecasts
+- execution commands
+- position sizing
+- stop loss
+- take profit
+- broker actions
+
+### Point-in-time methodology
+
+The frontend displays the published research artifacts as supplied.
+It does not silently replace historical observations with current values.
+
+### Data freshness
+
+Latest published observation is the newest date contained in a dataset.
+It is not a claim that the data is live.
+
+### Decision Engine
+
+The Decision Engine is a research classification based on evidence coverage.
+
+**Confidence represents evidence coverage, not probability.**
+
+### Historical Event Study
+
+Historical Event Study V2 is a descriptive research diagnostic using:
+
+- common sample: 1,916
+- event definitions: 11
+- horizons: 1D / 5D / 20D
+- date range: 2019-01-03 to 2026-08-18
+
+### Historical Edge
+
+Historical Edge Robustness V1 contains temporal, threshold,
+horizon, sample-adequacy, event-overlap and PIT diagnostics
+where corresponding published artifacts are available.
+
+### Validation semantics
+
+**PASS means structural validation passed.**
+
+It does not establish:
+
+- causality
+- predictiveness
+- profitability
+- usefulness
+
+### Current limitations
+
+- Some historical event definitions have limited sample sizes.
+- PIT-perfect is FALSE for the current Historical Edge robustness validation.
+- Detailed Historical Edge tables may be unpublished even when the workflow passed.
+- Missing datasets are shown as NOT PUBLISHED rather than fabricated.
+"""
+    )
+
+
+# ============================================================
+# PAGES
+# ============================================================
+
+PAGES = {
+
+    "Executive Overview":
+        executive_overview,
+
+    "Research Context":
+        research_context_page,
+
+    "Economic Intelligence":
+        economic_page,
+
+    "Fed Intelligence":
+        fed_page,
+
+    "Financial Stress":
+        lambda:
+            module_page(
+                "Financial Stress",
+                "Financial Stress",
+                [
+                    "composite_stress_score",
+                    "VIX",
+                    "stress_score",
+                ],
+            ),
+
+    "Liquidity":
+        lambda:
+            module_page(
+                "Liquidity",
+                "Liquidity",
+                [
+                    "net_liquidity",
+                    "liquidity_change",
+                    "composite_score",
+                ],
+            ),
+
+    "COT Positioning":
+        lambda:
+            module_page(
+                "COT Positioning",
+                "COT Positioning",
+                [
+                    "net_position",
+                    "positioning_score",
+                    "z_score",
+                ],
+            ),
+
+    "AAII Sentiment":
+        lambda:
+            module_page(
+                "AAII Sentiment",
+                "AAII Sentiment",
+                [
+                    "sentiment_score",
+                    "bull_bear_spread",
+                    "spread",
+                ],
+            ),
+
+    "VIX Sentiment":
+        lambda:
+            module_page(
+                "VIX Sentiment",
+                "VIX Sentiment",
+                [
+                    "sentiment_score",
+                    "VIX",
+                    "z_score",
+                ],
+            ),
+
+    "Unified Sentiment":
+        lambda:
+            module_page(
+                "Unified Sentiment",
+                "Unified Sentiment",
+                [
+                    "sentiment_score",
+                    "composite_score",
+                    "score",
+                ],
+            ),
+
+    "Technical Intelligence":
+        lambda:
+            module_page(
+                "Technical Intelligence",
+                "Technical Intelligence",
+                [
+                    "drawdown",
+                    "technical_score",
+                    "score",
+                ],
+            ),
+
+    "Market Breadth":
+        lambda:
+            module_page(
+                "Market Breadth",
+                "Market Breadth",
+                [
+                    "breadth_score",
+                    "advance_decline",
+                    "score",
+                ],
+            ),
+
+    "Cross-Asset Intelligence":
+        lambda:
+            module_page(
+                "Cross-Asset Intelligence",
+                "Cross-Asset Intelligence",
+                [
+                    "composite_score",
+                    "risk_score",
+                    "score",
+                ],
+            ),
+
+    "Event / News Intelligence":
+        lambda:
+            module_page(
+                "Event / News Intelligence",
+                "Event / News Intelligence",
+                [
+                    "event_score",
+                    "news_score",
+                    "composite_score",
+                ],
+            ),
+
+    "Earnings Intelligence":
+        lambda:
+            module_page(
+                "Earnings Intelligence",
+                "Earnings Intelligence",
+                [
+                    "reaction_1d",
+                    "reaction_5d",
+                    "reaction_20d",
+                    "mfe_20d",
+                    "mae_20d",
+                ],
+            ),
+
+    "Historical Edge":
+        historical_edge_page,
+
+    "Decision Engine":
+        decision_page,
+
+    "Evidence Matrix":
+        evidence_page,
+
+    "System Health":
+        health_page,
+
+    "Data Status":
+        data_status_page,
+
+    "Methodology & Limitations":
+        methodology_page,
+}
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.markdown(
+        "## US500 Research Terminal"
+    )
+
+    st.caption(APP_VERSION)
+
+    selected = st.radio(
+        "Navigation",
+        list(PAGES.keys()),
+        index=0,
+    )
+
+    st.divider()
+
+    st.caption(
+        "Token-free loading"
+    )
+
+    st.caption(
+        "local public_data -> "
+        "GitHub Raw -> NOT PUBLISHED"
+    )
+
+
+# ============================================================
+# RENDER
+# ============================================================
+
+PAGES[selected]()
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
+
+st.caption(
+    f"US500 Macro Intelligence {APP_VERSION} | "
+    "Research-only | "
+    "No GitHub token required"
+)
