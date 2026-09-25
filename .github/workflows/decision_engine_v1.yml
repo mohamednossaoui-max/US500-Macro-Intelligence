@@ -19,8 +19,6 @@ jobs:
       # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       # ============================================================
       # 2. PYTHON
@@ -58,16 +56,10 @@ jobs:
           echo "DECISION_ENGINE_EXIT_CODE=999" >> "$GITHUB_ENV"
 
       # ============================================================
-      # 5. DISCOVER LATEST RESEARCH CONTEXT ARTIFACT
-      #
-      # IMPORTANT:
-      # We discover BOTH:
-      #   - artifact ID
-      #   - workflow_run.id
-      #
-      # No hardcoded Run ID.
+      # 5. DISCOVER LATEST RESEARCH CONTEXT
       # ============================================================
-      - name: Discover latest Research Context artifact
+      - name: Discover latest Research Context
+        id: discover
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,17 +68,19 @@ jobs:
 
           REPO="${GITHUB_REPOSITORY}"
 
+          echo
           echo "============================================================"
           echo "DISCOVERING LATEST RESEARCH CONTEXT ARTIFACT"
           echo "============================================================"
+          echo
 
           gh api \
-            --paginate \
             "repos/${REPO}/actions/artifacts?per_page=100" \
             --jq '
               .artifacts[]
               | select(.expired == false)
               | select(.name == "research-context-v1")
+              | select(.workflow_run != null)
               | [
                   .id,
                   .created_at,
@@ -99,28 +93,28 @@ jobs:
             > /tmp/research_context_artifacts.tsv
 
           if [ ! -s /tmp/research_context_artifacts.tsv ]; then
-            echo
-            echo "ERROR: No valid research-context-v1 artifact found."
-            echo "Please run Research Context V1 first."
+            echo "ERROR: No research-context-v1 artifact found."
             exit 1
           fi
 
           python - <<'PY'
           from pathlib import Path
-          from datetime import datetime
+          from datetime import datetime, timezone
 
           source = Path("/tmp/research_context_artifacts.tsv")
 
           rows = []
 
           for line in source.read_text(encoding="utf-8").splitlines():
-
               parts = line.split("\t")
 
               if len(parts) != 5:
                   continue
 
               artifact_id, created_at, run_id, branch, sha = parts
+
+              if branch != "main":
+                  continue
 
               try:
                   dt = datetime.fromisoformat(
@@ -131,8 +125,8 @@ jobs:
 
               rows.append(
                   {
-                      "created_at": dt,
                       "artifact_id": artifact_id,
+                      "created_at": dt,
                       "run_id": run_id,
                       "branch": branch,
                       "sha": sha,
@@ -141,7 +135,7 @@ jobs:
 
           if not rows:
               raise SystemExit(
-                  "ERROR: No valid research-context-v1 artifact rows."
+                  "ERROR: No valid research-context-v1 artifact on main."
               )
 
           rows.sort(
@@ -151,42 +145,58 @@ jobs:
 
           latest = rows[0]
 
-          Path("/tmp/latest_research_context.txt").write_text(
-              "\t".join(
+          output = Path("/tmp/latest_research_context.env")
+
+          output.write_text(
+              "\n".join(
                   [
-                      latest["artifact_id"],
-                      latest["run_id"],
-                      latest["created_at"].isoformat(),
-                      latest["branch"],
-                      latest["sha"],
+                      f"artifact_id={latest['artifact_id']}",
+                      f"run_id={latest['run_id']}",
+                      f"created_at={latest['created_at'].isoformat()}",
+                      f"branch={latest['branch']}",
+                      f"sha={latest['sha']}",
                   ]
-              ),
+              )
+              + "\n",
               encoding="utf-8",
           )
 
           print()
           print("LATEST RESEARCH CONTEXT")
           print("--------------------------------------------")
-          print("Artifact ID :", latest["artifact_id"])
-          print("Run ID      :", latest["run_id"])
-          print("Created     :", latest["created_at"].isoformat())
-          print("Branch      :", latest["branch"])
-          print("SHA         :", latest["sha"])
+          print(f"Artifact ID : {latest['artifact_id']}")
+          print(f"Run ID      : {latest['run_id']}")
+          print(f"Created     : {latest['created_at'].isoformat()}")
+          print(f"Branch      : {latest['branch']}")
+          print(f"SHA         : {latest['sha']}")
           print("--------------------------------------------")
           PY
 
-          read \
-            ARTIFACT_ID \
-            RUN_ID \
-            CREATED_AT \
-            BRANCH \
-            SHA \
-            < /tmp/latest_research_context.txt
+          cat /tmp/latest_research_context.env
 
-          echo "RESEARCH_CONTEXT_ARTIFACT_ID=${ARTIFACT_ID}" >> "$GITHUB_ENV"
-          echo "RESEARCH_CONTEXT_RUN_ID=${RUN_ID}" >> "$GITHUB_ENV"
-          echo "RESEARCH_CONTEXT_CREATED_AT=${CREATED_AT}" >> "$GITHUB_ENV"
-          echo "RESEARCH_CONTEXT_SHA=${SHA}" >> "$GITHUB_ENV"
+          ARTIFACT_ID="$(grep '^artifact_id=' /tmp/latest_research_context.env | cut -d= -f2-)"
+          RUN_ID="$(grep '^run_id=' /tmp/latest_research_context.env | cut -d= -f2-)"
+          CREATED_AT="$(grep '^created_at=' /tmp/latest_research_context.env | cut -d= -f2-)"
+          BRANCH="$(grep '^branch=' /tmp/latest_research_context.env | cut -d= -f2-)"
+          SHA="$(grep '^sha=' /tmp/latest_research_context.env | cut -d= -f2-)"
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "ERROR: ARTIFACT_ID is empty."
+            exit 1
+          fi
+
+          if [ -z "$RUN_ID" ]; then
+            echo "ERROR: RUN_ID is empty."
+            exit 1
+          fi
+
+          {
+            echo "artifact_id=$ARTIFACT_ID"
+            echo "run_id=$RUN_ID"
+            echo "created_at=$CREATED_AT"
+            echo "branch=$BRANCH"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
 
       # ============================================================
       # 6. VERIFY ARTIFACT METADATA
@@ -195,19 +205,21 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.discover.outputs.artifact_id }}
+          RUN_ID: ${{ steps.discover.outputs.run_id }}
         run: |
           set -euo pipefail
 
           REPO="${GITHUB_REPOSITORY}"
-          ARTIFACT_ID="${RESEARCH_CONTEXT_ARTIFACT_ID}"
-          RUN_ID="${RESEARCH_CONTEXT_RUN_ID}"
 
+          echo
           echo "============================================================"
-          echo "VERIFYING ARTIFACT METADATA"
+          echo "VERIFYING RESEARCH CONTEXT ARTIFACT"
           echo "============================================================"
+          echo
 
-          echo "Artifact ID : ${ARTIFACT_ID}"
-          echo "Run ID      : ${RUN_ID}"
+          echo "Artifact ID: ${ARTIFACT_ID}"
+          echo "Workflow Run: ${RUN_ID}"
           echo
 
           gh api \
@@ -216,16 +228,19 @@ jobs:
               {
                 id: .id,
                 name: .name,
+                size_in_bytes: .size_in_bytes,
                 expired: .expired,
                 created_at: .created_at,
+                expires_at: .expires_at,
                 workflow_run_id: .workflow_run.id,
-                workflow_run_branch: .workflow_run.head_branch,
-                workflow_run_sha: .workflow_run.head_sha
+                workflow_run_name: .workflow_run.name,
+                workflow_run_head_branch: .workflow_run.head_branch,
+                workflow_run_head_sha: .workflow_run.head_sha
               }
             '
 
       # ============================================================
-      # 7. DOWNLOAD EXACT ARTIFACT FROM EXACT RUN
+      # 7. DOWNLOAD RESEARCH CONTEXT
       # ============================================================
       - name: Download latest Research Context artifact
         uses: actions/download-artifact@v5
@@ -233,7 +248,7 @@ jobs:
           name: research-context-v1
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          run-id: ${{ env.RESEARCH_CONTEXT_RUN_ID }}
+          run-id: ${{ steps.discover.outputs.run_id }}
           path: decision_engine_input
           merge-multiple: false
 
@@ -245,45 +260,36 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "============================================================"
-          echo "VERIFYING RESEARCH CONTEXT DOWNLOAD"
-          echo "============================================================"
-
           echo
-          echo "Downloaded files:"
+          echo "============================================================"
+          echo "RESEARCH CONTEXT DOWNLOADED FILES"
+          echo "============================================================"
+          echo
+
           find decision_engine_input \
-            -maxdepth 3 \
+            -maxdepth 5 \
             -type f \
             -print \
             | sort
 
-          CSV_COUNT="$(
-            find decision_engine_input \
-              -type f \
-              -name "*.csv" \
-              | wc -l
-          )"
+          echo
 
-          if [ "$CSV_COUNT" -eq 0 ]; then
-            echo
-            echo "ERROR: No CSV files found in Research Context artifact."
+          CSV_COUNT="$(find decision_engine_input -type f -name '*.csv' | wc -l)"
+
+          echo "CSV count: ${CSV_COUNT}"
+
+          if [ "$CSV_COUNT" -lt 1 ]; then
+            echo "ERROR: No CSV files were downloaded."
             exit 1
           fi
 
-          echo
-          echo "CSV files found: ${CSV_COUNT}"
-
       # ============================================================
-      # 9. VALIDATE INPUT
+      # 9. VALIDATE RESEARCH CONTEXT INPUT
       # ============================================================
       - name: Validate Research Context input
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "============================================================"
-          echo "VALIDATING RESEARCH CONTEXT INPUT"
-          echo "============================================================"
 
           python - <<'PY'
           from pathlib import Path
@@ -291,129 +297,117 @@ jobs:
 
           root = Path("decision_engine_input")
 
-          csv_files = sorted(root.rglob("*.csv"))
+          files = sorted(root.rglob("*.csv"))
 
-          if not csv_files:
+          if not files:
               raise SystemExit(
-                  "ERROR: Research Context CSV not found."
-              )
-
-          print("Research Context CSV candidates:")
-          for path in csv_files:
-              print(" -", path)
-
-          preferred = [
-              p for p in csv_files
-              if p.name == "research_context_v1.csv"
-          ]
-
-          if preferred:
-              target = preferred[0]
-          else:
-              target = csv_files[0]
-
-          print()
-          print("Selected input:")
-          print(target)
-
-          df = pd.read_csv(target)
-
-          if df.empty:
-              raise SystemExit(
-                  "ERROR: Research Context CSV is empty."
+                  "ERROR: No CSV files found in decision_engine_input."
               )
 
           print()
-          print("Rows:", len(df))
-          print("Columns:", len(df.columns))
+          print("============================================================")
+          print("VALIDATING RESEARCH CONTEXT INPUT")
+          print("============================================================")
+          print()
 
-          required_candidates = [
-              "asof_date",
-              "point_in_time_safe",
-              "research_only",
-          ]
+          valid = 0
 
-          lower_map = {
-              str(c).strip().lower(): c
-              for c in df.columns
-          }
+          for path in files:
+              print(f"Checking: {path}")
 
-          for required in required_candidates:
-
-              if required not in lower_map:
-                  print(
-                      f"WARNING: Expected column '{required}' "
-                      "was not found."
+              try:
+                  df = pd.read_csv(path)
+              except Exception as exc:
+                  raise SystemExit(
+                      f"ERROR: Cannot read {path}: {exc}"
                   )
 
-          pit_col = lower_map.get("point_in_time_safe")
+              if df.empty:
+                  raise SystemExit(
+                      f"ERROR: Empty CSV: {path}"
+                  )
 
-          if pit_col is not None:
+              columns = {str(c).strip().lower() for c in df.columns}
 
-              values = (
-                  df[pit_col]
-                  .astype(str)
-                  .str.strip()
-                  .str.lower()
-              )
+              if "point_in_time_safe" in columns:
+                  col = next(
+                      c for c in df.columns
+                      if str(c).strip().lower() == "point_in_time_safe"
+                  )
 
-              bad = ~values.isin(
-                  [
+                  values = (
+                      df[col]
+                      .astype(str)
+                      .str.strip()
+                      .str.lower()
+                  )
+
+                  allowed = {
                       "true",
                       "1",
                       "yes",
                       "y",
-                      "pass",
-                  ]
-              )
+                      "t",
+                  }
 
-              if bad.any():
-                  raise SystemExit(
-                      "ERROR: Research Context contains "
-                      "non-PIT-safe rows."
+                  bad = ~values.isin(allowed)
+
+                  if bad.any():
+                      raise SystemExit(
+                          f"ERROR: PIT violation detected in {path}"
+                      )
+
+              if "research_only" in columns:
+                  col = next(
+                      c for c in df.columns
+                      if str(c).strip().lower() == "research_only"
                   )
 
-          research_col = lower_map.get("research_only")
+                  values = (
+                      df[col]
+                      .astype(str)
+                      .str.strip()
+                      .str.lower()
+                  )
 
-          if research_col is not None:
-
-              values = (
-                  df[research_col]
-                  .astype(str)
-                  .str.strip()
-                  .str.lower()
-              )
-
-              bad = ~values.isin(
-                  [
+                  allowed = {
                       "true",
                       "1",
                       "yes",
                       "y",
-                  ]
-              )
+                      "t",
+                  }
 
-              if bad.any():
-                  raise SystemExit(
-                      "ERROR: Research Context contains "
-                      "non-research-only rows."
-                  )
+                  bad = ~values.isin(allowed)
+
+                  if bad.any():
+                      raise SystemExit(
+                          f"ERROR: research_only violation detected in {path}"
+                      )
+
+              valid += 1
 
           print()
+          print(f"Validated CSV files: {valid}")
           print("Research Context input validation: PASS")
+          print()
+
           PY
 
       # ============================================================
       # 10. RUN DECISION ENGINE
       # ============================================================
       - name: Run Decision Engine V1
+        id: run_engine
         shell: bash
         run: |
           set +e
 
+          echo
           echo "============================================================"
           echo "RUNNING DECISION ENGINE V1"
           echo "============================================================"
+          echo
 
           python tests/decision_engine/decision_engine_v1.py \
             --input-dir decision_engine_input \
@@ -435,13 +429,15 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
 
+          FILE="decision_engine_output/decision_engine_research_v1.json"
+
+          echo
           echo "============================================================"
           echo "DECISION ENGINE JSON"
           echo "============================================================"
-
-          FILE="decision_engine_output/decision_engine_research_v1.json"
+          echo
 
           if [ -f "$FILE" ]; then
             cat "$FILE"
@@ -456,13 +452,15 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
 
+          FILE="decision_engine_output/decision_engine_research_v1.csv"
+
+          echo
           echo "============================================================"
           echo "DECISION ENGINE CSV"
           echo "============================================================"
-
-          FILE="decision_engine_output/decision_engine_research_v1.csv"
+          echo
 
           if [ -f "$FILE" ]; then
             cat "$FILE"
@@ -477,13 +475,15 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
 
+          FILE="decision_engine_output/decision_engine_research_summary_v1.csv"
+
+          echo
           echo "============================================================"
           echo "DECISION ENGINE SUMMARY"
           echo "============================================================"
-
-          FILE="decision_engine_output/decision_engine_research_summary_v1.csv"
+          echo
 
           if [ -f "$FILE" ]; then
             cat "$FILE"
@@ -498,13 +498,15 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
 
+          FILE="decision_engine_output/decision_engine_research_evidence_v1.csv"
+
+          echo
           echo "============================================================"
           echo "DECISION ENGINE EVIDENCE"
           echo "============================================================"
-
-          FILE="decision_engine_output/decision_engine_research_evidence_v1.csv"
+          echo
 
           if [ -f "$FILE" ]; then
             cat "$FILE"
@@ -533,22 +535,25 @@ jobs:
         run: |
           set +e
 
-          echo "============================================================"
-          echo "FINAL DECISION ENGINE STATUS"
-          echo "============================================================"
-
           RC="${DECISION_ENGINE_EXIT_CODE:-999}"
 
           echo
-          echo "Research Context artifact : ${RESEARCH_CONTEXT_ARTIFACT_ID:-unknown}"
-          echo "Research Context Run      : ${RESEARCH_CONTEXT_RUN_ID:-unknown}"
-          echo "Research Context created  : ${RESEARCH_CONTEXT_CREATED_AT:-unknown}"
+          echo "============================================================"
+          echo "FINAL DECISION ENGINE STATUS"
+          echo "============================================================"
           echo
-          echo "Captured exit code: ${RC}"
 
+          echo "Research Context artifact : ${{ steps.discover.outputs.artifact_id }}"
+          echo "Research Context Run      : ${{ steps.discover.outputs.run_id }}"
+          echo "Research Context created  : ${{ steps.discover.outputs.created_at }}"
+          echo "Research Context branch   : ${{ steps.discover.outputs.branch }}"
+          echo "Research Context SHA      : ${{ steps.discover.outputs.sha }}"
           echo
-          echo "Decision Engine output directory:"
 
+          echo "Decision Engine exit code: ${RC}"
+          echo
+
+          echo "Decision Engine output:"
           if [ -d "decision_engine_output" ]; then
             find decision_engine_output \
               -maxdepth 2 \
@@ -556,24 +561,21 @@ jobs:
               -print \
               | sort
           else
-            echo "decision_engine_output directory missing."
+            echo "No output directory."
           fi
 
           echo
 
           if [ "$RC" -eq 0 ]; then
-
             echo "============================================================"
             echo "DECISION ENGINE V1: SUCCESS"
             echo "============================================================"
-
             exit 0
           fi
 
           echo "============================================================"
           echo "DECISION ENGINE V1: FAILED"
           echo "============================================================"
-
           echo
           echo "Exit code: ${RC}"
 
