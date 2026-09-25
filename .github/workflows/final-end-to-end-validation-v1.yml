@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,75 +27,37 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "============================================================"
-          echo "INSTALLING VALIDATION DEPENDENCIES"
-          echo "============================================================"
-
           python -m pip install --upgrade pip
           python -m pip install pandas
 
-          echo
-          echo "Installed pandas version:"
-          python -c "import pandas as pd; print(pd.__version__)"
-
-      - name: Display repository structure
+      - name: Prepare workspace
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "============================================================"
-          echo "US500 MACRO INTELLIGENCE"
-          echo "FINAL END-TO-END VALIDATION V1"
-          echo "============================================================"
-
-          echo
-          echo "Repository root:"
-          pwd
-
-          echo
-          echo "Top-level files:"
-          find . -maxdepth 2 -type f | sort | head -200
-
-      - name: Prepare artifacts directory
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "============================================================"
-          echo "PREPARING ARTIFACTS DIRECTORY"
-          echo "============================================================"
 
           rm -rf artifacts
+          rm -rf final_end_to_end_validation_output
+
           mkdir -p artifacts
 
-          echo "Artifacts directory:"
-          pwd
-          echo "/artifacts"
-
-      - name: Download latest available research artifacts
+      - name: Discover latest research artifacts
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          echo "============================================================"
-          echo "DOWNLOADING RESEARCH ARTIFACTS"
-          echo "============================================================"
-
           REPO="${GITHUB_REPOSITORY}"
 
-          echo
-          echo "Repository:"
-          echo "$REPO"
-
-          echo
-          echo "Collecting non-expired artifacts from GitHub Actions..."
+          echo "============================================================"
+          echo "DISCOVERING GITHUB ACTIONS ARTIFACTS"
+          echo "============================================================"
 
           gh api \
             --paginate \
             "repos/${REPO}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) |
+            --jq '.artifacts[] |
+              select(.expired == false) |
               [
                 .name,
                 .id,
@@ -103,16 +67,9 @@ jobs:
             > /tmp/all_artifacts.tsv
 
           if [ ! -s /tmp/all_artifacts.tsv ]; then
-            echo "No downloadable artifacts were found."
+            echo "ERROR: no downloadable artifacts found."
             exit 1
           fi
-
-          echo
-          echo "Total available artifact records:"
-          wc -l < /tmp/all_artifacts.tsv
-
-          echo
-          echo "Selecting the latest artifact for each artifact name..."
 
           python - <<'PY'
           from pathlib import Path
@@ -123,7 +80,10 @@ jobs:
 
           latest = {}
 
-          for line in source.read_text().splitlines():
+          for line in source.read_text(
+              encoding="utf-8"
+          ).splitlines():
+
               parts = line.split("\t")
 
               if len(parts) != 4:
@@ -140,46 +100,121 @@ jobs:
 
               previous = latest.get(name)
 
-              if previous is None or dt > previous[0]:
-                  latest[name] = (dt, artifact_id, url)
-
-          with output.open("w", encoding="utf-8") as f:
-              for name, (dt, artifact_id, url) in sorted(latest.items()):
-                  f.write(
-                      f"{name}\t{artifact_id}\t"
-                      f"{dt.isoformat()}\t{url}\n"
+              if (
+                  previous is None
+                  or dt > previous[0]
+              ):
+                  latest[name] = (
+                      dt,
+                      artifact_id,
+                      url,
                   )
 
-          print(f"Unique artifact names selected: {len(latest)}")
+          with output.open(
+              "w",
+              encoding="utf-8",
+          ) as f:
+
+              for name, (
+                  dt,
+                  artifact_id,
+                  url,
+              ) in sorted(latest.items()):
+
+                  f.write(
+                      f"{name}\t"
+                      f"{artifact_id}\t"
+                      f"{dt.isoformat()}\t"
+                      f"{url}\n"
+                  )
+
+          print(
+              "Latest unique artifact names:",
+              len(latest),
+          )
           PY
 
           echo
-          echo "Latest artifact set:"
-          cat /tmp/latest_artifacts.tsv
+          echo "Artifact discovery complete."
 
-          echo
-          echo "Downloading artifacts..."
+      - name: Download canonical research artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
 
-          count=0
+          echo "============================================================"
+          echo "DOWNLOADING CANONICAL RESEARCH ARTIFACTS"
+          echo "============================================================"
 
-          while IFS=$'\t' read -r name artifact_id created_at archive_url; do
+          REQUIRED_NAMES=(
+            "economic-intelligence-v2-3-refresh"
+            "fed-intelligence-v1"
+            "financial-stress-research-v1"
+            "cot-positioning-analyzer-v1"
+            "aaii-sentiment-analyzer-v1"
+            "vix-sentiment-analyzer-v1"
+            "sentiment-engine-v1"
+            "technical-intelligence-v1"
+            "market-breadth-full-validation-v1"
+            "cross-asset-intelligence-v1"
+            "event-news-intelligence-v2.1"
+            "earnings-reaction-v3"
+            "macro-context-v1"
+            "research-context-v1"
+          )
 
-            [ -z "$name" ] && continue
+          download_one() {
 
-            count=$((count + 1))
+            local wanted="$1"
+            local row
 
-            safe_name="$(printf '%s' "$name" | tr '/:' '__')"
-            zip_path="/tmp/${count}_${safe_name}.zip"
+            row="$(
+              awk \
+                -F '\t' \
+                -v n="$wanted" \
+                '$1 == n {print; exit}' \
+                /tmp/latest_artifacts.tsv \
+                || true
+            )"
+
+            if [ -z "$row" ]; then
+              echo
+              echo "WARNING:"
+              echo "Canonical artifact not found:"
+              echo "$wanted"
+              return 0
+            fi
+
+            IFS=$'\t' read -r \
+              name \
+              artifact_id \
+              created_at \
+              archive_url <<< "$row"
+
+            local safe_name
+            safe_name="$(
+              printf '%s' "$name" |
+              tr '/:' '__'
+            )"
+
+            local zip_path
+            zip_path="/tmp/${safe_name}.zip"
+
+            local extract_dir
             extract_dir="artifacts/${safe_name}"
 
             mkdir -p "$extract_dir"
 
             echo
             echo "------------------------------------------------------------"
-            echo "Artifact #$count"
-            echo "Name      : $name"
-            echo "Artifact ID: $artifact_id"
-            echo "Created   : $created_at"
+            echo "Artifact:"
+            echo "$name"
+            echo "Artifact ID:"
+            echo "$artifact_id"
+            echo "Created:"
+            echo "$created_at"
             echo "------------------------------------------------------------"
 
             gh api \
@@ -189,75 +224,84 @@ jobs:
               > "$zip_path"
 
             if [ ! -s "$zip_path" ]; then
-              echo "WARNING: empty artifact archive: $name"
-              rm -f "$zip_path"
-              continue
+              echo "ERROR: empty artifact archive:"
+              echo "$name"
+              exit 1
             fi
 
-            unzip -q -o "$zip_path" -d "$extract_dir"
+            unzip \
+              -q \
+              -o \
+              "$zip_path" \
+              -d "$extract_dir"
 
             rm -f "$zip_path"
+          }
 
-          done < /tmp/latest_artifacts.tsv
+          for name in "${REQUIRED_NAMES[@]}"; do
+            download_one "$name"
+          done
 
           echo
           echo "============================================================"
-          echo "ARTIFACT DOWNLOAD COMPLETE"
+          echo "DOWNLOADED FILES"
           echo "============================================================"
 
+          find artifacts \
+            -type f \
+            -print \
+            | sort
+
+          csv_count="$(
+            find artifacts \
+              -type f \
+              -name "*.csv" \
+              | wc -l
+          )"
+
+          json_count="$(
+            find artifacts \
+              -type f \
+              -name "*.json" \
+              | wc -l
+          )"
+
           echo
-          echo "Files available under artifacts/:"
+          echo "CSV count : $csv_count"
+          echo "JSON count: $json_count"
 
-          find artifacts -type f | sort
+          if [
+            "$csv_count" -eq 0
+            ] && [
+            "$json_count" -eq 0
+          ]; then
 
-          echo
-          echo "CSV count:"
-          find artifacts -type f -name "*.csv" | wc -l
-
-          echo
-          echo "JSON count:"
-          find artifacts -type f -name "*.json" | wc -l
-
-      - name: Verify required research layers
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "============================================================"
-          echo "VERIFYING RESEARCH ARTIFACTS"
-          echo "============================================================"
-
-          csv_count="$(find artifacts -type f -name "*.csv" | wc -l)"
-          json_count="$(find artifacts -type f -name "*.json" | wc -l)"
-
-          echo "CSV artifacts : $csv_count"
-          echo "JSON artifacts: $json_count"
-
-          if [ "$csv_count" -eq 0 ] && [ "$json_count" -eq 0 ]; then
             echo
-            echo "ERROR: No research artifacts were downloaded."
+            echo "ERROR:"
+            echo "No research artifacts were downloaded."
+
             exit 1
           fi
 
-          echo
-          echo "Artifact tree:"
-          find artifacts -maxdepth 3 -type f | sort | head -500
-
-      - name: Locate final validator
+      - name: Verify validator
         shell: bash
         run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "LOCATING FINAL VALIDATOR"
+          echo "VERIFYING FINAL VALIDATOR"
           echo "============================================================"
 
-          if [ ! -f "tests/final_end_to_end_validation_v1.py" ]; then
-            echo "Final validator not found at expected path."
+          if [
+            ! -f
+            tests/final_end_to_end_validation_v1.py
+          ]; then
 
-            echo
-            echo "Searching repository:"
-            find tests -type f \
+            echo "ERROR:"
+            echo "Final validator not found."
+
+            find tests \
+              -type f \
               \( \
                 -name "*final*validation*.py" \
                 -o \
@@ -268,9 +312,22 @@ jobs:
             exit 1
           fi
 
-          echo
-          echo "Final validator found:"
-          echo "tests/final_end_to_end_validation_v1.py"
+          echo "Final validator found."
+
+          if [
+            -f
+            FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md
+          ]; then
+
+            echo "Architecture document found."
+
+          else
+
+            echo "WARNING:"
+            echo "FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md"
+            echo "was not found at repository root."
+
+          fi
 
       - name: Run final end-to-end validator
         shell: bash
@@ -278,55 +335,89 @@ jobs:
           set +e
 
           echo "============================================================"
-          echo "RUNNING FINAL END-TO-END VALIDATION V1"
+          echo "FINAL END-TO-END VALIDATION V1"
           echo "============================================================"
 
-          python tests/final_end_to_end_validation_v1.py
+          python \
+            tests/final_end_to_end_validation_v1.py \
+            --repo-root . \
+            --artifacts-dir artifacts \
+            --output-dir final_end_to_end_validation_output
 
           rc=$?
 
-          echo
-          echo "Validator exit code: $rc"
-
-          printf '%s\n' "$rc" > final_end_to_end_validation_exit_code.txt
+          printf '%s\n' "$rc" \
+            > final_end_to_end_validation_exit_code.txt
 
           echo
-          echo "Exit code artifact written."
+          echo "Validator exit code:"
+          echo "$rc"
+
+          # Do not fail here.
+          # Diagnostics must be uploaded first.
 
           exit 0
 
-      - name: Display validation artifacts
+      - name: Display final validation result
         if: always()
         shell: bash
         run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "FINAL VALIDATION ARTIFACTS"
+          echo "FINAL VALIDATION RESULT"
           echo "============================================================"
 
-          echo
-          echo "CSV / validation files:"
+          if [
+            -f
+            final_end_to_end_validation_output/final_end_to_end_validation.json
+          ]; then
 
-          find . -type f \
-            \( \
-              -name "*.csv" \
-              -o \
-              -name "*validation*" \
-              -o \
-              -name "*summary*" \
-              -o \
-              -name "*events*" \
-            \) \
-            -print | sort
+            cat \
+              final_end_to_end_validation_output/final_end_to_end_validation.json
 
-          echo
-          echo "Exit code:"
-
-          if [ -f "final_end_to_end_validation_exit_code.txt" ]; then
-            cat final_end_to_end_validation_exit_code.txt
           else
-            echo "Exit code file not found."
+
+            echo "JSON result not found."
+
+          fi
+
+          echo
+          echo "============================================================"
+          echo "SUMMARY"
+          echo "============================================================"
+
+          if [
+            -f
+            final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
+          ]; then
+
+            cat \
+              final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
+
+          else
+
+            echo "Summary not found."
+
+          fi
+
+          echo
+          echo "============================================================"
+          echo "EVENTS / REVIEWS"
+          echo "============================================================"
+
+          if [
+            -f
+            final_end_to_end_validation_output/final_end_to_end_validation_events.csv
+          ]; then
+
+            cat \
+              final_end_to_end_validation_output/final_end_to_end_validation_events.csv
+
+          else
+
+            echo "Events file not found."
+
           fi
 
       - name: Upload final validation artifacts
@@ -335,11 +426,10 @@ jobs:
         with:
           name: final-end-to-end-validation-v1
           path: |
-            **/*validation*.csv
-            **/*summary*.csv
-            **/*events*.csv
+            final_end_to_end_validation_output/**
             final_end_to_end_validation_exit_code.txt
           if-no-files-found: warn
+          retention-days: 30
 
       - name: Apply final validation status
         if: always()
@@ -347,8 +437,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -f "final_end_to_end_validation_exit_code.txt" ]; then
+          if [
+            ! -f
+            final_end_to_end_validation_exit_code.txt
+          ]; then
+
+            echo "ERROR:"
             echo "Validation exit code file not found."
+
             exit 1
           fi
 
@@ -361,9 +457,12 @@ jobs:
           echo "============================================================"
 
           if [ "$rc" -eq 0 ]; then
+
             echo "FINAL END-TO-END VALIDATION: SUCCESS"
             echo "============================================================"
+
             exit 0
+
           fi
 
           echo "FINAL END-TO-END VALIDATION: FAILED"
