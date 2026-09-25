@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-09-25T09:40:20.122471+00:00",
+  "generated_at": "2026-09-25T10:08:08.040489+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "ParseError('syntax error: line 1, column 0')",
+    "error": "HTTP 429",
     "query_requests": 1,
     "fallback_required": true
   },

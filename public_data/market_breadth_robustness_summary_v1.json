@@ -9,7 +9,7 @@
     "row_count": 1916,
     "date_start": "2019-01-03",
     "date_end": "2026-08-18",
-    "mean_coverage_pct": 92.187439,
+    "mean_coverage_pct": 92.18526,
     "min_coverage_pct": 82.9703,
     "max_coverage_pct": 100.0
   },
@@ -18,56 +18,56 @@
       "coverage_threshold_pct": 75.0,
       "rows": 1916,
       "row_share_pct": 100.0,
-      "mean_coverage_pct": 92.1874,
+      "mean_coverage_pct": 92.1853,
       "positive_state_share_pct": 70.1461,
       "negative_state_share_pct": 28.8622,
       "balanced_state_share_pct": 0.9916,
-      "mean_net_advances": 19.01618,
-      "mean_net_advances_20d": 372.072219
+      "mean_net_advances": 19.017745,
+      "mean_net_advances_20d": 372.100158
     },
     {
       "coverage_threshold_pct": 80.0,
       "rows": 1916,
       "row_share_pct": 100.0,
-      "mean_coverage_pct": 92.1874,
+      "mean_coverage_pct": 92.1853,
       "positive_state_share_pct": 70.1461,
       "negative_state_share_pct": 28.8622,
       "balanced_state_share_pct": 0.9916,
-      "mean_net_advances": 19.01618,
-      "mean_net_advances_20d": 372.072219
+      "mean_net_advances": 19.017745,
+      "mean_net_advances_20d": 372.100158
     },
     {
       "coverage_threshold_pct": 85.0,
       "rows": 1735,
       "row_share_pct": 90.5532,
-      "mean_coverage_pct": 93.0609,
+      "mean_coverage_pct": 93.0585,
       "positive_state_share_pct": 69.7406,
       "negative_state_share_pct": 30.2594,
       "balanced_state_share_pct": 0.0,
-      "mean_net_advances": 16.282997,
-      "mean_net_advances_20d": 329.862248
+      "mean_net_advances": 16.284726,
+      "mean_net_advances_20d": 329.892795
     },
     {
       "coverage_threshold_pct": 90.0,
       "rows": 1169,
       "row_share_pct": 61.0125,
-      "mean_coverage_pct": 95.5321,
+      "mean_coverage_pct": 95.5285,
       "positive_state_share_pct": 64.1574,
       "negative_state_share_pct": 35.8426,
       "balanced_state_share_pct": 0.0,
-      "mean_net_advances": 13.578272,
-      "mean_net_advances_20d": 271.431993
+      "mean_net_advances": 13.580838,
+      "mean_net_advances_20d": 271.477331
     },
     {
       "coverage_threshold_pct": 95.0,
       "rows": 741,
       "row_share_pct": 38.6743,
-      "mean_coverage_pct": 97.0362,
+      "mean_coverage_pct": 97.0305,
       "positive_state_share_pct": 69.7706,
       "negative_state_share_pct": 30.2294,
       "balanced_state_share_pct": 0.0,
-      "mean_net_advances": 19.159244,
-      "mean_net_advances_20d": 387.855601
+      "mean_net_advances": 19.163293,
+      "mean_net_advances_20d": 387.927126
     },
     {
       "coverage_threshold_pct": 100.0,
@@ -78,7 +78,7 @@
       "negative_state_share_pct": 0.0,
       "balanced_state_share_pct": 0.0,
       "mean_net_advances": -50.0,
-      "mean_net_advances_20d": 506.0
+      "mean_net_advances_20d": 507.0
     }
   ],
   "state_distribution": [
@@ -105,7 +105,7 @@
       "recomputed_rows": 1791,
       "compared_rows": 1791,
       "max_abs_difference": 1.7763568394002505e-15,
-      "mean_abs_difference": 2.529767839410003e-16,
+      "mean_abs_difference": 2.5181061584213035e-16,
       "no_lookahead_check": true
     },
     {
@@ -114,7 +114,7 @@
       "recomputed_rows": 1772,
       "compared_rows": 1772,
       "max_abs_difference": 1.4654943925052066e-14,
-      "mean_abs_difference": 1.199567035049035e-15,
+      "mean_abs_difference": 1.1993663475137217e-15,
       "no_lookahead_check": true
     },
     {
@@ -123,7 +123,7 @@
       "recomputed_rows": 1772,
       "compared_rows": 1772,
       "max_abs_difference": 4.263256414560601e-14,
-      "mean_abs_difference": 4.6116336883578895e-15,
+      "mean_abs_difference": 4.6107751372921825e-15,
       "no_lookahead_check": true
     },
     {
@@ -132,7 +132,7 @@
       "recomputed_rows": 1771,
       "compared_rows": 1771,
       "max_abs_difference": 9.769962616701378e-15,
-      "mean_abs_difference": 8.037927178499245e-16,
+      "mean_abs_difference": 8.043294928159524e-16,
       "no_lookahead_check": true
     }
   ],

@@ -1,4 +1,0 @@
-methodology_version,base_method,start_threshold,exit_threshold,scored_sessions,event_count,longest_event_sessions,largest_peak,research_only
-v1.4,F_FREQUENCY_AWARE_v1.3,1.0,0.0,1664,4,284,3.041778195552251,True
-v1.4,F_FREQUENCY_AWARE_v1.3,1.0,0.25,1664,6,220,3.041778195552251,True
-v1.4,F_FREQUENCY_AWARE_v1.3,1.0,0.5,1664,7,213,3.041778195552251,True

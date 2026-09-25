@@ -1,0 +1,286 @@
+{
+  "project": "US500 Macro Intelligence",
+  "type": "research_only",
+  "generated_at_utc": "2026-09-25T10:19:31.914639+00:00",
+  "repository": "mohamednossaoui-max/US500-Macro-Intelligence",
+  "branch": "main",
+  "master_run_id": "36121914307",
+  "dataset_count": 55,
+  "datasets": [
+    {
+      "file": "aaii_historical_collection_summary_v1.csv",
+      "bytes": 452,
+      "sha256": "57e110985ff53145199c7796b76219a7054d84816e4872de9a04e916e722b37c"
+    },
+    {
+      "file": "aaii_historical_records_input_v1.csv",
+      "bytes": 553788,
+      "sha256": "7a864e765c4198137fb4a2fcce070df281aec2952591fafcf2766029f73b8476"
+    },
+    {
+      "file": "aaii_sentiment_extremes_v1.csv",
+      "bytes": 105256,
+      "sha256": "3832b698a9d2a68e97c3325d49fcc70e719eecbed6c88be9f7f6fbfffea31c8b"
+    },
+    {
+      "file": "aaii_sentiment_research_summary_v1.csv",
+      "bytes": 425,
+      "sha256": "3d5f858664b0073fbf6b896f577eda7db43099532d2c4da7c791a7e91740d517"
+    },
+    {
+      "file": "aaii_sentiment_research_v1.csv",
+      "bytes": 1312791,
+      "sha256": "6bcef92ce15db8feec66e6bbe48d1ca45bc19d06b427167d87aff839ba64b7a1"
+    },
+    {
+      "file": "cot_historical_collection_summary_v1.csv",
+      "bytes": 358,
+      "sha256": "c595ab47cf2c492f25fd3d92b23230586763ea7636e504396103f6d27191c232"
+    },
+    {
+      "file": "cot_historical_records_input_v1.csv",
+      "bytes": 306016,
+      "sha256": "8aea39f30dee58c3cc6f70550228836bad55fcd9ccf30d6337a6b36bd5dbd77c"
+    },
+    {
+      "file": "cot_positioning_extremes_v1.csv",
+      "bytes": 245793,
+      "sha256": "58c287afb40df55242c2b7e8253e89933b41983eb2f0e97b03b05befa2a8e5a5"
+    },
+    {
+      "file": "cot_positioning_research_summary_v1.csv",
+      "bytes": 663,
+      "sha256": "ffeb6b55f3276cd1646886f9b66765c3a523a58b7762dcb204a835ed8d9696b1"
+    },
+    {
+      "file": "cot_positioning_research_v1.csv",
+      "bytes": 541311,
+      "sha256": "b9e3b13b3de8f1d51c258a2d2b592f21e4f20d7aa4f86df15acecc848a2e5cd9"
+    },
+    {
+      "file": "cross_asset_research_v1.csv",
+      "bytes": 5175769,
+      "sha256": "e8bb1167eb655737bddc109abccc96618b65f10d187c61e0d0c63129ad02d4b9"
+    },
+    {
+      "file": "cross_asset_summary_v1.json",
+      "bytes": 1386,
+      "sha256": "5349c626faaf55ac3c6d5bb8b4cb1aa56ae24a07eb94e0860b7f6a120930267b"
+    },
+    {
+      "file": "cross_asset_validation_v1.json",
+      "bytes": 3197,
+      "sha256": "20e1a49e3c6094e6df7ddbca6317c56622a0acc21dd1b3f0e8dfa680be46529d"
+    },
+    {
+      "file": "earnings_market_reaction_summary_v3.csv",
+      "bytes": 1084,
+      "sha256": "4611a367fc7da902c10e4689486c46caff082294a94573199ba7c0b9f2068173"
+    },
+    {
+      "file": "earnings_market_reaction_v3.csv",
+      "bytes": 872767,
+      "sha256": "839084bf51b99ed3a3e97a2b93a582de6cbe4b4855b2c191e5b9a8739af13e00"
+    },
+    {
+      "file": "earnings_reaction_by_eps_class_v3.csv",
+      "bytes": 911,
+      "sha256": "deabe033ea3eff9c7702029deab898d5d4ff2ee6e99efe948985762f96d8b827"
+    },
+    {
+      "file": "earnings_reaction_by_sector_v3.csv",
+      "bytes": 801,
+      "sha256": "57a5ce7ee9f10e9bc75bf026457365cb27e4837f9d192b44a7eab59d7181e0ce"
+    },
+    {
+      "file": "economic_historical_events_v1.csv",
+      "bytes": 100779,
+      "sha256": "301b77589e42f492ed20d18f0d15edd20dd42873ddac80fd957ffd044a2dd159"
+    },
+    {
+      "file": "economic_historical_quality_v1.csv",
+      "bytes": 37876,
+      "sha256": "a85652fd634be6cce8f9fff4d9b71e8f6e8478353145be13acd312976f6d10e9"
+    },
+    {
+      "file": "economic_regime_events_v1.csv",
+      "bytes": 100203,
+      "sha256": "f7696faa65675222343bd53c7a3adf263b019e676c1b0de85d1cfc0b90d20758"
+    },
+    {
+      "file": "economic_regime_summary_v1.csv",
+      "bytes": 284,
+      "sha256": "34590c1cf4bd18f380757921b5767582f0b6a7bb304bddf58b9a302bcbbfb180"
+    },
+    {
+      "file": "economic_surprise_engine_v1.csv",
+      "bytes": 197180,
+      "sha256": "513a3e1446dc2d95155940a80fbad876b62d77316f344e98cd7e4f4b0463e744"
+    },
+    {
+      "file": "economic_surprise_summary_v1.csv",
+      "bytes": 472,
+      "sha256": "b5ea771a54b2f07ed349a87771063c4c88f3d00e121e38b300736b8a67c47e26"
+    },
+    {
+      "file": "event_news_research_summary_v2.json",
+      "bytes": 472,
+      "sha256": "a540307d289f5c466fe9204b5b9cac62e8edd66ed6119deaa616a77bbca105ec"
+    },
+    {
+      "file": "event_news_research_v2.csv",
+      "bytes": 26776,
+      "sha256": "1a3bcfa7b1e19c757d6930532b2c3bf854452fab26dcefbe55411b5ae497d623"
+    },
+    {
+      "file": "event_news_validation_v2.json",
+      "bytes": 75945,
+      "sha256": "f261ba45dc93c359f48be0251f4a7d57c032303948a094c2e3b8f94ecdcccdaf"
+    },
+    {
+      "file": "fed_intelligence_output_v1.json",
+      "bytes": 10700,
+      "sha256": "2648b44fdbda578911545e37020d97008b1c2f1e08cbb23502b7d7e67ac1a370"
+    },
+    {
+      "file": "financial_stress_records_input_v1.csv",
+      "bytes": 1766424,
+      "sha256": "a8c397ee60ab7bc1609f184abd6591a755632176c42de4e88c9b651a339009c5"
+    },
+    {
+      "file": "financial_stress_research_summary_v1.csv",
+      "bytes": 471,
+      "sha256": "5161cd24b4e485e2b4262aef59c5e4b078adca2458cbf7e90c283aacc6a5401c"
+    },
+    {
+      "file": "financial_stress_research_v1.csv",
+      "bytes": 609862,
+      "sha256": "d305ce7b672f037276953808e9dd763a65fb0a7348927a6b8267553d2a82e41a"
+    },
+    {
+      "file": "liquidity_historical_collection_summary_v1.csv",
+      "bytes": 1728,
+      "sha256": "86f927264f13664d9a21c54b4a1f291253ec34617631d73c550e2f88e12d027b"
+    },
+    {
+      "file": "liquidity_historical_records_input_v1.csv",
+      "bytes": 2595898,
+      "sha256": "90346b1c6de061ab8c974cd2c3b8265434a244bc327dc107c5d22f5ae66b8968"
+    },
+    {
+      "file": "liquidity_intelligence_research_v1.csv",
+      "bytes": 3967061,
+      "sha256": "02aa5dff652158474dd3d121030ccaf1e7b2d5c7837ddcd4b0a927c02d20dbb9"
+    },
+    {
+      "file": "liquidity_intelligence_summary_v1.csv",
+      "bytes": 795,
+      "sha256": "db5130123d2baa4bdc547de1cbfb62418604a26f064ed2c73888155a0eae2aaf"
+    },
+    {
+      "file": "market_breadth_analysis_summary_v1.json",
+      "bytes": 2188,
+      "sha256": "8a0057b1a5c5f4e9901bc7cd7a8c2d7f209c587fb4fb73b46ba4bf53953141ad"
+    },
+    {
+      "file": "market_breadth_analysis_v1.csv",
+      "bytes": 938866,
+      "sha256": "554ac26a7f5f8f54d67dd0887ea1b035958a3ecac6affdb816dc403ed23f5fff"
+    },
+    {
+      "file": "market_breadth_analysis_validation_v1.json",
+      "bytes": 344,
+      "sha256": "5034cba32e6fc3ef267d210015c14ee3b02fa5aea6e5469717de8b2110ad85c4"
+    },
+    {
+      "file": "market_breadth_coverage_robustness_v1.csv",
+      "bytes": 558,
+      "sha256": "e5f1640ed0269c6f84ba85fc9821aa7fd91229e9e89e57e306867ac0386dcefe"
+    },
+    {
+      "file": "market_breadth_full_validation_summary_v1.json",
+      "bytes": 1740,
+      "sha256": "bbad41dbed0d3c8261505179f3b387fca4187f64043d6e1894a2659984f13f05"
+    },
+    {
+      "file": "market_breadth_lookahead_audit_v1.csv",
+      "bytes": 515,
+      "sha256": "02ea44623fe71a2f9eb4ecb67d7f1c1fc32617b2d68224b2a4f43a5c24e5174c"
+    },
+    {
+      "file": "market_breadth_metadata_v1.json",
+      "bytes": 1042,
+      "sha256": "2ca4fcb31eac7943888d0bc2e0e0117e37deda0638269828ae72c04824324b52"
+    },
+    {
+      "file": "market_breadth_records_v1.csv",
+      "bytes": 450252,
+      "sha256": "24159873727b7adfd5a1c1b8bf0c8d1d17baf57120e2e65be3ae83a9199e4292"
+    },
+    {
+      "file": "market_breadth_robustness_summary_v1.json",
+      "bytes": 4370,
+      "sha256": "d3dad017e52a9aef5821fdba56da58cf8d0b2139fb263ce86b7ecb7b8fddb49e"
+    },
+    {
+      "file": "market_breadth_robustness_validation_v1.json",
+      "bytes": 433,
+      "sha256": "5a5f4051647adcb1ccf2ab40be463ef5a9beb892cde0169bc8b46c0581c58c17"
+    },
+    {
+      "file": "market_breadth_state_robustness_v1.csv",
+      "bytes": 125,
+      "sha256": "fa203401a5869782669c99e330776c59145031b004bbb9c3d1beb2b2247fd841"
+    },
+    {
+      "file": "market_breadth_validation_v1.json",
+      "bytes": 438,
+      "sha256": "f8c9b0534cc6c0c4aebf134d6c73769ccd3a3ba6b5f820e3e90e457ebc867009"
+    },
+    {
+      "file": "market_breadth_window_robustness_v1.csv",
+      "bytes": 347,
+      "sha256": "5dbc6625fa6e2a7d830616d176dc20e3390835e3674793d5965feb4fb086fec1"
+    },
+    {
+      "file": "technical_intelligence_extremes_v1.csv",
+      "bytes": 670035,
+      "sha256": "ce58672b930f906554749439316e8a687427249fd1e0b081f3b318bbfc18e20e"
+    },
+    {
+      "file": "technical_intelligence_research_summary_v1.csv",
+      "bytes": 497,
+      "sha256": "937e761aaaa1dacd8471fba3f7c2834e919cd770b1cd26ea8361dd6b344943c3"
+    },
+    {
+      "file": "technical_intelligence_research_v1.csv",
+      "bytes": 1484184,
+      "sha256": "a69b8ab4fec3dd2a0d8612f780e45c687335a0caa2766a385961f46fff8f00f8"
+    },
+    {
+      "file": "vix_historical_collection_summary_v1.csv",
+      "bytes": 389,
+      "sha256": "700f459436208e67e09970c527c6d1a9ead3ad2258e5f649ea4a150b5a255311"
+    },
+    {
+      "file": "vix_historical_records_input_v1.csv",
+      "bytes": 3014549,
+      "sha256": "0adaab527fae5245dcd22689012f79637d56bcaaf29917d7a990d9279a4217ce"
+    },
+    {
+      "file": "vix_sentiment_extremes_v1.csv",
+      "bytes": 822497,
+      "sha256": "79773b745ba23c161f6ea5b44c8a9e96b72a49364ea41e9314f0e162b61f0a35"
+    },
+    {
+      "file": "vix_sentiment_research_summary_v1.csv",
+      "bytes": 394,
+      "sha256": "e42e305bd274ef8f3ea764c9c1ddfce561e29a710208acbdcef2615f2cfa0937"
+    },
+    {
+      "file": "vix_sentiment_research_v1.csv",
+      "bytes": 4434578,
+      "sha256": "77f41a48c131c31b4c9e55c19702cb153055f07f8f58838e3adaf9e766947936"
+    }
+  ]
+}

@@ -1,2 +1,0 @@
-methodology_version,start_date,end_date,raw_rows,daily_session_rows,calendar_rows_used_for_A_to_D,point_in_time_safe_raw_rows,raw_revision_flag_true,pit_unsafe_rows,frequency_aware_daily_window,frequency_aware_weekly_window,event_start_threshold,event_end_threshold,event_calendar_vs_session_note,research_only,event_count_A_CURRENT_252D,event_count_F_FREQUENCY_AWARE
-v1.3,2020-01-02,2026-09-18,5778,1723,2452,5778,0,0,252,52,1.0,0.0,Regime scores A-D are calendar-day constructions; event statistics are measured only on original DAILY market-session dates.,True,5,4

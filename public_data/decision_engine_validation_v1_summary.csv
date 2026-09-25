@@ -1,2 +1,0 @@
-run_timestamp_utc,total_checks,pass,review,fail,status,research_only,architecture_version,methodology_version
-2026-09-24T20:30:11.608635+00:00,34,31,3,0,PASSED,TRUE,1.0,DECISION_ENGINE_V1_CONTRACT_FIRST

@@ -1,7 +1,7 @@
 technical_regime,observations,ticker,point_in_time_safe,research_only,decision_engine_ready,trading_signal_generated,forecast_generated,technical_score_generated
-STRONG_BULLISH,806,^GSPC,True,True,False,False,False,False
+STRONG_BULLISH,807,^GSPC,True,True,False,False,False,False
 NEUTRAL,552,^GSPC,True,True,False,False,False,False
-BULLISH,208,^GSPC,True,True,False,False,False,False
+BULLISH,210,^GSPC,True,True,False,False,False,False
 INSUFFICIENT_DATA,199,^GSPC,True,True,False,False,False,False
 BEARISH,116,^GSPC,True,True,False,False,False,False
 STRONG_BEARISH,58,^GSPC,True,True,False,False,False,False

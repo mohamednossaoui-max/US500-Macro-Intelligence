@@ -5,8 +5,8 @@
     "GOLD": 0.8229,
     "NASDAQ": 0.8277,
     "SP500": 0.8277,
-    "US10Y": 0.8269,
-    "VIX": 0.8279,
+    "US10Y": 0.827,
+    "VIX": 0.828,
     "WTI": 0.8234
   },
   "asset_first_dates": {
@@ -20,24 +20,24 @@
     "WTI": "2000-08-23"
   },
   "asset_last_dates": {
-    "BITCOIN": "2026-09-23",
-    "DXY": "2026-09-23",
-    "GOLD": "2026-09-23",
-    "NASDAQ": "2026-09-23",
-    "SP500": "2026-09-23",
-    "US10Y": "2026-09-23",
-    "VIX": "2026-09-23",
-    "WTI": "2026-09-23"
+    "BITCOIN": "2026-09-25",
+    "DXY": "2026-09-25",
+    "GOLD": "2026-09-25",
+    "NASDAQ": "2026-09-24",
+    "SP500": "2026-09-24",
+    "US10Y": "2026-09-24",
+    "VIX": "2026-09-25",
+    "WTI": "2026-09-25"
   },
   "asset_observation_counts": {
-    "BITCOIN": 4390,
-    "DXY": 6749,
-    "GOLD": 6541,
-    "NASDAQ": 6720,
-    "SP500": 6720,
-    "US10Y": 6714,
-    "VIX": 6722,
-    "WTI": 6549
+    "BITCOIN": 4392,
+    "DXY": 6751,
+    "GOLD": 6543,
+    "NASDAQ": 6721,
+    "SP500": 6721,
+    "US10Y": 6715,
+    "VIX": 6724,
+    "WTI": 6551
   },
   "assets_available": [
     "SP500",
@@ -78,7 +78,7 @@
     "unified_decision_disabled": true
   },
   "columns": 44,
-  "date_end": "2026-09-23",
+  "date_end": "2026-09-25",
   "date_start": "2000-01-03",
   "methodology": {
     "asset_coverage_policy": "Coverage is measured within each asset's own first-to-last available observation window",
@@ -112,7 +112,7 @@
     "CORR_GOLD_US10Y_60D",
     "CORR_DXY_US10Y_60D"
   ],
-  "rows": 8119,
+  "rows": 8121,
   "validator": "Cross-Asset Intelligence v1",
   "version": "1.0",
   "warnings": []

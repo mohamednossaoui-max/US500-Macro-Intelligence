@@ -1,2 +1,2 @@
 dataset,records,first_observation_date,last_observation_date,source,source_url,availability_semantics,point_in_time_safe,research_only,decision_engine_ready,sentiment_score_generated,duplicate_observations,min_expected_records
-AAII Investor Sentiment Survey,2041,1987-07-24,2026-09-17,AAII Investor Sentiment Survey,https://www.aaii.com/files/surveys/sentiment.xls,conservative_proxy_publication_thursday_after_survey_week,True,True,False,False,0,1000
+AAII Investor Sentiment Survey,2042,1987-07-24,2026-09-24,AAII Investor Sentiment Survey,https://www.aaii.com/files/surveys/sentiment.xls,conservative_proxy_publication_thursday_after_survey_week,True,True,False,False,0,1000
