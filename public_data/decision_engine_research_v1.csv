@@ -1,2 +1,2 @@
 engine,engine_version,as_of_date,state,confidence,confidence_type,evidence_count,supportive_count,contradictory_count,mixed_count,missing,point_in_time_safe,research_only,decision_engine_enabled,trading_signal,forecast,unified_decision,execution,broker_integration,position_sizing,stop_loss,take_profit
-decision-engine-v1,decision-engine-v1,2026-09-25,INSUFFICIENT_DATA,0.0,evidence_coverage,0,0,0,0,['usable research evidence'],True,True,True,,,,False,False,False,,
+decision-engine-v1,decision-engine-v1,2026-09-25,SUPPORTIVE,1.0,evidence_coverage,4,2,0,2,[],True,True,True,,,,False,False,False,,

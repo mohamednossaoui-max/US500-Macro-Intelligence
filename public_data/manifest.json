@@ -53,20 +53,20 @@
       "sha256": "e370173c3e5eda42af537cad0d583a5d643ed45ec288765050e8987002030d19"
     },
     "decision_engine_research_evidence_v1.csv": {
-      "bytes": 1,
-      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      "bytes": 378,
+      "sha256": "0d5e962fce872373b4b1c81600835f10e4876ff4a3f12ddec7bcadfa9825c1a0"
     },
     "decision_engine_research_summary_v1.csv": {
-      "bytes": 205,
-      "sha256": "54da0bf1ca19bfafb400167d0f94fb77583ad39643cfee45ed48b2b9e7367c55"
+      "bytes": 198,
+      "sha256": "6490fbeab2055e6eac438659c19602ab62b2ccf7cb98eb9d94993267d95aa947"
     },
     "decision_engine_research_v1.csv": {
-      "bytes": 467,
-      "sha256": "bdfc569c86b2af59c6447446fd795680b08eff5c67a08edc21503aedbbc28a9b"
+      "bytes": 434,
+      "sha256": "708999431983b10efa30c0e25ffc148664f3a72629574d26a45dde4a5d71227e"
     },
     "decision_engine_research_v1.json": {
-      "bytes": 657,
-      "sha256": "9ed4b5e854ccb375ac195dd7b3400fae7195ae4b5c859d591065488e2c3cd177"
+      "bytes": 1392,
+      "sha256": "868f1a061354cf518dd56ffec2a38bc9a1812ae84712db96c75823b2a01a1416"
     },
     "earnings_market_reaction_summary_v3.csv": {
       "bytes": 1084,
@@ -284,6 +284,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36189083832",
+  "source_run_id": "36189840012",
   "source_workflow": "Decision Engine V1"
 }

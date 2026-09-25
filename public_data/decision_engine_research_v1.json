@@ -2,16 +2,14 @@
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
   "as_of_date": "2026-09-25",
-  "state": "INSUFFICIENT_DATA",
-  "confidence": 0.0,
+  "state": "SUPPORTIVE",
+  "confidence": 1.0,
   "confidence_type": "evidence_coverage",
-  "evidence_count": 0,
-  "supportive_count": 0,
+  "evidence_count": 4,
+  "supportive_count": 2,
   "contradictory_count": 0,
-  "mixed_count": 0,
-  "missing": [
-    "usable research evidence"
-  ],
+  "mixed_count": 2,
+  "missing": [],
   "point_in_time_safe": true,
   "research_only": true,
   "decision_engine_enabled": true,
@@ -23,5 +21,34 @@
   "position_sizing": false,
   "stop_loss": null,
   "take_profit": null,
-  "evidence": []
+  "evidence": [
+    {
+      "source": "Macro Context",
+      "category": "economic",
+      "stance": "MIXED",
+      "reason": "Economic regime is MIXED.",
+      "value": "MIXED"
+    },
+    {
+      "source": "Financial Stress",
+      "category": "financial_stress",
+      "stance": "SUPPORTIVE",
+      "reason": "Financial stress regime is LOW_RESEARCH_STRESS.",
+      "value": "LOW_RESEARCH_STRESS"
+    },
+    {
+      "source": "Sentiment Engine",
+      "category": "sentiment",
+      "stance": "MIXED",
+      "reason": "Unified sentiment regime is NEUTRAL.",
+      "value": "NEUTRAL"
+    },
+    {
+      "source": "Technical Intelligence",
+      "category": "technical",
+      "stance": "SUPPORTIVE",
+      "reason": "Technical research regime is BULLISH.",
+      "value": "BULLISH"
+    }
+  ]
 }

@@ -1,2 +1,2 @@
 as_of_date,state,confidence,evidence_count,supportive_count,contradictory_count,mixed_count,point_in_time_safe,research_only,decision_engine_enabled
-2026-09-25,INSUFFICIENT_DATA,0.0,0,0,0,0,True,True,True
+2026-09-25,SUPPORTIVE,1.0,4,2,0,2,True,True,True
