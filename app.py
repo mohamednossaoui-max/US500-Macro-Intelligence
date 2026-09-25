@@ -98,7 +98,9 @@ def metric(label, value):
     st.metric(label, str(value))
 
 ctx = latest(DATA["Research Context"])
-dec = latest(DATA["Decision Summary"]) or latest(DATA["Decision Engine"])
+dec = latest(DATA["Decision Summary"])
+if dec is None:
+    dec = latest(DATA["Decision Engine"])
 
 context_date = val(ctx,["study_date","as_of_date","date"])
 macro = val(ctx,["macro_economic_regime","economic_regime"])
