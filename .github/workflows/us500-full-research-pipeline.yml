@@ -1,0 +1,903 @@
+name: US500 Macro Intelligence — Full Research Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_public_data:
+        description: "Publish successful research datasets into public_data/"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: us500-full-research-pipeline
+  cancel-in-progress: false
+
+jobs:
+
+  orchestrate:
+
+    name: Run Complete Research Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GH_REF: ${{ github.ref_name }}
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+
+      # ============================================================
+      # 2. GIT CONFIGURATION
+      # ============================================================
+
+      - name: Configure Git
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+
+      # ============================================================
+      # 3. VERIFY GH CLI
+      # ============================================================
+
+      - name: Verify GitHub CLI
+        run: |
+          set -euo pipefail
+
+          gh --version
+          gh auth status
+
+          echo "Repository:"
+          echo "$GH_REPO"
+
+          echo "Branch:"
+          echo "$GH_REF"
+
+
+      # ============================================================
+      # 4. MASTER ORCHESTRATOR
+      # ============================================================
+
+      - name: Run complete research pipeline
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          RUN_LOG="$RUNNER_TEMP/us500_pipeline_runs.tsv"
+
+          : > "$RUN_LOG"
+
+
+          # ========================================================
+          # TIME HELPERS
+          # ========================================================
+
+          epoch_now() {
+            date +%s
+          }
+
+
+          iso_to_epoch() {
+            date -u -d "$1" +%s
+          }
+
+
+          # ========================================================
+          # FIND NEW WORKFLOW RUN
+          # ========================================================
+
+          latest_run_after() {
+
+            local workflow="$1"
+            local since="$2"
+
+            gh run list \
+              --repo "$GH_REPO" \
+              --workflow "$workflow" \
+              --limit 20 \
+              --json databaseId,status,conclusion,createdAt,event \
+              --jq '.[] |
+                [
+                  .databaseId,
+                  .status,
+                  .conclusion,
+                  .createdAt,
+                  .event
+                ] |
+                @tsv' |
+            while IFS=$'\t' read -r \
+              id \
+              status \
+              conclusion \
+              created_at \
+              event
+            do
+
+              [ -n "$id" ] || continue
+
+              created_epoch="$(iso_to_epoch "$created_at")"
+
+              if [ "$created_epoch" -ge "$since" ]; then
+
+                printf \
+                  '%s\t%s\t%s\t%s\t%s\n' \
+                  "$id" \
+                  "$status" \
+                  "$conclusion" \
+                  "$created_at" \
+                  "$event"
+
+                break
+
+              fi
+
+            done
+          }
+
+
+          # ========================================================
+          # WAIT FOR WORKFLOW
+          # ========================================================
+
+          wait_for_run() {
+
+            local workflow="$1"
+            local run_id="$2"
+
+            echo ""
+            echo "============================================================"
+            echo "WAITING FOR WORKFLOW"
+            echo "WORKFLOW: $workflow"
+            echo "RUN ID:   $run_id"
+            echo "============================================================"
+
+            while true
+            do
+
+              read -r status conclusion <<< "$(
+                gh run view "$run_id" \
+                  --repo "$GH_REPO" \
+                  --json status,conclusion \
+                  --jq '[.status,.conclusion] | @tsv'
+              )"
+
+              echo
+              echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')]"
+              echo "Status:     $status"
+              echo "Conclusion: $conclusion"
+
+              if [ "$status" = "completed" ]
+              then
+
+                if [ "$conclusion" != "success" ]
+                then
+
+                  echo ""
+                  echo "============================================================"
+                  echo "PIPELINE FAILED"
+                  echo "WORKFLOW: $workflow"
+                  echo "RUN ID:   $run_id"
+                  echo "RESULT:   $conclusion"
+                  echo "============================================================"
+
+                  gh run view "$run_id" \
+                    --repo "$GH_REPO" || true
+
+                  exit 1
+                fi
+
+
+                echo "$workflow|$run_id" >> "$RUN_LOG"
+
+                echo ""
+                echo "SUCCESS:"
+                echo "$workflow"
+                echo "RUN: $run_id"
+
+                return 0
+
+              fi
+
+              sleep 15
+
+            done
+          }
+
+
+          # ========================================================
+          # RUN WORKFLOW
+          # ========================================================
+
+          run_workflow() {
+
+            local workflow="$1"
+
+            shift || true
+
+
+            echo ""
+            echo "############################################################"
+            echo "# STARTING"
+            echo "# $workflow"
+            echo "############################################################"
+
+
+            local before
+
+            before="$(epoch_now)"
+
+
+            # ------------------------------------------------------
+            # Give automatic workflow_run triggers a chance to appear
+            # ------------------------------------------------------
+
+            sleep 5
+
+
+            local detected
+
+            detected="$(
+              latest_run_after \
+                "$workflow" \
+                "$before" || true
+            )"
+
+
+            # ------------------------------------------------------
+            # If a run already exists, use it
+            # ------------------------------------------------------
+
+            if [ -n "$detected" ]
+            then
+
+              local run_id
+
+              run_id="$(
+                printf '%s\n' "$detected" |
+                head -n 1 |
+                cut -f1
+              )"
+
+              echo "Existing/new run detected:"
+              echo "$run_id"
+
+              wait_for_run \
+                "$workflow" \
+                "$run_id"
+
+              return 0
+
+            fi
+
+
+            # ------------------------------------------------------
+            # Dispatch workflow
+            # ------------------------------------------------------
+
+            echo "Dispatching:"
+            echo "$workflow"
+
+
+            if [ "$#" -gt 0 ]
+            then
+
+              gh workflow run \
+                "$workflow" \
+                --repo "$GH_REPO" \
+                --ref "$GH_REF" \
+                "$@"
+
+            else
+
+              gh workflow run \
+                "$workflow" \
+                --repo "$GH_REPO" \
+                --ref "$GH_REF"
+
+            fi
+
+
+            # ------------------------------------------------------
+            # Locate dispatched run
+            # ------------------------------------------------------
+
+            local run_id=""
+
+            for attempt in $(seq 1 30)
+            do
+
+              sleep 5
+
+              detected="$(
+                latest_run_after \
+                  "$workflow" \
+                  "$before" || true
+              )"
+
+
+              if [ -n "$detected" ]
+              then
+
+                run_id="$(
+                  printf '%s\n' "$detected" |
+                  head -n 1 |
+                  cut -f1
+                )"
+
+                break
+
+              fi
+
+
+              echo \
+                "Waiting for dispatched run... " \
+                "$attempt/30"
+
+            done
+
+
+            if [ -z "$run_id" ]
+            then
+
+              echo ""
+              echo "ERROR:"
+              echo "Could not locate dispatched run."
+              echo "$workflow"
+
+              exit 1
+
+            fi
+
+
+            wait_for_run \
+              "$workflow" \
+              "$run_id"
+          }
+
+
+          # ============================================================
+          # PHASE 1
+          # ECONOMIC INTELLIGENCE
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 1 — ECONOMIC INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "economic_intelligence_full_pipeline_v2.3_refresh.yml"
+
+
+          # ============================================================
+          # PHASE 2
+          # FINANCIAL STRESS
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 2 — FINANCIAL STRESS"
+          echo "============================================================"
+
+          run_workflow \
+            "financial-stress-historical-v1.yml"
+
+          run_workflow \
+            "financial-stress-research-v1.yml"
+
+
+          # ============================================================
+          # PHASE 3
+          # FED INTELLIGENCE
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 3 — FED INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "test-fed.yml"
+
+
+          # ============================================================
+          # PHASE 4
+          # EVENT / NEWS
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 4 — EVENT / NEWS INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "event-news-intelligence-v1.yml"
+
+
+          # ============================================================
+          # PHASE 5
+          # COT
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 5 — COT INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "cot-historical-v1.yml"
+
+          run_workflow \
+            "cot-positioning-analyzer-v1.yml"
+
+
+          # ============================================================
+          # PHASE 6
+          # VIX
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 6 — VIX INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "vix-historical-v1.yml"
+
+          run_workflow \
+            "vix-sentiment-analyzer-v1.yml"
+
+
+          # ============================================================
+          # PHASE 7
+          # AAII
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 7 — AAII SENTIMENT"
+          echo "============================================================"
+
+          run_workflow \
+            "aaii-historical-v1.yml"
+
+          run_workflow \
+            "aaii-sentiment-analyzer-v1.yml"
+
+
+          # ============================================================
+          # PHASE 8
+          # TECHNICAL
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 8 — TECHNICAL INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "technical-intelligence-v1.yml"
+
+
+          # ============================================================
+          # PHASE 9
+          # LIQUIDITY
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 9 — LIQUIDITY INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "liquidity-historical-v1.yml"
+
+          run_workflow \
+            "liquidity-intelligence-v1.yml"
+
+
+          # ============================================================
+          # PHASE 10
+          # MARKET BREADTH
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 10 — MARKET BREADTH"
+          echo "============================================================"
+
+          run_workflow \
+            "market-breadth-full-validation-v1.yml"
+
+
+          # ============================================================
+          # PHASE 11
+          # CROSS ASSET
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 11 — CROSS ASSET"
+          echo "============================================================"
+
+          run_workflow \
+            "cross-asset-intelligence-v1.yml"
+
+
+          # ============================================================
+          # PHASE 12
+          # EARNINGS
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "PHASE 12 — EARNINGS INTELLIGENCE"
+          echo "============================================================"
+
+          run_workflow \
+            "earnings_reaction_v3.yml"
+
+
+          # ============================================================
+          # COMPLETE
+          # ============================================================
+
+          echo ""
+          echo "============================================================"
+          echo "ALL PRODUCER WORKFLOWS COMPLETED SUCCESSFULLY"
+          echo "============================================================"
+
+          echo ""
+          echo "RUN LOG:"
+          cat "$RUN_LOG"
+
+
+      # ============================================================
+      # 5. DOWNLOAD ALL SUCCESSFUL ARTIFACTS
+      # ============================================================
+
+      - name: Publish research datasets to public_data
+        if: ${{ inputs.publish_public_data }}
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+
+          mkdir -p public_data
+
+
+          TMP="$RUNNER_TEMP/us500_artifacts"
+
+          rm -rf "$TMP"
+
+          mkdir -p "$TMP"
+
+
+          echo ""
+          echo "============================================================"
+          echo "DOWNLOADING SUCCESSFUL ARTIFACTS"
+          echo "============================================================"
+
+
+          while IFS='|' read -r workflow run_id
+          do
+
+            [ -n "$run_id" ] || continue
+
+
+            safe_name="$(
+              echo "$workflow" |
+              tr '/ ' '__'
+            )"
+
+
+            destination="$TMP/$safe_name"
+
+            mkdir -p "$destination"
+
+
+            echo ""
+            echo "------------------------------------------------------------"
+            echo "WORKFLOW:"
+            echo "$workflow"
+            echo ""
+            echo "RUN:"
+            echo "$run_id"
+            echo "------------------------------------------------------------"
+
+
+            if gh run download \
+                "$run_id" \
+                --repo "$GH_REPO" \
+                --dir "$destination"
+            then
+
+              find "$destination" \
+                -type f \
+                \( \
+                  -name '*.csv' \
+                  -o \
+                  -name '*.json' \
+                \) \
+                -print |
+              while IFS= read -r file
+              do
+
+                base="$(basename "$file")"
+
+
+                case "$base" in
+
+                  *.csv|*.json)
+
+                    cp "$file" \
+                      "public_data/$base"
+
+                    echo "Published:"
+                    echo "$base"
+
+                    ;;
+
+                esac
+
+              done
+
+            else
+
+              echo ""
+              echo "WARNING:"
+              echo "No downloadable artifact for:"
+              echo "$workflow / $run_id"
+
+            fi
+
+          done < "$RUNNER_TEMP/us500_pipeline_runs.tsv"
+
+
+      # ============================================================
+      # 6. BUILD PUBLIC DATA MANIFEST
+      # ============================================================
+
+      - name: Build public data manifest
+        if: ${{ inputs.publish_public_data }}
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+
+          python - <<'PY'
+
+          from pathlib import Path
+          import hashlib
+          import json
+
+
+          root = Path("public_data")
+
+
+          files = []
+
+
+          for path in sorted(root.iterdir()):
+
+              if not path.is_file():
+                  continue
+
+              if path.name in {
+                  "public_data_manifest.json",
+                  "README.md",
+              }:
+                  continue
+
+
+              data = path.read_bytes()
+
+
+              files.append(
+                  {
+                      "file": path.name,
+                      "bytes": len(data),
+                      "sha256": hashlib.sha256(data).hexdigest(),
+                  }
+              )
+
+
+          manifest = {
+
+              "schema_version":
+                  "us500-public-data-v1",
+
+              "research_only":
+                  True,
+
+              "source":
+                  "US500 Macro Intelligence GitHub Actions",
+
+              "files":
+                  files,
+          }
+
+
+          (
+              root /
+              "public_data_manifest.json"
+          ).write_text(
+              json.dumps(
+                  manifest,
+                  indent=2
+              ),
+              encoding="utf-8",
+          )
+
+
+          readme = """# US500 Macro Intelligence — Public Research Data
+
+This directory contains durable research datasets
+published by the Full Research Pipeline.
+
+Properties:
+
+- Research-only
+- No trade execution
+- No broker integration
+- No deterministic market prediction
+- Intended for the Streamlit application
+- No Personal GitHub Token required by the application
+
+The Streamlit application can read these files directly
+from the repository.
+"""
+
+
+          (
+              root /
+              "README.md"
+          ).write_text(
+              readme,
+              encoding="utf-8",
+          )
+
+
+          print("")
+          print(
+              "Public dataset count:",
+              len(files)
+          )
+
+
+          for item in files:
+
+              print(
+                  item["file"],
+                  item["bytes"]
+              )
+
+          PY
+
+
+      # ============================================================
+      # 7. SHOW PUBLIC DATA
+      # ============================================================
+
+      - name: Show public_data contents
+        if: ${{ inputs.publish_public_data }}
+        run: |
+
+          echo ""
+          echo "============================================================"
+          echo "PUBLIC DATA"
+          echo "============================================================"
+
+          find public_data \
+            -maxdepth 1 \
+            -type f \
+            -printf '%f\n' |
+            sort
+
+
+      # ============================================================
+      # 8. COMMIT PUBLIC DATA
+      # ============================================================
+
+      - name: Commit public_data
+        if: ${{ inputs.publish_public_data }}
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+
+          git add public_data
+
+
+          if git diff --cached --quiet
+          then
+
+            echo "No public_data changes."
+
+            exit 0
+
+          fi
+
+
+          git commit \
+            -m "chore: publish full research datasets"
+
+
+          git push \
+            origin \
+            "HEAD:$GH_REF"
+
+
+      # ============================================================
+      # 9. FINAL SUMMARY
+      # ============================================================
+
+      - name: Final pipeline summary
+        if: always()
+        shell: bash
+        run: |
+
+          echo ""
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "FULL PIPELINE SUMMARY"
+          echo "============================================================"
+
+          echo ""
+          echo "Research-only:"
+          echo "YES"
+
+          echo ""
+          echo "Trade execution:"
+          echo "NO"
+
+          echo ""
+          echo "Broker integration:"
+          echo "NO"
+
+          echo ""
+          echo "Deterministic market prediction:"
+          echo "NO"
+
+          echo ""
+          echo "Public data publication:"
+          echo "${{ inputs.publish_public_data }}"
+
+          echo ""
+          echo "Pipeline run log:"
+
+          if [ -f "$RUNNER_TEMP/us500_pipeline_runs.tsv" ]
+          then
+
+            cat \
+              "$RUNNER_TEMP/us500_pipeline_runs.tsv" \
+              || true
+
+          else
+
+            echo "No run log available."
+
+          fi
