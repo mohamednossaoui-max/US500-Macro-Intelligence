@@ -150,7 +150,7 @@
     },
     "fed_intelligence_output_v1.json": {
       "bytes": 10700,
-      "sha256": "011142c943293455297eb34a4bec11e66890a711dc0fb5185830843cd2eddb73"
+      "sha256": "2648b44fdbda578911545e37020d97008b1c2f1e08cbb23502b7d7e67ac1a370"
     },
     "final_end_to_end_validation_events.csv": {
       "bytes": 3627,
@@ -408,6 +408,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36119437852",
-  "source_workflow": "financial-stress-research-v1"
+  "source_run_id": "36119620835",
+  "source_workflow": "Fed Intelligence"
 }
