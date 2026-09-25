@@ -7,39 +7,789 @@ permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: us500-master-pipeline
+  cancel-in-progress: false
+
 jobs:
 
   master:
-    name: Master Pipeline
+    name: Complete US500 Research Pipeline
     runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GH_REF: main
 
     steps:
 
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
-      - name: Verify GitHub CLI
+      # ============================================================
+      # 2. INITIALIZE
+      # ============================================================
+
+      - name: Initialize Master Pipeline
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "=============================================="
-          echo "US500 MACRO INTELLIGENCE - MASTER PIPELINE"
-          echo "=============================================="
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "MASTER RESEARCH PIPELINE"
+          echo "============================================================"
+          echo ""
+          echo "Repository : ${GH_REPO}"
+          echo "Branch     : ${GH_REF}"
+          echo "Started    : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
 
           gh --version
+          git --version
 
+          mkdir -p master_runs
+          mkdir -p master_artifacts
+          mkdir -p public_data
+
+          rm -f master_runs/run_ids.txt
+          rm -f master_runs/status.txt
+
+          echo "Pipeline initialized."
+
+      # ============================================================
+      # 3. CREATE HELPER
+      # ============================================================
+
+      - name: Create Workflow Runner
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/run_workflow.sh <<'SCRIPT'
+          #!/usr/bin/env bash
+
+          set -euo pipefail
+
+          WORKFLOW="$1"
+          LABEL="$2"
+
+          echo ""
+          echo "============================================================"
+          echo "STARTING: ${LABEL}"
+          echo "Workflow: ${WORKFLOW}"
+          echo "============================================================"
+
+          START_EPOCH="$(date +%s)"
+
+          echo "Dispatching workflow..."
+
+          gh workflow run "${WORKFLOW}" \
+            --repo "${GH_REPO}" \
+            --ref "${GH_REF}"
+
+          echo "Workflow dispatched."
+
+          RUN_ID=""
+
+          echo "Waiting for GitHub to create the run..."
+
+          for i in $(seq 1 30); do
+
+            RUN_ID="$(
+              gh run list \
+                --repo "${GH_REPO}" \
+                --workflow "${WORKFLOW}" \
+                --branch "${GH_REF}" \
+                --limit 20 \
+                --json databaseId,status,conclusion,createdAt \
+                --jq '
+                  map(
+                    select(
+                      (.createdAt | fromdateiso8601) >= '"${START_EPOCH}"'
+                    )
+                  )
+                  | sort_by(.databaseId)
+                  | last
+                  | .databaseId // empty
+                '
+            )"
+
+            if [ -n "${RUN_ID}" ]; then
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ -z "${RUN_ID}" ]; then
+            echo ""
+            echo "ERROR: Could not identify dispatched run."
+            echo "Workflow: ${WORKFLOW}"
+            exit 1
+          fi
+
+          echo "Detected Run ID: ${RUN_ID}"
+
+          echo "${LABEL}|${WORKFLOW}|${RUN_ID}" \
+            >> master_runs/run_ids.txt
+
+          echo ""
+          echo "Monitoring Run ${RUN_ID}..."
+
+          while true; do
+
+            STATUS="$(
+              gh run view "${RUN_ID}" \
+                --repo "${GH_REPO}" \
+                --json status \
+                --jq '.status'
+            )"
+
+            CONCLUSION="$(
+              gh run view "${RUN_ID}" \
+                --repo "${GH_REPO}" \
+                --json conclusion \
+                --jq '.conclusion // ""'
+            )"
+
+            echo "$(date -u '+%H:%M:%S UTC') | status=${STATUS} | conclusion=${CONCLUSION}"
+
+            case "${STATUS}" in
+
+              completed)
+
+                if [ "${CONCLUSION}" = "success" ]; then
+
+                  echo ""
+                  echo "SUCCESS: ${LABEL}"
+                  echo "Run ID: ${RUN_ID}"
+
+                  echo "${LABEL}|SUCCESS|${RUN_ID}" \
+                    >> master_runs/status.txt
+
+                  break
+
+                else
+
+                  echo ""
+                  echo "FAILED: ${LABEL}"
+                  echo "Run ID: ${RUN_ID}"
+                  echo "Conclusion: ${CONCLUSION}"
+
+                  echo "${LABEL}|FAILED|${RUN_ID}" \
+                    >> master_runs/status.txt
+
+                  echo ""
+                  echo "Last jobs:"
+                  gh run view "${RUN_ID}" \
+                    --repo "${GH_REPO}" \
+                    --json jobs \
+                    --jq '.jobs[] |
+                      "\(.name) | \(.status) | \(.conclusion)"'
+
+                  exit 1
+                fi
+                ;;
+
+              queued|in_progress|waiting|requested|pending)
+
+                sleep 15
+                ;;
+
+              *)
+
+                echo ""
+                echo "Unexpected workflow status: ${STATUS}"
+                exit 1
+                ;;
+            esac
+          done
+          SCRIPT
+
+          chmod +x /tmp/run_workflow.sh
+
+          echo "Workflow runner created."
+
+      # ============================================================
+      # 4. ECONOMIC INTELLIGENCE
+      # ============================================================
+
+      - name: 01 - Economic Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/economic_intelligence_full_pipeline_v2.3_refresh.yml" \
+            "Economic Intelligence"
+
+      # ============================================================
+      # 5. FINANCIAL STRESS HISTORICAL
+      # ============================================================
+
+      - name: 02 - Financial Stress Historical
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/financial-stress-historical-v1.yml" \
+            "Financial Stress Historical"
+
+      # ============================================================
+      # 6. FINANCIAL STRESS RESEARCH
+      # ============================================================
+
+      - name: 03 - Financial Stress Research
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/financial-stress-research-v1.yml" \
+            "Financial Stress Research"
+
+      # ============================================================
+      # 7. FED INTELLIGENCE
+      # ============================================================
+
+      - name: 04 - Fed Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/test-fed.yml" \
+            "Fed Intelligence"
+
+      # ============================================================
+      # 8. EVENT NEWS
+      # ============================================================
+
+      - name: 05 - Event News Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/event-news-intelligence-v1.yml" \
+            "Event News Intelligence"
+
+      # ============================================================
+      # 9. COT HISTORICAL
+      # ============================================================
+
+      - name: 06 - COT Historical
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/cot-historical-v1.yml" \
+            "COT Historical"
+
+      # ============================================================
+      # 10. COT POSITIONING
+      # ============================================================
+
+      - name: 07 - COT Positioning
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/cot-positioning-analyzer-v1.yml" \
+            "COT Positioning"
+
+      # ============================================================
+      # 11. VIX HISTORICAL
+      # ============================================================
+
+      - name: 08 - VIX Historical
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/vix-historical-v1.yml" \
+            "VIX Historical"
+
+      # ============================================================
+      # 12. VIX SENTIMENT
+      # ============================================================
+
+      - name: 09 - VIX Sentiment
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/vix-sentiment-analyzer-v1.yml" \
+            "VIX Sentiment"
+
+      # ============================================================
+      # 13. AAII HISTORICAL
+      # ============================================================
+
+      - name: 10 - AAII Historical
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/aaii-historical-v1.yml" \
+            "AAII Historical"
+
+      # ============================================================
+      # 14. AAII SENTIMENT
+      # ============================================================
+
+      - name: 11 - AAII Sentiment
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/aaii-sentiment-analyzer-v1.yml" \
+            "AAII Sentiment"
+
+      # ============================================================
+      # 15. TECHNICAL INTELLIGENCE
+      # ============================================================
+
+      - name: 12 - Technical Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/technical-intelligence-v1.yml" \
+            "Technical Intelligence"
+
+      # ============================================================
+      # 16. LIQUIDITY HISTORICAL
+      # ============================================================
+
+      - name: 13 - Liquidity Historical
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/liquidity-historical-v1.yml" \
+            "Liquidity Historical"
+
+      # ============================================================
+      # 17. LIQUIDITY INTELLIGENCE
+      # ============================================================
+
+      - name: 14 - Liquidity Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/liquidity-intelligence-v1.yml" \
+            "Liquidity Intelligence"
+
+      # ============================================================
+      # 18. MARKET BREADTH
+      # ============================================================
+
+      - name: 15 - Market Breadth
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/market-breadth-full-validation-v1.yml" \
+            "Market Breadth"
+
+      # ============================================================
+      # 19. CROSS ASSET
+      # ============================================================
+
+      - name: 16 - Cross Asset Intelligence
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/cross-asset-intelligence-v1.yml" \
+            "Cross Asset Intelligence"
+
+      # ============================================================
+      # 20. EARNINGS
+      # ============================================================
+
+      - name: 17 - Earnings Market Reaction
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh \
+            ".github/workflows/earnings_reaction_v3.yml" \
+            "Earnings Market Reaction"
+
+      # ============================================================
+      # 21. PIPELINE SUMMARY
+      # ============================================================
+
+      - name: Research Pipeline Summary
+        if: always()
+        shell: bash
+        run: |
+          echo ""
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "PIPELINE SUMMARY"
+          echo "============================================================"
+          echo ""
+
+          if [ -f master_runs/status.txt ]; then
+            cat master_runs/status.txt
+          fi
+
+          echo ""
+          echo "Run IDs:"
+          if [ -f master_runs/run_ids.txt ]; then
+            cat master_runs/run_ids.txt
+          fi
+
+      # ============================================================
+      # 22. DOWNLOAD ARTIFACTS
+      # ============================================================
+
+      - name: Download Research Artifacts
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DOWNLOADING RESEARCH ARTIFACTS"
+          echo "============================================================"
+
+          rm -rf master_artifacts
+          mkdir -p master_artifacts
+
+          while IFS='|' read -r LABEL WORKFLOW RUN_ID; do
+
+            [ -z "${RUN_ID}" ] && continue
+
+            SAFE_LABEL="$(
+              echo "${LABEL}" |
+              tr '[:upper:]' '[:lower:]' |
+              tr ' ' '_' |
+              tr -cd '[:alnum:]_-'
+            )"
+
+            TARGET="master_artifacts/${SAFE_LABEL}"
+
+            mkdir -p "${TARGET}"
+
+            echo ""
+            echo "------------------------------------------------------------"
+            echo "Downloading: ${LABEL}"
+            echo "Run ID: ${RUN_ID}"
+            echo "------------------------------------------------------------"
+
+            if gh run download "${RUN_ID}" \
+              --repo "${GH_REPO}" \
+              --dir "${TARGET}"; then
+
+              echo "Artifact download completed."
+
+            else
+
+              echo "WARNING: No downloadable artifacts found for ${LABEL}"
+            fi
+
+          done < master_runs/run_ids.txt
+
+          echo ""
+          echo "Artifact tree:"
+          find master_artifacts -type f | sort || true
+
+      # ============================================================
+      # 23. BUILD PUBLIC DATA
+      # ============================================================
+
+      - name: Build Public Research Data
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "BUILDING PUBLIC RESEARCH DATA"
+          echo "============================================================"
+
+          mkdir -p public_data
+
+          # Do not delete the directory itself.
+          # Remove old generated datasets only.
+          find public_data \
+            -maxdepth 1 \
+            -type f \
+            \( -name "*.csv" -o -name "*.json" \) \
+            -delete
+
+          FOUND=0
+
+          while IFS= read -r FILE; do
+
+            BASENAME="$(basename "${FILE}")"
+
+            case "${BASENAME}" in
+
+              *.csv|*.json)
+
+                # Avoid copying manifests generated by this workflow.
+                case "${BASENAME}" in
+                  public_data_manifest.json)
+                    continue
+                    ;;
+                esac
+
+                DEST="public_data/${BASENAME}"
+
+                echo "Publishing: ${BASENAME}"
+
+                cp "${FILE}" "${DEST}"
+
+                FOUND=$((FOUND + 1))
+                ;;
+
+            esac
+
+          done < <(
+            find master_artifacts \
+              -type f \
+              \( -name "*.csv" -o -name "*.json" \) \
+              | sort
+          )
+
+          echo ""
+          echo "Published dataset count: ${FOUND}"
+
+          if [ "${FOUND}" -eq 0 ]; then
+            echo "ERROR: No CSV/JSON research datasets were found."
+            exit 1
+          fi
+
+          echo ""
+          echo "Public data:"
+          find public_data -maxdepth 1 -type f | sort
+
+      # ============================================================
+      # 24. BUILD MANIFEST
+      # ============================================================
+
+      - name: Build Public Data Manifest
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path("public_data")
+
+          datasets = []
+
+          for path in sorted(root.iterdir()):
+
+              if not path.is_file():
+                  continue
+
+              if path.name == "public_data_manifest.json":
+                  continue
+
+              if path.suffix.lower() not in {".csv", ".json"}:
+                  continue
+
+              data = path.read_bytes()
+
+              datasets.append({
+                  "file": path.name,
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest()
+              })
+
+          manifest = {
+              "project": "US500 Macro Intelligence",
+              "type": "research_only",
+              "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+              "repository": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "master_run_id": "${{ github.run_id }}",
+              "dataset_count": len(datasets),
+              "datasets": datasets
+          }
+
+          (root / "public_data_manifest.json").write_text(
+              json.dumps(manifest, indent=2),
+              encoding="utf-8"
+          )
+
+          print(
+              json.dumps(
+                  manifest,
+                  indent=2
+              )
+          )
+          PY
+
+      # ============================================================
+      # 25. CREATE README
+      # ============================================================
+
+      - name: Create Public Data README
+        if: success()
+        shell: bash
+        run: |
+          cat > public_data/README.md <<'EOF'
+          # US500 Macro Intelligence — Public Research Data
+
+          This directory contains research datasets generated by the
+          US500 Macro Intelligence Master Pipeline.
+
+          ## Purpose
+
+          Research and analytical use only.
+
+          This data is NOT:
+
+          - a trading signal
+          - an execution system
+          - investment advice
+          - a broker integration
+          - a deterministic market prediction system
+
+          ## Pipeline
+
+          The Master Pipeline sequentially executes the research modules:
+
+          1. Economic Intelligence
+          2. Financial Stress Historical
+          3. Financial Stress Research
+          4. Fed Intelligence
+          5. Event News Intelligence
+          6. COT Historical
+          7. COT Positioning
+          8. VIX Historical
+          9. VIX Sentiment
+          10. AAII Historical
+          11. AAII Sentiment
+          12. Technical Intelligence
+          13. Liquidity Historical
+          14. Liquidity Intelligence
+          15. Market Breadth
+          16. Cross Asset Intelligence
+          17. Earnings Market Reaction
+
+          ## Generated
+
+          See `public_data_manifest.json` for the exact datasets,
+          SHA-256 hashes, and generation metadata.
+          EOF
+
+      # ============================================================
+      # 26. COMMIT PUBLIC DATA
+      # ============================================================
+
+      - name: Commit Public Research Data
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "COMMITTING PUBLIC RESEARCH DATA"
+          echo "============================================================"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add public_data
+
+          if git diff --cached --quiet; then
+
+            echo "No changes detected."
+            echo "Nothing to commit."
+
+          else
+
+            git commit \
+              -m "chore: refresh public research datasets"
+
+            git push origin main
+
+            echo "Public research data pushed successfully."
+
+          fi
+
+      # ============================================================
+      # 27. FINAL VALIDATION
+      # ============================================================
+
+      - name: Final Master Validation
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo ""
+          echo "============================================================"
+          echo "MASTER PIPELINE COMPLETED SUCCESSFULLY"
+          echo "============================================================"
           echo ""
           echo "Repository:"
-          echo "${{ github.repository }}"
+          echo "${GH_REPO}"
+          echo ""
+          echo "Master Run ID:"
+          echo "${{ github.run_id }}"
+          echo ""
+          echo "Public datasets:"
+          find public_data -maxdepth 1 -type f | sort
+          echo ""
+          echo "Dataset count:"
+          find public_data -maxdepth 1 -type f \
+            \( -name "*.csv" -o -name "*.json" \) \
+            | wc -l
+          echo ""
+          echo "Completed:"
+          date -u '+%Y-%m-%d %H:%M:%S UTC'
+          echo ""
+          echo "============================================================"
+          echo "RESEARCH-ONLY PIPELINE — NO TRADE EXECUTION"
+          echo "============================================================"
+
+      # ============================================================
+      # 28. FAILURE DIAGNOSTICS
+      # ============================================================
+
+      - name: Failure Diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          echo ""
+          echo "============================================================"
+          echo "MASTER PIPELINE FAILED"
+          echo "============================================================"
 
           echo ""
-          echo "Branch:"
-          echo "${{ github.ref_name }}"
+          echo "Completed statuses:"
+          if [ -f master_runs/status.txt ]; then
+            cat master_runs/status.txt
+          else
+            echo "No status file."
+          fi
 
-      - name: Test workflow dispatch
-        run: |
-          echo "=============================================="
-          echo "MASTER WORKFLOW IS RUNNING"
-          echo "=============================================="
+          echo ""
+          echo "Run IDs:"
+          if [ -f master_runs/run_ids.txt ]; then
+            cat master_runs/run_ids.txt
+          else
+            echo "No run IDs recorded."
+          fi
 
-          echo "Manual dispatch works correctly."
+          echo ""
+          echo "The pipeline stopped at the first failed dependency."
+
+      # ============================================================
+      # 29. UPLOAD MASTER LOGS
+      # ============================================================
+
+      - name: Upload Master Diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us500-master-pipeline-diagnostics
+          path: |
+            master_runs/
+            master_artifacts/
+            public_data/
+          if-no-files-found: warn
+          retention-days: 14
