@@ -1,0 +1,12 @@
+check_id,category,layer,status,severity,message,detail
+RECORD_ID,Provenance,AAII Sentiment,REVIEW,WARNING,aaii_sentiment_research_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,COT Positioning,REVIEW,WARNING,cot_positioning_research_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Earnings Intelligence,REVIEW,WARNING,earnings_market_reaction_v3.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Earnings Intelligence,REVIEW,WARNING,earnings_reaction_by_eps_class_v3.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Earnings Intelligence,REVIEW,WARNING,earnings_reaction_by_sector_v3.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Economic Intelligence,REVIEW,WARNING,economic_surprise_engine_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Macro Context,REVIEW,WARNING,macro_context_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Research Context,REVIEW,WARNING,research_context_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Unified Sentiment,REVIEW,WARNING,sentiment_engine_research_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,Technical Intelligence,REVIEW,WARNING,technical_intelligence_research_v1.csv has no recognized record identity field.,
+RECORD_ID,Provenance,VIX Sentiment,REVIEW,WARNING,vix_sentiment_research_v1.csv has no recognized record identity field.,

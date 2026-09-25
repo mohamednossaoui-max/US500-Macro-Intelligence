@@ -108,6 +108,26 @@
       "bytes": 10700,
       "sha256": "2648b44fdbda578911545e37020d97008b1c2f1e08cbb23502b7d7e67ac1a370"
     },
+    "final_end_to_end_validation.json": {
+      "bytes": 923,
+      "sha256": "1dbf98ce6fb4ac2a1374dbf68ea3a5b713a7221e0d1aff3d650a53c14adda0b9"
+    },
+    "final_end_to_end_validation_events.csv": {
+      "bytes": 1465,
+      "sha256": "7eff7be85a9e35f463d47ab736313ba3f2cda5a9aae5e7b07518307bd1ccc35b"
+    },
+    "final_end_to_end_validation_manifest.csv": {
+      "bytes": 14759,
+      "sha256": "a0e15f127901ce94663a14b182a678176b4fb059441382af8daa039f059706a1"
+    },
+    "final_end_to_end_validation_report.csv": {
+      "bytes": 30293,
+      "sha256": "ad5314ae9604af1d6c98e94e5a24711fa12c958b4550f61460db7631dab23258"
+    },
+    "final_end_to_end_validation_summary.csv": {
+      "bytes": 54,
+      "sha256": "97a485372e62d60640aa10f0723043d7aa28aa5445bd403389536a121733549a"
+    },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
       "sha256": "a8c397ee60ab7bc1609f184abd6591a755632176c42de4e88c9b651a339009c5"
@@ -248,6 +268,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36184509429",
-  "source_workflow": "Research Context v1"
+  "source_run_id": "36186001790",
+  "source_workflow": "Final End-to-End Validation V1"
 }
