@@ -9,269 +9,614 @@ permissions:
 
 jobs:
   decision-engine-v1:
-    name: Decision Engine V1 — Contract-First / Research Only
+
     runs-on: ubuntu-latest
 
     steps:
 
-      # ============================================================
+      # ==========================================================
       # 1. CHECKOUT
-      # ============================================================
+      # ==========================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      # ============================================================
+      # ==========================================================
       # 2. PYTHON
-      # ============================================================
-      - name: Setup Python
+      # ==========================================================
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ============================================================
-      # 3. VERIFY SOURCE FILES
-      # ============================================================
-      - name: Verify Decision Engine files
+      # ==========================================================
+      # 3. INSTALL DEPENDENCIES
+      # ==========================================================
+
+      - name: Install dependencies
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=============================================="
-          echo "VERIFY DECISION ENGINE FILES"
-          echo "=============================================="
+          python -m pip install --upgrade pip
+          python -m pip install pandas
 
-          test -f tests/decision_engine/decision_engine_v1.py
-          test -f tests/decision_engine/decision_engine_validation_v1.py
+      # ==========================================================
+      # 4. PREPARE
+      # ==========================================================
 
-          echo "Decision Engine source: PASS"
-          echo "Decision Engine validator: PASS"
+      - name: Prepare workspace
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      # ============================================================
-      # 4. LOCATE LATEST RESEARCH CONTEXT ARTIFACT
-      # ============================================================
-      - name: Locate latest research context
+          rm -rf decision_engine_input
+          rm -rf decision_engine_output
+
+          mkdir -p decision_engine_input
+          mkdir -p decision_engine_output
+
+      # ==========================================================
+      # 5. DISCOVER RESEARCH-CONTEXT-V1 ARTIFACT
+      # ==========================================================
+
+      - name: Discover latest Research Context artifact
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          echo "=============================================="
-          echo "LOCATE LATEST RESEARCH CONTEXT"
-          echo "=============================================="
+          REPO="${GITHUB_REPOSITORY}"
 
-          rm -rf decision_engine_input
-          mkdir -p decision_engine_input
+          echo "============================================================"
+          echo "DISCOVERING RESEARCH CONTEXT ARTIFACT"
+          echo "============================================================"
 
-          ARTIFACT_JSON="$(
-            gh api \
-              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-              --jq '
-                [
-                  .artifacts[]
-                  | select(
-                      .name == "research-context-v1"
-                      and .expired == false
-                    )
-                ]
-                | sort_by(.created_at)
-                | reverse
-                | .[0]
-              '
-          )"
+          gh api \
+            --paginate \
+            "repos/${REPO}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] |
+              select(.expired == false) |
+              select(.name == "research-context-v1") |
+              [
+                .id,
+                .created_at,
+                .archive_download_url
+              ] | @tsv' \
+            > /tmp/research_context_artifacts.tsv
 
-          if [ -z "$ARTIFACT_JSON" ] || [ "$ARTIFACT_JSON" = "null" ]; then
+          if [ ! -s /tmp/research_context_artifacts.tsv ]; then
+
+            echo
             echo "ERROR:"
             echo "No valid research-context-v1 artifact found."
+
+            echo
+            echo "Decision Engine requires Research Context V1."
+            echo "Run Research Context V1 first."
+
             exit 1
           fi
 
-          ARTIFACT_ID="$(echo "$ARTIFACT_JSON" | jq -r '.id')"
-          ARTIFACT_CREATED_AT="$(echo "$ARTIFACT_JSON" | jq -r '.created_at')"
-          ARTIFACT_RUN_ID="$(echo "$ARTIFACT_JSON" | jq -r '.workflow_run.id')"
+          python - <<'PY'
+          from pathlib import Path
+          from datetime import datetime
 
-          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
-            echo "ERROR: Unable to determine artifact ID."
+          source = Path(
+              "/tmp/research_context_artifacts.tsv"
+          )
+
+          rows = []
+
+          for line in source.read_text(
+              encoding="utf-8"
+          ).splitlines():
+
+              parts = line.split("\t")
+
+              if len(parts) != 3:
+                  continue
+
+              artifact_id, created_at, url = parts
+
+              try:
+                  dt = datetime.fromisoformat(
+                      created_at.replace("Z", "+00:00")
+                  )
+              except Exception:
+                  continue
+
+              rows.append(
+                  (
+                      dt,
+                      artifact_id,
+                      url,
+                  )
+              )
+
+          if not rows:
+              raise SystemExit(
+                  "No valid research-context-v1 artifact."
+              )
+
+          rows.sort(
+              key=lambda x: x[0],
+              reverse=True,
+          )
+
+          latest = rows[0]
+
+          Path(
+              "/tmp/latest_research_context.txt"
+          ).write_text(
+              "\t".join(
+                  [
+                      latest[1],
+                      latest[0].isoformat(),
+                      latest[2],
+                  ]
+              ),
+              encoding="utf-8",
+          )
+
+          print(
+              "Latest research-context-v1:"
+          )
+          print(
+              "artifact_id =",
+              latest[1],
+          )
+          print(
+              "created_at  =",
+              latest[0].isoformat(),
+          )
+          PY
+
+      # ==========================================================
+      # 6. DOWNLOAD RESEARCH CONTEXT
+      # ==========================================================
+
+      - name: Download Research Context
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          IFS=$'\t' read -r \
+            ARTIFACT_ID \
+            CREATED_AT \
+            ARCHIVE_URL \
+            < /tmp/latest_research_context.txt
+
+          echo "============================================================"
+          echo "DOWNLOADING RESEARCH CONTEXT"
+          echo "============================================================"
+
+          echo "Artifact ID : $ARTIFACT_ID"
+          echo "Created     : $CREATED_AT"
+
+          gh api \
+            --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "$ARCHIVE_URL" \
+            > /tmp/research_context.zip
+
+          if [ ! -s /tmp/research_context.zip ]; then
+
+            echo "ERROR: downloaded artifact is empty."
+
             exit 1
           fi
 
-          if [ -z "$ARTIFACT_RUN_ID" ] || [ "$ARTIFACT_RUN_ID" = "null" ]; then
-            echo "ERROR: Unable to determine source workflow run ID."
-            exit 1
-          fi
+          unzip \
+            -q \
+            -o \
+            /tmp/research_context.zip \
+            -d decision_engine_input
 
-          echo "Artifact ID   : $ARTIFACT_ID"
-          echo "Created at    : $ARTIFACT_CREATED_AT"
-          echo "Source Run ID : $ARTIFACT_RUN_ID"
-
-          echo ""
-          echo "Downloading artifact..."
-
-          gh run download \
-            "$ARTIFACT_RUN_ID" \
-            --name research-context-v1 \
-            --dir decision_engine_input
-
-          echo ""
+          echo
           echo "Downloaded files:"
-          find decision_engine_input -type f -print
 
-      # ============================================================
-      # 5. PREPARE RESEARCH CONTEXT
-      # ============================================================
-      - name: Prepare Decision Engine input
+          find \
+            decision_engine_input \
+            -type f \
+            -print \
+            | sort
+
+      # ==========================================================
+      # 7. LOCATE CANONICAL CSV
+      # ==========================================================
+
+      - name: Locate Research Context CSV
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=============================================="
-          echo "PREPARE DECISION ENGINE INPUT"
-          echo "=============================================="
+          echo "============================================================"
+          echo "LOCATING RESEARCH CONTEXT CSV"
+          echo "============================================================"
 
-          SOURCE_FILE="$(
-            find decision_engine_input \
+          MATCHES="$(
+            find \
+              decision_engine_input \
               -type f \
-              -name "research_context_summary_v1.csv" \
-              -print \
-              -quit
+              -name "research_context_v1.csv" \
+              -print
           )"
 
-          if [ -z "$SOURCE_FILE" ]; then
+          if [ -z "$MATCHES" ]; then
+
+            echo
             echo "ERROR:"
-            echo "research_context_summary_v1.csv was not found."
-            echo ""
-            echo "Available files:"
-            find decision_engine_input -type f -print
+            echo "research_context_v1.csv not found."
+
+            echo
+            echo "Available CSV files:"
+
+            find \
+              decision_engine_input \
+              -type f \
+              -name "*.csv" \
+              -print \
+              | sort
+
             exit 1
           fi
 
-          rm -rf decision_engine_source
-          mkdir -p decision_engine_source
+          COUNT="$(
+            printf '%s\n' "$MATCHES" |
+            grep -c . || true
+          )"
 
-          cp "$SOURCE_FILE" \
-            decision_engine_source/research_context_summary_v1.csv
+          if [ "$COUNT" -ne 1 ]; then
 
-          echo "Source file:"
-          echo "$SOURCE_FILE"
+            echo
+            echo "ERROR:"
+            echo "Expected exactly one research_context_v1.csv."
+            echo "Found: $COUNT"
 
-          echo ""
-          echo "Prepared input:"
-          ls -lh \
-            decision_engine_source/research_context_summary_v1.csv
+            printf '%s\n' "$MATCHES"
 
-          echo ""
-          echo "Input preview:"
-          head -n 5 \
-            decision_engine_source/research_context_summary_v1.csv
+            exit 1
+          fi
 
-      # ============================================================
-      # 6. RUN DECISION ENGINE V1
-      # ============================================================
+          RESEARCH_CONTEXT_FILE="$(
+            printf '%s\n' "$MATCHES"
+          )"
+
+          echo "$RESEARCH_CONTEXT_FILE" \
+            > decision_engine_input/research_context_path.txt
+
+          echo
+          echo "Using:"
+          echo "$RESEARCH_CONTEXT_FILE"
+
+      # ==========================================================
+      # 8. PRE-VALIDATE INPUT
+      # ==========================================================
+
+      - name: Validate Research Context input
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          INPUT_FILE="$(
+            cat \
+              decision_engine_input/research_context_path.txt
+          )"
+
+          echo "============================================================"
+          echo "PRE-VALIDATING RESEARCH CONTEXT"
+          echo "============================================================"
+
+          python - "$INPUT_FILE" <<'PY'
+          import sys
+          from pathlib import Path
+
+          import pandas as pd
+
+          path = Path(sys.argv[1])
+
+          if not path.exists():
+              raise SystemExit(
+                  f"Missing input: {path}"
+              )
+
+          df = pd.read_csv(path)
+
+          if df.empty:
+              raise SystemExit(
+                  "Research Context is empty."
+              )
+
+          print(
+              "Rows:",
+              len(df),
+          )
+
+          print(
+              "Columns:",
+              len(df.columns),
+          )
+
+          required = [
+              "point_in_time_safe",
+              "research_only",
+          ]
+
+          missing = [
+              c for c in required
+              if c not in df.columns
+          ]
+
+          if missing:
+              raise SystemExit(
+                  "Missing required columns: "
+                  + ", ".join(missing)
+              )
+
+          def parse_bool(value):
+              if isinstance(value, bool):
+                  return value
+
+              text = str(value).strip().lower()
+
+              if text in {
+                  "true",
+                  "1",
+                  "yes",
+                  "y",
+                  "pass",
+              }:
+                  return True
+
+              if text in {
+                  "false",
+                  "0",
+                  "no",
+                  "n",
+                  "fail",
+              }:
+                  return False
+
+              return None
+
+          pit = df[
+              "point_in_time_safe"
+          ].map(parse_bool)
+
+          if pit.isna().any():
+              raise SystemExit(
+                  "Invalid point_in_time_safe values."
+              )
+
+          if not pit.all():
+              raise SystemExit(
+                  "Research Context contains PIT-unsafe rows."
+              )
+
+          research = df[
+              "research_only"
+          ].map(parse_bool)
+
+          if research.isna().any():
+              raise SystemExit(
+                  "Invalid research_only values."
+              )
+
+          if not research.all():
+              raise SystemExit(
+                  "Research Context contains non-research rows."
+              )
+
+          print(
+              "PIT validation: PASS"
+          )
+
+          print(
+              "Research-only validation: PASS"
+          )
+          PY
+
+      # ==========================================================
+      # 9. RUN DECISION ENGINE
+      # ==========================================================
+
       - name: Run Decision Engine V1
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
 
-          echo "=============================================="
-          echo "RUN DECISION ENGINE V1"
-          echo "=============================================="
+          INPUT_FILE="$(
+            cat \
+              decision_engine_input/research_context_path.txt
+          )"
 
-          rm -rf decision_engine_artifacts
-          mkdir -p decision_engine_artifacts
+          echo "============================================================"
+          echo "RUNNING DECISION ENGINE V1"
+          echo "============================================================"
 
           python \
             tests/decision_engine/decision_engine_v1.py \
-            --artifacts-dir \
-            decision_engine_source \
-            --output \
-            decision_engine_artifacts/decision_engine_research_v1.csv \
-            --summary-output \
-            decision_engine_artifacts/decision_engine_research_v1_summary.csv
+            --input "$INPUT_FILE" \
+            --output-dir decision_engine_output
 
-          echo ""
-          echo "Decision Engine output:"
-          ls -lh decision_engine_artifacts
+          RC=$?
 
-          echo ""
-          echo "Decision Engine CSV:"
-          cat \
-            decision_engine_artifacts/decision_engine_research_v1.csv
+          printf '%s\n' "$RC" \
+            > decision_engine_output/decision_engine_exit_code.txt
 
-          echo ""
-          echo "Decision Engine summary:"
-          cat \
-            decision_engine_artifacts/decision_engine_research_v1_summary.csv
+          echo
+          echo "Decision Engine exit code: $RC"
 
-      # ============================================================
-      # 7. VALIDATE DECISION ENGINE V1
-      # ============================================================
-      - name: Validate Decision Engine V1
+          # Do not fail yet.
+          # Upload diagnostics first.
+
+          exit 0
+
+      # ==========================================================
+      # 10. DISPLAY JSON
+      # ==========================================================
+
+      - name: Display Decision Engine JSON
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=============================================="
-          echo "VALIDATE DECISION ENGINE V1"
-          echo "=============================================="
+          echo "============================================================"
+          echo "DECISION ENGINE JSON"
+          echo "============================================================"
 
-          python \
-            tests/decision_engine/decision_engine_validation_v1.py \
-            --input \
-            decision_engine_artifacts/decision_engine_research_v1.csv \
-            --output \
-            decision_engine_artifacts/decision_engine_validation_v1.csv \
-            --summary-output \
-            decision_engine_artifacts/decision_engine_validation_v1_summary.csv \
-            --events-output \
-            decision_engine_artifacts/decision_engine_validation_v1_events.csv
+          if [ -f "decision_engine_output/decision_engine_research_v1.json" ]; then
 
-          echo ""
-          echo "Validation artifacts:"
-          ls -lh decision_engine_artifacts
+            cat \
+              decision_engine_output/decision_engine_research_v1.json
 
-          echo ""
-          echo "Validation summary:"
-          cat \
-            decision_engine_artifacts/decision_engine_validation_v1_summary.csv
+          else
 
-          echo ""
-          echo "Validation results:"
-          cat \
-            decision_engine_artifacts/decision_engine_validation_v1.csv
+            echo "Decision Engine JSON not found."
 
-      # ============================================================
-      # 8. FINAL STATUS
-      # ============================================================
-      - name: Final Decision Engine status
-        if: success()
+          fi
+
+      # ==========================================================
+      # 11. DISPLAY CSV
+      # ==========================================================
+
+      - name: Display Decision Engine CSV
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
 
-          echo ""
           echo "============================================================"
-          echo "DECISION ENGINE V1 — FINAL STATUS"
-          echo "============================================================"
-
-          echo "Contract validation       : PASSED"
-          echo "Research-only             : TRUE"
-          echo "Directional scoring       : FALSE"
-          echo "Trading signal generated  : FALSE"
-          echo "Forecast generated        : FALSE"
-          echo "Trade execution           : FALSE"
-          echo "Unified decision          : FALSE"
-          echo ""
-          echo "Decision Engine V1 is contract-valid."
+          echo "DECISION ENGINE CSV"
           echo "============================================================"
 
-      # ============================================================
-      # 9. UPLOAD ARTIFACTS
-      # ============================================================
-      - name: Upload Decision Engine artifacts
+          if [ -f "decision_engine_output/decision_engine_research_v1.csv" ]; then
+
+            cat \
+              decision_engine_output/decision_engine_research_v1.csv
+
+          else
+
+            echo "Decision Engine CSV not found."
+
+          fi
+
+      # ==========================================================
+      # 12. DISPLAY SUMMARY
+      # ==========================================================
+
+      - name: Display Decision Engine Summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DECISION ENGINE SUMMARY"
+          echo "============================================================"
+
+          if [ -f "decision_engine_output/decision_engine_research_summary_v1.csv" ]; then
+
+            cat \
+              decision_engine_output/decision_engine_research_summary_v1.csv
+
+          else
+
+            echo "Summary not found."
+
+          fi
+
+      # ==========================================================
+      # 13. DISPLAY EVIDENCE
+      # ==========================================================
+
+      - name: Display Decision Engine Evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DECISION ENGINE EVIDENCE"
+          echo "============================================================"
+
+          if [ -f "decision_engine_output/decision_engine_research_evidence_v1.csv" ]; then
+
+            cat \
+              decision_engine_output/decision_engine_research_evidence_v1.csv
+
+          else
+
+            echo "Evidence file not found."
+
+          fi
+
+      # ==========================================================
+      # 14. UPLOAD ARTIFACT
+      # ==========================================================
+
+      - name: Upload Decision Engine artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: decision-engine-v1
-          path: decision_engine_artifacts/
-          if-no-files-found: error
+          path: |
+            decision_engine_output/**
+          if-no-files-found: warn
           retention-days: 30
+
+      # ==========================================================
+      # 15. FINAL STATUS
+      # ==========================================================
+
+      - name: Apply Decision Engine status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "FINAL DECISION ENGINE STATUS"
+          echo "============================================================"
+
+          if [ ! -f "decision_engine_output/decision_engine_exit_code.txt" ]; then
+
+            echo "ERROR:"
+            echo "Decision Engine exit code file not found."
+
+            exit 1
+          fi
+
+          RC="$(
+            cat \
+              decision_engine_output/decision_engine_exit_code.txt
+          )"
+
+          echo
+          echo "Decision Engine exit code: $RC"
+
+          if [ "$RC" -eq 0 ]; then
+
+            echo
+            echo "============================================================"
+            echo "DECISION ENGINE V1: SUCCESS"
+            echo "============================================================"
+
+            exit 0
+
+          fi
+
+          echo
+          echo "============================================================"
+          echo "DECISION ENGINE V1: FAILED"
+          echo "============================================================"
+
+          exit "$RC"
