@@ -264,7 +264,9 @@ jobs:
           )
 
           if [ -n "$EXACT_RC" ]; then
+
             RESEARCH_CONTEXT_FILE="$EXACT_RC"
+
           else
 
             while IFS= read -r f; do
@@ -272,8 +274,10 @@ jobs:
               HEADER=$(head -n 1 "$f" 2>/dev/null || true)
 
               if echo "$HEADER" | grep -qi "study_date"; then
+
                 RESEARCH_CONTEXT_FILE="$f"
                 break
+
               fi
 
             done < <(
@@ -295,7 +299,9 @@ jobs:
           )
 
           if [ -n "$EXACT_LIQ" ]; then
+
             LIQUIDITY_FILE="$EXACT_LIQ"
+
           else
 
             while IFS= read -r f; do
@@ -329,7 +335,9 @@ jobs:
           )
 
           if [ -n "$EXACT_BREADTH" ]; then
+
             BREADTH_FILE="$EXACT_BREADTH"
+
           else
 
             while IFS= read -r f; do
@@ -461,17 +469,21 @@ jobs:
       - name: Display robustness validation
         if: always()
         run: |
+          set -e
 
           echo "=============================================="
           echo "HISTORICAL EDGE ROBUSTNESS v1"
           echo "=============================================="
 
-          if [ -f \
-            "historical_edge_robustness_v1/historical_edge_robustness_validation_v1.json"
-          ]; then
+          VALIDATION_FILE="historical_edge_robustness_v1/historical_edge_robustness_validation_v1.json"
 
-            cat \
-              historical_edge_robustness_v1/historical_edge_robustness_validation_v1.json
+          if [ -f "$VALIDATION_FILE" ]; then
+
+            echo ""
+            echo "VALIDATION REPORT"
+            echo "----------------------------------------------"
+
+            cat "$VALIDATION_FILE"
 
           else
 
@@ -485,11 +497,18 @@ jobs:
           echo "OUTPUT FILES"
           echo "=============================================="
 
-          find historical_edge_robustness_v1 \
-            -maxdepth 2 \
-            -type f \
-            -print \
-            2>/dev/null || true
+          if [ -d "historical_edge_robustness_v1" ]; then
+
+            find historical_edge_robustness_v1 \
+              -maxdepth 2 \
+              -type f \
+              -print
+
+          else
+
+            echo "Output directory was not generated."
+
+          fi
 
 
       # ============================================================
