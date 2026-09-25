@@ -1,0 +1,738 @@
+name: Publish Research Data V1
+
+on:
+
+  workflow_dispatch:
+
+  schedule:
+    - cron: "*/30 * * * *"
+
+  workflow_run:
+    workflows:
+      - "US500 Macro Intelligence"
+      - "US500 Macro Intelligence V3"
+      - "Economic Intelligence"
+      - "Financial Stress"
+      - "Sentiment Intelligence"
+      - "Technical Intelligence"
+      - "Liquidity Intelligence"
+      - "Market Breadth"
+      - "Event News Intelligence"
+      - "Cross Asset Intelligence"
+      - "Corporate Earnings Intelligence"
+      - "Fed Intelligence"
+      - "Decision Engine"
+      - "Final End-to-End Validation"
+      - "Historical Event Study"
+
+    types:
+      - completed
+
+
+permissions:
+  contents: write
+  actions: read
+
+
+concurrency:
+  group: publish-research-data
+  cancel-in-progress: false
+
+
+jobs:
+
+  publish:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ======================================================
+      # CHECKOUT
+      # ======================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ======================================================
+      # PYTHON
+      # ======================================================
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ======================================================
+      # PREPARE DIRECTORY
+      # ======================================================
+
+      - name: Prepare public data directory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p public_data
+
+          echo "============================================================"
+          echo "US500 MACRO INTELLIGENCE"
+          echo "PUBLIC RESEARCH DATA PUBLISHER V1"
+          echo "============================================================"
+
+          echo
+          echo "Repository:"
+          echo "${GITHUB_REPOSITORY}"
+
+          echo
+          echo "Branch:"
+          echo "${GITHUB_REF_NAME}"
+
+          echo
+          echo "Public data directory:"
+          ls -la public_data || true
+
+      # ======================================================
+      # DOWNLOAD ARTIFACTS
+      # ======================================================
+
+      - name: Download latest research artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          mkdir -p /tmp/us500_artifacts
+
+          echo
+          echo "============================================================"
+          echo "DISCOVERING GITHUB ACTIONS ARTIFACTS"
+          echo "============================================================"
+
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+
+          base = (
+              f"https://api.github.com/repos/"
+              f"{repo}/actions/artifacts"
+          )
+
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "US500-Public-Data-Publisher/1.0",
+          }
+
+          request = urllib.request.Request(
+              base + "?per_page=100",
+              headers=headers,
+          )
+
+          with urllib.request.urlopen(request, timeout=60) as response:
+              payload = json.load(response)
+
+          artifacts = payload.get("artifacts", [])
+
+          artifacts = [
+              a
+              for a in artifacts
+              if not a.get("expired", False)
+          ]
+
+          artifacts.sort(
+              key=lambda a: (
+                  a.get("created_at", ""),
+                  a.get("id", 0),
+              ),
+              reverse=True,
+          )
+
+          print(f"Non-expired artifacts found: {len(artifacts)}")
+
+          wanted_names = {
+              "research-context-v1",
+              "macro-context-v1",
+              "financial-stress-research-v1",
+              "sentiment-engine-v1",
+              "technical-intelligence-v1",
+              "liquidity-intelligence-v1",
+              "market-breadth-full-validation-v1",
+              "event-news-intelligence-v2.1",
+              "cross-asset-intelligence-v1",
+              "earnings-market-reaction-v3-results",
+              "fed-intelligence-v1",
+              "decision-engine-v1",
+              "final-end-to-end-validation-v1",
+              "historical-event-study-v2",
+              "historical-event-study-v1",
+          }
+
+          selected = [
+              a
+              for a in artifacts
+              if a.get("name") in wanted_names
+          ]
+
+          # Keep the newest artifact for each artifact name.
+          newest = {}
+
+          for artifact in selected:
+
+              name = artifact.get("name")
+
+              if name not in newest:
+                  newest[name] = artifact
+
+          selected = list(newest.values())
+
+          print(
+              f"Selected artifact families: "
+              f"{len(selected)}"
+          )
+
+          output_root = Path(
+              "/tmp/us500_artifacts"
+          )
+
+          for artifact in selected:
+
+              artifact_id = artifact["id"]
+              artifact_name = artifact["name"]
+
+              safe_name = "".join(
+                  c if c.isalnum() or c in "-_."
+                  else "_"
+                  for c in artifact_name
+              )
+
+              zip_path = (
+                  output_root /
+                  f"{safe_name}.zip"
+              )
+
+              extract_path = (
+                  output_root /
+                  safe_name
+              )
+
+              extract_path.mkdir(
+                  parents=True,
+                  exist_ok=True,
+              )
+
+              download_url = (
+                  f"https://api.github.com/repos/"
+                  f"{repo}/actions/artifacts/"
+                  f"{artifact_id}/zip"
+              )
+
+              print()
+              print(
+                  f"Downloading: "
+                  f"{artifact_name}"
+              )
+
+              request = urllib.request.Request(
+                  download_url,
+                  headers=headers,
+              )
+
+              with urllib.request.urlopen(
+                  request,
+                  timeout=120,
+              ) as response:
+
+                  data = response.read()
+
+              zip_path.write_bytes(data)
+
+              with zipfile.ZipFile(
+                  zip_path,
+                  "r",
+              ) as archive:
+
+                  archive.extractall(
+                      extract_path
+                  )
+
+              print(
+                  f"Extracted to: "
+                  f"{extract_path}"
+              )
+
+          PY
+
+      # ======================================================
+      # COLLECT EXPECTED FILES
+      # ======================================================
+
+      - name: Publish recognized research files
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          echo
+          echo "============================================================"
+          echo "COLLECTING RESEARCH FILES"
+          echo "============================================================"
+
+          declare -A FOUND
+
+          copy_latest_file() {
+
+            local filename="$1"
+
+            local source
+
+            source="$(
+              find /tmp/us500_artifacts \
+                -type f \
+                -name "$filename" \
+                -print \
+                | head -n 1
+            )"
+
+            if [ -n "${source}" ]; then
+
+              cp "${source}" \
+                 "public_data/${filename}"
+
+              FOUND["${filename}"]=1
+
+              echo "PUBLISHED: ${filename}"
+              echo "SOURCE:    ${source}"
+
+            else
+
+              echo "MISSING:   ${filename}"
+
+            fi
+          }
+
+
+          # ----------------------------------------------------
+          # Research Context
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "research_context_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Macro
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "macro_context_v1.csv"
+
+          copy_latest_file \
+            "macro_context_v1.json"
+
+
+          # ----------------------------------------------------
+          # Financial Stress
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "financial_stress_research_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Sentiment
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "sentiment_engine_research_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Technical
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "technical_intelligence_research_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Liquidity
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "liquidity_intelligence_v1.csv"
+
+          copy_latest_file \
+            "liquidity_intelligence_research_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Market Breadth
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "market_breadth_analysis_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Event News
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "event_news_research_v2.csv"
+
+
+          # ----------------------------------------------------
+          # Cross Asset
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "cross_asset_intelligence_v1.csv"
+
+
+          # ----------------------------------------------------
+          # Earnings
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "earnings_market_reaction_v3.csv"
+
+
+          # ----------------------------------------------------
+          # Fed
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "fed_intelligence_output_v1.json"
+
+
+          # ----------------------------------------------------
+          # Decision Engine
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "decision_engine_validation_v1.csv"
+
+          copy_latest_file \
+            "decision_engine_validation_v1_summary.csv"
+
+          copy_latest_file \
+            "decision_engine_validation_v1_events.csv"
+
+          copy_latest_file \
+            "decision_engine_research_v1.csv"
+
+          copy_latest_file \
+            "decision_engine_research_v1_summary.csv"
+
+
+          # ----------------------------------------------------
+          # Final Validation
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "final_end_to_end_validation_report.csv"
+
+          copy_latest_file \
+            "final_end_to_end_validation_summary.csv"
+
+          copy_latest_file \
+            "final_end_to_end_validation_manifest.csv"
+
+          copy_latest_file \
+            "final_end_to_end_validation_events.csv"
+
+
+          # ----------------------------------------------------
+          # Historical Edge V2
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "historical_event_study_summary_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_event_overlap_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_feature_redundancy_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_conditional_events_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_controlled_associations_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_sample_adequacy_v2.csv"
+
+          copy_latest_file \
+            "historical_event_study_baseline_v2.csv"
+
+
+          # ----------------------------------------------------
+          # Historical Edge V1 fallback
+          # ----------------------------------------------------
+
+          copy_latest_file \
+            "historical_event_study_summary_v1.csv"
+
+          copy_latest_file \
+            "historical_event_study_events_v1.csv"
+
+          copy_latest_file \
+            "historical_event_study_baseline_v1.csv"
+
+          copy_latest_file \
+            "historical_event_study_validation_v1.csv"
+
+
+          echo
+          echo "============================================================"
+          echo "PUBLIC DATA CONTENT"
+          echo "============================================================"
+
+          find public_data \
+            -maxdepth 1 \
+            -type f \
+            -printf "%f\n" \
+            | sort
+
+      # ======================================================
+      # GENERATE MANIFEST
+      # ======================================================
+
+      - name: Generate public data manifest
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          from pathlib import Path
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+
+          root = Path("public_data")
+
+          files = []
+
+          for path in sorted(root.iterdir()):
+
+              if not path.is_file():
+                  continue
+
+              digest = hashlib.sha256(
+                  path.read_bytes()
+              ).hexdigest()
+
+              files.append(
+                  {
+                      "file": path.name,
+                      "bytes": path.stat().st_size,
+                      "sha256": digest,
+                  }
+              )
+
+          manifest = {
+              "publisher_version": "1.0",
+              "generated_at_utc":
+                  datetime.now(
+                      timezone.utc
+                  ).isoformat(),
+              "repository":
+                  "mohamednossaoui-max/US500-Macro-Intelligence",
+              "research_only": True,
+              "files": files,
+          }
+
+          (root / "manifest.json").write_text(
+              json.dumps(
+                  manifest,
+                  indent=2,
+              ),
+              encoding="utf-8",
+          )
+
+          print(
+              json.dumps(
+                  manifest,
+                  indent=2,
+              )
+          )
+
+          PY
+
+      # ======================================================
+      # VALIDATE
+      # ======================================================
+
+      - name: Validate published data
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          echo
+          echo "============================================================"
+          echo "VALIDATING PUBLIC DATA"
+          echo "============================================================"
+
+          python - <<'PY'
+
+          from pathlib import Path
+          import pandas as pd
+          import json
+
+          root = Path("public_data")
+
+          csv_files = list(
+              root.glob("*.csv")
+          )
+
+          json_files = list(
+              root.glob("*.json")
+          )
+
+          print(
+              f"CSV files: {len(csv_files)}"
+          )
+
+          print(
+              f"JSON files: {len(json_files)}"
+          )
+
+          failures = []
+
+          for path in csv_files:
+
+              try:
+
+                  df = pd.read_csv(
+                      path,
+                      low_memory=False,
+                  )
+
+                  print(
+                      f"{path.name}: "
+                      f"{len(df):,} rows"
+                  )
+
+                  if df.empty:
+
+                      failures.append(
+                          f"{path.name}: EMPTY CSV"
+                      )
+
+              except Exception as exc:
+
+                  failures.append(
+                      f"{path.name}: "
+                      f"{type(exc).__name__}: {exc}"
+                  )
+
+          for path in json_files:
+
+              if path.name == "manifest.json":
+                  continue
+
+              try:
+
+                  json.loads(
+                      path.read_text(
+                          encoding="utf-8"
+                      )
+                  )
+
+                  print(
+                      f"{path.name}: VALID JSON"
+                  )
+
+              except Exception as exc:
+
+                  failures.append(
+                      f"{path.name}: "
+                      f"INVALID JSON: {exc}"
+                  )
+
+          if failures:
+
+              print()
+              print(
+                  "Validation failures:"
+              )
+
+              for failure in failures:
+                  print(
+                      f" - {failure}"
+                  )
+
+              raise SystemExit(1)
+
+          print()
+          print(
+              "PUBLIC DATA VALIDATION PASSED"
+          )
+
+          PY
+
+      # ======================================================
+      # GIT CONFIGURATION
+      # ======================================================
+
+      - name: Configure Git
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          git config user.name \
+            "github-actions[bot]"
+
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # ======================================================
+      # COMMIT
+      # ======================================================
+
+      - name: Commit public research data
+        shell: bash
+        run: |
+
+          set -euo pipefail
+
+          git add public_data/
+
+          if git diff \
+              --cached \
+              --quiet; then
+
+            echo
+            echo "No changes detected."
+            echo "Nothing to commit."
+
+            exit 0
+
+          fi
+
+          echo
+          echo "Changes detected."
+
+          git status --short
+
+          git commit \
+            -m "chore: publish latest research data"
+
+          git push
