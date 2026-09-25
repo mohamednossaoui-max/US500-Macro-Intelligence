@@ -1,693 +1,705 @@
-name: Publish Research Data V2
+name: Publish Research Data V3
 
 on:
+
   workflow_dispatch:
 
-  schedule:
-    # كل 30 دقيقة
-    - cron: "*/30 * * * *"
+  workflow_run:
+    workflows:
+      - "Economic Intelligence Full Pipeline v2.3 Refresh"
+      - "financial-stress-historical-v1"
+      - "financial-stress-research-v1"
+      - "Fed Intelligence"
+      - "Event News Intelligence v1"
+      - "COT Historical Collector v1"
+      - "COT Positioning Analyzer v1"
+      - "VIX Historical Collector v1"
+      - "VIX Sentiment Analyzer v1"
+      - "AAII Historical v1"
+      - "AAII Sentiment Analyzer v1"
+      - "Technical Intelligence v1"
+      - "Liquidity Historical v1"
+      - "Liquidity Intelligence v1"
+      - "Market Breadth - Full Validation v1"
+      - "Cross-Asset Intelligence v1"
+      - "Test Earnings Market Reaction V3"
+      - "Macro Context v1"
+      - "Research Context v1"
+      - "Decision Engine V1"
+      - "Historical Event Study v2"
+      - "Final End-to-End Validation V1"
+    types:
+      - completed
 
 permissions:
   contents: write
   actions: read
 
 concurrency:
-  group: publish-research-data
-  cancel-in-progress: true
+  group: publish-research-data-v3
+  cancel-in-progress: false
 
 jobs:
+
   publish:
+
+    name: Publish Research Data V3
+
     runs-on: ubuntu-latest
+
+    # ============================================================
+    # Only publish when the triggering workflow succeeded.
+    # Manual workflow_dispatch is always allowed.
+    # ============================================================
+
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     env:
       GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
 
     steps:
 
-      # ============================================================
+      # ==========================================================
       # 1. CHECKOUT
-      # ============================================================
+      # ==========================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      # ============================================================
+      # ==========================================================
       # 2. PYTHON
-      # ============================================================
+      # ==========================================================
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ============================================================
-      # 3. DISCOVER + DOWNLOAD + PUBLISH
-      # ============================================================
-      - name: Discover and publish research artifacts
+      # ==========================================================
+      # 3. CREATE PUBLIC DATA DIRECTORY
+      # ==========================================================
+
+      - name: Prepare public data directory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p public_data
+
+          echo "============================================================"
+          echo "PUBLIC DATA DIRECTORY"
+          echo "============================================================"
+
+          find public_data -maxdepth 1 -type f -print 2>/dev/null || true
+
+      # ==========================================================
+      # 4. DEFINE PUBLISH MAP
+      # ==========================================================
+
+      - name: Build publication map
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/publication_map.json <<'JSON'
+          {
+            "economic-intelligence-v2-3-refresh": [
+              "economic_historical_events_v1.csv",
+              "economic_historical_quality_v1.csv",
+              "economic_surprise_engine_v1.csv",
+              "economic_surprise_summary_v1.csv",
+              "economic_regime_events_v1.csv",
+              "economic_regime_summary_v1.csv"
+            ],
+
+            "financial-stress-historical-v1": [
+              "financial_stress_records_input_v1.csv",
+              "financial_stress_collection_summary_v1.csv"
+            ],
+
+            "financial-stress-research-v1": [
+              "financial_stress_research_v1.csv",
+              "financial_stress_research_summary_v1.csv"
+            ],
+
+            "fed-intelligence-v1": [
+              "fed_intelligence_output_v1.json"
+            ],
+
+            "event-news-intelligence-v2.1": [
+              "event_news_research_v2.csv",
+              "event_news_research_summary_v2.json",
+              "event_news_validation_v2.json"
+            ],
+
+            "cot-historical-v1": [
+              "cot_historical_records_input_v1.csv",
+              "cot_historical_collection_summary_v1.csv"
+            ],
+
+            "cot-positioning-v1": [
+              "cot_positioning_research_v1.csv",
+              "cot_positioning_research_summary_v1.csv",
+              "cot_positioning_extremes_v1.csv"
+            ],
+
+            "vix-historical-v1": [
+              "vix_historical_records_input_v1.csv",
+              "vix_historical_collection_summary_v1.csv"
+            ],
+
+            "vix-sentiment-v1": [
+              "vix_sentiment_research_v1.csv",
+              "vix_sentiment_research_summary_v1.csv",
+              "vix_sentiment_extremes_v1.csv"
+            ],
+
+            "aaii-sentiment-v1": [
+              "aaii_sentiment_research_v1.csv",
+              "aaii_sentiment_research_summary_v1.csv",
+              "aaii_sentiment_extremes_v1.csv"
+            ],
+
+            "technical-intelligence-v1": [
+              "technical_intelligence_research_v1.csv",
+              "technical_intelligence_research_summary_v1.csv",
+              "technical_intelligence_extremes_v1.csv"
+            ],
+
+            "liquidity-historical-v1": [
+              "liquidity_historical_records_input_v1.csv",
+              "liquidity_historical_collection_summary_v1.csv"
+            ],
+
+            "liquidity-intelligence-v1": [
+              "liquidity_intelligence_research_v1.csv",
+              "liquidity_intelligence_summary_v1.csv"
+            ],
+
+            "market-breadth-full-validation-v1": [
+              "market_breadth_analysis_v1.csv"
+            ],
+
+            "cross-asset-intelligence-v1": [
+              "cross_asset_intelligence_v1.csv"
+            ],
+
+            "earnings-market-reaction-v3-results": [
+              "earnings_market_reaction_v3.csv",
+              "earnings_market_reaction_summary_v3.csv",
+              "earnings_reaction_by_eps_class_v3.csv",
+              "earnings_reaction_by_sector_v3.csv"
+            ],
+
+            "macro-context-v1": [
+              "macro_context_v1.csv",
+              "macro_context_v1.json"
+            ],
+
+            "research-context-v1": [
+              "research_context_v1.csv",
+              "research_context_summary_v1.csv",
+              "research_context_extremes_v1.csv"
+            ],
+
+            "decision-engine-v1": [
+              "decision_engine_research_v1.csv",
+              "decision_engine_research_v1_summary.csv",
+              "decision_engine_validation_v1.csv",
+              "decision_engine_validation_v1_summary.csv",
+              "decision_engine_validation_v1_events.csv"
+            ],
+
+            "historical-event-study-v2": [
+              "historical_event_study_summary_v2.csv",
+              "historical_event_study_event_overlap_v2.csv",
+              "historical_event_study_feature_redundancy_v2.csv",
+              "historical_event_study_conditional_events_v2.csv",
+              "historical_event_study_controlled_associations_v2.csv",
+              "historical_event_study_sample_adequacy_v2.csv",
+              "historical_event_study_baseline_v2.csv"
+            ],
+
+            "final-end-to-end-validation-v1": [
+              "final_end_to_end_validation_report.csv",
+              "final_end_to_end_validation_summary.csv",
+              "final_end_to_end_validation_manifest.csv",
+              "final_end_to_end_validation_events.csv"
+            ]
+          }
+          JSON
+
+          echo "Publication map created."
+
+      # ==========================================================
+      # 5. DETERMINE TRIGGERING RUN
+      # ==========================================================
+
+      - name: Determine source workflow run
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+
+            echo "Triggered by:"
+            echo "${{ github.event.workflow_run.name }}"
+
+            echo "Run ID:"
+            echo "${{ github.event.workflow_run.id }}"
+
+            echo "RUN_ID=${{ github.event.workflow_run.id }}" \
+              >> "$GITHUB_ENV"
+
+            echo "SOURCE_WORKFLOW=${{ github.event.workflow_run.name }}" \
+              >> "$GITHUB_ENV"
+
+          else
+
+            echo "Manual publisher execution."
+
+            echo "RUN_ID=" >> "$GITHUB_ENV"
+            echo "SOURCE_WORKFLOW=MANUAL" >> "$GITHUB_ENV"
+
+          fi
+
+      # ==========================================================
+      # 6. DOWNLOAD TRIGGERING ARTIFACT
+      # ==========================================================
+
+      - name: Download triggering workflow artifact
+        if: github.event_name == 'workflow_run'
         shell: bash
         run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "US500 MACRO INTELLIGENCE"
-          echo "RESEARCH DATA PUBLISHER V2"
+          echo "DOWNLOADING TRIGGERING ARTIFACT"
           echo "============================================================"
 
-          rm -rf public_data
-          mkdir -p public_data
+          mkdir -p /tmp/source_artifact
+
+          RUN_ID="${{ github.event.workflow_run.id }}"
+
+          echo "Workflow:"
+          echo "${{ github.event.workflow_run.name }}"
+
+          echo "Run ID:"
+          echo "$RUN_ID"
+
+          ARTIFACT_NAME=""
+
+          case "${{ github.event.workflow_run.name }}" in
+
+            "Economic Intelligence Full Pipeline v2.3 Refresh")
+              ARTIFACT_NAME="economic-intelligence-v2-3-refresh"
+              ;;
+
+            "financial-stress-historical-v1")
+              ARTIFACT_NAME="financial-stress-historical-v1"
+              ;;
+
+            "financial-stress-research-v1")
+              ARTIFACT_NAME="financial-stress-research-v1"
+              ;;
+
+            "Fed Intelligence")
+              ARTIFACT_NAME="fed-intelligence-v1"
+              ;;
+
+            "Event News Intelligence v1")
+              ARTIFACT_NAME="event-news-intelligence-v2.1"
+              ;;
+
+            "COT Historical Collector v1")
+              ARTIFACT_NAME="cot-historical-v1"
+              ;;
+
+            "COT Positioning Analyzer v1")
+              ARTIFACT_NAME="cot-positioning-v1"
+              ;;
+
+            "VIX Historical Collector v1")
+              ARTIFACT_NAME="vix-historical-v1"
+              ;;
+
+            "VIX Sentiment Analyzer v1")
+              ARTIFACT_NAME="vix-sentiment-v1"
+              ;;
+
+            "AAII Historical v1")
+              ARTIFACT_NAME="aaii-historical-v1"
+              ;;
+
+            "AAII Sentiment Analyzer v1")
+              ARTIFACT_NAME="aaii-sentiment-v1"
+              ;;
+
+            "Technical Intelligence v1")
+              ARTIFACT_NAME="technical-intelligence-v1"
+              ;;
+
+            "Liquidity Historical v1")
+              ARTIFACT_NAME="liquidity-historical-v1"
+              ;;
+
+            "Liquidity Intelligence v1")
+              ARTIFACT_NAME="liquidity-intelligence-v1"
+              ;;
+
+            "Market Breadth - Full Validation v1")
+              ARTIFACT_NAME="market-breadth-full-validation-v1"
+              ;;
+
+            "Cross-Asset Intelligence v1")
+              ARTIFACT_NAME="cross-asset-intelligence-v1"
+              ;;
+
+            "Test Earnings Market Reaction V3")
+              ARTIFACT_NAME="earnings-market-reaction-v3-results"
+              ;;
+
+            "Macro Context v1")
+              ARTIFACT_NAME="macro-context-v1"
+              ;;
+
+            "Research Context v1")
+              ARTIFACT_NAME="research-context-v1"
+              ;;
+
+            "Decision Engine V1")
+              ARTIFACT_NAME="decision-engine-v1"
+              ;;
+
+            "Historical Event Study v2")
+              ARTIFACT_NAME="historical-event-study-v2"
+              ;;
+
+            "Final End-to-End Validation V1")
+              ARTIFACT_NAME="final-end-to-end-validation-v1"
+              ;;
+
+            *)
+              echo "No publication mapping for workflow."
+              exit 0
+              ;;
+
+          esac
+
+          echo "Artifact:"
+          echo "$ARTIFACT_NAME"
+
+          gh run download "$RUN_ID" \
+            --repo "$REPOSITORY" \
+            --name "$ARTIFACT_NAME" \
+            --dir /tmp/source_artifact
 
           echo
+          echo "Downloaded files:"
+
+          find /tmp/source_artifact \
+            -type f \
+            -print | sort
+
+      # ==========================================================
+      # 7. MANUAL MODE
+      #
+      # Download the latest successful run for every producer.
+      # This is useful for bootstrapping public_data after the
+      # previous artifacts have disappeared.
+      # ==========================================================
+
+      - name: Bootstrap from latest successful workflow runs
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+
           echo "============================================================"
-          echo "DISCOVERING GITHUB ACTIONS ARTIFACTS"
+          echo "BOOTSTRAP MODE"
           echo "============================================================"
 
-          gh api \
-            --paginate \
-            --slurp \
-            "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            > /tmp/artifacts_pages.json
-
-          echo "Artifact discovery completed."
-
-          # ========================================================
-          # Python performs the selection and uses GH CLI for
-          # authenticated artifact downloads.
-          # ========================================================
+          mkdir -p /tmp/bootstrap
 
           python <<'PY'
+
           import json
           import os
-          import shutil
           import subprocess
-          import tempfile
-          import zipfile
           from pathlib import Path
-          from datetime import datetime, timezone
 
-          REPO = os.environ["GITHUB_REPOSITORY"]
+          repo = os.environ["REPOSITORY"]
 
-          OUTPUT_DIR = Path("public_data")
-          OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+          with open(
+              "/tmp/publication_map.json",
+              "r",
+              encoding="utf-8"
+          ) as f:
+              mapping = json.load(f)
 
-          # ========================================================
-          # DATASET SPECIFICATIONS
-          # ========================================================
+          # Workflow name -> artifact name
+          workflows = {
+              "Economic Intelligence Full Pipeline v2.3 Refresh":
+                  "economic-intelligence-v2-3-refresh",
 
-          DATASETS = {
+              "financial-stress-historical-v1":
+                  "financial-stress-historical-v1",
 
-              "research_context": {
-                  "artifacts": [
-                      "research-context-v1",
-                  ],
-                  "files": [
-                      "research_context_v1.csv",
-                  ],
-              },
+              "financial-stress-research-v1":
+                  "financial-stress-research-v1",
 
-              "macro_context": {
-                  "artifacts": [
-                      "macro-context-v1",
-                  ],
-                  "files": [
-                      "macro_context_v1.csv",
-                      "macro_context_v1.json",
-                  ],
-              },
+              "Fed Intelligence":
+                  "fed-intelligence-v1",
 
-              "financial_stress": {
-                  "artifacts": [
-                      "financial-stress-research-v1",
-                  ],
-                  "files": [
-                      "financial_stress_research_v1.csv",
-                  ],
-              },
+              "Event News Intelligence v1":
+                  "event-news-intelligence-v2.1",
 
-              "sentiment": {
-                  "artifacts": [
-                      "sentiment-engine-v1",
-                  ],
-                  "files": [
-                      "sentiment_engine_research_v1.csv",
-                  ],
-              },
+              "COT Historical Collector v1":
+                  "cot-historical-v1",
 
-              "technical": {
-                  "artifacts": [
-                      "technical-intelligence-v1",
-                  ],
-                  "files": [
-                      "technical_intelligence_research_v1.csv",
-                  ],
-              },
+              "COT Positioning Analyzer v1":
+                  "cot-positioning-v1",
 
-              "liquidity": {
-                  "artifacts": [
-                      "liquidity-intelligence-v1",
-                  ],
-                  "files": [
-                      "liquidity_intelligence_v1.csv",
-                      "liquidity_intelligence_research_v1.csv",
-                  ],
-              },
+              "VIX Historical Collector v1":
+                  "vix-historical-v1",
 
-              "market_breadth": {
-                  "artifacts": [
-                      "market-breadth-full-validation-v1",
-                  ],
-                  "files": [
-                      "market_breadth_analysis_v1.csv",
-                  ],
-              },
+              "VIX Sentiment Analyzer v1":
+                  "vix-sentiment-v1",
 
-              "event_news": {
-                  "artifacts": [
-                      "event-news-intelligence-v2.1",
-                  ],
-                  "files": [
-                      "event_news_research_v2.csv",
-                  ],
-              },
+              "AAII Historical v1":
+                  "aaii-historical-v1",
 
-              "cross_asset": {
-                  "artifacts": [
-                      "cross-asset-intelligence-v1",
-                  ],
-                  "files": [
-                      "cross_asset_intelligence_v1.csv",
-                  ],
-              },
+              "AAII Sentiment Analyzer v1":
+                  "aaii-sentiment-v1",
 
-              "earnings": {
-                  "artifacts": [
-                      "earnings-market-reaction-v3-results",
-                  ],
-                  "files": [
-                      "earnings_market_reaction_v3.csv",
-                  ],
-              },
+              "Technical Intelligence v1":
+                  "technical-intelligence-v1",
 
-              "fed": {
-                  "artifacts": [
-                      "fed-intelligence-v1",
-                  ],
-                  "files": [
-                      "fed_intelligence_output_v1.json",
-                  ],
-              },
+              "Liquidity Historical v1":
+                  "liquidity-historical-v1",
 
-              "decision_engine": {
-                  "artifacts": [
-                      "decision-engine-v1",
-                  ],
-                  "files": [
-                      "decision_engine_validation_v1.csv",
-                      "decision_engine_validation_v1_summary.csv",
-                      "decision_engine_validation_v1_events.csv",
-                      "decision_engine_research_v1.csv",
-                      "decision_engine_research_v1_summary.csv",
-                  ],
-              },
+              "Liquidity Intelligence v1":
+                  "liquidity-intelligence-v1",
 
-              "final_validation": {
-                  "artifacts": [
-                      "final-end-to-end-validation-v1",
-                  ],
-                  "files": [
-                      "final_end_to_end_validation_report.csv",
-                      "final_end_to_end_validation_summary.csv",
-                      "final_end_to_end_validation_manifest.csv",
-                      "final_end_to_end_validation_events.csv",
-                  ],
-              },
+              "Market Breadth - Full Validation v1":
+                  "market-breadth-full-validation-v1",
 
-              "historical_edge": {
-                  "artifacts": [
-                      "historical-event-study-v2",
-                      "historical-event-study-v1",
-                  ],
-                  "files": [
-                      "historical_event_study_summary_v2.csv",
-                      "historical_event_study_event_overlap_v2.csv",
-                      "historical_event_study_feature_redundancy_v2.csv",
-                      "historical_event_study_conditional_events_v2.csv",
-                      "historical_event_study_controlled_associations_v2.csv",
-                      "historical_event_study_sample_adequacy_v2.csv",
-                      "historical_event_study_baseline_v2.csv",
-                      "historical_event_study_summary_v1.csv",
-                      "historical_event_study_events_v1.csv",
-                      "historical_event_study_baseline_v1.csv",
-                      "historical_event_study_validation_v1.csv",
-                  ],
-              },
+              "Cross-Asset Intelligence v1":
+                  "cross-asset-intelligence-v1",
+
+              "Test Earnings Market Reaction V3":
+                  "earnings-market-reaction-v3-results",
+
+              "Macro Context v1":
+                  "macro-context-v1",
+
+              "Research Context v1":
+                  "research-context-v1",
+
+              "Decision Engine V1":
+                  "decision-engine-v1",
+
+              "Historical Event Study v2":
+                  "historical-event-study-v2",
+
+              "Final End-to-End Validation V1":
+                  "final-end-to-end-validation-v1"
           }
 
-          # ========================================================
-          # LOAD ARTIFACT INDEX
-          # ========================================================
-
-          with open("/tmp/artifacts_pages.json", "r", encoding="utf-8") as f:
-              pages = json.load(f)
-
-          artifacts = []
-
-          for page in pages:
-              if isinstance(page, list):
-                  artifacts.extend(page)
-
-          # Only valid, non-expired artifacts
-          artifacts = [
-              a for a in artifacts
-              if not a.get("expired", False)
-          ]
-
-          print(f"Non-expired artifacts found: {len(artifacts)}")
-
-          # ========================================================
-          # INDEX ARTIFACTS BY NAME
-          # ========================================================
-
-          by_name = {}
-
-          for artifact in artifacts:
-              name = artifact.get("name")
-
-              if not name:
-                  continue
-
-              by_name.setdefault(name, []).append(artifact)
-
-          # Sort newest first
-          for name in by_name:
-              by_name[name].sort(
-                  key=lambda x: (
-                      x.get("created_at", ""),
-                      x.get("id", 0),
-                  ),
-                  reverse=True,
-              )
-
-          # ========================================================
-          # SELECT ARTIFACTS
-          # ========================================================
-
-          selected = {}
-
-          for dataset_name, spec in DATASETS.items():
-
-              for artifact_name in spec["artifacts"]:
-
-                  candidates = by_name.get(artifact_name, [])
-
-                  if not candidates:
-                      continue
-
-                  artifact = candidates[0]
-
-                  selected_key = artifact["id"]
-
-                  selected[selected_key] = artifact
-
-                  break
-
-          print(f"Selected artifact families: {len(selected)}")
-
-          # ========================================================
-          # MANIFEST
-          # ========================================================
-
-          manifest = {
-              "publisher": "US500 Macro Intelligence",
-              "publisher_version": "V2",
-              "research_only": True,
-              "generated_at_utc": datetime.now(
-                  timezone.utc
-              ).isoformat(),
-              "repository": REPO,
-              "datasets": {},
-              "files": {},
-          }
-
-          # ========================================================
-          # DOWNLOAD CACHE
-          # ========================================================
-
-          downloaded = {}
-
-          # ========================================================
-          # DOWNLOAD ARTIFACT USING GH CLI
-          # ========================================================
-
-          def download_artifact(artifact):
-
-              artifact_id = artifact["id"]
-
-              if artifact_id in downloaded:
-                  return downloaded[artifact_id]
+          for workflow, artifact in workflows.items():
 
               print()
               print("------------------------------------------------------------")
-              print(f"Downloading: {artifact['name']}")
-              print(f"Artifact ID: {artifact_id}")
-              print(f"Created: {artifact.get('created_at')}")
+              print("Workflow:", workflow)
+              print("Artifact:", artifact)
+              print("------------------------------------------------------------")
 
-              temp_dir = Path(
-                  tempfile.mkdtemp(
-                      prefix=f"artifact_{artifact_id}_"
-                  )
+              result = subprocess.run(
+                  [
+                      "gh",
+                      "run",
+                      "list",
+                      "--repo",
+                      repo,
+                      "--workflow",
+                      workflow,
+                      "--status",
+                      "success",
+                      "--limit",
+                      "1",
+                      "--json",
+                      "databaseId,createdAt,conclusion",
+                  ],
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
               )
 
-              zip_path = temp_dir / "artifact.zip"
+              if result.returncode != 0:
+                  print("Unable to query workflow.")
+                  continue
 
-              api_path = (
-                  f"repos/{REPO}/actions/artifacts/"
-                  f"{artifact_id}/zip"
+              try:
+                  runs = json.loads(result.stdout)
+              except Exception:
+                  print("Invalid workflow response.")
+                  continue
+
+              if not runs:
+                  print("No successful run found.")
+                  continue
+
+              run_id = str(
+                  runs[0]["databaseId"]
               )
 
-              print("Downloading authenticated artifact ZIP...")
-
-              with open(zip_path, "wb") as output:
-
-                  process = subprocess.run(
-                      [
-                          "gh",
-                          "api",
-                          api_path,
-                      ],
-                      stdout=output,
-                      stderr=subprocess.PIPE,
-                      env=os.environ,
-                  )
-
-              if process.returncode != 0:
-
-                  error = process.stderr.decode(
-                      "utf-8",
-                      errors="replace",
-                  )
-
-                  raise RuntimeError(
-                      f"Artifact download failed: "
-                      f"{artifact['name']} "
-                      f"(HTTP/API error)\n{error}"
-                  )
-
-              extract_dir = temp_dir / "extracted"
-              extract_dir.mkdir()
-
-              with zipfile.ZipFile(zip_path, "r") as z:
-
-                  z.extractall(extract_dir)
-
-              downloaded[artifact_id] = (
-                  artifact,
-                  extract_dir,
+              created = runs[0].get(
+                  "createdAt",
+                  ""
               )
 
-              return downloaded[artifact_id]
+              target = Path(
+                  "/tmp/bootstrap"
+              ) / artifact
 
-          # ========================================================
-          # FIND FILE INSIDE ZIP
-          # ========================================================
-
-          def find_file(root, filename):
-
-              matches = list(root.rglob(filename))
-
-              if not matches:
-                  return None
-
-              # Prefer exact basename match.
-              matches.sort(
-                  key=lambda p: (
-                      len(p.parts),
-                      str(p),
-                  )
+              target.mkdir(
+                  parents=True,
+                  exist_ok=True
               )
 
-              return matches[0]
-
-          # ========================================================
-          # PROCESS DATASETS
-          # ========================================================
-
-          published_count = 0
-          missing_count = 0
-
-          for dataset_name, spec in DATASETS.items():
-
-              print()
               print(
-                  "============================================================"
-              )
-              print(
-                  f"DATASET: {dataset_name}"
-              )
-              print(
-                  "============================================================"
+                  f"Latest successful run: "
+                  f"{run_id} ({created})"
               )
 
-              dataset_manifest = {
-                  "status": "missing",
-                  "artifact": None,
-                  "files": {},
-              }
+              download = subprocess.run(
+                  [
+                      "gh",
+                      "run",
+                      "download",
+                      run_id,
+                      "--repo",
+                      repo,
+                      "--name",
+                      artifact,
+                      "--dir",
+                      str(target),
+                  ],
+                  capture_output=True,
+                  text=True,
+                  env=os.environ,
+              )
 
-              artifact_used = None
-              extract_dir = None
+              if download.returncode != 0:
 
-              # ----------------------------------------------------
-              # Try candidate artifacts in order.
-              # ----------------------------------------------------
-
-              for artifact_name in spec["artifacts"]:
-
-                  candidates = by_name.get(
-                      artifact_name,
-                      [],
+                  print(
+                      "Artifact unavailable for this run."
                   )
 
-                  if not candidates:
-                      print(
-                          f"No artifact found: {artifact_name}"
-                      )
-                      continue
+                  print(
+                      download.stderr.strip()
+                  )
 
-                  artifact = candidates[0]
+                  continue
 
-                  try:
-
-                      _, root = download_artifact(
-                          artifact
-                      )
-
-                      found_any = False
-
-                      for filename in spec["files"]:
-
-                          source = find_file(
-                              root,
-                              filename,
-                          )
-
-                          if source is None:
-
-                              print(
-                                  f"  MISSING in artifact: "
-                                  f"{filename}"
-                              )
-
-                              continue
-
-                          destination = (
-                              OUTPUT_DIR / filename
-                          )
-
-                          destination.parent.mkdir(
-                              parents=True,
-                              exist_ok=True,
-                          )
-
-                          shutil.copy2(
-                              source,
-                              destination,
-                          )
-
-                          print(
-                              f"  PUBLISHED: {filename}"
-                          )
-
-                          dataset_manifest[
-                              "files"
-                          ][filename] = {
-                              "artifact_name":
-                                  artifact["name"],
-                              "artifact_id":
-                                  artifact["id"],
-                              "created_at":
-                                  artifact.get(
-                                      "created_at"
-                                  ),
-                              "source_path":
-                                  str(source),
-                          }
-
-                          manifest["files"][filename] = {
-                              "dataset":
-                                  dataset_name,
-                              "artifact_name":
-                                  artifact["name"],
-                              "artifact_id":
-                                  artifact["id"],
-                              "created_at":
-                                  artifact.get(
-                                      "created_at"
-                                  ),
-                          }
-
-                          published_count += 1
-                          found_any = True
-
-                      if found_any:
-
-                          artifact_used = artifact
-
-                          dataset_manifest[
-                              "status"
-                          ] = "published"
-
-                          break
-
-                  except Exception as exc:
-
-                      print(
-                          f"  ERROR downloading "
-                          f"{artifact_name}: {exc}"
-                      )
-
-                      continue
-
-              if artifact_used:
-
-                  dataset_manifest[
-                      "artifact"
-                  ] = {
-                      "name":
-                          artifact_used["name"],
-                      "id":
-                          artifact_used["id"],
-                      "created_at":
-                          artifact_used.get(
-                              "created_at"
-                          ),
-                  }
-
-              else:
-
-                  missing_count += 1
-
-              manifest["datasets"][
-                  dataset_name
-              ] = dataset_manifest
-
-          # ========================================================
-          # WRITE MANIFEST
-          # ========================================================
-
-          # Remove volatile timestamp so the publisher does not
-          # create a Git commit every 30 minutes when nothing changed.
-          manifest["generated_at_utc"] = None
-
-          manifest_path = (
-              OUTPUT_DIR / "manifest.json"
-          )
-
-          with open(
-              manifest_path,
-              "w",
-              encoding="utf-8",
-          ) as f:
-
-              json.dump(
-                  manifest,
-                  f,
-                  indent=2,
-                  sort_keys=True,
-              )
-
-          # ========================================================
-          # WRITE README
-          # ========================================================
-
-          readme = """# US500 Macro Intelligence — Public Research Data
-
-          This directory contains research datasets automatically published
-          from GitHub Actions artifacts.
-
-          ## Important
-
-          - Research-only.
-          - No trade execution.
-          - No brokerage integration.
-          - No position sizing.
-          - No SL/TP generation.
-          - No deterministic market prediction.
-          - Data is published automatically by GitHub Actions.
-
-          The Streamlit application reads these files locally first,
-          so a personal GitHub token is NOT required.
-
-          `manifest.json` contains the artifact provenance.
-          """
-
-          with open(
-              OUTPUT_DIR / "README.md",
-              "w",
-              encoding="utf-8",
-          ) as f:
-
-              f.write(readme.strip() + "\n")
-
-          print()
-          print(
-              "============================================================"
-          )
-          print(
-              "PUBLIC DATA PUBLISH SUMMARY"
-          )
-          print(
-              "============================================================"
-          )
-
-          print(
-              f"Files published: {published_count}"
-          )
-
-          print(
-              f"Datasets missing: {missing_count}"
-          )
-
-          print(
-              f"Output directory: {OUTPUT_DIR.resolve()}"
-          )
-
-          if published_count == 0:
-
-              raise SystemExit(
-                  "ERROR: No research files were published."
-              )
+              print("Artifact downloaded.")
 
           PY
 
-      # ============================================================
-      # 4. SHOW RESULT
-      # ============================================================
-      - name: Show published files
-        shell: bash
-        run: |
           echo
           echo "============================================================"
-          echo "PUBLIC DATA DIRECTORY"
+          echo "BOOTSTRAP DOWNLOAD COMPLETE"
+          echo "============================================================"
+
+          find /tmp/bootstrap \
+            -type f \
+            -print | sort || true
+
+      # ==========================================================
+      # 8. COLLECT SOURCE FILES
+      # ==========================================================
+
+      - name: Collect published research files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "COLLECTING RESEARCH DATA"
+          echo "============================================================"
+
+          # --------------------------------------------------------
+          # Triggered run
+          # --------------------------------------------------------
+
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+
+            if [ -d "/tmp/source_artifact" ]; then
+
+              while IFS= read -r file; do
+
+                base="$(basename "$file")"
+
+                echo "Publishing:"
+                echo "  $base"
+
+                cp "$file" \
+                  "public_data/$base"
+
+              done < <(
+                find /tmp/source_artifact \
+                  -type f \
+                  \( \
+                    -name "*.csv" \
+                    -o \
+                    -name "*.json" \
+                  \)
+              )
+
+            fi
+
+          fi
+
+          # --------------------------------------------------------
+          # Manual bootstrap
+          # --------------------------------------------------------
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+
+            if [ -d "/tmp/bootstrap" ]; then
+
+              while IFS= read -r file; do
+
+                base="$(basename "$file")"
+
+                echo "Publishing:"
+                echo "  $base"
+
+                cp "$file" \
+                  "public_data/$base"
+
+              done < <(
+                find /tmp/bootstrap \
+                  -type f \
+                  \( \
+                    -name "*.csv" \
+                    -o \
+                    -name "*.json" \
+                  \)
+              )
+
+            fi
+
+          fi
+
+          echo
+          echo "============================================================"
+          echo "PUBLIC DATA FILES"
           echo "============================================================"
 
           find public_data \
@@ -696,10 +708,154 @@ jobs:
             -printf "%f\n" \
             | sort
 
-      # ============================================================
-      # 5. COMMIT
-      # ============================================================
-      - name: Commit published data
+      # ==========================================================
+      # 9. CREATE MANIFEST
+      # ==========================================================
+
+      - name: Create public data manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python <<'PY'
+
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("public_data")
+
+          manifest = {
+              "publisher": "US500 Macro Intelligence",
+              "publisher_version": "V3",
+              "research_only": True,
+              "source_workflow": "${{ github.event.workflow_run.name }}",
+              "source_run_id": "${{ github.event.workflow_run.id }}",
+              "files": {}
+          }
+
+          for path in sorted(root.iterdir()):
+
+              if not path.is_file():
+                  continue
+
+              if path.name in {
+                  "manifest.json",
+                  "README.md"
+              }:
+                  continue
+
+              data = path.read_bytes()
+
+              manifest["files"][path.name] = {
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(
+                      data
+                  ).hexdigest()
+              }
+
+          with open(
+              root / "manifest.json",
+              "w",
+              encoding="utf-8"
+          ) as f:
+
+              json.dump(
+                  manifest,
+                  f,
+                  indent=2,
+                  sort_keys=True
+              )
+
+              f.write("\n")
+
+          PY
+
+      # ==========================================================
+      # 10. README
+      # ==========================================================
+
+      - name: Create public data README
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > public_data/README.md <<'EOF'
+          # US500 Macro Intelligence — Public Research Data
+
+          Automatically published research datasets.
+
+          ## Research-only
+
+          This data layer is:
+
+          - Research only
+          - No trade execution
+          - No broker integration
+          - No position sizing
+          - No SL/TP generation
+          - No deterministic market prediction
+
+          The Streamlit terminal reads this directory directly.
+
+          A personal GitHub token is not required.
+
+          `manifest.json` contains SHA-256 checksums for published files.
+          EOF
+
+      # ==========================================================
+      # 11. VALIDATE
+      # ==========================================================
+
+      - name: Validate public data
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "PUBLIC DATA VALIDATION"
+          echo "============================================================"
+
+          FILE_COUNT=$(
+            find public_data \
+              -maxdepth 1 \
+              -type f \
+              \( \
+                -name "*.csv" \
+                -o \
+                -name "*.json" \
+              \) \
+              | wc -l
+          )
+
+          echo "Published data files: $FILE_COUNT"
+
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo
+            echo "WARNING:"
+            echo "No research data was available to publish."
+            echo
+            echo "This is expected on the first bootstrap if all"
+            echo "previous GitHub Actions artifacts have expired."
+            echo
+            echo "Run the producer workflows first."
+            exit 0
+          fi
+
+          echo
+          echo "Published files:"
+
+          find public_data \
+            -maxdepth 1 \
+            -type f \
+            -printf "%f\n" \
+            | sort
+
+      # ==========================================================
+      # 12. COMMIT
+      # ==========================================================
+
+      - name: Commit public research data
         shell: bash
         run: |
           set -euo pipefail
@@ -713,25 +869,28 @@ jobs:
           git add public_data
 
           if git diff --cached --quiet; then
+
             echo
             echo "============================================================"
-            echo "NO DATA CHANGES"
+            echo "NO PUBLIC DATA CHANGES"
             echo "============================================================"
-            echo "Nothing new to commit."
+
             exit 0
           fi
 
           echo
           echo "============================================================"
-          echo "COMMITTING RESEARCH DATA"
+          echo "COMMITTING PUBLIC RESEARCH DATA"
           echo "============================================================"
 
           git commit \
-            -m "chore: publish latest research data"
+            -m "chore: publish research data v3"
 
           git push
 
           echo
           echo "============================================================"
-          echo "PUBLICATION COMPLETE"
+          echo "RESEARCH DATA PUBLISHED"
           echo "============================================================"
+
+          git log -1 --oneline
