@@ -12,16 +12,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
       - name: Install validation dependencies
         shell: bash
         run: |
@@ -30,6 +40,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pandas
 
+      # ============================================================
+      # 4. PREPARE WORKSPACE
+      # ============================================================
       - name: Prepare workspace
         shell: bash
         run: |
@@ -37,9 +50,14 @@ jobs:
 
           rm -rf artifacts
           rm -rf final_end_to_end_validation_output
+          rm -f final_end_to_end_validation_exit_code.txt
 
           mkdir -p artifacts
+          mkdir -p final_end_to_end_validation_output
 
+      # ============================================================
+      # 5. DISCOVER ALL NON-EXPIRED ARTIFACTS
+      # ============================================================
       - name: Discover latest research artifacts
         shell: bash
         env:
@@ -100,20 +118,14 @@ jobs:
 
               previous = latest.get(name)
 
-              if (
-                  previous is None
-                  or dt > previous[0]
-              ):
+              if previous is None or dt > previous[0]:
                   latest[name] = (
                       dt,
                       artifact_id,
                       url,
                   )
 
-          with output.open(
-              "w",
-              encoding="utf-8",
-          ) as f:
+          with output.open("w", encoding="utf-8") as f:
 
               for name, (
                   dt,
@@ -135,8 +147,12 @@ jobs:
           PY
 
           echo
-          echo "Artifact discovery complete."
+          echo "Latest artifact inventory:"
+          cat /tmp/latest_artifacts.tsv
 
+      # ============================================================
+      # 6. DOWNLOAD CANONICAL RESEARCH ARTIFACTS
+      # ============================================================
       - name: Download canonical research artifacts
         shell: bash
         env:
@@ -181,8 +197,7 @@ jobs:
 
             if [ -z "$row" ]; then
               echo
-              echo "WARNING:"
-              echo "Canonical artifact not found:"
+              echo "WARNING: canonical artifact not found:"
               echo "$wanted"
               return 0
             fi
@@ -209,12 +224,9 @@ jobs:
 
             echo
             echo "------------------------------------------------------------"
-            echo "Artifact:"
-            echo "$name"
-            echo "Artifact ID:"
-            echo "$artifact_id"
-            echo "Created:"
-            echo "$created_at"
+            echo "Artifact : $name"
+            echo "ID       : $artifact_id"
+            echo "Created  : $created_at"
             echo "------------------------------------------------------------"
 
             gh api \
@@ -247,10 +259,7 @@ jobs:
           echo "DOWNLOADED FILES"
           echo "============================================================"
 
-          find artifacts \
-            -type f \
-            -print \
-            | sort
+          find artifacts -type f -print | sort
 
           csv_count="$(
             find artifacts \
@@ -270,19 +279,16 @@ jobs:
           echo "CSV count : $csv_count"
           echo "JSON count: $json_count"
 
-          if [
-            "$csv_count" -eq 0
-            ] && [
-            "$json_count" -eq 0
-          ]; then
-
+          if [ "$csv_count" -eq 0 ] && [ "$json_count" -eq 0 ]; then
             echo
             echo "ERROR:"
             echo "No research artifacts were downloaded."
-
             exit 1
           fi
 
+      # ============================================================
+      # 7. VERIFY VALIDATOR
+      # ============================================================
       - name: Verify validator
         shell: bash
         run: |
@@ -292,10 +298,7 @@ jobs:
           echo "VERIFYING FINAL VALIDATOR"
           echo "============================================================"
 
-          if [
-            ! -f
-            tests/final_end_to_end_validation_v1.py
-          ]; then
+          if [ ! -f tests/final_end_to_end_validation_v1.py ]; then
 
             echo "ERROR:"
             echo "Final validator not found."
@@ -314,10 +317,7 @@ jobs:
 
           echo "Final validator found."
 
-          if [
-            -f
-            FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md
-          ]; then
+          if [ -f FINAL_UNIFIED_DECISION_ARCHITECTURE_V1.md ]; then
 
             echo "Architecture document found."
 
@@ -329,6 +329,9 @@ jobs:
 
           fi
 
+      # ============================================================
+      # 8. RUN VALIDATOR
+      # ============================================================
       - name: Run final end-to-end validator
         shell: bash
         run: |
@@ -353,11 +356,28 @@ jobs:
           echo "Validator exit code:"
           echo "$rc"
 
-          # Do not fail here.
-          # Diagnostics must be uploaded first.
+          echo
+          echo "Validator diagnostics:"
+          if [ -d final_end_to_end_validation_output ]; then
+            find final_end_to_end_validation_output \
+              -maxdepth 2 \
+              -type f \
+              -print \
+              | sort
+          else
+            echo "Output directory does not exist."
+          fi
+
+          # IMPORTANT:
+          # Do not fail this step.
+          # We need to upload diagnostics before applying
+          # the final validation status.
 
           exit 0
 
+      # ============================================================
+      # 9. DISPLAY JSON RESULT
+      # ============================================================
       - name: Display final validation result
         if: always()
         shell: bash
@@ -368,10 +388,7 @@ jobs:
           echo "FINAL VALIDATION RESULT"
           echo "============================================================"
 
-          if [
-            -f
-            final_end_to_end_validation_output/final_end_to_end_validation.json
-          ]; then
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation.json ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation.json
@@ -387,10 +404,7 @@ jobs:
           echo "SUMMARY"
           echo "============================================================"
 
-          if [
-            -f
-            final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
-          ]; then
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_summary.csv ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation_summary.csv
@@ -406,10 +420,7 @@ jobs:
           echo "EVENTS / REVIEWS"
           echo "============================================================"
 
-          if [
-            -f
-            final_end_to_end_validation_output/final_end_to_end_validation_events.csv
-          ]; then
+          if [ -f final_end_to_end_validation_output/final_end_to_end_validation_events.csv ]; then
 
             cat \
               final_end_to_end_validation_output/final_end_to_end_validation_events.csv
@@ -420,6 +431,9 @@ jobs:
 
           fi
 
+      # ============================================================
+      # 10. UPLOAD COMPLETE VALIDATION OUTPUT
+      # ============================================================
       - name: Upload final validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -431,16 +445,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # ============================================================
+      # 11. APPLY REAL VALIDATION STATUS
+      # ============================================================
       - name: Apply final validation status
         if: always()
         shell: bash
         run: |
           set -euo pipefail
 
-          if [
-            ! -f
-            final_end_to_end_validation_exit_code.txt
-          ]; then
+          echo "============================================================"
+          echo "APPLYING FINAL VALIDATION STATUS"
+          echo "============================================================"
+
+          if [ ! -f final_end_to_end_validation_exit_code.txt ]; then
 
             echo "ERROR:"
             echo "Validation exit code file not found."
@@ -454,10 +472,12 @@ jobs:
           )"
 
           echo
-          echo "============================================================"
+          echo "Validator exit code: $rc"
+          echo
 
           if [ "$rc" -eq 0 ]; then
 
+            echo "============================================================"
             echo "FINAL END-TO-END VALIDATION: SUCCESS"
             echo "============================================================"
 
@@ -465,6 +485,7 @@ jobs:
 
           fi
 
+          echo "============================================================"
           echo "FINAL END-TO-END VALIDATION: FAILED"
           echo "============================================================"
 
