@@ -99,7 +99,7 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
-          from datetime import datetime, timezone
+          from datetime import datetime
 
           source = Path("/tmp/research_context_artifacts.tsv")
 
@@ -126,10 +126,11 @@ jobs:
               rows.append(
                   {
                       "artifact_id": artifact_id,
-                      "created_at": dt,
+                      "created_at": created_at,
                       "run_id": run_id,
                       "branch": branch,
                       "sha": sha,
+                      "dt": dt,
                   }
               )
 
@@ -139,7 +140,7 @@ jobs:
               )
 
           rows.sort(
-              key=lambda x: x["created_at"],
+              key=lambda x: x["dt"],
               reverse=True,
           )
 
@@ -150,53 +151,55 @@ jobs:
           output.write_text(
               "\n".join(
                   [
-                      f"artifact_id={latest['artifact_id']}",
-                      f"run_id={latest['run_id']}",
-                      f"created_at={latest['created_at'].isoformat()}",
-                      f"branch={latest['branch']}",
-                      f"sha={latest['sha']}",
+                      f"ARTIFACT_ID={latest['artifact_id']}",
+                      f"RUN_ID={latest['run_id']}",
+                      f"CREATED_AT={latest['created_at']}",
+                      f"BRANCH={latest['branch']}",
+                      f"SHA={latest['sha']}",
                   ]
               )
               + "\n",
               encoding="utf-8",
           )
 
-          print()
-          print("LATEST RESEARCH CONTEXT")
-          print("--------------------------------------------")
-          print(f"Artifact ID : {latest['artifact_id']}")
-          print(f"Run ID      : {latest['run_id']}")
-          print(f"Created     : {latest['created_at'].isoformat()}")
-          print(f"Branch      : {latest['branch']}")
-          print(f"SHA         : {latest['sha']}")
-          print("--------------------------------------------")
+          print("Latest Research Context selected:")
+          print(f"  Artifact ID : {latest['artifact_id']}")
+          print(f"  Run ID      : {latest['run_id']}")
+          print(f"  Created     : {latest['created_at']}")
+          print(f"  Branch      : {latest['branch']}")
+          print(f"  SHA         : {latest['sha']}")
           PY
 
-          cat /tmp/latest_research_context.env
+          source /tmp/latest_research_context.env
 
-          ARTIFACT_ID="$(grep '^artifact_id=' /tmp/latest_research_context.env | cut -d= -f2-)"
-          RUN_ID="$(grep '^run_id=' /tmp/latest_research_context.env | cut -d= -f2-)"
-          CREATED_AT="$(grep '^created_at=' /tmp/latest_research_context.env | cut -d= -f2-)"
-          BRANCH="$(grep '^branch=' /tmp/latest_research_context.env | cut -d= -f2-)"
-          SHA="$(grep '^sha=' /tmp/latest_research_context.env | cut -d= -f2-)"
-
-          if [ -z "$ARTIFACT_ID" ]; then
+          if [ -z "${ARTIFACT_ID:-}" ]; then
             echo "ERROR: ARTIFACT_ID is empty."
             exit 1
           fi
 
-          if [ -z "$RUN_ID" ]; then
+          if [ -z "${RUN_ID:-}" ]; then
             echo "ERROR: RUN_ID is empty."
             exit 1
           fi
 
           {
-            echo "artifact_id=$ARTIFACT_ID"
-            echo "run_id=$RUN_ID"
-            echo "created_at=$CREATED_AT"
-            echo "branch=$BRANCH"
-            echo "sha=$SHA"
+            echo "artifact_id=${ARTIFACT_ID}"
+            echo "run_id=${RUN_ID}"
+            echo "created_at=${CREATED_AT}"
+            echo "branch=${BRANCH}"
+            echo "sha=${SHA}"
           } >> "$GITHUB_OUTPUT"
+
+          echo
+          echo "============================================================"
+          echo "RESEARCH CONTEXT DISCOVERY SUCCESS"
+          echo "============================================================"
+          echo "Artifact ID : ${ARTIFACT_ID}"
+          echo "Run ID      : ${RUN_ID}"
+          echo "Created     : ${CREATED_AT}"
+          echo "Branch      : ${BRANCH}"
+          echo "SHA         : ${SHA}"
+          echo
 
       # ============================================================
       # 6. VERIFY ARTIFACT METADATA
@@ -205,12 +208,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           ARTIFACT_ID: ${{ steps.discover.outputs.artifact_id }}
           RUN_ID: ${{ steps.discover.outputs.run_id }}
         run: |
           set -euo pipefail
-
-          REPO="${GITHUB_REPOSITORY}"
 
           echo
           echo "============================================================"
@@ -218,9 +220,15 @@ jobs:
           echo "============================================================"
           echo
 
-          echo "Artifact ID: ${ARTIFACT_ID}"
-          echo "Workflow Run: ${RUN_ID}"
-          echo
+          if [ -z "${ARTIFACT_ID}" ]; then
+            echo "ERROR: Missing artifact ID."
+            exit 1
+          fi
+
+          if [ -z "${RUN_ID}" ]; then
+            echo "ERROR: Missing workflow run ID."
+            exit 1
+          fi
 
           gh api \
             "repos/${REPO}/actions/artifacts/${ARTIFACT_ID}" \
@@ -231,13 +239,16 @@ jobs:
                 size_in_bytes: .size_in_bytes,
                 expired: .expired,
                 created_at: .created_at,
-                expires_at: .expires_at,
+                updated_at: .updated_at,
                 workflow_run_id: .workflow_run.id,
-                workflow_run_name: .workflow_run.name,
-                workflow_run_head_branch: .workflow_run.head_branch,
-                workflow_run_head_sha: .workflow_run.head_sha
+                workflow_run_url: .workflow_run.html_url
               }
             '
+
+          echo
+          echo "Expected workflow run: ${RUN_ID}"
+          echo "Artifact verification completed."
+          echo
 
       # ============================================================
       # 7. DOWNLOAD RESEARCH CONTEXT
@@ -262,34 +273,44 @@ jobs:
 
           echo
           echo "============================================================"
-          echo "RESEARCH CONTEXT DOWNLOADED FILES"
+          echo "VERIFYING RESEARCH CONTEXT DOWNLOAD"
           echo "============================================================"
           echo
 
           find decision_engine_input \
-            -maxdepth 5 \
+            -maxdepth 3 \
             -type f \
             -print \
             | sort
 
           echo
 
-          CSV_COUNT="$(find decision_engine_input -type f -name '*.csv' | wc -l)"
+          CSV_COUNT=$(find decision_engine_input -type f -name "*.csv" | wc -l)
 
-          echo "CSV count: ${CSV_COUNT}"
+          echo "CSV files found: ${CSV_COUNT}"
 
-          if [ "$CSV_COUNT" -lt 1 ]; then
-            echo "ERROR: No CSV files were downloaded."
+          if [ "${CSV_COUNT}" -lt 1 ]; then
+            echo "ERROR: No CSV files found in Research Context artifact."
             exit 1
           fi
 
+          echo
+          echo "Research Context download verified."
+          echo
+
       # ============================================================
-      # 9. VALIDATE RESEARCH CONTEXT INPUT
+      # 9. VALIDATE INPUT
       # ============================================================
       - name: Validate Research Context input
         shell: bash
         run: |
           set -euo pipefail
+
+          echo
+          echo "============================================================"
+          echo "VALIDATING RESEARCH CONTEXT INPUT"
+          echo "============================================================"
+          echo
 
           python - <<'PY'
           from pathlib import Path
@@ -301,104 +322,100 @@ jobs:
 
           if not files:
               raise SystemExit(
-                  "ERROR: No CSV files found in decision_engine_input."
+                  "ERROR: No CSV files found."
               )
 
-          print()
-          print("============================================================")
-          print("VALIDATING RESEARCH CONTEXT INPUT")
-          print("============================================================")
-          print()
+          print(f"CSV files discovered: {len(files)}")
 
-          valid = 0
+          valid_files = 0
 
           for path in files:
-              print(f"Checking: {path}")
-
               try:
                   df = pd.read_csv(path)
               except Exception as exc:
                   raise SystemExit(
-                      f"ERROR: Cannot read {path}: {exc}"
+                      f"ERROR: Failed reading {path}: {exc}"
                   )
+
+              print(
+                  f"{path}: rows={len(df)}, columns={len(df.columns)}"
+              )
 
               if df.empty:
                   raise SystemExit(
                       f"ERROR: Empty CSV: {path}"
                   )
 
-              columns = {str(c).strip().lower() for c in df.columns}
-
-              if "point_in_time_safe" in columns:
-                  col = next(
-                      c for c in df.columns
-                      if str(c).strip().lower() == "point_in_time_safe"
-                  )
-
+              if "point_in_time_safe" in df.columns:
                   values = (
-                      df[col]
+                      df["point_in_time_safe"]
+                      .dropna()
                       .astype(str)
-                      .str.strip()
                       .str.lower()
+                      .unique()
+                      .tolist()
                   )
 
-                  allowed = {
-                      "true",
-                      "1",
-                      "yes",
-                      "y",
-                      "t",
-                  }
+                  bad = [
+                      value
+                      for value in values
+                      if value not in {
+                          "true",
+                          "1",
+                          "yes",
+                          "y",
+                      }
+                  ]
 
-                  bad = ~values.isin(allowed)
-
-                  if bad.any():
+                  if bad:
                       raise SystemExit(
-                          f"ERROR: PIT violation detected in {path}"
+                          f"ERROR: PIT violation in {path}: {bad}"
                       )
 
-              if "research_only" in columns:
-                  col = next(
-                      c for c in df.columns
-                      if str(c).strip().lower() == "research_only"
-                  )
-
+              if "research_only" in df.columns:
                   values = (
-                      df[col]
+                      df["research_only"]
+                      .dropna()
                       .astype(str)
-                      .str.strip()
                       .str.lower()
+                      .unique()
+                      .tolist()
                   )
 
-                  allowed = {
-                      "true",
-                      "1",
-                      "yes",
-                      "y",
-                      "t",
-                  }
+                  bad = [
+                      value
+                      for value in values
+                      if value not in {
+                          "true",
+                          "1",
+                          "yes",
+                          "y",
+                      }
+                  ]
 
-                  bad = ~values.isin(allowed)
-
-                  if bad.any():
+                  if bad:
                       raise SystemExit(
-                          f"ERROR: research_only violation detected in {path}"
+                          f"ERROR: Research-only violation in {path}: {bad}"
                       )
 
-              valid += 1
+              valid_files += 1
 
           print()
-          print(f"Validated CSV files: {valid}")
-          print("Research Context input validation: PASS")
-          print()
-
+          print(
+              f"Research Context validation passed: {valid_files} CSV files."
+          )
           PY
+
+          echo
+          echo "============================================================"
+          echo "RESEARCH CONTEXT INPUT VALIDATION PASSED"
+          echo "============================================================"
+          echo
 
       # ============================================================
       # 10. RUN DECISION ENGINE
       # ============================================================
       - name: Run Decision Engine V1
-        id: run_engine
         shell: bash
         run: |
           set +e
@@ -410,13 +427,14 @@ jobs:
           echo
 
           python tests/decision_engine/decision_engine_v1.py \
-            --input-dir decision_engine_input \
+            --input decision_engine_input \
             --output-dir decision_engine_output
 
           RC=$?
 
           echo
           echo "Decision Engine exit code: ${RC}"
+          echo
 
           echo "DECISION_ENGINE_EXIT_CODE=${RC}" >> "$GITHUB_ENV"
 
@@ -554,6 +572,7 @@ jobs:
           echo
 
           echo "Decision Engine output:"
+
           if [ -d "decision_engine_output" ]; then
             find decision_engine_output \
               -maxdepth 2 \
