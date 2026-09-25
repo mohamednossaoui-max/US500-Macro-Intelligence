@@ -1,0 +1,507 @@
+name: Historical Edge - Robustness Validation v1
+
+on:
+  workflow_dispatch:
+
+  push:
+    paths:
+      - ".github/workflows/historical-edge-robustness-v1.yml"
+      - "tests/historical_edge/historical_edge_robustness_v1.py"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: historical-edge-robustness-v1
+  cancel-in-progress: false
+
+jobs:
+
+  historical-edge-robustness:
+
+    name: US500 Historical Edge Robustness v1
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. DEPENDENCIES
+      # ============================================================
+
+      - name: Install dependencies
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+
+          pip install \
+            pandas \
+            numpy \
+            yfinance
+
+
+      # ============================================================
+      # 4. VERIFY SCRIPT
+      # ============================================================
+
+      - name: Verify robustness script
+        run: |
+          set -e
+
+          test -f \
+            tests/historical_edge/historical_edge_robustness_v1.py
+
+          python -m py_compile \
+            tests/historical_edge/historical_edge_robustness_v1.py
+
+          echo "Robustness script: OK"
+
+
+      # ============================================================
+      # 5. PREPARE DIRECTORIES
+      # ============================================================
+
+      - name: Prepare directories
+        run: |
+          set -e
+
+          rm -rf input
+          rm -rf historical_edge_robustness_v1
+
+          mkdir -p input/research_context
+          mkdir -p input/liquidity
+          mkdir -p input/breadth
+
+
+      # ============================================================
+      # 6. RESEARCH CONTEXT
+      # ============================================================
+
+      - name: Download latest Research Context artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "RESEARCH CONTEXT"
+          echo "=============================================="
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=research-context-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: research-context-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/research_context.zip
+
+          unzip -o \
+            /tmp/research_context.zip \
+            -d input/research_context
+
+          find input/research_context \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 7. LIQUIDITY
+      # ============================================================
+
+      - name: Download latest Liquidity Intelligence artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "LIQUIDITY"
+          echo "=============================================="
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=liquidity-intelligence-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: liquidity-intelligence-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/liquidity.zip
+
+          unzip -o \
+            /tmp/liquidity.zip \
+            -d input/liquidity
+
+          find input/liquidity \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 8. MARKET BREADTH
+      # ============================================================
+
+      - name: Download latest Market Breadth artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "MARKET BREADTH"
+          echo "=============================================="
+
+          ARTIFACT_ID=$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&name=market-breadth-full-validation-v1" \
+              --jq '
+                .artifacts
+                | map(select(.expired == false))
+                | sort_by(.created_at)
+                | last
+                | .id
+              '
+          )
+
+          if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
+            echo "ERROR: market-breadth-full-validation-v1 artifact not found."
+            exit 1
+          fi
+
+          echo "Artifact ID: $ARTIFACT_ID"
+
+          gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/breadth.zip
+
+          unzip -o \
+            /tmp/breadth.zip \
+            -d input/breadth
+
+          find input/breadth \
+            -type f \
+            -print
+
+
+      # ============================================================
+      # 9. LOCATE INPUT FILES
+      # ============================================================
+
+      - name: Locate input CSV files
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "LOCATING INPUT FILES"
+          echo "=============================================="
+
+          find input \
+            -type f \
+            -name "*.csv" \
+            -print
+
+          RESEARCH_CONTEXT_FILE=""
+          LIQUIDITY_FILE=""
+          BREADTH_FILE=""
+
+          EXACT_RC=$(
+            find input/research_context \
+              -type f \
+              -name "research_context_v1.csv" \
+              -print \
+              -quit
+          )
+
+          if [ -n "$EXACT_RC" ]; then
+            RESEARCH_CONTEXT_FILE="$EXACT_RC"
+          else
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | grep -qi "study_date"; then
+                RESEARCH_CONTEXT_FILE="$f"
+                break
+              fi
+
+            done < <(
+              find input/research_context \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
+
+
+          EXACT_LIQ=$(
+            find input/liquidity \
+              -type f \
+              -name "liquidity_intelligence_research_v1.csv" \
+              -print \
+              -quit
+          )
+
+          if [ -n "$EXACT_LIQ" ]; then
+            LIQUIDITY_FILE="$EXACT_LIQ"
+          else
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | \
+                grep -qi "NET_LIQUIDITY_PROXY_MILLIONS"; then
+
+                LIQUIDITY_FILE="$f"
+                break
+
+              fi
+
+            done < <(
+              find input/liquidity \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
+
+
+          EXACT_BREADTH=$(
+            find input/breadth \
+              -type f \
+              -name "market_breadth_analysis_v1.csv" \
+              -print \
+              -quit
+          )
+
+          if [ -n "$EXACT_BREADTH" ]; then
+            BREADTH_FILE="$EXACT_BREADTH"
+          else
+
+            while IFS= read -r f; do
+
+              HEADER=$(head -n 1 "$f" 2>/dev/null || true)
+
+              if echo "$HEADER" | \
+                grep -qi "breadth_research_state"; then
+
+                BREADTH_FILE="$f"
+                break
+
+              fi
+
+            done < <(
+              find input/breadth \
+                -type f \
+                -name "*.csv" \
+                -print
+            )
+
+          fi
+
+
+          echo ""
+          echo "Resolved Research Context:"
+          echo "$RESEARCH_CONTEXT_FILE"
+
+          echo ""
+          echo "Resolved Liquidity:"
+          echo "$LIQUIDITY_FILE"
+
+          echo ""
+          echo "Resolved Market Breadth:"
+          echo "$BREADTH_FILE"
+
+
+          if [ -z "$RESEARCH_CONTEXT_FILE" ]; then
+            echo "ERROR: Research Context not found."
+            exit 1
+          fi
+
+          if [ -z "$LIQUIDITY_FILE" ]; then
+            echo "ERROR: Liquidity not found."
+            exit 1
+          fi
+
+          if [ -z "$BREADTH_FILE" ]; then
+            echo "ERROR: Market Breadth not found."
+            exit 1
+          fi
+
+
+          {
+            echo "RESEARCH_CONTEXT_FILE=$RESEARCH_CONTEXT_FILE"
+            echo "LIQUIDITY_FILE=$LIQUIDITY_FILE"
+            echo "BREADTH_FILE=$BREADTH_FILE"
+          } >> "$GITHUB_ENV"
+
+
+      # ============================================================
+      # 10. INPUT VALIDATION
+      # ============================================================
+
+      - name: Validate input files
+        run: |
+          set -e
+
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          files = {
+              "RESEARCH_CONTEXT_FILE":
+                  os.environ["RESEARCH_CONTEXT_FILE"],
+              "LIQUIDITY_FILE":
+                  os.environ["LIQUIDITY_FILE"],
+              "BREADTH_FILE":
+                  os.environ["BREADTH_FILE"],
+          }
+
+          for name, path in files.items():
+
+              df = pd.read_csv(
+                  path,
+                  low_memory=False,
+              )
+
+              print("=" * 60)
+              print(name)
+              print("File:", path)
+              print("Rows:", len(df))
+              print("Columns:", len(df.columns))
+
+              if df.empty:
+                  raise SystemExit(
+                      f"ERROR: {name} is empty"
+                  )
+
+          print("=" * 60)
+          print("ALL INPUTS VALID")
+          PY
+
+
+      # ============================================================
+      # 11. RUN ROBUSTNESS
+      # ============================================================
+
+      - name: Run Historical Edge Robustness v1
+        run: |
+          set -e
+
+          echo "=============================================="
+          echo "RUNNING HISTORICAL EDGE ROBUSTNESS v1"
+          echo "=============================================="
+
+          python \
+            tests/historical_edge/historical_edge_robustness_v1.py \
+            --research-context "$RESEARCH_CONTEXT_FILE" \
+            --liquidity "$LIQUIDITY_FILE" \
+            --breadth "$BREADTH_FILE" \
+            --output historical_edge_robustness_v1
+
+
+      # ============================================================
+      # 12. DISPLAY VALIDATION
+      # ============================================================
+
+      - name: Display robustness validation
+        if: always()
+        run: |
+
+          echo "=============================================="
+          echo "HISTORICAL EDGE ROBUSTNESS v1"
+          echo "=============================================="
+
+          if [ -f \
+            "historical_edge_robustness_v1/historical_edge_robustness_validation_v1.json"
+          ]; then
+
+            cat \
+              historical_edge_robustness_v1/historical_edge_robustness_validation_v1.json
+
+          else
+
+            echo "Validation report was not generated."
+
+          fi
+
+
+          echo ""
+          echo "=============================================="
+          echo "OUTPUT FILES"
+          echo "=============================================="
+
+          find historical_edge_robustness_v1 \
+            -maxdepth 2 \
+            -type f \
+            -print \
+            2>/dev/null || true
+
+
+      # ============================================================
+      # 13. UPLOAD ARTIFACT
+      # ============================================================
+
+      - name: Upload Historical Edge Robustness artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+
+        with:
+          name: historical-edge-robustness-v1
+          path: historical_edge_robustness_v1/
+          if-no-files-found: warn
+          retention-days: 30
