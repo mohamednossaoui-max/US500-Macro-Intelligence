@@ -110,15 +110,15 @@
     },
     "event_news_research_summary_v2.json": {
       "bytes": 472,
-      "sha256": "f7cc6347559d532ab75c46ae1b01fb5da586d273de711626160e4b1aee32443d"
+      "sha256": "c2cdee81247667e87877b91ef5500800f29a3f91cde1cd93af6e94ff47e69cee"
     },
     "event_news_research_v2.csv": {
-      "bytes": 26776,
-      "sha256": "3810802cea52567a8570c1eeb220732c67b08bdf41303498a3e3a8da55a08174"
+      "bytes": 26736,
+      "sha256": "23a45200119b22a88eb46f879d13508d92c689214d124bb8441b22da2635930e"
     },
     "event_news_validation_v2.json": {
-      "bytes": 76010,
-      "sha256": "3826983c363b3dccc82eae1005f701f9c55d210bd1c4ea2accacd51be2d8d6ae"
+      "bytes": 75934,
+      "sha256": "ae48ff2cb068ff05c036e90b17b1487216dcd87db02cb2bdbcdd0e3c487191b8"
     },
     "fed_intelligence_output_v1.json": {
       "bytes": 10700,
@@ -284,6 +284,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36189840012",
-  "source_workflow": "Decision Engine V1"
+  "source_run_id": "36190635249",
+  "source_workflow": "Event News Intelligence v1"
 }

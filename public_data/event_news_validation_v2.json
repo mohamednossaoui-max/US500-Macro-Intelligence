@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-09-25T13:16:59.334524+00:00",
+  "generated_at": "2026-09-25T21:17:38.419997+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -156,6 +156,15 @@
         "description": "Minutes of the Federal Open Market Committee, March 17–18, 2026",
         "published_at": "2026-04-08T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260408a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
+        "description": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
+        "published_at": "2026-09-25T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260925a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -327,15 +336,6 @@
         "description": "Federal Reserve Board announces approval of the application by FS Bancorp, Inc.",
         "published_at": "2026-08-04T20:30:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260804b.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Federal Reserve Board announces approval of the application by Banco Santander, S.A. and Santander Holdings USA, Inc.",
-        "description": "Federal Reserve Board announces approval of the application by Banco Santander, S.A. and Santander Holdings USA, Inc.",
-        "published_at": "2026-08-04T20:30:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260804a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
