@@ -3,12 +3,12 @@
 PR-04 contract
 --------------
 A record may be used in a snapshot only when the information was available to
-an analyst on or before that snapshot date.  For economic releases the
-availability date is the release date unless an explicit ``available_as_of``
-column is supplied.
+an analyst on or before that snapshot date. For economic releases, the
+availability date is ``available_as_of`` when explicitly populated for that
+row; otherwise it falls back to ``release_date``.
 
-The helpers are deliberately side-effect free: they do not rewrite source
-files and they preserve the caller's DataFrame schema/index.
+The helpers are side-effect free: they do not rewrite source files and they
+preserve the caller's DataFrame schema/index.
 """
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ def normalize_as_of_date(value) -> pd.Timestamp:
     ts = pd.to_datetime(value, errors="coerce", utc=True)
     if pd.isna(ts):
         raise ValueError(f"Invalid as-of date: {value!r}")
-    # Convert to timezone-naive so comparisons are deterministic across inputs.
     return ts.tz_convert(None).normalize()
 
 
@@ -34,14 +33,28 @@ def _optional_date(value) -> Optional[pd.Timestamp]:
     return ts.tz_convert(None).normalize()
 
 
+def _effective_availability(df: pd.DataFrame, *, release_col: str,
+                            available_col: str) -> pd.Series:
+    """Return row-level effective availability with backward-compatible fallback."""
+    if release_col not in df.columns:
+        raise ValueError(f"Missing required PIT column: {release_col}")
+
+    release = pd.to_datetime(df[release_col], errors="coerce", utc=True)
+    if available_col in df.columns:
+        explicit = pd.to_datetime(df[available_col], errors="coerce", utc=True)
+        effective = explicit.fillna(release)
+    else:
+        effective = release
+    return effective.dt.tz_convert(None).dt.normalize()
+
+
 def validate_temporal_order(*, release_date, vintage_date=None,
                             observation_date=None, available_as_of=None) -> bool:
     """Validate temporal ordering without changing existing methodology.
 
-    Existing economic-history files define ``vintage_date`` as information
-    known no later than the release.  An explicit availability date may not
-    precede the release.  Observation dates, when present, may not occur after
-    the date on which the information becomes available.
+    ``vintage_date`` must be known no later than release. An explicitly
+    populated ``available_as_of`` may not precede release. ``observation_date``
+    may not occur after the effective availability date.
     """
     release = _optional_date(release_date)
     if release is None:
@@ -70,36 +83,31 @@ def validate_temporal_order(*, release_date, vintage_date=None,
 def filter_available_as_of(df: pd.DataFrame, as_of_date, *,
                            release_col: str = "release_date",
                            available_col: str = "available_as_of") -> pd.DataFrame:
-    """Return only rows that were knowable by ``as_of_date``.
+    """Return rows knowable by ``as_of_date``.
 
-    If ``available_col`` exists it is authoritative. Otherwise ``release_col``
-    is used. Invalid/missing availability dates are excluded (fail closed).
+    Availability is resolved per row. A populated ``available_as_of`` is
+    authoritative; a missing/invalid value falls back to that row's
+    ``release_date``. Rows with neither a valid explicit availability nor a
+    valid release date fail closed and are excluded.
     """
-    if release_col not in df.columns:
-        raise ValueError(f"Missing required PIT column: {release_col}")
-
     cutoff = normalize_as_of_date(as_of_date)
     work = df.copy()
-    source_col = available_col if available_col in work.columns else release_col
-    available = pd.to_datetime(work[source_col], errors="coerce", utc=True)
-    available = available.dt.tz_convert(None).dt.normalize()
-    return work.loc[available.notna() & (available <= cutoff)].copy()
+    effective = _effective_availability(
+        work, release_col=release_col, available_col=available_col
+    )
+    return work.loc[effective.notna() & (effective <= cutoff)].copy()
 
 
 def latest_available_as_of(df: pd.DataFrame, as_of_date, *,
                            release_col: str = "release_date",
                            available_col: str = "available_as_of") -> pd.DataFrame:
-    """Return PIT-safe rows sorted by their effective availability date.
-
-    The caller can select the final row globally or within its own grouping.
-    This function intentionally does not infer business keys such as indicator
-    or reference period.
-    """
+    """Return PIT-safe rows sorted by effective availability date."""
     work = filter_available_as_of(
         df, as_of_date, release_col=release_col, available_col=available_col
     )
-    source_col = available_col if available_col in work.columns else release_col
-    order = pd.to_datetime(work[source_col], errors="coerce", utc=True)
+    order = _effective_availability(
+        work, release_col=release_col, available_col=available_col
+    )
     work = work.assign(_pit_available_order=order)
     work = work.sort_values("_pit_available_order", kind="mergesort")
     return work.drop(columns=["_pit_available_order"])
