@@ -1,17 +1,108 @@
-import hashlib, json, sys
+import hashlib
+import json
+import sys
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]; sys.path.insert(0,str(ROOT/"scripts"))
-from verify_publication_integrity import sha256_file, verify_manifest, run, extract_entries
-def wm(p,fn,data): p.write_text(json.dumps({"files":{fn:{"bytes":len(data),"sha256":hashlib.sha256(data).hexdigest()}}}))
-def test_sha(tmp_path):
- p=tmp_path/"x";p.write_bytes(b"abc");assert sha256_file(p)==hashlib.sha256(b"abc").hexdigest()
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from verify_publication_integrity import (  # noqa: E402
+    extract_entries,
+    run,
+    sha256_file,
+    verify_manifest,
+)
+
+
+def write_manifest(path: Path, filename: str, data: bytes) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "files": {
+                    filename: {
+                        "bytes": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_sha256_file(tmp_path):
+    path = tmp_path / "x"
+    path.write_bytes(b"abc")
+    assert sha256_file(path) == hashlib.sha256(b"abc").hexdigest()
+
+
+def test_extract_entries_requires_files_mapping():
+    try:
+        extract_entries({"datasets": []})
+    except ValueError as exc:
+        assert "files" in str(exc)
+    else:
+        raise AssertionError("legacy manifest format must not be accepted")
+
+
 def test_match(tmp_path):
- d=tmp_path/"p";d.mkdir();(d/"x").write_bytes(b"a");wm(d/"manifest.json","x",b"a");assert verify_manifest(d/"manifest.json",d)["summary"]["match"]==1
+    root = tmp_path / "public_data"
+    root.mkdir()
+    (root / "x").write_bytes(b"a")
+    write_manifest(root / "manifest.json", "x", b"a")
+    assert verify_manifest(root / "manifest.json", root)["summary"]["match"] == 1
+
+
 def test_mismatch(tmp_path):
- d=tmp_path/"p";d.mkdir();(d/"x").write_bytes(b"b");wm(d/"manifest.json","x",b"a");assert verify_manifest(d/"manifest.json",d)["summary"]["mismatch"]==1
-def test_missing(tmp_path):
- d=tmp_path/"p";d.mkdir();wm(d/"manifest.json","x",b"a");assert verify_manifest(d/"manifest.json",d)["summary"]["missing"]==1
-def test_readonly(tmp_path):
- d=tmp_path/"p";d.mkdir();f=d/"x";f.write_bytes(b"a");m=d/"manifest.json";wm(m,"x",b"a");before=(m.read_bytes(),f.read_bytes());verify_manifest(m,d);assert before==(m.read_bytes(),f.read_bytes())
-def test_conflict(tmp_path):
- d=tmp_path/"p";d.mkdir();(d/"x").write_bytes(b"b");wm(d/"manifest.json","x",b"b");(d/"public_data_manifest.json").write_text(json.dumps({"datasets":[{"file":"x","bytes":1,"sha256":hashlib.sha256(b"a").hexdigest()}]}));assert len(run(d)["manifest_conflicts"])==1
+    root = tmp_path / "public_data"
+    root.mkdir()
+    (root / "x").write_bytes(b"b")
+    write_manifest(root / "manifest.json", "x", b"a")
+    assert verify_manifest(root / "manifest.json", root)["summary"]["mismatch"] == 1
+
+
+def test_missing_published_file(tmp_path):
+    root = tmp_path / "public_data"
+    root.mkdir()
+    write_manifest(root / "manifest.json", "x", b"a")
+    assert verify_manifest(root / "manifest.json", root)["summary"]["missing"] == 1
+
+
+def test_verifier_is_read_only(tmp_path):
+    root = tmp_path / "public_data"
+    root.mkdir()
+    data_file = root / "x"
+    data_file.write_bytes(b"a")
+    manifest = root / "manifest.json"
+    write_manifest(manifest, "x", b"a")
+    before = (manifest.read_bytes(), data_file.read_bytes())
+    verify_manifest(manifest, root)
+    assert before == (manifest.read_bytes(), data_file.read_bytes())
+
+
+def test_run_uses_only_canonical_manifest(tmp_path):
+    root = tmp_path / "public_data"
+    root.mkdir()
+    (root / "x").write_bytes(b"a")
+    write_manifest(root / "manifest.json", "x", b"a")
+    report = run(root)
+    assert not report["errors"]
+    assert len(report["manifests"]) == 1
+    assert report["manifests"][0]["summary"]["manifest"] == "manifest.json"
+
+
+def test_run_fails_when_legacy_manifest_exists(tmp_path):
+    root = tmp_path / "public_data"
+    root.mkdir()
+    (root / "x").write_bytes(b"a")
+    write_manifest(root / "manifest.json", "x", b"a")
+    (root / "public_data_manifest.json").write_text("{}", encoding="utf-8")
+    report = run(root)
+    assert any("Legacy manifest must be retired" in error for error in report["errors"])
+
+
+def test_run_fails_when_canonical_manifest_missing(tmp_path):
+    root = tmp_path / "public_data"
+    root.mkdir()
+    report = run(root)
+    assert any("Canonical manifest is missing" in error for error in report["errors"])
