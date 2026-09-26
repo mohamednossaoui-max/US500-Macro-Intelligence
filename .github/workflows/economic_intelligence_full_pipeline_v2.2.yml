@@ -19,19 +19,26 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 pypdf
+          pip install pandas numpy requests beautifulsoup4 pypdf pytest
 
       - name: Verify v2.2 standalone files
         run: |
           test -f economic_historical_expansion_v2.2.py
           test -f economic_surprise_engine_v1.1.py
           test -f economic_regime_classifier_v1.5.py
+          test -f point_in_time.py
+          test -f tests/test_point_in_time_integrity.py
 
       - name: Syntax check
         run: |
           python -m py_compile economic_historical_expansion_v2.2.py
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
+          python -m py_compile point_in_time.py
+          python -m py_compile macro_context_v1.py
+
+      - name: PR-04 Point-in-Time integrity tests
+        run: python -m pytest -q tests/test_point_in_time_integrity.py
 
       - name: Historical Expansion v2.2
         run: python economic_historical_expansion_v2.2.py
