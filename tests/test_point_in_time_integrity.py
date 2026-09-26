@@ -85,3 +85,23 @@ def test_zscore_at_t_is_unchanged_by_future_release():
     np.testing.assert_allclose(
         z1.to_numpy(), z2.iloc[:len(base)].to_numpy(), equal_nan=True
     )
+
+
+def test_missing_available_as_of_falls_back_to_release_date():
+    df = pd.DataFrame({
+        "release_date": ["2026-07-05", "2026-07-06"],
+        "available_as_of": [pd.NA, "2026-07-08"],
+        "actual": [1.0, 2.0],
+    })
+    out = filter_available_as_of(df, "2026-07-06")
+    assert out["actual"].tolist() == [1.0]
+
+
+def test_explicit_availability_after_release_delays_visibility():
+    df = pd.DataFrame({
+        "release_date": ["2026-07-05"],
+        "available_as_of": ["2026-07-08"],
+        "actual": [1.0],
+    })
+    assert filter_available_as_of(df, "2026-07-07").empty
+    assert len(filter_available_as_of(df, "2026-07-08")) == 1
