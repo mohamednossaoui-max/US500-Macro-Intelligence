@@ -667,73 +667,26 @@ jobs:
           find public_data -maxdepth 1 -type f | sort
 
       # ============================================================
-      # 25. BUILD COMPLETE MANIFEST
+      # 25. PUBLICATION MANIFEST OWNERSHIP
       # ============================================================
 
-      - name: Build Public Data Manifest
+      - name: Publication Manifest Ownership
         if: success()
         shell: bash
         run: |
           set -euo pipefail
-
-          python - <<'PY'
-          import hashlib
-          import json
-          from datetime import datetime, timezone
-          from pathlib import Path
-
-          root = Path("public_data")
-
-          datasets = []
-
-          for path in sorted(root.iterdir()):
-
-              if not path.is_file():
-                  continue
-
-              if path.name == "public_data_manifest.json":
-                  continue
-
-              if path.suffix.lower() not in {".csv", ".json"}:
-                  continue
-
-              data = path.read_bytes()
-
-              datasets.append({
-                  "file": path.name,
-                  "bytes": len(data),
-                  "sha256": hashlib.sha256(data).hexdigest()
-              })
-
-          manifest = {
-              "project": "US500 Macro Intelligence",
-              "type": "research_only",
-              "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-              "repository": "${{ github.repository }}",
-              "branch": "${{ github.ref_name }}",
-              "master_run_id": "${{ github.run_id }}",
-              "dataset_count": len(datasets),
-              "datasets": datasets
-          }
-
-          output = root / "public_data_manifest.json"
-
-          output.write_text(
-              json.dumps(manifest, indent=2),
-              encoding="utf-8"
-          )
-
-          print("")
-          print("============================================================")
-          print("PUBLIC DATA MANIFEST")
-          print("============================================================")
-          print(
-              json.dumps(
-                  manifest,
-                  indent=2
-              )
-          )
-          PY
+          echo "============================================================"
+          echo "PUBLICATION MANIFEST OWNERSHIP"
+          echo "============================================================"
+          echo "Canonical publication manifest: public_data/manifest.json"
+          echo "Manifest owner: publish_research_data_v1.yml"
+          echo "This workflow does not generate or modify a publication manifest."
+          echo "Legacy public_data_manifest.json is retained temporarily only."
+          if [ -f "public_data/manifest.json" ]; then
+            echo "STATUS: canonical manifest detected."
+          else
+            echo "STATUS: canonical manifest is not currently present."
+          fi
 
       # ============================================================
       # 26. CREATE / UPDATE README
@@ -796,12 +749,15 @@ jobs:
 
           ## Manifest
 
-          See:
+          The canonical publication manifest is:
 
-          `public_data_manifest.json`
+          `manifest.json`
 
-          for dataset names, file sizes, SHA-256 hashes, and generation
-          metadata.
+          It contains published dataset names, file sizes, SHA-256 hashes,
+          and publication metadata.
+
+          `public_data_manifest.json` is a legacy manifest retained
+          temporarily for backwards compatibility. It is not canonical.
           EOF
 
       # ============================================================

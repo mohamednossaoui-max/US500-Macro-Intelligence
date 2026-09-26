@@ -1,59 +1,36 @@
 name: Publication Integrity Check
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   publication-integrity:
-    name: Verify Publication Integrity
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Show environment
-        run: |
-          python --version
-          echo "Repository:"
-          pwd
-          echo ""
-          echo "Public data manifests:"
-          find public_data -maxdepth 1 -type f \
-            \( -name "manifest.json" -o -name "public_data_manifest.json" \) \
-            -print
-
       - name: Run Publication Integrity verifier
+        run: python scripts/verify_publication_integrity.py
+      - name: Verify Canonical Manifest
         run: |
-          echo "=========================================="
-          echo "PUBLICATION INTEGRITY VERIFICATION"
-          echo "=========================================="
-
-          python scripts/verify_publication_integrity.py
-
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path("public_data"); m=json.loads((root/"manifest.json").read_text()); files=m.get("files")
+          if not isinstance(files,dict) or not files: raise SystemExit("FAIL: invalid canonical manifest")
+          failures=[]
+          for fn,md in sorted(files.items()):
+              p=root/fn
+              if not p.is_file(): failures.append(f"MISSING: {fn}"); continue
+              if hashlib.sha256(p.read_bytes()).hexdigest()!=md.get("sha256"): failures.append(f"SHA256 MISMATCH: {fn}")
+              if p.stat().st_size!=md.get("bytes"): failures.append(f"SIZE MISMATCH: {fn}")
+          if failures:
+              print("\n".join(failures)); raise SystemExit(1)
+          print(f"CANONICAL MANIFEST PASSED\nVerified files: {len(files)}")
+          PY
       - name: Run Publication Integrity tests
         run: |
-          echo "=========================================="
-          echo "PUBLICATION INTEGRITY TESTS"
-          echo "=========================================="
-
-          python -m pip install --upgrade pip
           python -m pip install pytest
-
           python -m pytest -q tests/test_publication_integrity.py
-
-      - name: Integrity check completed
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "Publication Integrity workflow completed."
-          echo "No production data was modified."
-          echo "=========================================="
