@@ -1,0 +1,11 @@
+[
+  "tests/test_publication_integrity.py::test_extract_entries_requires_files_mapping",
+  "tests/test_publication_integrity.py::test_match",
+  "tests/test_publication_integrity.py::test_mismatch",
+  "tests/test_publication_integrity.py::test_missing_published_file",
+  "tests/test_publication_integrity.py::test_run_fails_when_canonical_manifest_missing",
+  "tests/test_publication_integrity.py::test_run_fails_when_legacy_manifest_exists",
+  "tests/test_publication_integrity.py::test_run_uses_only_canonical_manifest",
+  "tests/test_publication_integrity.py::test_sha256_file",
+  "tests/test_publication_integrity.py::test_verifier_is_read_only"
+]
