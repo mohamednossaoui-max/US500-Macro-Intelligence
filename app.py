@@ -116,20 +116,27 @@ DATE_COLUMNS = [
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_manifest() -> dict[str, Any]:
-    for filename in ("public_data_manifest.json", "manifest.json"):
+    """Load canonical manifest.json, with legacy fallback."""
+    manifest_names = ("manifest.json", "public_data_manifest.json")
+    for filename in manifest_names:
         local = PUBLIC_DATA / filename
-        if local.exists():
+        if local.exists() and local.is_file():
             try:
-                return json.loads(local.read_text(encoding="utf-8"))
+                manifest = json.loads(local.read_text(encoding="utf-8"))
             except (OSError, ValueError):
-                pass
-    for filename in ("public_data_manifest.json", "manifest.json"):
+                continue
+            if isinstance(manifest, dict):
+                return manifest
+    for filename in manifest_names:
         raw = fetch_raw(filename)
-        if raw is not None:
-            try:
-                return json.loads(raw.decode("utf-8"))
-            except (UnicodeDecodeError, ValueError):
-                pass
+        if raw is None:
+            continue
+        try:
+            manifest = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(manifest, dict):
+            return manifest
     return {}
 
 
