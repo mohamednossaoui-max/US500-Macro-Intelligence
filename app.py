@@ -12,12 +12,12 @@ import pandas as pd
 import requests
 import streamlit as st
 
-APP_VERSION = "V6.1"
+APP_VERSION = "V6.2"
 REPO = "mohamednossaoui-max/US500-Macro-Intelligence"
 BRANCH = "main"
 PUBLIC_DATA = Path(__file__).resolve().parent / "public_data"
 RAW_BASE = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/public_data"
-HEADERS = {"User-Agent": "US500-Macro-Intelligence-Research-Terminal/6.1"}
+HEADERS = {"User-Agent": "US500-Macro-Intelligence-Research-Terminal/6.2"}
 
 st.set_page_config(
     page_title=f"US500 Macro Intelligence {APP_VERSION}",
@@ -191,7 +191,7 @@ def load_csv(filename: str) -> tuple[Optional[pd.DataFrame], str]:
         df = pd.read_csv(io.BytesIO(raw), low_memory=False)
         df.columns = [str(c).strip() for c in df.columns]
         return df, source
-    except (ValueError, TypeError, pd.errors.ParserError, UnicodeDecodeError):
+    except (ValueError, TypeError, pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError):
         return None, f"UNREADABLE: {source}"
 
 
@@ -295,9 +295,22 @@ def card(label: str, value: Any, note: str = "") -> None:
 
 def table(df: Optional[pd.DataFrame], height: int = 380) -> None:
     if df is None:
-        st.info("Artifact is not published.")
+        st.info("Artifact is not published or could not be loaded.")
+        return
+    if df.empty:
+        st.info("Artifact is published but contains no rows.")
         return
     st.dataframe(df, use_container_width=True, height=height, hide_index=True)
+
+
+def source_status(text: str) -> str:
+    if text.startswith("LOCAL:"):
+        return "LOCAL"
+    if text.startswith("GITHUB RAW:"):
+        return "GITHUB RAW"
+    if text.startswith("UNREADABLE:"):
+        return "UNREADABLE"
+    return "NOT PUBLISHED"
 
 
 def source(name: str, text: str) -> None:
@@ -368,7 +381,7 @@ def module_page(
              "sentiment_regime", "breadth_research_state"],
         )),
         ("PIT", safe_value(row, ["point_in_time_safe", "pit_safe"])),
-        ("Source", "Published"),
+        ("Source", source_status(src)),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
@@ -419,6 +432,22 @@ def executive() -> None:
     for col, (label, value) in zip(cols, metrics):
         with col:
             card(label, value)
+
+    st.subheader("Publication & Freshness")
+    coverage = st.columns(4)
+    coverage_metrics = [
+        ("Research Context", latest_date(rc)),
+        ("Macro Context", latest_date(mc)),
+        ("Decision Engine", latest_date(dec)),
+        ("Final Validation", latest_date(load_named("Final Validation Summary")[0])),
+    ]
+    for col, (label, value) in zip(coverage, coverage_metrics):
+        with col:
+            card(label, value)
+    st.caption(
+        f"Sources: Research Context={source_status(rc_src)} • "
+        f"Macro Context={source_status(mc_src)} • Decision={source_status(dec_src)}"
+    )
 
     st.subheader("Research Scores")
     cols = st.columns(6)
@@ -850,6 +879,18 @@ def data_status() -> None:
 
     table(pd.DataFrame(rows), 650)
 
+    configured_files = set(DATASETS.values())
+    extra_published = sorted(published - configured_files)
+    if extra_published:
+        st.subheader("Published Artifacts Not Yet Mapped to a Named Module")
+        st.dataframe(
+            pd.DataFrame({"File": extra_published}),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.success("All artifacts in the current manifest are mapped to the terminal configuration.")
+
     manifest = get_manifest()
     cols = st.columns(4)
     metrics = [
@@ -990,7 +1031,7 @@ with st.sidebar:
     st.caption(f"Manifest datasets: {get_manifest().get('dataset_count', '—')}")
 
 st.markdown(
-    '<div class="hero"><h1>US500 Macro Intelligence — Research Terminal V6.1</h1>'
+    '<div class="hero"><h1>US500 Macro Intelligence — Research Terminal V6.2</h1>'
     '<p>Published research artifacts • point-in-time fields • transparent evidence</p>'
     '<span class="badge">RESEARCH ONLY</span>'
     '<span class="badge">TOKEN FREE</span>'
