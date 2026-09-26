@@ -739,10 +739,13 @@ jobs:
               if not path.is_file():
                   continue
 
-              if path.name in {
-                  "manifest.json",
-                  "README.md"
-              }:
+              if path.name == "README.md":
+                  continue
+
+              # Publication manifests are metadata, never published payloads.
+              if path.name == "manifest.json" or (
+                  path.suffix == ".json" and "manifest" in path.stem.lower()
+              ):
                   continue
 
               data = path.read_bytes()

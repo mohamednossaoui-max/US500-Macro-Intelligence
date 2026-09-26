@@ -593,8 +593,10 @@ jobs:
 
               *.csv|*.json)
 
+                # Publication manifests are owned by the dedicated
+                # publication workflow and are never copied from artifacts.
                 case "${BASENAME}" in
-                  public_data_manifest.json)
+                  *manifest*.json)
                     continue
                     ;;
                 esac
@@ -681,7 +683,6 @@ jobs:
           echo "Canonical publication manifest: public_data/manifest.json"
           echo "Manifest owner: publish_research_data_v1.yml"
           echo "This workflow does not generate or modify a publication manifest."
-          echo "Legacy public_data_manifest.json is retained temporarily only."
           if [ -f "public_data/manifest.json" ]; then
             echo "STATUS: canonical manifest detected."
           else
@@ -756,8 +757,6 @@ jobs:
           It contains published dataset names, file sizes, SHA-256 hashes,
           and publication metadata.
 
-          `public_data_manifest.json` is a legacy manifest retained
-          temporarily for backwards compatibility. It is not canonical.
           EOF
 
       # ============================================================
