@@ -39,6 +39,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from point_in_time import filter_available_as_of
+
 
 # ============================================================
 # INPUT FILES
@@ -168,9 +170,11 @@ def load_economic(as_of_date):
     # the macro context date.
     # --------------------------------------------------------
 
-    df = df[
-        df["release_date"] <= as_of_date
-    ].copy()
+    df = filter_available_as_of(
+        df,
+        as_of_date,
+        release_col="release_date",
+    )
 
     if df.empty:
         raise ValueError(

@@ -37,6 +37,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from point_in_time import validate_temporal_order
+
 
 INPUT_FILE = "economic_historical_events_v1.csv"
 OUTPUT_FILE = "economic_surprise_engine_v1.csv"
@@ -141,19 +143,16 @@ def finalize_gdp_release_types(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def point_in_time_safe(row: pd.Series) -> bool:
-    release = pd.to_datetime(row["release_date"], errors="coerce")
-    vintage = pd.to_datetime(row["vintage_date"], errors="coerce")
-
-    if pd.isna(release) or pd.isna(vintage):
+    """Fail closed unless the row satisfies the shared PR-04 PIT contract."""
+    if pd.isna(row.get("actual")):
         return False
 
-    if vintage > release:
-        return False
-
-    if pd.isna(row["actual"]):
-        return False
-
-    return True
+    return validate_temporal_order(
+        release_date=row.get("release_date"),
+        vintage_date=row.get("vintage_date"),
+        observation_date=row.get("observation_date"),
+        available_as_of=row.get("available_as_of"),
+    )
 
 
 def historical_consensus_available(row: pd.Series) -> bool:

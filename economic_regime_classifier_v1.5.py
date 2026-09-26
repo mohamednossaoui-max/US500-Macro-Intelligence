@@ -32,6 +32,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from point_in_time import filter_available_as_of
+
 
 INPUT_FILE = "economic_surprise_engine_v1.csv"
 OUTPUT_EVENTS = "economic_regime_events_v1.csv"
@@ -158,13 +160,17 @@ def normalize_surprise_schema(df: pd.DataFrame) -> pd.DataFrame:
 def latest_fresh_indicator_rows(df, snapshot_date, indicators):
     rows = []
 
+    # Central PR-04 guard: future releases/revisions are removed before any
+    # indicator selection. This preserves the existing classifier behaviour
+    # while making the anti-lookahead rule reusable and testable.
+    available = filter_available_as_of(df, snapshot_date)
+
     for indicator in indicators:
-        x = df[
-            (df["indicator"] == indicator)
-            & (df["release_date"] <= snapshot_date)
-            & (df["pit_safe"] == True)
-            & (df["directional_shock_z"].notna())
-            & (df.get("regime_eligible", True) == True)
+        x = available[
+            (available["indicator"] == indicator)
+            & (available["pit_safe"] == True)
+            & (available["directional_shock_z"].notna())
+            & (available.get("regime_eligible", True) == True)
         ].copy()
 
         if x.empty:
