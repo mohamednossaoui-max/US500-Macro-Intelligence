@@ -264,10 +264,6 @@
       "bytes": 347,
       "sha256": "5dbc6625fa6e2a7d830616d176dc20e3390835e3674793d5965feb4fb086fec1"
     },
-    "public_data_manifest.json": {
-      "bytes": 9688,
-      "sha256": "4a2a88905d8fdb60fb89fa87c3bbd5008328391034536d6559b151dc40445315"
-    },
     "research_context_extremes_v1.csv": {
       "bytes": 2559690,
       "sha256": "61e257955349b86ad300ea5a165b4e4045ea169204d9e918ebc86d2d9185796a"
