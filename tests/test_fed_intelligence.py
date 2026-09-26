@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+import fed_intelligence as fed
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _texts():
+    return {
+        "statement_text": "inflation remains elevated. policy remains restrictive.",
+        "minutes_text": "inflation remains elevated. higher for longer.",
+        "chair_text": "labor market softened. rate cuts may be appropriate.",
+    }
+
+
+def test_missing_minutes_are_excluded_and_weights_are_renormalized():
+    t = _texts()
+    out = fed.build_deep_fed_analysis(
+        statement_text=t["statement_text"],
+        minutes_text="",
+        chair_text=t["chair_text"],
+        sep_shift_data={},
+    )
+    w = out["document_weights"]
+    assert w["minutes"] == 0.0
+    assert w["statement"] == pytest.approx(0.35 / 0.60, abs=1e-6)
+    assert w["chair"] == pytest.approx(0.25 / 0.60, abs=1e-6)
+    assert sum(w.values()) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_all_documents_keep_35_40_25_weights():
+    out = fed.build_deep_fed_analysis(**_texts(), sep_shift_data={})
+    assert out["document_weights"] == {
+        "statement": 0.35,
+        "minutes": 0.4,
+        "chair": 0.25,
+    }
+
+
+def test_unavailable_minutes_do_not_act_as_fake_neutral_evidence():
+    t = _texts()
+    out = fed.build_deep_fed_analysis(
+        statement_text=t["statement_text"],
+        minutes_text="",
+        chair_text=t["chair_text"],
+        sep_shift_data={},
+    )
+    assert out["document_availability"]["minutes"] is False
+    for dimension in fed.DIMENSION_WEIGHTS:
+        expected = (
+            out["statement"][dimension]["score_100"] * (0.35 / 0.60)
+            + out["chair"][dimension]["score_100"] * (0.25 / 0.60)
+        )
+        assert out["combined"][dimension]["score_100"] == pytest.approx(expected, abs=0.11)
+
+
+def test_no_communication_documents_means_no_fed_score():
+    out = fed.build_deep_fed_analysis("", "", "", {})
+    assert out["fed_score"]["score"] is None
+    assert out["fed_score"]["classification"] == "UNAVAILABLE"
+    assert all(weight == 0 for weight in out["document_weights"].values())
+
+
+def test_sep_shift_remains_directional_adjustment_only():
+    out = fed.build_deep_fed_analysis(
+        **_texts(),
+        sep_shift_data={"classification": "HAWKISH SHIFT"},
+    )
+    assert out["fed_score"]["sep_adjustment"] == 5.0
+    assert "not a probability" in out["method"].lower()
+
+
+def test_backward_compatible_powell_keys_are_preserved_in_engine_contract():
+    source = (ROOT / "fed_intelligence.py").read_text(encoding="utf-8")
+    assert '"chair_press"' in source
+    assert '"powell"' in source
+    assert '"powell_page"' in source
+    assert '"powell_pdf"' in source
+
+
+def test_fed_ui_exposes_required_report_sections():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    required = [
+        'st.subheader("FOMC Communication")',
+        'st.subheader("SEP — Current vs Previous")',
+        'st.subheader("Fed Synthesis by Dimension")',
+        'st.subheader("Beige Book")',
+        '"Not yet published / unavailable"',
+    ]
+    for marker in required:
+        assert marker in source
