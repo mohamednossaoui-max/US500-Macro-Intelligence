@@ -32,7 +32,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests beautifulsoup4 pypdf lxml
+          pip install pandas requests beautifulsoup4 pypdf lxml pytest
+
+      # ------------------------------------------------------
+      # PR-05 availability-aware Fed scoring tests
+      # ------------------------------------------------------
+      - name: Run PR-05 Fed Intelligence tests
+        run: |
+          python -m pytest -q tests/test_fed_intelligence.py
 
       # ------------------------------------------------------
       # Run existing Fed Intelligence engine
