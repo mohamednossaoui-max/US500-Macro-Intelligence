@@ -1,36 +1,723 @@
 name: Publication Integrity Check
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   publication-integrity:
+    name: Publication Integrity
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ============================================================
+      # 2. SET UP PYTHON
+      # ============================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run Publication Integrity verifier
-        run: python scripts/verify_publication_integrity.py
-      - name: Verify Canonical Manifest
+
+
+      # ============================================================
+      # 3. SHOW ENVIRONMENT
+      # ============================================================
+
+      - name: Show environment
+        shell: bash
         run: |
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "PUBLICATION INTEGRITY ENVIRONMENT"
+          echo "=========================================="
+          echo ""
+
+          echo "Python:"
+          python --version
+
+          echo ""
+          echo "Repository:"
+          pwd
+
+          echo ""
+          echo "Branch:"
+          echo "${GITHUB_REF_NAME}"
+
+          echo ""
+          echo "Commit:"
+          echo "${GITHUB_SHA}"
+
+          echo ""
+          echo "Manifest files currently present:"
+
+          find public_data \
+            -maxdepth 1 \
+            -type f \
+            -name "*manifest*.json" \
+            -print \
+            | sort || true
+
+
+      # ============================================================
+      # 4. VERIFY LEGACY MANIFEST IS RETIRED
+      # ============================================================
+
+      - name: Verify Legacy Manifest Retirement
+        shell: bash
+        run: |
+          set -euo pipefail
+
           python - <<'PY'
-          import hashlib,json
           from pathlib import Path
-          root=Path("public_data"); m=json.loads((root/"manifest.json").read_text()); files=m.get("files")
-          if not isinstance(files,dict) or not files: raise SystemExit("FAIL: invalid canonical manifest")
-          failures=[]
-          for fn,md in sorted(files.items()):
-              p=root/fn
-              if not p.is_file(): failures.append(f"MISSING: {fn}"); continue
-              if hashlib.sha256(p.read_bytes()).hexdigest()!=md.get("sha256"): failures.append(f"SHA256 MISMATCH: {fn}")
-              if p.stat().st_size!=md.get("bytes"): failures.append(f"SIZE MISMATCH: {fn}")
-          if failures:
-              print("\n".join(failures)); raise SystemExit(1)
-          print(f"CANONICAL MANIFEST PASSED\nVerified files: {len(files)}")
+
+
+          legacy = Path(
+              "public_data/public_data_manifest.json"
+          )
+
+
+          print(
+              "=========================================="
+          )
+          print(
+              "LEGACY MANIFEST RETIREMENT"
+          )
+          print(
+              "=========================================="
+          )
+          print("")
+
+
+          if legacy.exists():
+
+              print(
+                  "FAIL: legacy manifest still exists:"
+              )
+              print(
+                  "  public_data/public_data_manifest.json"
+              )
+              print("")
+              print(
+                  "PR-03 requires this file to be removed."
+              )
+
+              raise SystemExit(1)
+
+
+          print(
+              "PASS: legacy public_data_manifest.json "
+              "is retired"
+          )
           PY
-      - name: Run Publication Integrity tests
+
+
+      # ============================================================
+      # 5. RUN PUBLICATION INTEGRITY VERIFIER
+      # ============================================================
+
+      - name: Run Publication Integrity verifier
+        shell: bash
         run: |
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "PUBLICATION INTEGRITY VERIFICATION"
+          echo "=========================================="
+          echo ""
+
+          python scripts/verify_publication_integrity.py
+
+
+      # ============================================================
+      # 6. VERIFY CANONICAL MANIFEST
+      #
+      # manifest.json is the ONLY canonical publication manifest.
+      #
+      # This gate verifies:
+      #
+      #   - legacy manifest does not exist
+      #   - canonical manifest exists
+      #   - canonical JSON is valid
+      #   - files mapping exists
+      #   - every published artifact exists
+      #   - every byte size matches
+      #   - every SHA-256 matches
+      #
+      # Any failure blocks the workflow.
+      # ============================================================
+
+      - name: Verify Canonical Manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+
+          root = Path("public_data")
+
+          canonical = root / "manifest.json"
+
+          legacy = (
+              root
+              / "public_data_manifest.json"
+          )
+
+
+          print(
+              "=========================================="
+          )
+          print(
+              "PR-03 CANONICAL MANIFEST VERIFICATION"
+          )
+          print(
+              "=========================================="
+          )
+          print("")
+
+
+          # --------------------------------------------------------
+          # LEGACY MANIFEST MUST NOT EXIST
+          # --------------------------------------------------------
+
+          if legacy.exists():
+
+              print(
+                  "FAIL: legacy manifest still exists:"
+              )
+
+              print(
+                  "  public_data/"
+                  "public_data_manifest.json"
+              )
+
+              raise SystemExit(1)
+
+
+          print(
+              "PASS: legacy "
+              "public_data_manifest.json "
+              "is retired"
+          )
+
+
+          # --------------------------------------------------------
+          # CANONICAL MANIFEST MUST EXIST
+          # --------------------------------------------------------
+
+          if not canonical.is_file():
+
+              print(
+                  "FAIL: canonical manifest is missing:"
+              )
+
+              print(
+                  "  public_data/manifest.json"
+              )
+
+              raise SystemExit(1)
+
+
+          print(
+              "PASS: canonical manifest.json exists"
+          )
+
+
+          # --------------------------------------------------------
+          # LOAD CANONICAL MANIFEST
+          # --------------------------------------------------------
+
+          try:
+
+              manifest = json.loads(
+                  canonical.read_text(
+                      encoding="utf-8"
+                  )
+              )
+
+          except (
+              OSError,
+              UnicodeDecodeError,
+              json.JSONDecodeError,
+          ) as exc:
+
+              print("")
+              print(
+                  "FAIL: unable to read "
+                  "canonical manifest"
+              )
+
+              print(
+                  f"Reason: {exc}"
+              )
+
+              raise SystemExit(1)
+
+
+          if not isinstance(
+              manifest,
+              dict,
+          ):
+
+              print("")
+              print(
+                  "FAIL: manifest.json must "
+                  "contain a JSON object"
+              )
+
+              raise SystemExit(1)
+
+
+          # --------------------------------------------------------
+          # VALIDATE FILES MAPPING
+          # --------------------------------------------------------
+
+          files = manifest.get(
+              "files"
+          )
+
+
+          if not isinstance(
+              files,
+              dict,
+          ):
+
+              print("")
+              print(
+                  "FAIL: manifest.json has no "
+                  "valid 'files' mapping"
+              )
+
+              raise SystemExit(1)
+
+
+          if not files:
+
+              print("")
+              print(
+                  "FAIL: manifest.json contains "
+                  "no published files"
+              )
+
+              raise SystemExit(1)
+
+
+          print(
+              f"PASS: manifest contains "
+              f"{len(files)} file entries"
+          )
+
+
+          # --------------------------------------------------------
+          # VERIFY ARTIFACTS
+          # --------------------------------------------------------
+
+          failures = []
+
+          verified = 0
+
+
+          for filename, metadata in sorted(
+              files.items()
+          ):
+
+              # ----------------------------------------------------
+              # Validate filename
+              # ----------------------------------------------------
+
+              if not isinstance(
+                  filename,
+                  str,
+              ):
+
+                  failures.append(
+                      "INVALID FILE NAME"
+                  )
+
+                  continue
+
+
+              # ----------------------------------------------------
+              # Validate metadata
+              # ----------------------------------------------------
+
+              if not isinstance(
+                  metadata,
+                  dict,
+              ):
+
+                  failures.append(
+                      f"INVALID METADATA: "
+                      f"{filename}"
+                  )
+
+                  continue
+
+
+              path = (
+                  root
+                  / filename
+              )
+
+
+              # ----------------------------------------------------
+              # File must exist
+              # ----------------------------------------------------
+
+              if not path.is_file():
+
+                  failures.append(
+                      f"MISSING: {filename}"
+                  )
+
+                  continue
+
+
+              expected_sha256 = (
+                  metadata.get(
+                      "sha256"
+                  )
+              )
+
+              expected_bytes = (
+                  metadata.get(
+                      "bytes"
+                  )
+              )
+
+
+              # ----------------------------------------------------
+              # SHA metadata must be valid
+              # ----------------------------------------------------
+
+              if not isinstance(
+                  expected_sha256,
+                  str,
+              ):
+
+                  failures.append(
+                      f"INVALID SHA256 METADATA: "
+                      f"{filename}"
+                  )
+
+                  continue
+
+
+              if len(
+                  expected_sha256
+              ) != 64:
+
+                  failures.append(
+                      f"INVALID SHA256 LENGTH: "
+                      f"{filename}"
+                  )
+
+                  continue
+
+
+              # ----------------------------------------------------
+              # Byte metadata must be valid
+              # ----------------------------------------------------
+
+              if not isinstance(
+                  expected_bytes,
+                  int,
+              ):
+
+                  failures.append(
+                      f"INVALID SIZE METADATA: "
+                      f"{filename}"
+                  )
+
+                  continue
+
+
+              # ----------------------------------------------------
+              # Calculate SHA-256
+              # ----------------------------------------------------
+
+              digest = (
+                  hashlib.sha256()
+              )
+
+
+              try:
+
+                  with path.open(
+                      "rb"
+                  ) as handle:
+
+                      for chunk in iter(
+                          lambda: handle.read(
+                              1024 * 1024
+                          ),
+                          b"",
+                      ):
+
+                          digest.update(
+                              chunk
+                          )
+
+              except OSError as exc:
+
+                  failures.append(
+                      f"READ ERROR: "
+                      f"{filename}: {exc}"
+                  )
+
+                  continue
+
+
+              actual_sha256 = (
+                  digest.hexdigest()
+              )
+
+              actual_bytes = (
+                  path.stat().st_size
+              )
+
+
+              # ----------------------------------------------------
+              # Compare SHA
+              # ----------------------------------------------------
+
+              if (
+                  actual_sha256
+                  != expected_sha256
+              ):
+
+                  failures.append(
+                      f"SHA256 MISMATCH: "
+                      f"{filename}"
+                  )
+
+
+              # ----------------------------------------------------
+              # Compare byte size
+              # ----------------------------------------------------
+
+              if (
+                  actual_bytes
+                  != expected_bytes
+              ):
+
+                  failures.append(
+                      f"SIZE MISMATCH: "
+                      f"{filename} "
+                      f"(expected="
+                      f"{expected_bytes}, "
+                      f"actual="
+                      f"{actual_bytes})"
+                  )
+
+
+              if (
+                  actual_sha256
+                  == expected_sha256
+                  and
+                  actual_bytes
+                  == expected_bytes
+              ):
+
+                  verified += 1
+
+
+          # --------------------------------------------------------
+          # FINAL RESULT
+          # --------------------------------------------------------
+
+          print("")
+          print(
+              "=========================================="
+          )
+
+
+          if failures:
+
+              print(
+                  "CANONICAL MANIFEST FAILED"
+              )
+
+              print(
+                  "=========================================="
+              )
+
+              print("")
+
+
+              for failure in failures:
+
+                  print(
+                      f"  - {failure}"
+                  )
+
+
+              print("")
+              print(
+                  f"Failures: "
+                  f"{len(failures)}"
+              )
+
+              print(
+                  f"Successfully verified: "
+                  f"{verified}"
+              )
+
+              raise SystemExit(1)
+
+
+          print(
+              "CANONICAL MANIFEST PASSED"
+          )
+
+          print(
+              "=========================================="
+          )
+
+          print(
+              f"Verified files: "
+              f"{verified}"
+          )
+
+          print(
+              "SHA-256 mismatches: 0"
+          )
+
+          print(
+              "Size mismatches: 0"
+          )
+
+          print(
+              "Missing files: 0"
+          )
+
+          print(
+              "Legacy manifests: 0"
+          )
+
+          print("")
+          print(
+              "Canonical source:"
+          )
+
+          print(
+              "  public_data/manifest.json"
+          )
+
+          PY
+
+
+      # ============================================================
+      # 7. INSTALL PYTEST
+      # ============================================================
+
+      - name: Install test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
           python -m pip install pytest
-          python -m pytest -q tests/test_publication_integrity.py
+
+
+      # ============================================================
+      # 8. RUN PUBLICATION INTEGRITY TESTS
+      # ============================================================
+
+      - name: Run Publication Integrity tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "PUBLICATION INTEGRITY TESTS"
+          echo "=========================================="
+          echo ""
+
+          python -m pytest \
+            -q \
+            tests/test_publication_integrity.py
+
+
+      # ============================================================
+      # 9. VERIFY WORKFLOWS DO NOT RECREATE LEGACY MANIFEST
+      # ============================================================
+
+      - name: Verify workflows do not recreate legacy manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "LEGACY MANIFEST WORKFLOW CHECK"
+          echo "=========================================="
+          echo ""
+
+          matches="$(
+            grep -RIn \
+              --include="*.yml" \
+              --include="*.yaml" \
+              "public_data_manifest.json" \
+              .github/workflows \
+              | grep -v \
+                "publication-integrity-check.yml" \
+              || true
+          )"
+
+          if [ -n "$matches" ]; then
+
+            echo "FAIL:"
+            echo ""
+            echo "A workflow still references:"
+            echo "public_data_manifest.json"
+            echo ""
+            echo "$matches"
+
+            exit 1
+
+          fi
+
+          echo \
+            "PASS: no production workflow references the legacy manifest"
+
+
+      # ============================================================
+      # 10. COMPLETE
+      # ============================================================
+
+      - name: Complete job
+        if: success()
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "PUBLICATION INTEGRITY PASSED"
+          echo "=========================================="
+          echo ""
+          echo "PR-03 validation completed successfully."
+          echo ""
+          echo "Canonical manifest:"
+          echo "  public_data/manifest.json"
+          echo ""
+          echo "Legacy manifest:"
+          echo "  RETIRED"
+          echo ""
+          echo "Publication artifacts:"
+          echo "  SHA-256 verified"
+          echo "  Byte sizes verified"
+          echo ""
+          echo "No production data was modified."
