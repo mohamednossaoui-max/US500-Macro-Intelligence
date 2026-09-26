@@ -588,17 +588,139 @@ def fed() -> None:
     st.header("Fed Intelligence")
     obj, src = load_named("Fed Intelligence")
 
-    if not isinstance(obj, dict):
-        st.warning("Fed Intelligence is not published.")
+    if not isinstance(obj, dict) or not obj.get("available", False):
+        st.warning("Fed Intelligence is not published or is currently unavailable.")
+        source("Fed Intelligence", src)
         return
 
-    rows = []
-    for key, value in obj.items():
-        if isinstance(value, (str, int, float, bool)) or value is None:
-            rows.append({"Field": key, "Value": fmt(value)})
+    st.caption(
+        "Research-only interpretation of official Federal Reserve communications. "
+        "Scores are analytical indicators, not probabilities or trading signals."
+    )
 
-    if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    header_cols = st.columns(3)
+    header_values = [
+        ("As of", obj.get("as_of_date")),
+        ("Latest FOMC", obj.get("latest_fomc")),
+        ("Fed Chair", obj.get("fed_chair")),
+    ]
+    for col, (label, value) in zip(header_cols, header_values):
+        with col:
+            card(label, value)
+
+    fed_score = obj.get("fed_score") if isinstance(obj.get("fed_score"), dict) else {}
+    sep_shift = obj.get("sep_shift") if isinstance(obj.get("sep_shift"), dict) else {}
+    score_cols = st.columns(4)
+    score_values = [
+        ("Fed Policy Score", fed_score.get("score")),
+        ("Classification", fed_score.get("classification")),
+        ("Base Score", fed_score.get("base_score")),
+        ("SEP Direction", sep_shift.get("classification", "Not available")),
+    ]
+    for col, (label, value) in zip(score_cols, score_values):
+        with col:
+            card(label, value)
+
+    phase = obj.get("phase_2b") if isinstance(obj.get("phase_2b"), dict) else {}
+    weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
+
+    st.subheader("FOMC Communication")
+    communication = [
+        ("Statement", obj.get("statement"), obj.get("statement_source"), weights.get("statement")),
+        ("Minutes", obj.get("minutes"), obj.get("minutes_source"), weights.get("minutes")),
+        ("Press Conference", obj.get("chair_press"), obj.get("chair_page") or obj.get("chair_pdf"), weights.get("chair")),
+    ]
+    cols = st.columns(3)
+    for col, (label, payload, url, weight) in zip(cols, communication):
+        payload = payload if isinstance(payload, dict) else {}
+        available = bool(payload.get("available"))
+        with col:
+            status = "Available" if available else "Not yet published / unavailable"
+            note = f"Effective score weight: {weight * 100:.1f}%" if isinstance(weight, (int, float)) and weight > 0 else "Excluded from score"
+            card(label, status, note)
+            st.caption(f"Tone: {fmt(payload.get('tone'))}")
+            if url:
+                st.markdown(f"[Official source]({url})")
+
+    st.subheader("SEP — Current vs Previous")
+    current = obj.get("sep_current") if isinstance(obj.get("sep_current"), dict) else {}
+    previous = obj.get("sep_previous") if isinstance(obj.get("sep_previous"), dict) else {}
+    fields = sep_shift.get("fields") if isinstance(sep_shift.get("fields"), dict) else {}
+    labels = {
+        "gdp": "GDP",
+        "unemployment": "Unemployment",
+        "pce": "PCE",
+        "core_pce": "Core PCE",
+        "fed_funds": "Fed Funds",
+    }
+    sep_rows = []
+    for key, label in labels.items():
+        detail = fields.get(key) if isinstance(fields.get(key), dict) else {}
+        sep_rows.append({
+            "Projection": label,
+            "Current": detail.get("current", current.get(key)),
+            "Previous": detail.get("previous", previous.get(key)),
+            "Change": detail.get("change"),
+        })
+    st.dataframe(pd.DataFrame(sep_rows), use_container_width=True, hide_index=True)
+    st.caption(
+        f"Current SEP: {fmt(obj.get('latest_sep_date'))} • "
+        f"Previous SEP: {fmt(obj.get('previous_sep_date'))} • "
+        f"Directional shift: {fmt(sep_shift.get('classification'))}. "
+        "SEP is a directional comparison of participant projections, not a policy probability."
+    )
+
+    combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
+    if combined:
+        st.subheader("Fed Synthesis by Dimension")
+        dimension_rows = []
+        for name, data in combined.items():
+            if not isinstance(data, dict):
+                continue
+            dimension_rows.append({
+                "Dimension": str(name).replace("_", " ").title(),
+                "Score": data.get("score_100"),
+                "Classification": data.get("classification"),
+            })
+        if dimension_rows:
+            st.dataframe(pd.DataFrame(dimension_rows), use_container_width=True, hide_index=True)
+        reasons = phase.get("reasons")
+        if isinstance(reasons, list) and reasons:
+            with st.expander("Fed synthesis evidence"):
+                for reason in reasons:
+                    st.write(reason)
+
+    st.subheader("Beige Book")
+    beige = obj.get("beige_book") if isinstance(obj.get("beige_book"), dict) else {}
+    beige_analysis = obj.get("beige_analysis") if isinstance(obj.get("beige_analysis"), dict) else {}
+    if not beige.get("available"):
+        st.info("Beige Book is not available for the current as-of date.")
+    else:
+        beige_cols = st.columns(4)
+        beige_values = [
+            ("Issue", beige.get("issue_date")),
+            ("Published", beige.get("publication_date")),
+            ("Tone", beige_analysis.get("tone")),
+            ("Analytical Score", beige_analysis.get("score")),
+        ]
+        for col, (label, value) in zip(beige_cols, beige_values):
+            with col:
+                card(label, value)
+        dimensions = beige_analysis.get("dimensions")
+        if isinstance(dimensions, dict) and dimensions:
+            rows = []
+            for name, data in dimensions.items():
+                if isinstance(data, dict):
+                    rows.append({
+                        "Dimension": str(name).replace("_", " ").title(),
+                        "Score": data.get("score_100"),
+                        "Classification": data.get("classification"),
+                    })
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        if beige.get("url"):
+            st.markdown(f"[Official Beige Book source]({beige.get('url')})")
+        st.caption("Beige Book is economic context/confirmation and is not included directly in the Fed Policy Score.")
 
     with st.expander("Complete Fed JSON"):
         st.json(obj)

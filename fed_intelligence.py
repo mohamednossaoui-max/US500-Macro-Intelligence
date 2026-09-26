@@ -1018,90 +1018,115 @@ def build_deep_fed_analysis(
     sep_shift_data: Optional[Dict]
 ) -> Dict:
 
-    statement_dimensions = {}
-    minutes_dimensions = {}
-    chair_dimensions = {}
+    document_texts = {
+        "statement": statement_text or "",
+        "minutes": minutes_text or "",
+        "chair": chair_text or "",
+    }
+    base_weights = {
+        "statement": 0.35,
+        "minutes": 0.40,
+        "chair": 0.25,
+    }
+    available = {
+        name: bool(text.strip())
+        for name, text in document_texts.items()
+    }
+    available_weight = sum(
+        weight for name, weight in base_weights.items()
+        if available[name]
+    )
+    effective_weights = {
+        name: (
+            round(weight / available_weight, 6)
+            if available[name] and available_weight > 0
+            else 0.0
+        )
+        for name, weight in base_weights.items()
+    }
+
+    document_dimensions = {
+        "statement": {},
+        "minutes": {},
+        "chair": {},
+    }
 
     for dimension in DIMENSION_WEIGHTS:
-
-        s = dimension_signal(
-            statement_text,
-            dimension
-        )
-
-        m = dimension_signal(
-            minutes_text,
-            dimension
-        )
-
-        c = dimension_signal(
-            chair_text,
-            dimension
-        )
-
-        statement_dimensions[dimension] = {
-            **s,
-            "score_100": dimension_to_100(s)
-        }
-
-        minutes_dimensions[dimension] = {
-            **m,
-            "score_100": dimension_to_100(m)
-        }
-
-        chair_dimensions[dimension] = {
-            **c,
-            "score_100": dimension_to_100(c)
-        }
+        for name, text in document_texts.items():
+            signal = dimension_signal(text, dimension)
+            document_dimensions[name][dimension] = {
+                **signal,
+                "score_100": dimension_to_100(signal)
+            }
 
     combined = {}
-
     for dimension in DIMENSION_WEIGHTS:
-
-        s = statement_dimensions[dimension]["score_100"]
-        m = minutes_dimensions[dimension]["score_100"]
-        c = chair_dimensions[dimension]["score_100"]
-
-        combined_score = (
-            s * 0.35
-            + m * 0.40
-            + c * 0.25
-        )
+        if available_weight == 0:
+            combined_score = 50.0
+            classification = "UNAVAILABLE"
+        else:
+            combined_score = sum(
+                document_dimensions[name][dimension]["score_100"]
+                * effective_weights[name]
+                for name in document_texts
+            )
+            if combined_score >= 70:
+                classification = "HAWKISH"
+            elif combined_score >= 55:
+                classification = "MODERATELY HAWKISH"
+            elif combined_score <= 30:
+                classification = "DOVISH"
+            elif combined_score <= 45:
+                classification = "MODERATELY DOVISH"
+            else:
+                classification = "NEUTRAL"
 
         combined[dimension] = {
-            "score_100": round(
-                combined_score,
-                1
-            ),
-            "statement": statement_dimensions[dimension],
-            "minutes": minutes_dimensions[dimension],
-            "chair": chair_dimensions[dimension]
+            "score_100": round(combined_score, 1),
+            "classification": classification,
+            "statement": document_dimensions["statement"][dimension],
+            "minutes": document_dimensions["minutes"][dimension],
+            "chair": document_dimensions["chair"][dimension],
         }
 
     dimensions_for_score = {
-        k: {
-            "score_100": v["score_100"]
-        }
+        k: {"score_100": v["score_100"]}
         for k, v in combined.items()
     }
 
-    fed_score = calculate_fed_score(
-        dimensions_for_score,
-        sep_shift_data
-    )
-
-    reasons = build_evidence(
-        dimensions_for_score,
-        sep_shift_data
-    )
+    if available_weight == 0:
+        fed_score = {
+            "score": None,
+            "base_score": None,
+            "sep_adjustment": 0.0,
+            "classification": "UNAVAILABLE",
+        }
+        reasons = ["- No FOMC communication document is available for scoring."]
+    else:
+        fed_score = calculate_fed_score(
+            dimensions_for_score,
+            sep_shift_data
+        )
+        reasons = build_evidence(
+            dimensions_for_score,
+            sep_shift_data
+        )
 
     return {
-        "statement": statement_dimensions,
-        "minutes": minutes_dimensions,
-        "chair": chair_dimensions,
+        "document_availability": available,
+        "document_weights": effective_weights,
+        "statement": document_dimensions["statement"],
+        "minutes": document_dimensions["minutes"],
+        "chair": document_dimensions["chair"],
         "combined": combined,
         "fed_score": fed_score,
-        "reasons": reasons
+        "reasons": reasons,
+        "method": (
+            "Statement/Minutes/Chair weights are 35/40/25 when all are "
+            "available. Missing documents are excluded and the remaining "
+            "weights are renormalized. SEP is a directional adjustment, "
+            "not a probability or trading signal."
+        ),
     }
 
 
@@ -1787,6 +1812,21 @@ def build_fed_intelligence() -> Dict:
         "powell_page": press["page_url"],
 
         "powell_pdf": press["pdf_url"],
+
+        "document_status": {
+            "statement": {
+                "available": bool(statement_text.strip()),
+                "source": statement_url or None,
+            },
+            "minutes": {
+                "available": bool(minutes_text.strip()),
+                "source": minutes_url or None,
+            },
+            "chair_press": {
+                "available": bool(press.get("text", "").strip()),
+                "source": press.get("page_url") or press.get("pdf_url") or None,
+            },
+        },
 
         # ----------------------------------------------------
         # SEP
