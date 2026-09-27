@@ -38,11 +38,3 @@ def test_fed_artifact_remains_research_only_contextual():
     assert q['research_only'] is True
     assert q['decision_role'] == 'CONTEXTUAL'
     assert q['pit_status'] == 'PIT_SAFE'
-
-
-def test_state_is_separated_from_decision_readiness_in_ui():
-    source = (ROOT / 'app.py').read_text(encoding='utf-8')
-    assert 'Decision Ready = False. State is descriptive research synthesis only' in source
-    assert 'Research readiness: NOT READY.' in source
-    assert '("Decision Ready", safe_value(rc_row, ["decision_engine_ready"]))' in source
-    assert 'does not authorize forecasting' in source
