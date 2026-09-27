@@ -352,18 +352,6 @@ def card(label: str, value: Any, note: str = "") -> None:
     dynamic_card(label, fmt(value), note)
 
 
-def dark_dataframe(df: pd.DataFrame, *, height: int = 380, hide_index: bool = True) -> None:
-    # st.dataframe is canvas-rendered and may stay white despite CSS in some
-    # Streamlit/browser combinations. Render a native HTML research table so
-    # the institutional dark palette is deterministic across every module.
-    safe = df.copy()
-    html = safe.to_html(index=not hide_index, escape=True, border=0, classes="v3-data-table")
-    st.markdown(
-        f'<div class="v3-table-wrap" style="max-height:{int(height)}px">{html}</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def table(df: Optional[pd.DataFrame], height: int = 380) -> None:
     if df is None:
         st.info("Artifact is not published or could not be loaded.")
@@ -371,7 +359,7 @@ def table(df: Optional[pd.DataFrame], height: int = 380) -> None:
     if df.empty:
         st.info("Artifact is published but contains no rows.")
         return
-    dark_dataframe(df, height=height, hide_index=True)
+    st.dataframe(df, use_container_width=True, height=height, hide_index=True)
 
 
 def source_status(text: str) -> str:
@@ -1117,7 +1105,7 @@ def fed() -> None:
             "Current tone": current_doc.get("tone", "UNAVAILABLE"), "Previous tone": previous_doc.get("tone", "UNAVAILABLE"),
             "Change": comp.get("classification", "UNAVAILABLE"),
         })
-    dark_dataframe(pd.DataFrame(comparison_rows), height=420, hide_index=True)
+    st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
     st.caption("Unavailable or not-yet-published reports remain unavailable; they are never converted into neutral evidence.")
 
     # --- Synthesis ------------------------------------------------------
@@ -1200,7 +1188,7 @@ def fed() -> None:
                 "Projection": label, "Previous": detail.get("previous", previous.get(key)),
                 "Current": detail.get("current", current.get(key)), "Change": detail.get("change"),
             })
-        dark_dataframe(pd.DataFrame(sep_rows), height=420, hide_index=True)
+        st.dataframe(pd.DataFrame(sep_rows), use_container_width=True, hide_index=True)
 
     with st.expander("Complete Fed JSON"):
         st.json(obj)
@@ -1605,7 +1593,11 @@ def data_status() -> None:
     extra_published = sorted(published - configured_files)
     if extra_published:
         st.subheader("Published Artifacts Not Yet Mapped to a Named Module")
-        dark_dataframe(pd.DataFrame({"File": extra_published}), height=420, hide_index=True)
+        st.dataframe(
+            pd.DataFrame({"File": extra_published}),
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
         st.success("All artifacts in the current manifest are mapped to the terminal configuration.")
 
