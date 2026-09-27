@@ -42,21 +42,45 @@ OUTPUT_SUMMARY = "economic_regime_summary_v1.csv"
 DIMENSION_MAP = {
     "CPI": "INFLATION",
     "CORE_CPI": "INFLATION",
+    "PPI_FINAL_DEMAND": "INFLATION",
+    "CORE_PPI": "INFLATION",
+    "PCE_PRICE_INDEX": "INFLATION",
+    "CORE_PCE": "INFLATION",
     "NFP": "LABOR",
     "UNEMPLOYMENT_RATE": "LABOR",
     "INITIAL_JOBLESS_CLAIMS": "LABOR",
+    "AVERAGE_HOURLY_EARNINGS": "LABOR",
     "ISM_MANUFACTURING_PMI": "GROWTH",
+    "ISM_SERVICES_PMI": "GROWTH",
     "GDP": "GROWTH",
+    "RETAIL_SALES": "GROWTH",
+    "RETAIL_SALES_EX_AUTOS": "GROWTH",
+}
+
+# Closely related measures are first averaged into a family. Families are then
+# equally weighted inside a dimension. This prevents a dimension/family from
+# gaining mechanical influence merely because more variants are published.
+INDICATOR_FAMILY = {
+    "CPI": "CPI", "CORE_CPI": "CPI",
+    "PPI_FINAL_DEMAND": "PPI", "CORE_PPI": "PPI",
+    "PCE_PRICE_INDEX": "PCE", "CORE_PCE": "PCE",
+    "NFP": "EMPLOYMENT",
+    "UNEMPLOYMENT_RATE": "UNEMPLOYMENT",
+    "INITIAL_JOBLESS_CLAIMS": "CLAIMS",
+    "AVERAGE_HOURLY_EARNINGS": "WAGES",
+    "ISM_MANUFACTURING_PMI": "ISM", "ISM_SERVICES_PMI": "ISM",
+    "GDP": "GDP",
+    "RETAIL_SALES": "RETAIL", "RETAIL_SALES_EX_AUTOS": "RETAIL",
 }
 
 FRESHNESS_DAYS = {
-    "CPI": 45,
-    "CORE_CPI": 45,
-    "NFP": 45,
-    "UNEMPLOYMENT_RATE": 45,
-    "INITIAL_JOBLESS_CLAIMS": 21,
-    "ISM_MANUFACTURING_PMI": 45,
-    "GDP": 120,
+    "CPI": 45, "CORE_CPI": 45,
+    "PPI_FINAL_DEMAND": 45, "CORE_PPI": 45,
+    "PCE_PRICE_INDEX": 50, "CORE_PCE": 50,
+    "NFP": 45, "UNEMPLOYMENT_RATE": 45,
+    "INITIAL_JOBLESS_CLAIMS": 21, "AVERAGE_HOURLY_EARNINGS": 45,
+    "ISM_MANUFACTURING_PMI": 45, "ISM_SERVICES_PMI": 45,
+    "GDP": 120, "RETAIL_SALES": 45, "RETAIL_SALES_EX_AUTOS": 45,
 }
 
 MIN_LABOR_INDICATORS = 2
@@ -219,7 +243,12 @@ def build_dimension(df, snapshot_date, dimension):
             "method": "INSUFFICIENT_FRESH_ZSCORES",
         }
 
-    score = float(np.mean([x["z"] for x in selected]))
+    families = {}
+    for item in selected:
+        family = INDICATOR_FAMILY[item["indicator"]]
+        families.setdefault(family, []).append(item["z"])
+    family_scores = [float(np.mean(values)) for values in families.values()]
+    score = float(np.mean(family_scores))
     latest_date = max(x["release_date"] for x in selected)
     age = (snapshot_date - latest_date).days
 
@@ -231,7 +260,7 @@ def build_dimension(df, snapshot_date, dimension):
         "indicators": "|".join(x["indicator"] for x in selected),
         "zscore_count": len(selected),
         "raw_shock_count": 0,
-        "method": "EQUAL_WEIGHT_FRESH_ZSCORES",
+        "method": "FAMILY_BALANCED_FRESH_ZSCORES",
     }
 
 

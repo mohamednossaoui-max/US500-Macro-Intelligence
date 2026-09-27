@@ -93,12 +93,12 @@
       "sha256": "582c6dd571e4a928b2d45f1870c317575f38fcd7b0f2efa648d94fe290ea661f"
     },
     "economic_regime_events_v1.csv": {
-      "bytes": 100203,
-      "sha256": "f7696faa65675222343bd53c7a3adf263b019e676c1b0de85d1cfc0b90d20758"
+      "bytes": 104233,
+      "sha256": "a684b86341c8b1eca4205771492a51ce5df13690642c43a073cc0d062d259ce6"
     },
     "economic_regime_summary_v1.csv": {
       "bytes": 284,
-      "sha256": "34590c1cf4bd18f380757921b5767582f0b6a7bb304bddf58b9a302bcbbfb180"
+      "sha256": "bf8b3587fe55933656efc0a2fc4ae2af736270f72de794b9f1535a4238965eee"
     },
     "economic_surprise_engine_v1.csv": {
       "bytes": 205728,

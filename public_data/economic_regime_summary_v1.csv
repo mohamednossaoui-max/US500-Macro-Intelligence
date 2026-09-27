@@ -1,6 +1,6 @@
 economic_regime,observations,research_only,decision_engine_ready
-MIXED,212,True,False
-PARTIAL_DATA,35,True,False
+MIXED,213,True,False
+PARTIAL_DATA,39,True,False
 INSUFFICIENT_DATA,32,True,False
 STAGFLATIONARY,25,True,False
 DISINFLATIONARY_SLOWDOWN,21,True,False
