@@ -106,3 +106,43 @@ def test_fed_ui_does_not_mislabel_legacy_available_evidence_as_excluded():
     assert "explicit_weight" in source
     assert "explicit_availability" in source
 
+
+
+def test_document_comparison_never_invents_missing_previous_evidence():
+    current = fed.analyze("Current", "inflation remains elevated. policy remains restrictive.")
+    out = fed.compare_document_analysis(current, fed.analyze("Previous", ""))
+    assert out["available"] is False
+    assert out["classification"] == "UNAVAILABLE"
+    assert out["tone_score_change"] is None
+
+
+def test_document_comparison_reports_directional_change():
+    previous = fed.analyze("Previous", "rate cuts. lower rates. easing policy.")
+    current = fed.analyze("Current", "higher for longer. restrictive. additional tightening.")
+    out = fed.compare_document_analysis(current, previous)
+    assert out["available"] is True
+    assert out["classification"] == "MORE HAWKISH"
+
+
+def test_fed_quality_contract_degrades_partial_publication_set():
+    data = {
+        "document_status": {
+            "statement": {"available": True},
+            "minutes": {"available": False},
+            "chair_press": {"available": True},
+        },
+        "sep_current": {"available": True},
+        "beige_book": {"available": True},
+    }
+    q = fed.fed_quality_contract(data, fed.date(2026, 9, 27))
+    assert q["quality_gate"] == "DEGRADED"
+    assert q["quality_reason"] == "PARTIAL_PUBLICATION_SET"
+    assert q["research_only"] is True
+    assert q["forecast"] is False
+
+
+def test_fed_ui_exposes_current_previous_and_quality_sections():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert 'st.subheader("Communication — Current vs Previous")' in source
+    assert 'st.subheader("Fed Evidence Quality")' in source
+    assert '"Quality Gate"' in source
