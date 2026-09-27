@@ -1,0 +1,33 @@
+{
+  "validator": "Final Remaining-Layers Hardening v1",
+  "generated_at": "2026-09-27T18:55:10.079409+00:00",
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "event_news_structured",
+      "pass": true
+    },
+    {
+      "check": "event_news_contextual",
+      "pass": true
+    },
+    {
+      "check": "earnings_contextual",
+      "pass": true
+    },
+    {
+      "check": "event_study_reliability",
+      "pass": true
+    },
+    {
+      "check": "decision_registry_has_context",
+      "pass": true
+    },
+    {
+      "check": "context_excluded_from_state",
+      "pass": true
+    }
+  ],
+  "research_only": true,
+  "decision_semantics_changed": false
+}

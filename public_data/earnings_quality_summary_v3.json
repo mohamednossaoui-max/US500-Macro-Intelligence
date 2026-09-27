@@ -1,0 +1,21 @@
+{
+  "module": "Corporate Earnings Intelligence",
+  "version": "3.1-hardening",
+  "generated_at": "2026-09-27T18:55:10.079409+00:00",
+  "rows": 1203,
+  "ticker_count": 10,
+  "date_start": "1996-04-16",
+  "date_end": "2026-08-26",
+  "pit_safe_event_rows": 1203,
+  "reaction_rows": 1203,
+  "quality_gate_counts": {
+    "DEGRADED": 1203
+  },
+  "decision_role_counts": {
+    "CONTEXTUAL": 1203
+  },
+  "decision_role": "CONTEXTUAL",
+  "included_in_decision_state": false,
+  "research_only": true,
+  "pit_limitation": "Event facts can be PIT-safe; post-event reaction fields are only knowable after their stated horizon has elapsed and are not contemporaneous decision inputs."
+}

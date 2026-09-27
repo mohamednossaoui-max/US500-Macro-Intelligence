@@ -18,5 +18,21 @@
   "trading_signal": false,
   "forecast": false,
   "pit_perfect": false,
-  "point_in_time_reconstructed": false
+  "point_in_time_reconstructed": false,
+  "hardening_version": "final-remaining-layers-hardening-v1",
+  "structured_evidence": true,
+  "event_class_counts": {
+    "OTHER_OFFICIAL": 41,
+    "MACRO_RELEASE": 30,
+    "POLICY_EVENT": 15,
+    "ADMINISTRATIVE": 11
+  },
+  "research_relevance_counts": {
+    "MEDIUM": 52,
+    "HIGH": 45
+  },
+  "duplicate_rows": 3,
+  "decision_role": "CONTEXTUAL",
+  "included_in_decision_state": false,
+  "interpretation": "Rule-based relevance and event class are research metadata only; no sentiment, forecast, or trading score is inferred."
 }
