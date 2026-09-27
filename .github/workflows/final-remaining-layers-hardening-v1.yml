@@ -1,0 +1,22 @@
+name: final-remaining-layers-hardening-v1
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'final_remaining_layers_hardening_v1.py'
+      - 'app.py'
+      - 'tests/test_final_remaining_layers_hardening.py'
+      - 'public_data/**'
+jobs:
+  hardening:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install pandas pytest
+      - run: python final_remaining_layers_hardening_v1.py
+      - run: python -m pytest -q tests/test_final_remaining_layers_hardening.py
+      - run: python -m py_compile app.py final_remaining_layers_hardening_v1.py
