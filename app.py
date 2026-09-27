@@ -472,7 +472,7 @@ def module_page(
 
 
 def executive() -> None:
-    st.caption("US500 MACRO INTELLIGENCE · RESEARCH · EVIDENCE · MACRO · MARKETS")
+    st.caption("US500 MACRO INTELLIGENCE · EXECUTIVE RESEARCH TERMINAL")
     st.header("Executive Research Dashboard")
 
     rc, rc_src = load_named("Research Context Summary")
@@ -483,77 +483,110 @@ def executive() -> None:
 
     rc_row = latest_row(rc)
     dec_row = latest_row(dec)
-
-    # Visual layer only: every value below comes from already-published artifacts.
     decision_state = safe_value(dec_row, ["state"], "—")
     decision_ready = str(safe_value(rc_row, ["decision_engine_ready"], "False")).strip().lower() in {"true", "1", "yes"}
     freshness = safe_value(rc_row, ["evidence_freshness_status"], "—")
     pit = safe_value(rc_row, ["evidence_pit_status", "point_in_time_safe"], "—")
 
+    # Command strip — published state only.
     top = st.columns(4)
     with top[0]: status_badge("US500 Regime", fmt(decision_state), "positive" if str(decision_state).upper()=="SUPPORTIVE" else "neutral", "Published Decision Engine state")
     with top[1]: status_badge("Research Readiness", "READY" if decision_ready else "NOT READY", "positive" if decision_ready else "warning", "Research-only · no execution")
     with top[2]: status_badge("Data Freshness", fmt(freshness), "info", f"Coverage {fmt(safe_value(rc_row,['evidence_coverage_pct']))}%")
     with top[3]: status_badge("PIT Integrity", fmt(pit), "warning" if str(pit).upper() not in {"TRUE","SAFE","PIT_SAFE"} else "positive", "Point-in-time evidence status")
 
-    section_header("Macro Regime Map", "CURRENT RESEARCH SCORES")
-    score_cols = st.columns(6)
-    score_cards = [
-        ("Growth", safe_value(rc_row,["growth_score"]), safe_value(rc_row,["economic_regime"]), "negative"),
-        ("Inflation", safe_value(rc_row,["inflation_score"]), "Inflation evidence", "positive"),
-        ("Labor", safe_value(rc_row,["labor_score"]), "Labor evidence", "info"),
-        ("Fed", safe_value(rc_row,["fed_score"]), "Fed policy context", "purple"),
-        ("Stress", safe_value(rc_row,["financial_stress_composite"]), safe_value(rc_row,["financial_stress_regime"]), "positive"),
-        ("Sentiment", safe_value(rc_row,["unified_sentiment_score"]), safe_value(rc_row,["sentiment_regime"]), "info"),
-    ]
-    for col, (label, value, state, tone) in zip(score_cols, score_cards):
-        with col: metric_card(label, fmt(value), fmt(state), tone)
-
-    section_header("Publication & Freshness", "LIVE PUBLISHED ARTIFACTS")
-    coverage = st.columns(5)
-    coverage_metrics = [
-        ("Research Context", latest_date(rc)), ("Macro Context", latest_date(mc)),
-        ("Fed Intelligence", latest_date_from_json(fed_obj)), ("Decision Engine", latest_date(dec)),
-        ("Final Validation", latest_date(load_named("Final Validation Summary")[0])),
-    ]
-    for col, (label, value) in zip(coverage, coverage_metrics):
-        with col: metric_card(label, value, "Published / available date", "info")
-    st.caption(f"Sources: Research Context={source_status(rc_src)} • Macro Context={source_status(mc_src)} • Fed={source_status(fed_src)} • Decision={source_status(dec_src)}")
-
+    # Alert center: only observable publication / research-gate conditions.
+    alerts = []
     rc_date, decision_date, fed_date = latest_date(rc), latest_date(dec), latest_date_from_json(fed_obj)
+    if not decision_ready:
+        alerts.append(("warning", "Research Gate", "Decision Engine is NOT READY; state is descriptive research only."))
     if fed_date != "—" and decision_date != "—" and fed_date > decision_date:
-        st.warning(f"Freshness mismatch: Fed Intelligence is as of {fed_date}, while the published Decision Engine is as of {decision_date}. Fed remains contextual and is not silently backfilled.")
+        alerts.append(("warning", "Freshness", f"Fed Intelligence ({fed_date}) is newer than Decision Engine ({decision_date})."))
     if rc_date != "—" and decision_date != "—" and rc_date != decision_date:
-        st.warning(f"Research Context ({rc_date}) and Decision Engine ({decision_date}) are not aligned. Treat the published decision as a snapshot, not a live synthesis.")
+        alerts.append(("warning", "Alignment", f"Research Context ({rc_date}) and Decision Engine ({decision_date}) are not aligned."))
+    if str(pit).upper() not in {"TRUE","SAFE","PIT_SAFE"}:
+        alerts.append(("info", "PIT", f"PIT status is {fmt(pit)}; inspect evidence quality before interpretation."))
 
-    section_header("Decision Engine", "RESEARCH GATE")
-    dcols = st.columns(8)
-    dmetrics = [
-        ("State", safe_value(dec_row,["state"]), "neutral"), ("Evidence Coverage", safe_value(dec_row,["confidence"]), "info"),
-        ("Evidence", safe_value(dec_row,["evidence_count"]), "info"), ("Supportive", safe_value(dec_row,["supportive_count"]), "positive"),
-        ("Contradictory", safe_value(dec_row,["contradictory_count"]), "negative"), ("Mixed", safe_value(dec_row,["mixed_count"]), "warning"),
-        ("PIT", safe_value(dec_row,["point_in_time_safe"]), "warning"), ("Research Only", safe_value(dec_row,["research_only"]), "purple"),
+    with st.expander(f"⚡ Alert Center · {len(alerts)} active", expanded=bool(alerts)):
+        if not alerts:
+            st.success("No dashboard-level publication alerts detected.")
+        for kind, title, message in alerts:
+            if kind == "warning": st.warning(f"**{title}:** {message}")
+            else: st.info(f"**{title}:** {message}")
+
+    # Score hierarchy / ranking. Absolute magnitude is used only for visual ranking,
+    # while the signed published score remains visible and unchanged.
+    section_header("Indicator Hierarchy", "RANKED · PUBLISHED SCORES")
+    raw_scores = [
+        ("Growth", safe_value(rc_row,["growth_score"]), safe_value(rc_row,["economic_regime"]), "Macro"),
+        ("Inflation", safe_value(rc_row,["inflation_score"]), "Inflation evidence", "Macro"),
+        ("Labor", safe_value(rc_row,["labor_score"]), "Labor evidence", "Macro"),
+        ("Fed", safe_value(rc_row,["fed_score"]), "Fed policy context", "Policy"),
+        ("Financial Stress", safe_value(rc_row,["financial_stress_composite"]), safe_value(rc_row,["financial_stress_regime"]), "Markets"),
+        ("Sentiment", safe_value(rc_row,["unified_sentiment_score"]), safe_value(rc_row,["sentiment_regime"]), "Markets"),
     ]
-    for col,(label,value,tone) in zip(dcols,dmetrics):
-        with col: metric_card(label, fmt(value), "Published state", tone)
+    ranked=[]
+    for name,value,state,group in raw_scores:
+        try: num=float(value)
+        except (TypeError,ValueError): num=None
+        ranked.append({"Indicator":name,"Score":num,"State":fmt(state),"Group":group,"Magnitude":abs(num) if num is not None else None})
+    rank_df=pd.DataFrame(ranked).sort_values("Magnitude",ascending=False,na_position="last").reset_index(drop=True)
+    rank_df.insert(0,"Rank",range(1,len(rank_df)+1))
+    st.dataframe(
+        rank_df[["Rank","Indicator","Group","Score","Magnitude","State"]],
+        use_container_width=True, hide_index=True,
+        column_config={
+            "Score": st.column_config.NumberColumn(format="%.2f"),
+            "Magnitude": st.column_config.ProgressColumn("Visual Strength", min_value=0, max_value=max(1.0, float(rank_df["Magnitude"].max() or 1.0)), format="%.2f"),
+        },
+    )
+    st.caption("Ranking is a visual hierarchy by absolute published score magnitude only; it is not importance, probability, forecast confidence, or a trading signal.")
 
-    st.info("Evidence Coverage is completeness of eligible CORE evidence, not probability or forecast confidence.")
-    if decision_ready:
-        st.success("Research readiness: READY. The published state remains research-only and is not an execution instruction.")
-    else:
-        st.warning("Research readiness: NOT READY. The published Decision Engine state describes the current evidence balance only; it is not a forecast, trading signal, or execution permission.")
+    # Dynamic workspace with tabs to reduce visual overload.
+    tab_trend, tab_evidence, tab_freshness = st.tabs(["📈 Interactive Trends", "🧩 Evidence Matrix", "🕒 Freshness & Publication"])
+    with tab_trend:
+        candidates=[c for c in ["growth_score","inflation_score","labor_score","fed_score","financial_stress_composite","unified_sentiment_score"] if isinstance(rc,pd.DataFrame) and c in rc.columns]
+        if isinstance(rc,pd.DataFrame) and candidates:
+            selected=st.multiselect("Indicators", candidates, default=candidates[:4], key="exec_trend_indicators")
+            date_candidates=[c for c in ["context_date","date","as_of_date","timestamp"] if c in rc.columns]
+            plot_df=rc.copy()
+            if date_candidates:
+                plot_df[date_candidates[0]]=pd.to_datetime(plot_df[date_candidates[0]],errors="coerce")
+                plot_df=plot_df.set_index(date_candidates[0])
+            if selected:
+                numeric=plot_df[selected].apply(pd.to_numeric,errors="coerce").dropna(how="all")
+                if not numeric.empty:
+                    st.line_chart(numeric, use_container_width=True, height=420)
+                else: st.info("Selected published series contain no plottable numeric observations.")
+            else: st.info("Select one or more published indicators.")
+        else:
+            st.info("No published Research Context time-series columns are available for the interactive chart.")
+        st.caption("Hover, zoom and series controls are provided by Streamlit's interactive chart layer; underlying research values are unchanged.")
 
-    left, right = st.columns([1.45, 1])
-    with left:
-        section_header("Decision Evidence", "EVIDENCE MATRIX")
-        table(evidence, 330)
-        source("Decision Evidence", evidence_src)
-    with right:
-        section_header("Research Context Trend", "DYNAMIC VIEW")
-        chart(rc, ["unified_sentiment_score", "fed_score", "inflation_score", "growth_score"])
+    with tab_evidence:
+        dcols=st.columns(6)
+        dmetrics=[
+            ("State",safe_value(dec_row,["state"]),"neutral"),("Coverage",safe_value(dec_row,["confidence"]),"info"),
+            ("Evidence",safe_value(dec_row,["evidence_count"]),"info"),("Supportive",safe_value(dec_row,["supportive_count"]),"positive"),
+            ("Contradictory",safe_value(dec_row,["contradictory_count"]),"negative"),("Mixed",safe_value(dec_row,["mixed_count"]),"warning"),
+        ]
+        for col,(label,value,tone) in zip(dcols,dmetrics):
+            with col: metric_card(label,fmt(value),"Published Decision Engine",tone)
+        st.info("Evidence Coverage is completeness of eligible CORE evidence, not probability or forecast confidence.")
+        table(evidence,390); source("Decision Evidence",evidence_src)
+
+    with tab_freshness:
+        coverage_metrics=[
+            ("Research Context",latest_date(rc),rc_src),("Macro Context",latest_date(mc),mc_src),
+            ("Fed Intelligence",latest_date_from_json(fed_obj),fed_src),("Decision Engine",latest_date(dec),dec_src),
+            ("Final Validation",latest_date(load_named("Final Validation Summary")[0]),"published artifact"),
+        ]
+        cols=st.columns(5)
+        for col,(label,value,src) in zip(cols,coverage_metrics):
+            with col: metric_card(label,value,source_status(src) if src != "published artifact" else src,"info")
+        st.caption("Dates and source states are read from the existing published artifacts; no fallback market values are fabricated.")
 
     st.caption(f"Research Context: {rc_src} • Macro Context: {mc_src} • Decision: {dec_src}")
-
 
 def research_context() -> None:
     st.header("Research Context")
