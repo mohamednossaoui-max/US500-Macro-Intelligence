@@ -1635,6 +1635,18 @@ def build_beige_analysis(
     }
 
 
+def latest_document_date(links: Dict[str, Dict[date, str]], kind: str, as_of: date) -> Optional[date]:
+    """Return the latest discovered document date available on or before *as_of*.
+
+    For FOMC minutes the date encoded by the Federal Reserve link is the meeting
+    date, not the later publication date. Discovery of the link establishes that
+    the minutes are published in the current snapshot; keeping the meeting date
+    separate prevents them from being mislabeled as minutes for a newer meeting.
+    """
+    dates = [d for d in links.get(kind, {}) if d <= as_of]
+    return max(dates) if dates else None
+
+
 def previous_document_date(links: Dict[str, Dict[date, str]], kind: str, current: date) -> Optional[date]:
     """Return the latest earlier publication/meeting date for one Fed document kind."""
     dates = [d for d in links.get(kind, {}) if d < current]
@@ -1669,10 +1681,14 @@ def fed_quality_contract(data: Dict, as_of: date) -> Dict:
     sep_ok = bool((data.get("sep_current") or {}).get("available"))
     beige_ok = bool((data.get("beige_book") or {}).get("available"))
     available_docs = sum(bool((docs.get(k) or {}).get("available")) for k in ("statement", "minutes", "chair_press"))
+    minutes_status = docs.get("minutes") or {}
+    minutes_lagged = bool(minutes_status.get("available") and minutes_status.get("lagged"))
     if available_docs == 0:
         gate, quality, reason = "EXCLUDED", "INSUFFICIENT", "NO_FOMC_COMMUNICATION"
     elif available_docs < 3 or not sep_ok:
         gate, quality, reason = "DEGRADED", "MEDIUM", "PARTIAL_PUBLICATION_SET"
+    elif minutes_lagged:
+        gate, quality, reason = "DEGRADED", "MEDIUM", "LATEST_MINUTES_LAG_LATEST_FOMC"
     else:
         gate, quality, reason = "ELIGIBLE", "HIGH", None
     return {
@@ -1714,11 +1730,14 @@ def build_fed_intelligence() -> Dict:
         )
     )
 
+    # Minutes are published with a lag. Do not require them to share the date of
+    # the latest completed FOMC meeting; use the latest minutes actually published
+    # in the discovered official calendar and retain their own meeting date.
+    minutes_meeting_date = latest_document_date(links, "minutes", today)
     minutes_url = (
-        links["minutes"].get(
-            meeting,
-            ""
-        )
+        links["minutes"].get(minutes_meeting_date, "")
+        if minutes_meeting_date
+        else ""
     )
 
     press_url = (
@@ -1745,7 +1764,11 @@ def build_fed_intelligence() -> Dict:
     )
 
     previous_statement_date = previous_document_date(links, "statement", meeting)
-    previous_minutes_date = previous_document_date(links, "minutes", meeting)
+    previous_minutes_date = (
+        previous_document_date(links, "minutes", minutes_meeting_date)
+        if minutes_meeting_date
+        else None
+    )
     previous_press_date = previous_document_date(links, "press", meeting)
     previous_statement_text = fetch_document(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
     previous_minutes_text = fetch_document(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
@@ -1851,6 +1874,11 @@ def build_fed_intelligence() -> Dict:
 
         "minutes_source": minutes_url,
 
+        # The meeting covered by the latest published minutes can legitimately
+        # lag the latest FOMC meeting. Keep this explicit for UI/PIT consumers.
+        "minutes_meeting_date": minutes_meeting_date.isoformat() if minutes_meeting_date else None,
+        "minutes_is_latest_meeting": bool(minutes_meeting_date and minutes_meeting_date == meeting),
+
         "chair_press": analyze(
             f"{chair} Press Conference",
             press["text"]
@@ -1878,6 +1906,9 @@ def build_fed_intelligence() -> Dict:
             "minutes": {
                 "available": bool(minutes_text.strip()),
                 "source": minutes_url or None,
+                "meeting_date": minutes_meeting_date.isoformat() if minutes_meeting_date else None,
+                "latest_fomc_date": meeting.isoformat(),
+                "lagged": bool(minutes_meeting_date and minutes_meeting_date != meeting),
             },
             "chair_press": {
                 "available": bool(press.get("text", "").strip()),
@@ -1893,7 +1924,7 @@ def build_fed_intelligence() -> Dict:
                 "comparison": compare_document_analysis(analyze("FOMC Statement", statement_text), analyze("Previous FOMC Statement", previous_statement_text)),
             },
             "minutes": {
-                "current_date": meeting.isoformat() if minutes_text else None,
+                "current_date": minutes_meeting_date.isoformat() if minutes_text and minutes_meeting_date else None,
                 "previous_date": previous_minutes_date.isoformat() if previous_minutes_date else None,
                 "previous": analyze("Previous FOMC Minutes", previous_minutes_text),
                 "comparison": compare_document_analysis(analyze("FOMC Minutes", minutes_text), analyze("Previous FOMC Minutes", previous_minutes_text)),

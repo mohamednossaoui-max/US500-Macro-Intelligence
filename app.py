@@ -972,7 +972,15 @@ def fed() -> None:
     else:
         change_text = "No comparable SEP shift is available."
     minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
-    minutes_text = "Minutes are incorporated." if minutes_payload.get("available") else "Minutes are pending and are not treated as evidence."
+    minutes_status = (obj.get("document_status") or {}).get("minutes", {}) if isinstance(obj.get("document_status"), dict) else {}
+    if minutes_payload.get("available"):
+        minutes_date = obj.get("minutes_meeting_date") or minutes_status.get("meeting_date")
+        if minutes_status.get("lagged"):
+            minutes_text = f"Latest published Minutes ({fmt(minutes_date)}) are incorporated as lagged evidence for the prior meeting."
+        else:
+            minutes_text = f"Minutes ({fmt(minutes_date)}) are incorporated."
+    else:
+        minutes_text = "Minutes are pending and are not treated as evidence."
     st.markdown(
         f"<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
         f"<div class='read'>{fmt(classification)} · {fmt(sep_direction)}</div>"
@@ -990,6 +998,13 @@ def fed() -> None:
         ("Minutes", "minutes", obj.get("minutes"), obj.get("minutes_source")),
     ]
     st.subheader("FOMC Communication")
+    minutes_status = (obj.get("document_status") or {}).get("minutes", {}) if isinstance(obj.get("document_status"), dict) else {}
+    if minutes_status.get("available") and minutes_status.get("lagged"):
+        st.caption(
+            f"Latest published FOMC Minutes cover the {fmt(minutes_status.get('meeting_date'))} meeting; "
+            f"the latest FOMC meeting is {fmt(minutes_status.get('latest_fomc_date'))}. "
+            "They are retained as lagged research evidence and are not relabeled as current-meeting minutes."
+        )
     timeline_bits = []
     for label, _, payload, _ in communication:
         payload = payload if isinstance(payload, dict) else {}
