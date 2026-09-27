@@ -992,6 +992,7 @@ def fed() -> None:
     # --- Compact communication evidence --------------------------------
     weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
     availability_meta = phase.get("document_availability") if isinstance(phase.get("document_availability"), dict) else {}
+    score_eligibility = phase.get("document_score_eligibility") if isinstance(phase.get("document_score_eligibility"), dict) else {}
     communication = [
         ("Statement", "statement", obj.get("statement"), obj.get("statement_source")),
         ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_page") or obj.get("chair_pdf")),
@@ -1016,7 +1017,11 @@ def fed() -> None:
         tone = fmt(payload.get("tone")) if available else "PENDING"
         explicit_weight = weights.get(key)
         explicit_availability = availability_meta.get(key)
-        if isinstance(explicit_weight, (int, float)):
+        scoring_key = "chair" if key == "chair" else key
+        explicit_score_eligible = score_eligibility.get(scoring_key)
+        if explicit_score_eligible is False and available:
+            note = "lagged evidence · excluded from current-meeting score"
+        elif isinstance(explicit_weight, (int, float)):
             note = f"score weight {explicit_weight * 100:.1f}%" if explicit_weight > 0 else "excluded from score"
         elif explicit_availability is False or not available:
             note = "excluded until published"
@@ -1073,6 +1078,11 @@ def fed() -> None:
     # --- Synthesis ------------------------------------------------------
     combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
     st.subheader("Fed Synthesis")
+    if minutes_status.get("available") and minutes_status.get("lagged"):
+        st.caption(
+            "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP. "
+            "The latest published Minutes remain visible for research comparison but are excluded from the current-meeting score because they cover the prior meeting."
+        )
     if combined:
         for name, data in combined.items():
             if not isinstance(data, dict):

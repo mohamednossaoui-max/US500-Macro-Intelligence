@@ -1015,7 +1015,8 @@ def build_deep_fed_analysis(
     statement_text: str,
     minutes_text: str,
     chair_text: str,
-    sep_shift_data: Optional[Dict]
+    sep_shift_data: Optional[Dict],
+    minutes_current_for_score: bool = True,
 ) -> Dict:
 
     document_texts = {
@@ -1032,14 +1033,20 @@ def build_deep_fed_analysis(
         name: bool(text.strip())
         for name, text in document_texts.items()
     }
+    # A published Minutes document may legitimately lag the latest FOMC meeting.
+    # Keep it available for research/current-vs-previous analysis, but do not let
+    # prior-meeting Minutes drive the *current-meeting* Fed score.
+    score_eligible = dict(available)
+    if available["minutes"] and not minutes_current_for_score:
+        score_eligible["minutes"] = False
     available_weight = sum(
         weight for name, weight in base_weights.items()
-        if available[name]
+        if score_eligible[name]
     )
     effective_weights = {
         name: (
             round(weight / available_weight, 6)
-            if available[name] and available_weight > 0
+            if score_eligible[name] and available_weight > 0
             else 0.0
         )
         for name, weight in base_weights.items()
@@ -1114,6 +1121,7 @@ def build_deep_fed_analysis(
 
     return {
         "document_availability": available,
+        "document_score_eligibility": score_eligible,
         "document_weights": effective_weights,
         "statement": document_dimensions["statement"],
         "minutes": document_dimensions["minutes"],
@@ -1122,9 +1130,10 @@ def build_deep_fed_analysis(
         "fed_score": fed_score,
         "reasons": reasons,
         "method": (
-            "Statement/Minutes/Chair weights are 35/40/25 when all are "
-            "available. Missing documents are excluded and the remaining "
-            "weights are renormalized. SEP is a directional adjustment, "
+            "Statement/Minutes/Chair base weights are 35/40/25. Missing documents "
+            "are excluded and the remaining weights are renormalized. Published "
+            "Minutes from a prior meeting remain research evidence but receive zero "
+            "weight in the current-meeting score. SEP is a directional adjustment, "
             "not a probability or trading signal."
         ),
     }
@@ -1829,7 +1838,8 @@ def build_fed_intelligence() -> Dict:
         statement_text=statement_text,
         minutes_text=minutes_text,
         chair_text=press["text"],
-        sep_shift_data=shift
+        sep_shift_data=shift,
+        minutes_current_for_score=bool(minutes_meeting_date and minutes_meeting_date == meeting),
     )
 
     # --------------------------------------------------------
