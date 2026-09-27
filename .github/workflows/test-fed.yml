@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   fed-intelligence:
@@ -78,6 +78,23 @@ jobs:
           assert "as_of_date" in data
           assert "latest_fomc" in data
           PY
+
+      # ------------------------------------------------------
+      # Publish refreshed Fed artifact to the repository
+      # The Streamlit app reads public_data from the deployed checkout,
+      # so uploading an Actions artifact alone does not refresh the UI.
+      # ------------------------------------------------------
+      - name: Publish refreshed Fed Intelligence data
+        run: |
+          if git diff --quiet -- public_data/fed_intelligence_output_v1.json public_data/manifest.json; then
+            echo "Fed Intelligence public_data is already current."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public_data/fed_intelligence_output_v1.json public_data/manifest.json
+            git commit -m "data: refresh Fed Intelligence artifact"
+            git push
+          fi
 
       # ------------------------------------------------------
       # Upload artifact
