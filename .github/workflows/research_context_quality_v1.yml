@@ -1,0 +1,22 @@
+name: PR-08D Research Context Quality Integration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  research-context-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Integrate evidence quality into Research Context summary
+        run: python research_context_quality_integration_v1.py
+      - name: PR-08D tests
+        run: python -m pytest -q tests/test_research_context_quality_integration.py
+      - name: Full regression
+        run: python -m pytest -q
+      - name: Publication integrity
+        run: python scripts/verify_publication_integrity.py --public-data public_data
