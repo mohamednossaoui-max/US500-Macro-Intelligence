@@ -1,8 +1,8 @@
 {
   "available": true,
-  "as_of_date": "2026-09-25",
+  "as_of_date": "2026-09-27",
   "latest_fomc": "2026-09-16",
-  "current_date": "2026-09-25",
+  "current_date": "2026-09-27",
   "fed_chair": "Kevin Warsh",
   "statement": {
     "name": "FOMC Statement",
@@ -49,6 +49,95 @@
   },
   "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "powell_pdf": null,
+  "document_status": {
+    "statement": {
+      "available": true,
+      "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm"
+    },
+    "minutes": {
+      "available": false,
+      "source": null
+    },
+    "chair_press": {
+      "available": true,
+      "source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm"
+    }
+  },
+  "communication_comparison": {
+    "statement": {
+      "current_date": "2026-09-16",
+      "previous_date": "2026-07-29",
+      "previous": {
+        "name": "Previous FOMC Statement",
+        "available": true,
+        "tone": "NEUTRAL",
+        "tone_score": 2,
+        "inflation_mentions": 1,
+        "labor_mentions": 4,
+        "growth_mentions": 2,
+        "financial_mentions": 10,
+        "text_length": 9718
+      },
+      "comparison": {
+        "available": true,
+        "classification": "BROADLY UNCHANGED",
+        "tone_score_change": 0,
+        "mention_changes": {
+          "inflation_mentions": 0,
+          "labor_mentions": 0,
+          "growth_mentions": 0,
+          "financial_mentions": 0
+        }
+      }
+    },
+    "minutes": {
+      "current_date": null,
+      "previous_date": "2026-07-29",
+      "previous": {
+        "name": "Previous FOMC Minutes",
+        "available": true,
+        "tone": "HAWKISH",
+        "tone_score": 11,
+        "inflation_mentions": 73,
+        "labor_mentions": 34,
+        "growth_mentions": 27,
+        "financial_mentions": 22,
+        "text_length": 48113
+      },
+      "comparison": {
+        "available": false,
+        "classification": "UNAVAILABLE",
+        "tone_score_change": null,
+        "mention_changes": {}
+      }
+    },
+    "chair_press": {
+      "current_date": "2026-09-16",
+      "previous_date": "2026-07-29",
+      "previous": {
+        "name": "Previous Press Conference",
+        "available": true,
+        "tone": "NEUTRAL",
+        "tone_score": 2,
+        "inflation_mentions": 60,
+        "labor_mentions": 14,
+        "growth_mentions": 7,
+        "financial_mentions": 2,
+        "text_length": 40743
+      },
+      "comparison": {
+        "available": true,
+        "classification": "BROADLY UNCHANGED",
+        "tone_score_change": -2,
+        "mention_changes": {
+          "inflation_mentions": -60,
+          "labor_mentions": -13,
+          "growth_mentions": -7,
+          "financial_mentions": 7
+        }
+      }
+    }
+  },
   "latest_sep_date": "2026-09-16",
   "previous_sep_date": "2026-06-17",
   "sep_current": {
@@ -106,6 +195,16 @@
     }
   },
   "phase_2b": {
+    "document_availability": {
+      "statement": true,
+      "minutes": false,
+      "chair": true
+    },
+    "document_weights": {
+      "statement": 0.583333,
+      "minutes": 0.0,
+      "chair": 0.416667
+    },
     "statement": {
       "inflation": {
         "score": 1,
@@ -219,7 +318,8 @@
     },
     "combined": {
       "inflation": {
-        "score_100": 51.8,
+        "score_100": 52.9,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -243,7 +343,8 @@
         }
       },
       "labor": {
-        "score_100": 51.8,
+        "score_100": 52.9,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -268,6 +369,7 @@
       },
       "growth": {
         "score_100": 50.0,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 0,
           "classification": "NEUTRAL",
@@ -292,6 +394,7 @@
       },
       "financial": {
         "score_100": 50.0,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 0,
           "classification": "NEUTRAL",
@@ -316,6 +419,7 @@
       },
       "policy": {
         "score_100": 50.0,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 0,
           "classification": "NEUTRAL",
@@ -340,25 +444,26 @@
       }
     },
     "fed_score": {
-      "score": 55.7,
-      "base_score": 50.7,
+      "score": 56.2,
+      "base_score": 51.2,
       "sep_adjustment": 5.0,
-      "classification": "NEUTRAL"
+      "classification": "MODERATELY HAWKISH"
     },
     "reasons": [
-      "- Inflation: None (+0.45)",
-      "- Labor: None (+0.27)",
+      "- Inflation: None (+0.72)",
+      "- Labor: None (+0.43)",
       "- Growth: None (+0.00)",
       "- Financial: None (+0.00)",
       "- Policy: None (+0.00)",
       "- SEP: HAWKISH SHIFT"
-    ]
+    ],
+    "method": "Statement/Minutes/Chair weights are 35/40/25 when all are available. Missing documents are excluded and the remaining weights are renormalized. SEP is a directional adjustment, not a probability or trading signal."
   },
   "fed_score": {
-    "score": 55.7,
-    "base_score": 50.7,
+    "score": 56.2,
+    "base_score": 51.2,
     "sep_adjustment": 5.0,
-    "classification": "NEUTRAL"
+    "classification": "MODERATELY HAWKISH"
   },
   "beige_book": {
     "available": true,
@@ -432,5 +537,20 @@
       "- Housing: NEUTRAL (50.0/100)"
     ],
     "method": "Heuristic analytical score based on directional language in the official National Summary. Not a probability."
+  },
+  "quality": {
+    "quality_gate": "DEGRADED",
+    "quality_status": "MEDIUM",
+    "quality_reason": "PARTIAL_PUBLICATION_SET",
+    "pit_status": "PIT_SAFE",
+    "freshness_status": "CURRENT",
+    "research_only": true,
+    "forecast": false,
+    "trading_signal": false,
+    "as_of_date": "2026-09-27",
+    "communication_documents_available": 2,
+    "sep_available": true,
+    "beige_book_available": true,
+    "decision_role": "CONTEXTUAL"
   }
 }

@@ -1,9 +1,5 @@
 {
   "files": {
-    "README.md": {
-      "bytes": 439,
-      "sha256": "c87097d22fd03f86345c781e0f12ce459eb01bdf1a124ddc97c989a3e633c8ef"
-    },
     "aaii_historical_collection_summary_v1.csv": {
       "bytes": 452,
       "sha256": "57e110985ff53145199c7796b76219a7054d84816e4872de9a04e916e722b37c"
@@ -133,8 +129,8 @@
       "sha256": "ae48ff2cb068ff05c036e90b17b1487216dcd87db02cb2bdbcdd0e3c487191b8"
     },
     "fed_intelligence_output_v1.json": {
-      "bytes": 10700,
-      "sha256": "2648b44fdbda578911545e37020d97008b1c2f1e08cbb23502b7d7e67ac1a370"
+      "bytes": 14219,
+      "sha256": "a6533d6fa2a1992f907df220dff602403c79bfb3875c940c54b69a7b5230cbef"
     },
     "final_end_to_end_validation.json": {
       "bytes": 923,
@@ -352,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36190915225",
-  "source_workflow": "Historical Event Study v2"
+  "source_run_id": "36346873275",
+  "source_workflow": "Fed Intelligence"
 }
