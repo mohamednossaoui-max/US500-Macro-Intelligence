@@ -1,0 +1,21 @@
+{
+  "as_of_date": "2026-09-26",
+  "evidence_total": 40,
+  "available": 37,
+  "eligible": 30,
+  "pit_safe_pct": 75.0,
+  "current_pct": 100.0,
+  "high_quality_pct": 30.0,
+  "modules": {
+    "CROSS_ASSET": 8,
+    "ECONOMIC": 14,
+    "FED": 3,
+    "FINANCIAL_STRESS": 1,
+    "LIQUIDITY": 6,
+    "MARKET_BREADTH": 1,
+    "SENTIMENT_AAII": 1,
+    "SENTIMENT_COT": 2,
+    "SENTIMENT_VIX": 1,
+    "TECHNICAL": 3
+  }
+}

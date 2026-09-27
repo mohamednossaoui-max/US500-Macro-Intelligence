@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "schema_valid": true,
+  "chronology_valid": true,
+  "future_evidence_count": 0,
+  "invalid_enum_count": 0,
+  "missing_required_count": 0,
+  "research_only_violations": 0,
+  "trading_field_violations": 0,
+  "warnings": [
+    "Current artifact uses observation_date + 1 calendar day; session-aware availability is not yet represented",
+    "Historical constituent membership is a free-public reconstruction; pit_perfect=false",
+    "NOT_YET_PUBLISHED_OR_UNAVAILABLE"
+  ]
+}

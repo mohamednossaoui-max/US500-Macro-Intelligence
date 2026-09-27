@@ -276,6 +276,22 @@
       "bytes": 7235794,
       "sha256": "fc881082ddeb17ac53d85ad3982df502330a6c11073b95a1d240184890830ace"
     },
+    "research_evidence_contract_v1.csv": {
+      "bytes": 13400,
+      "sha256": "4c3111c8f28d69d1c27527ce61144d3f0a829bbdf9e1c884bcc3087ddb27bb1f"
+    },
+    "research_evidence_quality_summary_v1.json": {
+      "bytes": 409,
+      "sha256": "b463f41b6af2e6f34627fa0bc5d91ecd812e9430dea9139382ffc375dc845ea3"
+    },
+    "research_evidence_quality_v1.csv": {
+      "bytes": 3502,
+      "sha256": "3e924c1e07aece3b15cfe0cdd24d8d5f6cd2e7cd3c6dc1373bae79d3c09e9873"
+    },
+    "research_evidence_validation_v1.json": {
+      "bytes": 494,
+      "sha256": "1c773ea602502be21132d042d7615d427eae94e0b496a5a7f82981c7c40f067f"
+    },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 670819,
       "sha256": "f09cca98e8ac7f4af69fb11f70761bf72f7990b0f08ab444be5c00e2125a5fcf"
