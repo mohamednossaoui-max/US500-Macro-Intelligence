@@ -48,6 +48,17 @@ background:rgba(128,140,155,.04);min-height:88px}
 .pulse{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(128,140,155,.16)}
 .pulse:last-child{border-bottom:0}.pulse-name{font-weight:750}.pulse-value{font-variant-numeric:tabular-nums;font-weight:800}.pulse-note{font-size:.76rem;color:#8b96a5}
 .timeline{font-weight:800;letter-spacing:.01em;padding:10px 0 4px 0}
+.fed-gauge{position:relative;height:16px;border-radius:999px;background:linear-gradient(90deg,rgba(74,144,226,.55),rgba(128,140,155,.18) 50%,rgba(231,111,81,.55));margin:18px 2px 8px}
+.fed-marker{position:absolute;top:-7px;width:4px;height:30px;border-radius:4px;background:currentColor;box-shadow:0 0 0 3px rgba(128,140,155,.18)}
+.fed-scale{display:flex;justify-content:space-between;font-size:.67rem;font-weight:800;letter-spacing:.07em;color:#8b96a5}
+.signal-card{border:1px solid rgba(128,140,155,.25);border-radius:12px;padding:12px 14px;background:rgba(128,140,155,.035);min-height:105px}
+.signal-title{font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#8b96a5}
+.signal-main{font-size:1.05rem;font-weight:850;margin:.25rem 0}.signal-why{font-size:.76rem;color:#8b96a5;line-height:1.35}
+.comm-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;border-bottom:1px solid rgba(128,140,155,.16)}
+.comm-row:last-child{border-bottom:0}.comm-name{font-weight:800}.comm-state{font-size:.76rem;font-weight:800}.comm-note{font-size:.73rem;color:#8b96a5}
+.bottom-line{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:15px 16px;background:rgba(128,140,155,.055);margin:.25rem 0 1rem}
+.bottom-line .title{font-size:.68rem;font-weight:850;letter-spacing:.09em;color:#8b96a5}.bottom-line .read{font-size:1.12rem;font-weight:850;margin:.25rem 0}.bottom-line .body{font-size:.84rem;line-height:1.5;color:#8b96a5}
+@media (max-width: 700px){.block-container{padding-left:.75rem;padding-right:.75rem}.hero{padding:14px 14px}.hero h1{font-size:1.45rem}.card{min-height:76px;padding:11px 12px}.value{font-size:1.02rem}.pulse{display:grid;grid-template-columns:1fr auto;gap:2px 10px}.pulse-note{grid-column:2;text-align:right}.timeline{font-size:.8rem;white-space:normal}.signal-card{min-height:0}.fed-strip,.bottom-line{padding:12px 13px}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -606,7 +617,13 @@ def fed() -> None:
         "Scores are analytical indicators, not probabilities or trading signals."
     )
 
-    # --- Headline state -------------------------------------------------
+    fed_score = obj.get("fed_score") if isinstance(obj.get("fed_score"), dict) else {}
+    sep_shift = obj.get("sep_shift") if isinstance(obj.get("sep_shift"), dict) else {}
+    phase = obj.get("phase_2b") if isinstance(obj.get("phase_2b"), dict) else {}
+    score = fed_score.get("score")
+    classification = fed_score.get("classification", "UNAVAILABLE")
+    sep_direction = sep_shift.get("classification", "Not available")
+
     header_cols = st.columns(3)
     for col, (label, value) in zip(header_cols, [
         ("As of", obj.get("as_of_date")),
@@ -616,35 +633,33 @@ def fed() -> None:
         with col:
             card(label, value)
 
-    fed_score = obj.get("fed_score") if isinstance(obj.get("fed_score"), dict) else {}
-    sep_shift = obj.get("sep_shift") if isinstance(obj.get("sep_shift"), dict) else {}
-    score = fed_score.get("score")
-    classification = fed_score.get("classification", "UNAVAILABLE")
-    sep_direction = sep_shift.get("classification", "Not available")
-
+    # --- Policy pulse: visual first ------------------------------------
     st.subheader("Policy Pulse")
-    pulse_cols = st.columns([1, 2])
-    with pulse_cols[0]:
-        card("Fed Policy Score", score, f"{classification} · {sep_direction}")
-    with pulse_cols[1]:
-        if isinstance(score, (int, float)):
-            st.caption("DOVISH  ←  0 ───────── 50 ───────── 100  →  HAWKISH")
-            st.progress(max(0, min(100, int(round(score)))))
-            st.caption(
-                f"Current analytical position: {score:.1f}/100 · {classification}. "
-                "The gauge is descriptive, not a policy probability."
-            )
-        else:
-            st.info("A policy score is not available for the current evidence set.")
+    if isinstance(score, (int, float)):
+        marker = max(0.0, min(100.0, float(score)))
+        st.markdown(
+            f"<div class='fed-strip'><div class='kicker'>FED POLICY SCORE</div>"
+            f"<div class='headline'>{score:.1f}/100 · {fmt(classification)} · {fmt(sep_direction)}</div>"
+            f"<div class='fed-gauge'><span class='fed-marker' style='left:calc({marker:.1f}% - 2px)'></span></div>"
+            "<div class='fed-scale'><span>DOVISH</span><span>NEUTRAL · 50</span><span>HAWKISH</span></div>"
+            "<div class='detail' style='margin-top:8px'>Descriptive research gauge — not a policy probability or trading signal.</div></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info("A policy score is not available for the current evidence set.")
 
-    # --- What changed ---------------------------------------------------
+    # --- SEP changes ----------------------------------------------------
     fields = sep_shift.get("fields") if isinstance(sep_shift.get("fields"), dict) else {}
     labels = {
-        "gdp": "GDP",
-        "unemployment": "Unemployment",
-        "pce": "PCE",
-        "core_pce": "Core PCE",
-        "fed_funds": "Fed Funds",
+        "gdp": "GDP", "unemployment": "Unemployment", "pce": "PCE",
+        "core_pce": "Core PCE", "fed_funds": "Fed Funds",
+    }
+    explanations = {
+        "gdp": ("growth outlook stronger", "growth outlook softer"),
+        "unemployment": ("labor outlook softer", "labor outlook stronger"),
+        "pce": ("inflation path higher", "inflation path lower"),
+        "core_pce": ("core inflation path higher", "core inflation path lower"),
+        "fed_funds": ("higher policy-rate path", "lower policy-rate path"),
     }
     changes = []
     for key, label in labels.items():
@@ -659,49 +674,77 @@ def fed() -> None:
         change_cols = st.columns(min(3, len(changes)))
         for col, (_, key, label, detail) in zip(change_cols, changes[:3]):
             delta = detail.get("change")
+            prev = detail.get("previous")
+            cur = detail.get("current")
             arrow = "▲" if delta > 0 else "▼" if delta < 0 else "→"
-            sign = "+" if delta > 0 else ""
             if key == "unemployment":
                 implication = "Hawkish" if delta < 0 else "Dovish" if delta > 0 else "Neutral"
+                why = explanations[key][1] if delta < 0 else explanations[key][0]
             else:
                 implication = "Hawkish" if delta > 0 else "Dovish" if delta < 0 else "Neutral"
+                why = explanations[key][0] if delta > 0 else explanations[key][1]
             with col:
-                card(label, f"{arrow} {sign}{delta:.1f}", implication)
+                st.markdown(
+                    f"<div class='signal-card'><div class='signal-title'>{label}</div>"
+                    f"<div class='signal-main'>{fmt(prev,1)} → {fmt(cur,1)} &nbsp; {arrow} {delta:+.1f}</div>"
+                    f"<div class='signal-why'><b>{implication.upper()}</b> · {why}</div></div>",
+                    unsafe_allow_html=True,
+                )
     else:
         st.info("No comparable SEP changes are available for this snapshot.")
 
-    # --- Communication timeline ----------------------------------------
-    phase = obj.get("phase_2b") if isinstance(obj.get("phase_2b"), dict) else {}
+    # --- Bottom line: move decision read near the top ------------------
+    top_change = changes[0] if changes else None
+    if top_change:
+        _, top_key, top_label, top_detail = top_change
+        top_delta = top_detail.get("change")
+        top_reason = explanations[top_key][0] if top_delta > 0 else explanations[top_key][1]
+        change_text = f"Largest SEP move: {top_label} {top_delta:+.1f} ({top_reason})."
+    else:
+        change_text = "No comparable SEP shift is available."
+    minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
+    minutes_text = "Minutes are incorporated." if minutes_payload.get("available") else "Minutes are pending and are not treated as evidence."
+    st.markdown(
+        f"<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
+        f"<div class='read'>{fmt(classification)} · {fmt(sep_direction)}</div>"
+        f"<div class='body'>Fed Policy Score: {fmt(score,1)}. {change_text} {minutes_text} "
+        "Beige Book remains contextual rather than a direct score input.</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # --- Compact communication evidence --------------------------------
     weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
     availability_meta = phase.get("document_availability") if isinstance(phase.get("document_availability"), dict) else {}
-
-    st.subheader("FOMC Communication")
-    st.markdown("<div class='timeline'>Statement ✓ &nbsp; ─── &nbsp; Press Conference ✓ &nbsp; ─── &nbsp; Minutes ⏳</div>", unsafe_allow_html=True)
     communication = [
         ("Statement", "statement", obj.get("statement"), obj.get("statement_source")),
         ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_page") or obj.get("chair_pdf")),
         ("Minutes", "minutes", obj.get("minutes"), obj.get("minutes_source")),
     ]
-    cols = st.columns(3)
-    for col, (label, key, payload, url) in zip(cols, communication):
+    st.subheader("FOMC Communication")
+    timeline_bits = []
+    for label, _, payload, _ in communication:
+        payload = payload if isinstance(payload, dict) else {}
+        timeline_bits.append(f"{label} {'✓' if payload.get('available') else '⏳'}")
+    st.markdown(f"<div class='timeline'>{' &nbsp; ─── &nbsp; '.join(timeline_bits)}</div>", unsafe_allow_html=True)
+    for label, key, payload, url in communication:
         payload = payload if isinstance(payload, dict) else {}
         available = bool(payload.get("available"))
+        tone = fmt(payload.get("tone")) if available else "PENDING"
         explicit_weight = weights.get(key)
         explicit_availability = availability_meta.get(key)
         if isinstance(explicit_weight, (int, float)):
-            score_note = f"Effective score weight: {explicit_weight * 100:.1f}%" if explicit_weight > 0 else "Excluded from score"
+            note = f"score weight {explicit_weight * 100:.1f}%" if explicit_weight > 0 else "excluded from score"
         elif explicit_availability is False or not available:
-            score_note = "Excluded until published"
+            note = "excluded until published"
         else:
-            # Backward-compatible artifact: evidence is present but the older JSON
-            # predates explicit PR-05 weight metadata. Never mislabel it as excluded.
-            score_note = "Included in analysis · weight metadata pending refresh"
-        status = "Available" if available else "Not yet published / unavailable"
-        with col:
-            card(label, status, score_note)
-            st.caption(f"Tone: {fmt(payload.get('tone'))}")
-            if url:
-                st.markdown(f"[Official source]({url})")
+            note = "included · weight metadata pending refresh"
+        link = f" · <a href='{url}' target='_blank'>official source</a>" if url else ""
+        st.markdown(
+            f"<div class='comm-row'><span><span class='comm-name'>{label}</span> "
+            f"<span class='comm-note'>{link}</span></span>"
+            f"<span><span class='comm-state'>{tone}</span><br><span class='comm-note'>{note}</span></span></div>",
+            unsafe_allow_html=True,
+        )
 
     # --- SEP pulse ------------------------------------------------------
     st.subheader("SEP Pulse — Current vs Previous")
@@ -712,13 +755,12 @@ def fed() -> None:
         cur = detail.get("current", current.get(key))
         prev = detail.get("previous", previous.get(key))
         delta = detail.get("change")
-        arrow = "→"
-        if isinstance(delta, (int, float)):
-            arrow = "▲" if delta > 0 else "▼" if delta < 0 else "→"
+        arrow = "▲" if isinstance(delta, (int, float)) and delta > 0 else "▼" if isinstance(delta, (int, float)) and delta < 0 else "→"
+        delta_text = f"{delta:+.1f}" if isinstance(delta, (int, float)) else "—"
         st.markdown(
             f"<div class='pulse'><span class='pulse-name'>{label}</span>"
-            f"<span class='pulse-value'>{fmt(prev)} &nbsp;→&nbsp; {fmt(cur)} &nbsp; {arrow}</span>"
-            f"<span class='pulse-note'>Δ {fmt(delta)}</span></div>",
+            f"<span class='pulse-value'>{fmt(prev,1)} → {fmt(cur,1)} &nbsp; {arrow}</span>"
+            f"<span class='pulse-note'>Δ {delta_text}</span></div>",
             unsafe_allow_html=True,
         )
     st.caption(
@@ -734,12 +776,12 @@ def fed() -> None:
             if not isinstance(data, dict):
                 continue
             dim_score = data.get("score_100")
-            label = str(name).replace("_", " ").title()
+            dim_label = str(name).replace("_", " ").title()
             if isinstance(dim_score, (int, float)):
                 direction = "Hawkish tilt" if dim_score > 52 else "Dovish tilt" if dim_score < 48 else "Balanced"
                 c1, c2 = st.columns([1, 3])
                 with c1:
-                    st.markdown(f"**{label}**  ")
+                    st.markdown(f"**{dim_label}**")
                     st.caption(f"{dim_score:.1f} · {direction}")
                 with c2:
                     st.progress(max(0, min(100, int(round(dim_score)))))
@@ -760,10 +802,8 @@ def fed() -> None:
     else:
         beige_cols = st.columns(4)
         for col, (label, value) in zip(beige_cols, [
-            ("Issue", beige.get("issue_date")),
-            ("Published", beige.get("publication_date")),
-            ("Tone", beige_analysis.get("tone")),
-            ("Context Score", beige_analysis.get("score")),
+            ("Issue", beige.get("issue_date")), ("Published", beige.get("publication_date")),
+            ("Tone", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
         ]):
             with col:
                 card(label, value)
@@ -781,41 +821,19 @@ def fed() -> None:
             st.markdown(f"[Official Beige Book source]({beige.get('url')})")
         st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
 
-    # --- Bottom line ----------------------------------------------------
-    st.subheader("Fed Bottom Line")
-    top_change = changes[0] if changes else None
-    change_text = "No comparable SEP shift is available."
-    if top_change:
-        _, _, label, detail = top_change
-        delta = detail.get("change")
-        change_text = f"The largest SEP change is {label} ({delta:+.1f})."
-    minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
-    minutes_text = "Minutes are incorporated." if minutes_payload.get("available") else "Minutes are still pending and are not treated as evidence."
-    st.markdown(
-        f"<div class='fed-strip'><div class='kicker'>CURRENT READ</div>"
-        f"<div class='headline'>{fmt(classification)} · {fmt(sep_direction)}</div>"
-        f"<div class='detail'>Fed Policy Score: {fmt(score)}. {change_text} {minutes_text} "
-        "Beige Book remains contextual rather than a direct score input.</div></div>",
-        unsafe_allow_html=True,
-    )
-
-    # Keep research detail available without dominating the decision view.
     with st.expander("View detailed data"):
         sep_rows = []
         for key, label in labels.items():
             detail = fields.get(key) if isinstance(fields.get(key), dict) else {}
             sep_rows.append({
-                "Projection": label,
-                "Previous": detail.get("previous", previous.get(key)),
-                "Current": detail.get("current", current.get(key)),
-                "Change": detail.get("change"),
+                "Projection": label, "Previous": detail.get("previous", previous.get(key)),
+                "Current": detail.get("current", current.get(key)), "Change": detail.get("change"),
             })
         st.dataframe(pd.DataFrame(sep_rows), use_container_width=True, hide_index=True)
 
     with st.expander("Complete Fed JSON"):
         st.json(obj)
     source("Fed Intelligence", src)
-
 
 def sentiment() -> None:
     st.header("Sentiment Intelligence")
