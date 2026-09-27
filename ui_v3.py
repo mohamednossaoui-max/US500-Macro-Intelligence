@@ -45,9 +45,16 @@ def tone_for(value: Any) -> str:
     return "info" if s not in ("—","NOT AVAILABLE","NONE") else "neutral"
 
 
-def dynamic_card(label: str, value: Any, note: str = "", tone: str | None = None) -> None:
+def dynamic_card(label: str, value: Any, note: Any = "", tone: str | None = None) -> None:
+    # Notes can legitimately be numeric (for example the published unified
+    # sentiment score).  Escape only after normalising to display text so a
+    # float/NaN cannot crash the Sentiment page.
     t = tone or tone_for(value)
-    st.markdown(f'<div class="v3-card v3-{t}"><div class="v3-label">{escape(label)}</div><div class="v3-value">{_s(value)}</div><div class="v3-note">{escape(note)}</div></div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="v3-card v3-{t}"><div class="v3-label">{_s(label)}</div>'
+        f'<div class="v3-value">{_s(value)}</div><div class="v3-note">{_s(note)}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def section(title: str, kicker: str = "") -> None:
