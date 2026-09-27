@@ -12,12 +12,12 @@ import pandas as pd
 import requests
 import streamlit as st
 
-APP_VERSION = "V6.2"
+APP_VERSION = "V6.3"
 REPO = "mohamednossaoui-max/US500-Macro-Intelligence"
 BRANCH = "main"
 PUBLIC_DATA = Path(__file__).resolve().parent / "public_data"
 RAW_BASE = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/public_data"
-HEADERS = {"User-Agent": "US500-Macro-Intelligence-Research-Terminal/6.2"}
+HEADERS = {"User-Agent": "US500-Macro-Intelligence-Research-Terminal/6.3"}
 
 st.set_page_config(
     page_title=f"US500 Macro Intelligence {APP_VERSION}",
@@ -129,6 +129,8 @@ DATASETS = {
     "Event Study Redundancy": "historical_event_study_feature_redundancy_v2.csv",
     "Event Study Adequacy": "historical_event_study_sample_adequacy_v2.csv",
     "Event Study Validation": "historical_event_study_validation_v2.json",
+    "Remaining Layers Quality": "remaining_layers_quality_v1.csv",
+    "Remaining Layers Validation": "remaining_layers_quality_validation_v1.json",
 }
 
 DATE_COLUMNS = [
@@ -1235,16 +1237,28 @@ def cross_asset() -> None:
     source("Cross Asset",src); source("Cross Asset Summary",ss); _research_footer(df)
 
 def event_news() -> None:
-    module_page(
-        "Event / News Intelligence V2",
-        "Event News",
-        ["event_score", "news_score", "composite_score"],
-        json_names=["Event News Summary", "Event News Validation"],
-    )
+    st.header("Event / News Intelligence V2 — Quality Aware")
+    df, src = load_named("Event News")
+    summary, ss = load_named("Event News Summary")
+    validation, vs = load_named("Event News Validation")
+    row = latest_row(df)
+    cols=st.columns(5)
+    metrics=[("Rows", len(df) if isinstance(df,pd.DataFrame) else "—"),("PIT", safe_value(row,["pit_status","point_in_time_safe"])),("Quality Gate",safe_value(row,["quality_gate"])),("Role",safe_value(row,["decision_role"])),("Research Only",safe_value(row,["research_only"]))]
+    for col,(label,value) in zip(cols,metrics):
+        with col: card(label,value)
+    st.caption("News is contextual evidence. Publication chronology is audited; it is not automatically promoted into Decision Engine scoring.")
+    table(df.tail(300) if isinstance(df,pd.DataFrame) else None,560); source("Event News",src)
+    if isinstance(summary,dict):
+        with st.expander("Published summary"): st.json(summary)
+    source("Event News Summary",ss)
+    if isinstance(validation,dict):
+        with st.expander("Validation metadata"): st.json(validation)
+    source("Event News Validation",vs)
 
 
 def earnings() -> None:
-    st.header("Corporate Earnings Intelligence V3")
+    st.header("Corporate Earnings Intelligence V3 — Quality Aware")
+    st.caption("Post-event market reactions are contextual historical evidence. They are PIT_LIMITED for a contemporaneous decision snapshot unless their reaction horizon has elapsed.")
     tabs = st.tabs(["Events", "Summary", "EPS Classes", "Sectors"])
 
     with tabs[0]:
@@ -1269,7 +1283,8 @@ def earnings() -> None:
 
 
 def decision() -> None:
-    st.header("Decision Engine V1 - Research Gate")
+    st.header("Decision Engine V1 — Research Gate")
+    st.caption("Decision semantics are preserved. Quality/PIT metadata is shown separately and never converted into a trading signal or forecast.")
     df, src = load_named("Decision Summary")
     evidence, evidence_src = load_named("Decision Evidence")
     obj, json_src = load_named("Decision JSON")
@@ -1361,9 +1376,8 @@ def event_study() -> None:
 def historical_edge() -> None:
     st.header("Historical Edge / Robustness")
 
-    st.info(
-        "The current public_data manifest does not publish separate historical_edge_* "
-        "artifacts. The currently published robustness evidence is Historical Event Study V2."
+    st.warning(
+        "Historical Edge is EXCLUDED/UNAVAILABLE in the current publication because no dedicated historical_edge_* artifacts are published. Historical Event Study V2 is shown only as contextual reference; it is not relabeled as Historical Edge."
     )
 
     validation, src = load_named("Event Study Validation")
@@ -1424,6 +1438,10 @@ def final_validation() -> None:
 
 def data_status() -> None:
     st.header("Data Status & Freshness")
+    quality, qsrc = load_named("Remaining Layers Quality")
+    if isinstance(quality,pd.DataFrame):
+        st.subheader("Remaining-Layer Quality Contract")
+        table(quality,420); source("Remaining Layers Quality",qsrc)
 
     published = set(manifest_files())
     rows = []
@@ -1524,15 +1542,20 @@ position sizing, stop loss, or take profit.
 
 No GitHub token or GitHub API authentication is required.
 
-### Point-in-time
+### Point-in-time and evidence quality
 
 The terminal displays PIT fields supplied by the research pipeline and does not
-silently replace historical observations with current values.
+silently replace historical observations with current values. Remaining layers
+use an explicit quality contract: ELIGIBLE / DEGRADED / EXCLUDED. Missing or
+excluded evidence is never silently converted to neutral or zero.
 
 ### Decision Engine
 
 The published Decision Engine exposes state, confidence/evidence coverage,
-evidence counts, PIT status and research-only controls.
+evidence counts, PIT status and research-only controls. Quality status is
+metadata and does not redefine supportive/contradictory/mixed semantics.
+Event/News and Earnings remain contextual unless a dedicated PIT-safe adapter
+explicitly makes an item eligible.
 
 ### Historical Event Study V2
 
