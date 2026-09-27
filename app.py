@@ -112,9 +112,11 @@ DATASETS = {
     "Earnings Summary": "earnings_market_reaction_summary_v3.csv",
     "Earnings EPS": "earnings_reaction_by_eps_class_v3.csv",
     "Earnings Sectors": "earnings_reaction_by_sector_v3.csv",
+    "Earnings Quality": "earnings_quality_summary_v3.json",
     "Decision": "decision_engine_research_v1.csv",
     "Decision Summary": "decision_engine_research_summary_v1.csv",
     "Decision Evidence": "decision_engine_research_evidence_v1.csv",
+    "Decision Evidence Registry": "decision_engine_evidence_registry_v2.csv",
     "Decision JSON": "decision_engine_research_v1.json",
     "Final Validation": "final_end_to_end_validation_report.csv",
     "Final Validation Summary": "final_end_to_end_validation_summary.csv",
@@ -131,6 +133,7 @@ DATASETS = {
     "Event Study Validation": "historical_event_study_validation_v2.json",
     "Remaining Layers Quality": "remaining_layers_quality_v1.csv",
     "Remaining Layers Validation": "remaining_layers_quality_validation_v1.json",
+    "Final Hardening Validation": "final_remaining_layers_hardening_v1.json",
 }
 
 DATE_COLUMNS = [
@@ -1246,7 +1249,14 @@ def event_news() -> None:
     metrics=[("Rows", len(df) if isinstance(df,pd.DataFrame) else "—"),("PIT", safe_value(row,["pit_status","point_in_time_safe"])),("Quality Gate",safe_value(row,["quality_gate"])),("Role",safe_value(row,["decision_role"])),("Research Only",safe_value(row,["research_only"]))]
     for col,(label,value) in zip(cols,metrics):
         with col: card(label,value)
-    st.caption("News is contextual evidence. Publication chronology is audited; it is not automatically promoted into Decision Engine scoring.")
+    st.caption("News is structured contextual evidence. Publication chronology, deterministic event class, research relevance and duplicate flags are visible; none is automatically promoted into Decision Engine state scoring.")
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        rel = df.get("research_relevance", pd.Series(dtype=str)).astype(str).value_counts()
+        classes = df.get("event_class", pd.Series(dtype=str)).astype(str).value_counts()
+        dups = df.get("is_duplicate", pd.Series(dtype=bool)).astype(str).str.lower().eq("true").sum()
+        qcols = st.columns(4)
+        for col, item in zip(qcols, [("High relevance", int(rel.get("HIGH",0))), ("Macro releases", int(classes.get("MACRO_RELEASE",0))), ("Policy events", int(classes.get("POLICY_EVENT",0))), ("Duplicates flagged", int(dups))]):
+            with col: card(*item)
     table(df.tail(300) if isinstance(df,pd.DataFrame) else None,560); source("Event News",src)
     if isinstance(summary,dict):
         with st.expander("Published summary"): st.json(summary)
@@ -1260,6 +1270,14 @@ def earnings() -> None:
     st.header("Corporate Earnings Intelligence V3 — Quality Aware")
     st.caption("Post-event market reactions are contextual historical evidence. They are PIT_LIMITED for a contemporaneous decision snapshot unless their reaction horizon has elapsed.")
     tabs = st.tabs(["Events", "Summary", "EPS Classes", "Sectors"])
+
+    quality, quality_src = load_named("Earnings Quality")
+    if isinstance(quality, dict):
+        cols = st.columns(5)
+        for col, item in zip(cols, [("Rows", quality.get("rows","—")), ("Tickers", quality.get("ticker_count","—")), ("Coverage start", quality.get("date_start","—")), ("Coverage end", quality.get("date_end","—")), ("Decision role", quality.get("decision_role","—"))]):
+            with col: card(*item)
+        st.warning(quality.get("pit_limitation", "Post-event reactions are contextual only."))
+    source("Earnings Quality", quality_src)
 
     with tabs[0]:
         df, src = load_named("Earnings")
@@ -1287,6 +1305,7 @@ def decision() -> None:
     st.caption("Decision semantics are preserved. Quality/PIT metadata is shown separately and never converted into a trading signal or forecast.")
     df, src = load_named("Decision Summary")
     evidence, evidence_src = load_named("Decision Evidence")
+    registry, registry_src = load_named("Decision Evidence Registry")
     obj, json_src = load_named("Decision JSON")
     row = latest_row(df)
 
@@ -1306,7 +1325,9 @@ def decision() -> None:
             card(label, value)
 
     st.subheader("Evidence Matrix")
-    table(evidence, 350)
+    st.caption("CORE evidence may determine the published V1 research state. CONTEXTUAL evidence is integrated for visibility but has included_in_state = FALSE and cannot change the state.")
+    table(registry if isinstance(registry, pd.DataFrame) else evidence, 420)
+    source("Decision Evidence Registry", registry_src)
     source("Decision Evidence", evidence_src)
 
     st.subheader("Decision Summary")
@@ -1369,6 +1390,8 @@ def event_study() -> None:
         ("Sample Adequacy", adequacy, adequacy_src),
     ]:
         st.subheader(title)
+        if title == "Sample Adequacy":
+            st.caption("Reliability is definition-specific: <5 observations = INSUFFICIENT; 5–9 = LIMITED; 10–24 = MODERATE; ≥25 = ADEQUATE. Even ADEQUATE remains descriptive only and is never treated as causal/predictive evidence.")
         table(df, 560 if title == "Event x Horizon Summary" else 360)
         source(title, src)
 
@@ -1419,12 +1442,12 @@ def final_validation() -> None:
     table(summary, 220)
     source("Final Validation Summary", summary_src)
 
-    if isinstance(summary, pd.DataFrame) and "status" in summary.columns:
-        counts = summary["status"].astype(str).str.upper().value_counts()
+    if isinstance(summary, pd.DataFrame) and {"status","count"}.issubset(summary.columns):
+        sm = {str(r["status"]).upper(): r["count"] for _, r in summary.iterrows()}
         cols = st.columns(4)
         for col, status in zip(cols, ["PASS", "REVIEW", "FAIL", "OVERALL"]):
             with col:
-                card(status, int(counts.get(status, 0)))
+                card(status, sm.get(status, 0 if status != "OVERALL" else "—"))
 
     st.subheader("Validation Report")
     table(report, 650)
@@ -1554,8 +1577,7 @@ excluded evidence is never silently converted to neutral or zero.
 The published Decision Engine exposes state, confidence/evidence coverage,
 evidence counts, PIT status and research-only controls. Quality status is
 metadata and does not redefine supportive/contradictory/mixed semantics.
-Event/News and Earnings remain contextual unless a dedicated PIT-safe adapter
-explicitly makes an item eligible.
+Event/News and Earnings are integrated into the unified evidence registry as CONTEXTUAL evidence with `included_in_state = FALSE`. They are visible to the research gate but cannot silently alter Decision Engine V1 state semantics. Any future promotion requires a dedicated PIT-safe adapter and explicit validation.
 
 ### Historical Event Study V2
 
