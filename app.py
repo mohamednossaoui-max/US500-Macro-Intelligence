@@ -1037,6 +1037,24 @@ def fed() -> None:
         f"Directional shift: {fmt(sep_direction)}. SEP is a directional comparison, not a policy probability."
     )
 
+    # --- Communication current vs previous -----------------------------
+    comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
+    st.subheader("Communication — Current vs Previous")
+    comparison_rows = []
+    for key, label in (("statement", "FOMC Statement"), ("minutes", "FOMC Minutes"), ("chair_press", "Press Conference")):
+        item = comparison.get(key) if isinstance(comparison.get(key), dict) else {}
+        comp = item.get("comparison") if isinstance(item.get("comparison"), dict) else {}
+        previous_doc = item.get("previous") if isinstance(item.get("previous"), dict) else {}
+        current_doc = obj.get("chair_press" if key == "chair_press" else key)
+        current_doc = current_doc if isinstance(current_doc, dict) else {}
+        comparison_rows.append({
+            "Report": label, "Current": item.get("current_date"), "Previous": item.get("previous_date"),
+            "Current tone": current_doc.get("tone", "UNAVAILABLE"), "Previous tone": previous_doc.get("tone", "UNAVAILABLE"),
+            "Change": comp.get("classification", "UNAVAILABLE"),
+        })
+    st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
+    st.caption("Unavailable or not-yet-published reports remain unavailable; they are never converted into neutral evidence.")
+
     # --- Synthesis ------------------------------------------------------
     combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
     st.subheader("Fed Synthesis")
@@ -1089,6 +1107,20 @@ def fed() -> None:
         if beige.get("url"):
             st.markdown(f"[Official Beige Book source]({beige.get('url')})")
         st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
+
+    quality = obj.get("quality") if isinstance(obj.get("quality"), dict) else {}
+    st.subheader("Fed Evidence Quality")
+    qcols = st.columns(4)
+    for col, (label, value) in zip(qcols, [
+        ("Quality Gate", quality.get("quality_gate", "UNKNOWN")),
+        ("PIT", quality.get("pit_status", "UNKNOWN")),
+        ("Freshness", quality.get("freshness_status", "UNKNOWN")),
+        ("Role", quality.get("decision_role", "CONTEXTUAL")),
+    ]):
+        with col:
+            card(label, value)
+    if quality.get("quality_reason"):
+        st.caption(f"Quality note: {quality.get('quality_reason')}. Quality metadata does not alter the Fed analytical score.")
 
     with st.expander("View detailed data"):
         sep_rows = []

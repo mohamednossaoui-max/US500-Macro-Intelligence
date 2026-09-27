@@ -1635,6 +1635,56 @@ def build_beige_analysis(
     }
 
 
+def previous_document_date(links: Dict[str, Dict[date, str]], kind: str, current: date) -> Optional[date]:
+    """Return the latest earlier publication/meeting date for one Fed document kind."""
+    dates = [d for d in links.get(kind, {}) if d < current]
+    return max(dates) if dates else None
+
+
+def compare_document_analysis(current: Dict, previous: Dict) -> Dict:
+    """Deterministic current-vs-previous comparison without inventing missing evidence."""
+    if not current.get("available") or not previous.get("available"):
+        return {"available": False, "classification": "UNAVAILABLE", "tone_score_change": None, "mention_changes": {}}
+    cur = current.get("tone_score")
+    prev = previous.get("tone_score")
+    delta = round(cur - prev, 2) if isinstance(cur, (int, float)) and isinstance(prev, (int, float)) else None
+    if delta is None:
+        cls = "UNAVAILABLE"
+    elif delta >= 3:
+        cls = "MORE HAWKISH"
+    elif delta <= -3:
+        cls = "MORE DOVISH"
+    else:
+        cls = "BROADLY UNCHANGED"
+    mentions = {}
+    for key in ("inflation_mentions", "labor_mentions", "growth_mentions", "financial_mentions"):
+        a, b = current.get(key), previous.get(key)
+        mentions[key] = (a - b) if isinstance(a, int) and isinstance(b, int) else None
+    return {"available": True, "classification": cls, "tone_score_change": delta, "mention_changes": mentions}
+
+
+def fed_quality_contract(data: Dict, as_of: date) -> Dict:
+    """Quality/PIT metadata only; never changes analytical direction or score."""
+    docs = data.get("document_status", {})
+    sep_ok = bool((data.get("sep_current") or {}).get("available"))
+    beige_ok = bool((data.get("beige_book") or {}).get("available"))
+    available_docs = sum(bool((docs.get(k) or {}).get("available")) for k in ("statement", "minutes", "chair_press"))
+    if available_docs == 0:
+        gate, quality, reason = "EXCLUDED", "INSUFFICIENT", "NO_FOMC_COMMUNICATION"
+    elif available_docs < 3 or not sep_ok:
+        gate, quality, reason = "DEGRADED", "MEDIUM", "PARTIAL_PUBLICATION_SET"
+    else:
+        gate, quality, reason = "ELIGIBLE", "HIGH", None
+    return {
+        "quality_gate": gate, "quality_status": quality, "quality_reason": reason,
+        "pit_status": "PIT_SAFE", "freshness_status": "CURRENT",
+        "research_only": True, "forecast": False, "trading_signal": False,
+        "as_of_date": as_of.isoformat(), "communication_documents_available": available_docs,
+        "sep_available": sep_ok, "beige_book_available": beige_ok,
+        "decision_role": "CONTEXTUAL"
+    }
+
+
 # ============================================================
 # COMPLETE FED INTELLIGENCE
 # ============================================================
@@ -1693,6 +1743,13 @@ def build_fed_intelligence() -> Dict:
     chair = fed_chair_for_date(
         meeting
     )
+
+    previous_statement_date = previous_document_date(links, "statement", meeting)
+    previous_minutes_date = previous_document_date(links, "minutes", meeting)
+    previous_press_date = previous_document_date(links, "press", meeting)
+    previous_statement_text = fetch_document(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
+    previous_minutes_text = fetch_document(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
+    previous_press = press_page_data(links["press"].get(previous_press_date, "")) if previous_press_date else {"page_url": None, "pdf_url": None, "text": ""}
 
     current_sep_date = latest_sep(
         links,
@@ -1764,7 +1821,7 @@ def build_fed_intelligence() -> Dict:
         beige.get("text", "")
     )
 
-    return {
+    result = {
 
         "available": True,
 
@@ -1828,6 +1885,27 @@ def build_fed_intelligence() -> Dict:
             },
         },
 
+        "communication_comparison": {
+            "statement": {
+                "current_date": meeting.isoformat(),
+                "previous_date": previous_statement_date.isoformat() if previous_statement_date else None,
+                "previous": analyze("Previous FOMC Statement", previous_statement_text),
+                "comparison": compare_document_analysis(analyze("FOMC Statement", statement_text), analyze("Previous FOMC Statement", previous_statement_text)),
+            },
+            "minutes": {
+                "current_date": meeting.isoformat() if minutes_text else None,
+                "previous_date": previous_minutes_date.isoformat() if previous_minutes_date else None,
+                "previous": analyze("Previous FOMC Minutes", previous_minutes_text),
+                "comparison": compare_document_analysis(analyze("FOMC Minutes", minutes_text), analyze("Previous FOMC Minutes", previous_minutes_text)),
+            },
+            "chair_press": {
+                "current_date": meeting.isoformat() if press.get("text") else None,
+                "previous_date": previous_press_date.isoformat() if previous_press_date else None,
+                "previous": analyze("Previous Press Conference", previous_press.get("text", "")),
+                "comparison": compare_document_analysis(analyze(f"{chair} Press Conference", press.get("text", "")), analyze("Previous Press Conference", previous_press.get("text", ""))),
+            },
+        },
+
         # ----------------------------------------------------
         # SEP
         # ----------------------------------------------------
@@ -1876,6 +1954,8 @@ def build_fed_intelligence() -> Dict:
 
         "beige_analysis": beige_analysis
     }
+    result["quality"] = fed_quality_contract(result, today)
+    return result
 
 
 # ============================================================

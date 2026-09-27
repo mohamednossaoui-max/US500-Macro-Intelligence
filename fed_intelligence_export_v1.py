@@ -15,13 +15,15 @@ No trading signals.
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import date, datetime
 from pathlib import Path
 
 from fed_intelligence import build_fed_intelligence
 
 
-OUTPUT_FILE = Path("fed_intelligence_output_v1.json")
+OUTPUT_FILE = Path("public_data/fed_intelligence_output_v1.json")
+MANIFEST_FILE = Path("public_data/manifest.json")
 
 
 def json_default(value):
@@ -59,6 +61,21 @@ def main():
             default=json_default
         ),
         encoding="utf-8"
+    )
+
+    # Keep the canonical publication manifest synchronized with the artifact.
+    manifest = {}
+    if MANIFEST_FILE.exists():
+        manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    files = manifest.setdefault("files", {})
+    payload = OUTPUT_FILE.read_bytes()
+    files[OUTPUT_FILE.name] = {
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    manifest["research_only"] = True
+    MANIFEST_FILE.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
     print()
