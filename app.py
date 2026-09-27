@@ -545,6 +545,37 @@ def research_context() -> None:
         with col:
             card(label, value)
 
+    # PR-08D.1 — expose the already-published evidence-quality metadata.
+    # Presentation only: no quality value is recomputed in the UI.
+    st.subheader("Evidence Quality")
+    qcols = st.columns(5)
+    qmetrics = [
+        ("Overall Quality", safe_value(row, ["evidence_quality_status"]),
+         f"As of {safe_value(row, ['evidence_as_of_date'], 'NOT AVAILABLE')}"),
+        ("Coverage", safe_value(row, ["evidence_coverage_pct"]), "% available evidence"),
+        ("Freshness", safe_value(row, ["evidence_freshness_status"]),
+         f"{fmt(safe_value(row, ['evidence_freshness_current_pct'], None))}% current"),
+        ("PIT Integrity", safe_value(row, ["evidence_pit_status"]),
+         f"{fmt(safe_value(row, ['evidence_pit_safe_pct'], None))}% PIT-safe"),
+        ("Degraded / Missing", safe_value(row, ["evidence_degraded_count"]),
+         f"{fmt(safe_value(row, ['evidence_excluded_count'], None), 0)} excluded"),
+    ]
+    for col, (label, value, note) in zip(qcols, qmetrics):
+        with col:
+            card(label, value, note)
+
+    q_quality = safe_value(row, ["evidence_quality_status"], "NOT AVAILABLE")
+    q_pit = safe_value(row, ["evidence_pit_status"], "NOT AVAILABLE")
+    q_fresh = safe_value(row, ["evidence_freshness_status"], "NOT AVAILABLE")
+    q_cov = safe_value(row, ["evidence_coverage_pct"], "NOT AVAILABLE")
+    q_deg = safe_value(row, ["evidence_degraded_count"], "NOT AVAILABLE")
+    st.caption(
+        f"Evidence quality is published research metadata: quality={q_quality}, "
+        f"coverage={q_cov}%, freshness={q_fresh}, PIT={q_pit}, degraded={q_deg}. "
+        "It describes evidence fitness and exclusions only; it is not a forecast, "
+        "trading signal, recommendation, or execution input."
+    )
+
     table(df, 300)
     source("Research Context Summary", src)
 
