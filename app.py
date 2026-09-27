@@ -557,6 +557,15 @@ def executive() -> None:
 
     st.info("Evidence Coverage is completeness of eligible CORE evidence, not probability or forecast confidence.")
 
+    decision_ready = str(safe_value(rc_row, ["decision_engine_ready"], "False")).strip().lower() in {"true", "1", "yes"}
+    if decision_ready:
+        st.success("Research readiness: READY. The published state remains research-only and is not an execution instruction.")
+    else:
+        st.warning(
+            "Research readiness: NOT READY. The published Decision Engine state describes the current evidence balance only; "
+            "it must not be interpreted as a forecast, trading signal, or execution permission."
+        )
+
     st.subheader("Decision Evidence")
     table(evidence, 300)
     source("Decision Evidence", evidence_src)
@@ -1406,9 +1415,11 @@ def decision() -> None:
     evidence, evidence_src = load_named("Decision Evidence")
     registry, registry_src = load_named("Decision Evidence Registry")
     obj, json_src = load_named("Decision JSON")
+    rc, rc_src = load_named("Research Context Summary")
     row = latest_row(df)
+    rc_row = latest_row(rc)
 
-    cols = st.columns(8)
+    cols = st.columns(9)
     metrics = [
         ("State", safe_value(row, ["state"])),
         ("Evidence Coverage", safe_value(row, ["confidence"])),
@@ -1418,10 +1429,21 @@ def decision() -> None:
         ("Mixed", safe_value(row, ["mixed_count"])),
         ("PIT", safe_value(row, ["point_in_time_safe"])),
         ("Research Only", safe_value(row, ["research_only"])),
+        ("Decision Ready", safe_value(rc_row, ["decision_engine_ready"])),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
             card(label, value)
+
+    decision_ready = str(safe_value(rc_row, ["decision_engine_ready"], "False")).strip().lower() in {"true", "1", "yes"}
+    if not decision_ready:
+        st.warning(
+            "Decision Ready = False. State is descriptive research synthesis only and does not authorize forecasting, "
+            "trading, sizing, or execution."
+        )
+    else:
+        st.success("Decision Ready = True for research synthesis. Research-only / no-execution constraints still apply.")
+    source("Research Context Summary", rc_src)
 
     st.subheader("Evidence Matrix")
     st.caption("CORE evidence may determine the published V1 research state. CONTEXTUAL evidence is integrated for visibility but has included_in_state = FALSE and cannot change the state.")
