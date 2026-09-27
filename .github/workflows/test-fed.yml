@@ -16,13 +16,13 @@ jobs:
       # Checkout repository
       # ------------------------------------------------------
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # ------------------------------------------------------
       # Python
       # ------------------------------------------------------
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -54,13 +54,13 @@ jobs:
       # ------------------------------------------------------
       - name: Verify Fed Intelligence output
         run: |
-          test -f public_data/fed_intelligence_output_v1.json
+          test -f fed_intelligence_output_v1.json
 
           python - <<'PY'
           import json
           from pathlib import Path
 
-          path = Path("public_data/fed_intelligence_output_v1.json")
+          path = Path("fed_intelligence_output_v1.json")
 
           data = json.loads(
               path.read_text(encoding="utf-8")
@@ -83,11 +83,9 @@ jobs:
       # Upload artifact
       # ------------------------------------------------------
       - name: Upload Fed Intelligence artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fed-intelligence-v1
-          path: |
-            public_data/fed_intelligence_output_v1.json
-            public_data/manifest.json
+          path: fed_intelligence_output_v1.json
           if-no-files-found: error
           retention-days: 90
