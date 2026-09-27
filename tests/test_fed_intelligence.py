@@ -185,3 +185,21 @@ def test_fed_ui_labels_lagged_minutes_without_relabeling_them_current():
     assert "Latest published FOMC Minutes cover the" in source
     assert "lagged research evidence" in source
     assert "are not relabeled as current-meeting minutes" in source
+
+
+def test_lagged_minutes_remain_available_but_are_excluded_from_current_score():
+    out = fed.build_deep_fed_analysis(
+        **_texts(), sep_shift_data={}, minutes_current_for_score=False
+    )
+    assert out["document_availability"]["minutes"] is True
+    assert out["document_score_eligibility"]["minutes"] is False
+    assert out["document_weights"]["minutes"] == 0.0
+    assert out["document_weights"]["statement"] == pytest.approx(0.35 / 0.60, abs=1e-6)
+    assert out["document_weights"]["chair"] == pytest.approx(0.25 / 0.60, abs=1e-6)
+    assert "prior meeting" in out["method"].lower()
+
+
+def test_fed_ui_explains_lagged_minutes_scoring_boundary():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "lagged evidence · excluded from current-meeting score" in source
+    assert "Current-meeting synthesis uses the current Statement and Press Conference" in source
