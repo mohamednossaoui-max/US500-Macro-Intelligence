@@ -161,20 +161,20 @@
       "sha256": "fafff8b25d362fb0e51a4c01245fe9d7cae7da836288e4c7aa00a9759c031ea1"
     },
     "historical_event_study_conditional_events_v2.csv": {
-      "bytes": 1,
-      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      "bytes": 215,
+      "sha256": "ad91c4ccc82e54fe4d4c53c68af3ed9843494a24f51355b5e631ac0bcc7af366"
     },
     "historical_event_study_controlled_associations_v2.csv": {
-      "bytes": 10964,
-      "sha256": "acd14b6d0942d808316044d680a208e357ac096a672e6706c5ea994214dd7545"
+      "bytes": 10911,
+      "sha256": "6e72af76653578baf913101825caaa5a8e853e8b8899c34ae6e73289fbbb017e"
     },
     "historical_event_study_event_overlap_v2.csv": {
       "bytes": 4134,
       "sha256": "86385e29250954115288a2ef4a819c6e55254a0649ac4e5d90129a51acdb2c24"
     },
     "historical_event_study_feature_redundancy_v2.csv": {
-      "bytes": 2486,
-      "sha256": "22b5f47c919e846e06b9f8fa57768f0091a6bb63b921c4a46132565d9c32f196"
+      "bytes": 2478,
+      "sha256": "4b932b757336d7fee4f54a3c3f2d0c14e6de10bbc712fbaa5c6179dc32757157"
     },
     "historical_event_study_sample_adequacy_v2.csv": {
       "bytes": 971,
@@ -328,6 +328,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36190915225",
+  "source_run_id": "36329688936",
   "source_workflow": "Historical Event Study v2"
 }
