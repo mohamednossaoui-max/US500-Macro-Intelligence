@@ -18,8 +18,25 @@ def apply_ui_v3() -> None:
 .v3-kicker{font-size:.68rem;font-weight:850;letter-spacing:.13em;color:var(--blue);text-transform:uppercase}.v3-title{font-size:1.95rem;font-weight:900;letter-spacing:-.035em;margin:.15rem 0}.v3-sub{color:var(--muted);font-size:.82rem}.v3-section{margin:1.45rem 0 .55rem;border-bottom:1px solid var(--line);padding-bottom:.4rem}.v3-section b{font-size:1.03rem}.v3-rank{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(10,23,37,.8);margin:6px 0}.v3-ranknum{font-size:.72rem;color:var(--blue);font-weight:900;min-width:24px}.v3-rankname{font-weight:800;flex:1}.v3-rankvalue{font-variant-numeric:tabular-nums;font-weight:850}.v3-alert{border:1px solid var(--line);border-left:3px solid var(--accent,#8ea4b7);border-radius:11px;padding:10px 12px;background:rgba(10,23,37,.82);margin:7px 0}.v3-alert b{color:var(--accent,#edf6ff)}
 /* Streamlit dataframe / table dark surface */
 [data-testid="stDataFrame"], [data-testid="stTable"]{border:1px solid var(--line)!important;border-radius:13px!important;overflow:hidden!important;background:#081522!important;box-shadow:0 10px 24px rgba(0,0,0,.12)}
-[data-testid="stDataFrame"] *{--gdg-bg-cell:#081522!important;--gdg-bg-header:#0d2133!important;--gdg-text-dark:#eaf4ff!important;--gdg-text-medium:#a7bac9!important;--gdg-border-color:#17344d!important}
+/* Glide Data Grid is canvas-rendered: its colors come from the component theme,
+   while these selectors keep the surrounding Streamlit chrome dark. */
+[data-testid="stDataFrame"]{--gdg-bg-cell:#081522!important;--gdg-bg-header:#0d2133!important;--gdg-text-dark:#eaf4ff!important;--gdg-text-medium:#a7bac9!important;--gdg-border-color:#17344d!important}
+[data-testid="stDataFrame"] [data-testid="stDataFrameResizable"],
+[data-testid="stDataFrame"] [data-testid="stDataFrameGlideDataEditor"],
+[data-testid="stDataFrame"] > div{background:#081522!important}
+[data-testid="stDataFrame"] button{background:#0d2133!important;color:#eaf4ff!important;border-color:#17344d!important}
 [data-testid="stDataFrame"] canvas{filter:none!important}
+/* Native st.table is DOM-rendered and can be fully themed. */
+[data-testid="stTable"] table{background:#081522!important;color:#eaf4ff!important}
+[data-testid="stTable"] th{background:#0d2133!important;color:#eaf4ff!important;border-color:#17344d!important}
+[data-testid="stTable"] td{background:#081522!important;color:#dcecff!important;border-color:#17344d!important}
+.v3-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:13px;background:#081522;box-shadow:0 10px 24px rgba(0,0,0,.12);scrollbar-color:#245077 #081522}
+.v3-data-table{width:100%;border-collapse:separate;border-spacing:0;background:#081522;color:#dcecff;font-size:.78rem;font-variant-numeric:tabular-nums}
+.v3-data-table thead th{position:sticky;top:0;z-index:2;background:#0d2133;color:#edf6ff;text-align:left;font-size:.69rem;letter-spacing:.035em;text-transform:uppercase;padding:10px 12px;border-bottom:1px solid #245077;white-space:nowrap}
+.v3-data-table tbody td{padding:9px 12px;border-bottom:1px solid #112b40;background:#081522;white-space:nowrap}
+.v3-data-table tbody tr:nth-child(even) td{background:#091827}.v3-data-table tbody tr:hover td{background:#0d2133;color:#fff}
+/* Altair/Vega/Plotly wrappers: remove the white card effect around charts. */
+[data-testid="stVegaLiteChart"], [data-testid="stPlotlyChart"], [data-testid="stArrowVegaLiteChart"]{background:#081522!important;border:1px solid var(--line)!important;border-radius:13px!important;padding:6px!important}
 [data-testid="stMetric"]{background:linear-gradient(145deg,rgba(15,34,53,.94),rgba(7,20,33,.94));border:1px solid var(--line);border-radius:13px;padding:12px 14px}
 [data-testid="stAlert"]{border-radius:12px!important;border-color:var(--line)!important}
 .stTabs [data-baseweb="tab-list"]{gap:8px;border-bottom:1px solid var(--line)}.stTabs [data-baseweb="tab"]{background:#091827;border:1px solid var(--line);border-radius:9px 9px 0 0;padding:8px 14px}.stTabs [aria-selected="true"]{border-color:#2c6590!important;color:#fff!important}
