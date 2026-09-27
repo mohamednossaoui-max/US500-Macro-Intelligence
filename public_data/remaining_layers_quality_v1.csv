@@ -1,0 +1,10 @@
+layer,available,row_count,pit_status,freshness_status,quality_status,quality_gate,quality_reason,decision_role,research_only,forecast,trading_signal,note
+EVENT_NEWS,True,97,PIT_SAFE,CURRENT,MEDIUM,ELIGIBLE,,CONTEXTUAL,True,False,False,publication-time chronology audited; contextual only
+EARNINGS,True,1203,PIT_LIMITED,CURRENT,MEDIUM,DEGRADED,PIT_LIMITED,CONTEXTUAL,True,False,False,post-event reaction data cannot be treated as contemporaneous decision evidence
+DECISION_ENGINE,True,1,PIT_SAFE,CURRENT,MEDIUM,ELIGIBLE,,OUTPUT,True,False,False,state semantics preserved; quality is metadata only
+HISTORICAL_EVENT_STUDY,True,1916,PIT_LIMITED,CURRENT,MEDIUM,DEGRADED,PIT_LIMITED,CONTEXTUAL,True,False,False,historical association; not forecast or causal evidence
+HISTORICAL_EDGE,False,0,UNKNOWN,UNKNOWN,INSUFFICIENT,EXCLUDED,UNAVAILABLE,SUPPORTING,True,False,False,no historical_edge_* artifact in current publication; no synthetic substitute
+FINAL_VALIDATION,True,1,PIT_LIMITED,CURRENT,MEDIUM,DEGRADED,PIT_LIMITED,VALIDATION,True,False,False,structural validation only
+DATA_STATUS,True,0,PIT_SAFE,CURRENT,HIGH,ELIGIBLE,,OBSERVABILITY,True,False,False,derived from canonical manifest and quality contract
+DATA_EXPLORER,True,0,PIT_SAFE,CURRENT,HIGH,ELIGIBLE,,OBSERVABILITY,True,False,False,display-only; no recomputation
+METHODOLOGY,True,0,PIT_SAFE,CURRENT,HIGH,ELIGIBLE,,DOCUMENTATION,True,False,False,documents research-only/PIT/quality boundaries

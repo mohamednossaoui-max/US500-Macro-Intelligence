@@ -1,0 +1,18 @@
+{
+  "version": "remaining-layers-quality-v1",
+  "status": "PASS",
+  "research_only": true,
+  "forecast": false,
+  "trading_signal": false,
+  "layer_count": 9,
+  "eligible_count": 5,
+  "degraded_count": 3,
+  "excluded_count": 1,
+  "future_evidence_count": 0,
+  "historical_edge_published": false,
+  "decision_semantics_changed": false,
+  "warnings": [
+    "Historical Edge remains explicitly unavailable until dedicated artifacts are published.",
+    "Earnings reaction horizons are contextual/post-event evidence and are PIT_LIMITED for contemporaneous decisions."
+  ]
+}
