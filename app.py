@@ -12,6 +12,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from publication_manifest import manifest_file_names, manifest_metric
+
 APP_VERSION = "V6.3"
 REPO = "mohamednossaoui-max/US500-Macro-Intelligence"
 BRANCH = "main"
@@ -186,14 +188,8 @@ def fetch_raw(filename: str) -> Optional[bytes]:
 
 
 def manifest_files() -> list[str]:
-    manifest = get_manifest()
-    result = []
-    datasets = manifest.get("datasets")
-    if isinstance(datasets, list):
-        for item in datasets:
-            if isinstance(item, dict) and isinstance(item.get("file"), str):
-                result.append(item["file"])
-    return sorted(set(result))
+    """Return artifacts published by the canonical manifest contract."""
+    return manifest_file_names(get_manifest())
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -1501,10 +1497,10 @@ def data_status() -> None:
     manifest = get_manifest()
     cols = st.columns(4)
     metrics = [
-        ("Manifest Datasets", manifest.get("dataset_count", "—")),
-        ("Generated UTC", manifest.get("generated_at_utc", "—")),
-        ("Master Run", manifest.get("master_run_id", "—")),
-        ("Repository", manifest.get("repository", REPO)),
+        ("Published Artifacts", manifest_metric(manifest, "artifact_count")),
+        ("Publisher", manifest_metric(manifest, "publisher")),
+        ("Publisher Version", manifest_metric(manifest, "publisher_version")),
+        ("Source Run", manifest_metric(manifest, "source_run_id")),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
@@ -1518,10 +1514,14 @@ def data_status() -> None:
 
 def explorer() -> None:
     st.header("Published Data Explorer")
-    files = manifest_files()
+    manifest = get_manifest()
+    if not manifest:
+        st.warning("Publication manifest is unavailable.")
+        return
 
+    files = manifest_file_names(manifest)
     if not files:
-        st.warning("public_data manifest was not found.")
+        st.warning("Publication manifest contains no published artifacts.")
         return
 
     selected = st.selectbox("Artifact", files)
@@ -1631,7 +1631,7 @@ with st.sidebar:
     st.divider()
     st.caption("Token-free")
     st.caption("local public_data → GitHub Raw → NOT PUBLISHED")
-    st.caption(f"Manifest datasets: {get_manifest().get('dataset_count', '—')}")
+    st.caption(f"Published artifacts: {manifest_metric(get_manifest(), 'artifact_count')}")
 
 st.markdown(
     '<div class="hero"><h1>US500 Macro Intelligence — Research Terminal V6.2</h1>'
