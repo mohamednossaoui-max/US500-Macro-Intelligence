@@ -54,13 +54,13 @@ jobs:
       # ------------------------------------------------------
       - name: Verify Fed Intelligence output
         run: |
-          test -f fed_intelligence_output_v1.json
+          test -f public_data/fed_intelligence_output_v1.json
 
           python - <<'PY'
           import json
           from pathlib import Path
 
-          path = Path("fed_intelligence_output_v1.json")
+          path = Path("public_data/fed_intelligence_output_v1.json")
 
           data = json.loads(
               path.read_text(encoding="utf-8")
@@ -86,6 +86,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fed-intelligence-v1
-          path: fed_intelligence_output_v1.json
+          path: |
+            public_data/fed_intelligence_output_v1.json
+            public_data/manifest.json
           if-no-files-found: error
           retention-days: 90
