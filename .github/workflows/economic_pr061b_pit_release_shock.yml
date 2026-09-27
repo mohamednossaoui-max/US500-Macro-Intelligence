@@ -1,0 +1,38 @@
+name: PR-06.1B Economic PIT + Release Shock
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pit-release-shock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy requests beautifulsoup4 pypdf pytest
+      - name: Build historical baseline
+        run: |
+          python economic_historical_expansion_v2.2.py
+          python economic_historical_refresh_v1.py
+      - name: Collect verified expanded releases
+        run: python economic_release_collector_v1_1.py
+      - name: PIT bridge
+        run: python economic_pit_release_bridge_v1.py
+      - name: Release Shock Engine
+        run: python economic_surprise_engine_v1.1.py
+      - name: PR-06.1B acceptance tests
+        run: python -m pytest -q tests/test_economic_pit_release_shock.py
+      - name: Upload PR-06.1B artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-pr061b-pit-release-shock
+          path: |
+            economic_historical_events_v1.csv
+            economic_historical_quality_v1.csv
+            economic_surprise_engine_v1.csv
+            economic_surprise_summary_v1.csv
