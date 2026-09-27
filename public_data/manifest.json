@@ -129,8 +129,8 @@
       "sha256": "ae48ff2cb068ff05c036e90b17b1487216dcd87db02cb2bdbcdd0e3c487191b8"
     },
     "fed_intelligence_output_v1.json": {
-      "bytes": 14219,
-      "sha256": "a6533d6fa2a1992f907df220dff602403c79bfb3875c940c54b69a7b5230cbef"
+      "bytes": 14844,
+      "sha256": "59ad1bc8fbf2cf31868554ef5afcc855280e51233e69428312b490c88346afc7"
     },
     "final_end_to_end_validation.json": {
       "bytes": 923,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36347413719",
+  "source_run_id": "36348412451",
   "source_workflow": "Fed Intelligence"
 }
