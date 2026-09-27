@@ -215,10 +215,15 @@
       "minutes": true,
       "chair": true
     },
+    "document_score_eligibility": {
+      "statement": true,
+      "minutes": false,
+      "chair": true
+    },
     "document_weights": {
-      "statement": 0.35,
-      "minutes": 0.4,
-      "chair": 0.25
+      "statement": 0.583333,
+      "minutes": 0.0,
+      "chair": 0.416667
     },
     "statement": {
       "inflation": {
@@ -333,8 +338,8 @@
     },
     "combined": {
       "inflation": {
-        "score_100": 59.8,
-        "classification": "MODERATELY HAWKISH",
+        "score_100": 52.9,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -358,8 +363,8 @@
         }
       },
       "labor": {
-        "score_100": 59.8,
-        "classification": "MODERATELY HAWKISH",
+        "score_100": 52.9,
+        "classification": "NEUTRAL",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -383,7 +388,7 @@
         }
       },
       "growth": {
-        "score_100": 48.0,
+        "score_100": 50.0,
         "classification": "NEUTRAL",
         "statement": {
           "score": 0,
@@ -433,7 +438,7 @@
         }
       },
       "policy": {
-        "score_100": 54.0,
+        "score_100": 50.0,
         "classification": "NEUTRAL",
         "statement": {
           "score": 0,
@@ -459,24 +464,24 @@
       }
     },
     "fed_score": {
-      "score": 60.0,
-      "base_score": 55.0,
+      "score": 56.2,
+      "base_score": 51.2,
       "sep_adjustment": 5.0,
       "classification": "MODERATELY HAWKISH"
     },
     "reasons": [
-      "- Inflation: None (+2.45)",
-      "- Labor: None (+1.47)",
-      "- Growth: None (-0.30)",
+      "- Inflation: None (+0.72)",
+      "- Labor: None (+0.43)",
+      "- Growth: None (+0.00)",
       "- Financial: None (+0.00)",
-      "- Policy: None (+1.40)",
+      "- Policy: None (+0.00)",
       "- SEP: HAWKISH SHIFT"
     ],
-    "method": "Statement/Minutes/Chair weights are 35/40/25 when all are available. Missing documents are excluded and the remaining weights are renormalized. SEP is a directional adjustment, not a probability or trading signal."
+    "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
   },
   "fed_score": {
-    "score": 60.0,
-    "base_score": 55.0,
+    "score": 56.2,
+    "base_score": 51.2,
     "sep_adjustment": 5.0,
     "classification": "MODERATELY HAWKISH"
   },
