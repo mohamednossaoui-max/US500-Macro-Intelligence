@@ -48,6 +48,10 @@ background:rgba(128,140,155,.04);min-height:88px}
 .pulse{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(128,140,155,.16)}
 .pulse:last-child{border-bottom:0}.pulse-name{font-weight:750}.pulse-value{font-variant-numeric:tabular-nums;font-weight:800}.pulse-note{font-size:.76rem;color:#8b96a5}
 .timeline{font-weight:800;letter-spacing:.01em;padding:10px 0 4px 0}
+.econ-pulse{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:15px 16px;background:rgba(128,140,155,.045);margin:.35rem 0 .9rem}
+.econ-regime{font-size:1.45rem;font-weight:900;letter-spacing:.03em}.econ-sub{font-size:.8rem;color:#8b96a5;line-height:1.45}
+.econ-dim{border:1px solid rgba(128,140,155,.22);border-radius:12px;padding:12px 14px;background:rgba(128,140,155,.03);min-height:112px}
+.econ-dim .score{font-size:1.25rem;font-weight:850;margin:.2rem 0}.econ-release{border-left:3px solid rgba(128,140,155,.35);padding:8px 12px;margin:6px 0}.econ-release .name{font-weight:850}.econ-release .meta{font-size:.75rem;color:#8b96a5}.econ-bottom{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:14px 16px;background:rgba(128,140,155,.055);margin:.3rem 0 1rem}
 .fed-gauge{position:relative;height:16px;border-radius:999px;background:linear-gradient(90deg,rgba(74,144,226,.55),rgba(128,140,155,.18) 50%,rgba(231,111,81,.55));margin:18px 2px 8px}
 .fed-marker{position:absolute;top:-7px;width:4px;height:30px;border-radius:4px;background:currentColor;box-shadow:0 0 0 3px rgba(128,140,155,.18)}
 .fed-scale{display:flex;justify-content:space-between;font-size:.67rem;font-weight:800;letter-spacing:.07em;color:#8b96a5}
@@ -580,27 +584,201 @@ def macro_context() -> None:
 
 def economic() -> None:
     st.header("Economic Intelligence")
-    tabs = st.tabs(["Regime", "Surprise", "Historical Events", "Quality"])
+    regime_df, regime_src = load_named("Economic Regime")
+    surprise_df, surprise_src = load_named("Economic Surprise")
+    events_df, events_src = load_named("Economic Historical Events")
+    quality_df, quality_src = load_named("Economic Quality")
 
-    with tabs[0]:
-        df, src = load_named("Economic Regime")
-        table(df, 420)
-        source("Economic Regime", src)
+    if not isinstance(regime_df, pd.DataFrame) or regime_df.empty:
+        st.warning("Economic Regime is not published or is currently unavailable.")
+        source("Economic Regime", regime_src)
+        return
 
-    with tabs[1]:
-        df, src = load_named("Economic Surprise")
-        table(df.tail(300) if isinstance(df, pd.DataFrame) else None, 500)
-        source("Economic Surprise", src)
+    st.caption(
+        "Point-in-time research view of inflation, labor and growth evidence. "
+        "Release shocks are not consensus surprises unless a published consensus is explicitly available."
+    )
 
-    with tabs[2]:
-        df, src = load_named("Economic Historical Events")
-        table(df.tail(300) if isinstance(df, pd.DataFrame) else None, 500)
-        source("Economic Historical Events", src)
+    row = latest_row(regime_df)
+    as_of = safe_value(row, ["release_date"])
+    regime = safe_value(row, ["economic_regime"])
+    pit_safe = safe_value(row, ["pit_safe"])
+    research_only = safe_value(row, ["research_only"])
 
-    with tabs[3]:
-        df, src = load_named("Economic Quality")
-        table(df, 420)
-        source("Economic Quality", src)
+    dims = {
+        "Inflation": {
+            "score": safe_value(row, ["inflation_score"], None),
+            "indicators": safe_value(row, ["inflation_indicators"], "—"),
+            "age": safe_value(row, ["inflation_age_days"], None),
+        },
+        "Labor": {
+            "score": safe_value(row, ["labor_score"], None),
+            "indicators": safe_value(row, ["labor_indicators"], "—"),
+            "age": safe_value(row, ["labor_age_days"], None),
+        },
+        "Growth": {
+            "score": safe_value(row, ["growth_score"], None),
+            "indicators": safe_value(row, ["growth_indicators"], "—"),
+            "age": safe_value(row, ["growth_age_days"], None),
+        },
+    }
+
+    def _direction(value: Any) -> tuple[str, str]:
+        if not isinstance(value, (int, float)):
+            return "—", "Unavailable"
+        if value >= 0.15:
+            return "↑", "Positive directional pressure"
+        if value <= -0.15:
+            return "↓", "Negative directional pressure"
+        return "→", "Near neutral"
+
+    def _release_interpretation(indicator: str, shock: Any) -> str:
+        if not isinstance(shock, (int, float)) or abs(float(shock)) < 1e-12:
+            return "Little directional change versus the prior reference."
+        positive = float(shock) > 0
+        if indicator in {"CPI", "CORE_CPI"}:
+            return "Inflation pressure stronger." if positive else "Inflation pressure softer."
+        if indicator in {"NFP", "INITIAL_JOBLESS_CLAIMS", "UNEMPLOYMENT_RATE"}:
+            return "Labor evidence firmer." if positive else "Labor evidence softer."
+        if indicator in {"GDP", "ISM_MANUFACTURING_PMI"}:
+            return "Growth momentum firmer." if positive else "Growth momentum softer."
+        return "Positive directional release shock." if positive else "Negative directional release shock."
+
+    # Economic Pulse ----------------------------------------------------
+    st.subheader("Economic Pulse")
+    headline_parts = []
+    for name, data in dims.items():
+        arrow, _ = _direction(data["score"])
+        score_text = f"{data['score']:+.2f}" if isinstance(data["score"], (int, float)) else "—"
+        headline_parts.append(f"{name} {arrow} {score_text}")
+    st.markdown(
+        f"<div class='econ-pulse'><div class='label'>CURRENT ECONOMIC REGIME</div>"
+        f"<div class='econ-regime'>{fmt(regime)}</div>"
+        f"<div class='econ-sub'>As of {fmt(as_of)} · {' · '.join(headline_parts)} · PIT {fmt(pit_safe)}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # What changed: latest material releases, ranked by directional z-score magnitude.
+    st.subheader("What Changed?")
+    recent = None
+    if isinstance(surprise_df, pd.DataFrame) and not surprise_df.empty:
+        recent = surprise_df.copy()
+        recent["_date"] = pd.to_datetime(recent.get("release_date"), errors="coerce")
+        recent["_z"] = pd.to_numeric(recent.get("directional_zscore"), errors="coerce")
+        recent["_shock"] = pd.to_numeric(recent.get("directional_release_shock"), errors="coerce")
+        recent = recent.sort_values(["_date", "_z"], ascending=[False, False])
+        newest = recent["_date"].max()
+        if pd.notna(newest):
+            recent = recent[recent["_date"] >= newest - pd.Timedelta(days=14)]
+        recent["_abs_z"] = recent["_z"].abs()
+        recent = recent.sort_values(["_abs_z", "_date"], ascending=[False, False]).head(3)
+
+    if isinstance(recent, pd.DataFrame) and not recent.empty:
+        cols = st.columns(len(recent))
+        for col, (_, release) in zip(cols, recent.iterrows()):
+            indicator = str(release.get("indicator", "—"))
+            actual = release.get("actual")
+            previous = release.get("delta_reference_value")
+            if pd.isna(previous):
+                previous = release.get("previous")
+            delta = release.get("release_delta")
+            shock = release.get("directional_release_shock")
+            arrow = "▲" if isinstance(shock, (int, float)) and shock > 0 else "▼" if isinstance(shock, (int, float)) and shock < 0 else "→"
+            delta_text = f"{delta:+.1f}" if isinstance(delta, (int, float)) else "—"
+            with col:
+                st.markdown(
+                    f"<div class='signal-card'><div class='signal-title'>{indicator.replace('_', ' ')}</div>"
+                    f"<div class='signal-main'>{fmt(previous, 1)} → {fmt(actual, 1)} &nbsp; {arrow} {delta_text}</div>"
+                    f"<div class='signal-why'>{_release_interpretation(indicator, shock)}<br>"
+                    f"{fmt(release.get('release_date'))} · {fmt(release.get('zscore_class'))}</div></div>",
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.info("No recent release-shock evidence is available.")
+
+    # Bottom line -------------------------------------------------------
+    inflation = dims["Inflation"]["score"]
+    labor = dims["Labor"]["score"]
+    growth = dims["Growth"]["score"]
+    statements = []
+    if isinstance(inflation, (int, float)):
+        statements.append("inflation pressure is relatively firm" if inflation >= .15 else "inflation pressure is relatively soft" if inflation <= -.15 else "inflation is near neutral")
+    if isinstance(labor, (int, float)):
+        statements.append("labor evidence is firm" if labor >= .15 else "labor evidence is soft" if labor <= -.15 else "labor remains close to neutral")
+    if isinstance(growth, (int, float)):
+        statements.append("growth evidence is firm" if growth >= .15 else "growth evidence is softer" if growth <= -.15 else "growth remains close to neutral")
+    bottom = "; ".join(statements) + "." if statements else "Dimension evidence is unavailable."
+    st.subheader("Economic Bottom Line")
+    st.markdown(
+        f"<div class='econ-bottom'><div class='label'>CURRENT READ</div><div class='value'>{fmt(regime)}</div>"
+        f"<div class='small'>{bottom.capitalize()} This is a research classification, not a market forecast.</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    # Dimension pulse ---------------------------------------------------
+    st.subheader("Dimension Pulse")
+    cols = st.columns(3)
+    for col, (name, data) in zip(cols, dims.items()):
+        arrow, direction = _direction(data["score"])
+        score_text = f"{data['score']:+.2f}" if isinstance(data["score"], (int, float)) else "—"
+        age_text = f"{int(data['age'])} days" if isinstance(data["age"], (int, float)) else "Unavailable"
+        indicators = str(data["indicators"]).replace("|", " · ")
+        with col:
+            st.markdown(
+                f"<div class='econ-dim'><div class='label'>{name.upper()}</div>"
+                f"<div class='score'>{arrow} {score_text}</div>"
+                f"<div class='small'>{direction}<br>{indicators}<br>Freshness: {age_text}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    # Latest releases ---------------------------------------------------
+    st.subheader("Latest Economic Releases")
+    if isinstance(surprise_df, pd.DataFrame) and not surprise_df.empty:
+        releases = surprise_df.copy()
+        releases["_date"] = pd.to_datetime(releases.get("release_date"), errors="coerce")
+        releases = releases.sort_values("_date", ascending=False).head(8)
+        for _, release in releases.iterrows():
+            indicator = str(release.get("indicator", "—"))
+            consensus_method = str(release.get("consensus_method", "NOT_AVAILABLE"))
+            shock = release.get("directional_release_shock")
+            z = release.get("directional_zscore")
+            actual = release.get("actual")
+            previous = release.get("delta_reference_value")
+            if pd.isna(previous):
+                previous = release.get("previous")
+            st.markdown(
+                f"<div class='econ-release'><div class='name'>{indicator.replace('_', ' ')}</div>"
+                f"<div>{fmt(previous, 1)} → <b>{fmt(actual, 1)}</b> · Release Δ {fmt(release.get('release_delta'), 1)}</div>"
+                f"<div class='meta'>{fmt(release.get('release_date'))} · Directional shock {fmt(shock, 2)} · z {fmt(z, 2)} · "
+                f"{fmt(release.get('zscore_class'))} · Consensus: {consensus_method}</div></div>",
+                unsafe_allow_html=True,
+            )
+            url = release.get("source_url")
+            if isinstance(url, str) and url.startswith("http"):
+                st.markdown(f"[Official source]({url})")
+    else:
+        st.info("Economic release data is unavailable.")
+
+    st.caption(
+        f"Economic Regime: {source_status(regime_src)} · Release Engine: {source_status(surprise_src)} · "
+        f"PIT Safe: {fmt(pit_safe)} · Research Only: {fmt(research_only)}"
+    )
+
+    # Research detail: retain auditability without dominating the page.
+    st.subheader("Research Detail")
+    with st.expander("Regime history"):
+        table(regime_df.tail(250), 480)
+        source("Economic Regime", regime_src)
+    with st.expander("Release Shock / Surprise Engine data"):
+        st.caption("Consensus fields are displayed as published. NOT_AVAILABLE is never converted into a beat/miss claim.")
+        table(surprise_df.tail(300) if isinstance(surprise_df, pd.DataFrame) else None, 520)
+        source("Economic Surprise", surprise_src)
+    with st.expander("Historical events"):
+        table(events_df.tail(300) if isinstance(events_df, pd.DataFrame) else None, 520)
+        source("Economic Historical Events", events_src)
+    with st.expander("Data quality"):
+        table(quality_df, 420)
+        source("Economic Quality", quality_src)
 
 
 def fed() -> None:
