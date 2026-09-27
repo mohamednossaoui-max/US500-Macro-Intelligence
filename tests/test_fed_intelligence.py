@@ -85,11 +85,24 @@ def test_backward_compatible_powell_keys_are_preserved_in_engine_contract():
 def test_fed_ui_exposes_required_report_sections():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     required = [
+        'st.subheader("Policy Pulse")',
+        'st.subheader("What Changed?")',
         'st.subheader("FOMC Communication")',
-        'st.subheader("SEP — Current vs Previous")',
-        'st.subheader("Fed Synthesis by Dimension")',
-        'st.subheader("Beige Book")',
+        'st.subheader("SEP Pulse — Current vs Previous")',
+        'st.subheader("Fed Synthesis")',
+        'st.subheader("Beige Book Context")',
+        'st.subheader("Fed Bottom Line")',
+        'with st.expander("View detailed data")',
         '"Not yet published / unavailable"',
     ]
     for marker in required:
         assert marker in source
+
+
+def test_fed_ui_does_not_mislabel_legacy_available_evidence_as_excluded():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "Included in analysis · weight metadata pending refresh" in source
+    assert "Excluded until published" in source
+    assert "explicit_weight" in source
+    assert "explicit_availability" in source
+
