@@ -1849,6 +1849,22 @@ def validate_layer_coverage(
                 ),
             )
 
+        elif layer == "Unified Sentiment" and (
+            mapping["COT Positioning"]["PRIMARY"]
+            and mapping["AAII Sentiment"]["PRIMARY"]
+            and mapping["VIX Sentiment"]["PRIMARY"]
+        ):
+
+            add_check(
+                results,
+                "LAYER_COVERAGE",
+                "Layer Coverage",
+                layer,
+                "PASS",
+                "INFO",
+                "Unified Sentiment is represented by the published COT, AAII and VIX primary components; no synthetic aggregate artifact is required.",
+            )
+
         else:
 
             add_check(

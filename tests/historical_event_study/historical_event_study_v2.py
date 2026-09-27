@@ -477,7 +477,13 @@ def conditional_event_diagnostics(panel: pd.DataFrame) -> pd.DataFrame:
                     ),
                 })
 
-    return pd.DataFrame(rows)
+    columns = [
+        "event_name", "event_layer", "conditioning_event", "conditioning_layer",
+        "horizon", "event_and_condition_observations", "event_only_observations",
+        "event_and_condition_mean_return_pct", "event_only_mean_return_pct",
+        "conditional_difference_pp",
+    ]
+    return pd.DataFrame(rows, columns=columns)
 
 
 def controlled_association(panel: pd.DataFrame) -> pd.DataFrame:
