@@ -74,6 +74,25 @@ core['quality_gate']='ELIGIBLE'; core['decision_role']='CORE'; core['included_in
 rows=[]
 rows.append({'source':'Event / News','category':'event_news','stance':'CONTEXTUAL','reason':f"{len(ev)} official items; {int((ev['research_relevance']=='HIGH').sum())} high-relevance; {int(ev['is_duplicate'].sum())} duplicates flagged.",'value':summary.get('coverage_level','—'),'quality_gate':'ELIGIBLE','decision_role':'CONTEXTUAL','included_in_state':False,'pit_status':'PIT_SAFE_BY_PUBLICATION_TIME'})
 rows.append({'source':'Corporate Earnings','category':'earnings','stance':'CONTEXTUAL','reason':f"{len(ea)} historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.",'value':quality['date_end'],'quality_gate':'DEGRADED','decision_role':'CONTEXTUAL','included_in_state':False,'pit_status':'PIT_LIMITED'})
+# Fed Intelligence is surfaced as the independently published current research layer.
+# It is deliberately CONTEXTUAL here: Research Context already carries legacy Fed fields,
+# so promoting this artifact into V1 state would risk double counting and change semantics.
+fed_path=P/'fed_intelligence_output_v1.json'
+if fed_path.exists():
+    fed=json.loads(fed_path.read_text())
+    fq=fed.get('quality') if isinstance(fed.get('quality'),dict) else {}
+    fs=fed.get('fed_score') if isinstance(fed.get('fed_score'),dict) else {}
+    rows.append({
+        'source':'Fed Intelligence (current)',
+        'category':'fed',
+        'stance':'CONTEXTUAL',
+        'reason':f"Independent Fed artifact as of {fed.get('as_of_date','—')}; {fq.get('quality_reason','quality reason unavailable')}. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.",
+        'value':fs.get('score'),
+        'quality_gate':fq.get('quality_gate','DEGRADED'),
+        'decision_role':'CONTEXTUAL',
+        'included_in_state':False,
+        'pit_status':fq.get('pit_status','UNKNOWN'),
+    })
 reg=pd.concat([core,pd.DataFrame(rows)],ignore_index=True)
 reg.to_csv(P/'decision_engine_evidence_registry_v2.csv',index=False)
 
@@ -83,7 +102,7 @@ checks=[
  ('event_news_contextual', (ev['decision_role'].astype(str).str.upper()=='CONTEXTUAL').all()),
  ('earnings_contextual', (ea['decision_role'].astype(str).str.upper()=='CONTEXTUAL').all()),
  ('event_study_reliability', 'reliability_tier' in ad),
- ('decision_registry_has_context', {'Event / News','Corporate Earnings'}.issubset(set(reg['source']))),
+ ('decision_registry_has_context', {'Event / News','Corporate Earnings','Fed Intelligence (current)'}.issubset(set(reg['source']))),
  ('context_excluded_from_state', (~reg.loc[reg['decision_role']=='CONTEXTUAL','included_in_state'].astype(bool)).all()),
 ]
 out={'validator':'Final Remaining-Layers Hardening v1','generated_at':now,'status':'PASS' if all(v for _,v in checks) else 'FAIL','checks':[{'check':k,'pass':bool(v)} for k,v in checks],'research_only':True,'decision_semantics_changed':False}

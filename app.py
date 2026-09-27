@@ -282,6 +282,18 @@ def latest_row(df: Optional[pd.DataFrame]) -> Optional[pd.Series]:
     return df.iloc[-1]
 
 
+def latest_date_from_json(obj: Any) -> str:
+    if not isinstance(obj, dict):
+        return "—"
+    for key in ("as_of_date", "current_date", "generated_at", "generated_at_utc", "date"):
+        value = obj.get(key)
+        if value:
+            parsed = pd.to_datetime(value, errors="coerce", utc=True)
+            if not pd.isna(parsed):
+                return parsed.strftime("%Y-%m-%d")
+    return "—"
+
+
 def latest_date(df: Optional[pd.DataFrame]) -> str:
     if df is None or df.empty:
         return "—"
@@ -462,6 +474,7 @@ def executive() -> None:
     mc, mc_src = load_named("Macro Context")
     dec, dec_src = load_named("Decision Summary")
     evidence, evidence_src = load_named("Decision Evidence")
+    fed_obj, fed_src = load_named("Fed Intelligence")
 
     rc_row = latest_row(rc)
     mc_row = latest_row(mc)
@@ -481,10 +494,11 @@ def executive() -> None:
             card(label, value)
 
     st.subheader("Publication & Freshness")
-    coverage = st.columns(4)
+    coverage = st.columns(5)
     coverage_metrics = [
         ("Research Context", latest_date(rc)),
         ("Macro Context", latest_date(mc)),
+        ("Fed Intelligence", latest_date_from_json(fed_obj)),
         ("Decision Engine", latest_date(dec)),
         ("Final Validation", latest_date(load_named("Final Validation Summary")[0])),
     ]
@@ -493,8 +507,23 @@ def executive() -> None:
             card(label, value)
     st.caption(
         f"Sources: Research Context={source_status(rc_src)} • "
-        f"Macro Context={source_status(mc_src)} • Decision={source_status(dec_src)}"
+        f"Macro Context={source_status(mc_src)} • Fed={source_status(fed_src)} • Decision={source_status(dec_src)}"
     )
+
+    rc_date = latest_date(rc)
+    decision_date = latest_date(dec)
+    fed_date = latest_date_from_json(fed_obj)
+    if fed_date != "—" and decision_date != "—" and fed_date > decision_date:
+        st.warning(
+            f"Freshness mismatch: Fed Intelligence is as of {fed_date}, while the published "
+            f"Decision Engine is as of {decision_date}. Fed is contextual and is not silently "
+            "backfilled into the current Decision Engine state."
+        )
+    if rc_date != "—" and decision_date != "—" and rc_date != decision_date:
+        st.warning(
+            f"Research Context ({rc_date}) and Decision Engine ({decision_date}) are not aligned. "
+            "Treat the published decision as a snapshot, not a live synthesis."
+        )
 
     st.subheader("Research Scores")
     cols = st.columns(6)
@@ -514,7 +543,7 @@ def executive() -> None:
     cols = st.columns(8)
     metrics = [
         ("State", safe_value(dec_row, ["state"])),
-        ("Confidence", safe_value(dec_row, ["confidence"])),
+        ("Evidence Coverage", safe_value(dec_row, ["confidence"])),
         ("Evidence", safe_value(dec_row, ["evidence_count"])),
         ("Supportive", safe_value(dec_row, ["supportive_count"])),
         ("Contradictory", safe_value(dec_row, ["contradictory_count"])),
@@ -526,7 +555,7 @@ def executive() -> None:
         with col:
             card(label, value)
 
-    st.info("Confidence is evidence coverage, not probability.")
+    st.info("Evidence Coverage is completeness of eligible CORE evidence, not probability or forecast confidence.")
 
     st.subheader("Decision Evidence")
     table(evidence, 300)
@@ -1382,7 +1411,7 @@ def decision() -> None:
     cols = st.columns(8)
     metrics = [
         ("State", safe_value(row, ["state"])),
-        ("Confidence", safe_value(row, ["confidence"])),
+        ("Evidence Coverage", safe_value(row, ["confidence"])),
         ("Evidence", safe_value(row, ["evidence_count"])),
         ("Supportive", safe_value(row, ["supportive_count"])),
         ("Contradictory", safe_value(row, ["contradictory_count"])),
