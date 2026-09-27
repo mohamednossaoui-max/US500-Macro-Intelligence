@@ -12,8 +12,6 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from publication_manifest import manifest_file_names, manifest_metric
-
 APP_VERSION = "V6.3"
 REPO = "mohamednossaoui-max/US500-Macro-Intelligence"
 BRANCH = "main"
@@ -188,8 +186,27 @@ def fetch_raw(filename: str) -> Optional[bytes]:
 
 
 def manifest_files() -> list[str]:
-    """Return artifacts published by the canonical manifest contract."""
-    return manifest_file_names(get_manifest())
+    """Return published artifact paths from either supported manifest shape.
+
+    The canonical publication manifest stores artifacts under ``files`` as a
+    mapping keyed by repository-relative paths. Older manifests used a
+    ``datasets`` list with a ``file`` field. Keep both shapes readable, but
+    never treat the manifest itself as an artifact.
+    """
+    manifest = get_manifest()
+    result: list[str] = []
+
+    files = manifest.get("files")
+    if isinstance(files, dict):
+        result.extend(str(name) for name in files if isinstance(name, str))
+
+    datasets = manifest.get("datasets")
+    if isinstance(datasets, list):
+        for item in datasets:
+            if isinstance(item, dict) and isinstance(item.get("file"), str):
+                result.append(item["file"])
+
+    return sorted({name.replace("\\", "/").lstrip("/") for name in result})
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -1497,10 +1514,10 @@ def data_status() -> None:
     manifest = get_manifest()
     cols = st.columns(4)
     metrics = [
-        ("Published Artifacts", manifest_metric(manifest, "artifact_count")),
-        ("Publisher", manifest_metric(manifest, "publisher")),
-        ("Publisher Version", manifest_metric(manifest, "publisher_version")),
-        ("Source Run", manifest_metric(manifest, "source_run_id")),
+        ("Manifest Datasets", manifest.get("dataset_count", "—")),
+        ("Generated UTC", manifest.get("generated_at_utc", "—")),
+        ("Master Run", manifest.get("master_run_id", "—")),
+        ("Repository", manifest.get("repository", REPO)),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
@@ -1514,18 +1531,23 @@ def data_status() -> None:
 
 def explorer() -> None:
     st.header("Published Data Explorer")
-    manifest = get_manifest()
-    if not manifest:
-        st.warning("Publication manifest is unavailable.")
-        return
+    files = manifest_files()
 
-    files = manifest_file_names(manifest)
     if not files:
-        st.warning("Publication manifest contains no published artifacts.")
+        st.warning("public_data manifest was not found.")
         return
 
     selected = st.selectbox("Artifact", files)
-    obj, src = load_csv(selected) if selected.endswith(".csv") else load_json(selected)
+    suffix = Path(selected).suffix.lower()
+
+    if suffix == ".csv":
+        obj, src = load_csv(selected)
+    elif suffix == ".json":
+        obj, src = load_json(selected)
+    else:
+        raw, src = load_bytes(selected)
+        obj = raw
+
     source(selected, src)
 
     if isinstance(obj, pd.DataFrame):
@@ -1540,8 +1562,26 @@ def explorer() -> None:
             file_name=Path(selected).name,
             mime="text/csv",
         )
-    elif isinstance(obj, dict):
+    elif isinstance(obj, (dict, list)):
         st.json(obj)
+    elif isinstance(obj, (bytes, bytearray)):
+        try:
+            text = bytes(obj).decode("utf-8")
+        except UnicodeDecodeError:
+            st.download_button(
+                "Download artifact",
+                bytes(obj),
+                file_name=Path(selected).name,
+                mime="application/octet-stream",
+            )
+        else:
+            st.code(text, language=None)
+            st.download_button(
+                "Download artifact",
+                bytes(obj),
+                file_name=Path(selected).name,
+                mime="text/plain",
+            )
     else:
         st.info("Artifact is unavailable or unreadable.")
 
@@ -1631,7 +1671,7 @@ with st.sidebar:
     st.divider()
     st.caption("Token-free")
     st.caption("local public_data → GitHub Raw → NOT PUBLISHED")
-    st.caption(f"Published artifacts: {manifest_metric(get_manifest(), 'artifact_count')}")
+    st.caption(f"Manifest datasets: {get_manifest().get('dataset_count', '—')}")
 
 st.markdown(
     '<div class="hero"><h1>US500 Macro Intelligence — Research Terminal V6.2</h1>'
