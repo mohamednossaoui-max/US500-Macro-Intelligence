@@ -51,7 +51,7 @@ background:rgba(128,140,155,.04);min-height:88px}
 .econ-pulse{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:15px 16px;background:rgba(128,140,155,.045);margin:.35rem 0 .9rem}
 .econ-regime{font-size:1.45rem;font-weight:900;letter-spacing:.03em}.econ-sub{font-size:.8rem;color:#8b96a5;line-height:1.45}
 .econ-dim{border:1px solid rgba(128,140,155,.22);border-radius:12px;padding:12px 14px;background:rgba(128,140,155,.03);min-height:112px}
-.econ-dim .score{font-size:1.25rem;font-weight:850;margin:.2rem 0}.econ-release{border:1px solid rgba(128,140,155,.22);border-radius:11px;padding:10px 12px;margin:7px 0;background:rgba(128,140,155,.025)}.econ-release .name{font-weight:850}.econ-release .meta{font-size:.75rem;color:#8b96a5}.econ-bottom{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:14px 16px;background:rgba(128,140,155,.055);margin:.3rem 0 1rem}.econ-group{border:1px solid rgba(128,140,155,.22);border-radius:12px;padding:12px 14px;background:rgba(128,140,155,.025);min-height:130px}.econ-group-title{font-size:.74rem;font-weight:850;letter-spacing:.07em;color:#8b96a5;margin-bottom:8px}.econ-indicator{padding:6px 0;border-bottom:1px solid rgba(128,140,155,.12)}.econ-indicator:last-child{border-bottom:0}.econ-indicator b{font-size:.86rem}.econ-reading{font-size:.8rem;font-variant-numeric:tabular-nums}.econ-context{font-size:.71rem;color:#8b96a5}
+.econ-dim .score{font-size:1.25rem;font-weight:850;margin:.2rem 0}.econ-release{border:1px solid rgba(128,140,155,.22);border-radius:11px;padding:10px 12px;margin:7px 0;background:rgba(128,140,155,.025)}.econ-release .name{font-weight:850}.econ-release .meta{font-size:.75rem;color:#8b96a5}.econ-bottom{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:14px 16px;background:rgba(128,140,155,.055);margin:.3rem 0 1rem}.econ-group{border:1px solid rgba(128,140,155,.22);border-radius:12px;padding:9px 12px;background:rgba(128,140,155,.025);min-height:96px}.econ-group-title{font-size:.72rem;font-weight:850;letter-spacing:.07em;color:#8b96a5;margin-bottom:5px}.econ-indicator{padding:4px 0;border-bottom:1px solid rgba(128,140,155,.12)}.econ-indicator:last-child{border-bottom:0}.econ-indicator b{font-size:.86rem}.econ-reading{font-size:.8rem;font-variant-numeric:tabular-nums}.econ-context{font-size:.71rem;color:#8b96a5}
 .fed-gauge{position:relative;height:16px;border-radius:999px;background:linear-gradient(90deg,rgba(74,144,226,.55),rgba(128,140,155,.18) 50%,rgba(231,111,81,.55));margin:18px 2px 8px}
 .fed-marker{position:absolute;top:-7px;width:4px;height:30px;border-radius:4px;background:currentColor;box-shadow:0 0 0 3px rgba(128,140,155,.18)}
 .fed-scale{display:flex;justify-content:space-between;font-size:.67rem;font-weight:800;letter-spacing:.07em;color:#8b96a5}
@@ -741,7 +741,10 @@ def economic() -> None:
             if not parts:
                 actual = release.get("actual")
                 parts = [f"<b>{fmt(actual, 1)}</b>"]
-            context = f"{fmt(release.get('release_date'))} · {fmt(release.get('zscore_class'))}"
+            zclass = str(release.get('zscore_class') or '').strip().upper()
+            context = fmt(release.get('release_date'))
+            if zclass and zclass not in {'INSUFFICIENT_HISTORY', 'NOT_AVAILABLE', 'NONE', 'NAN'}:
+                context += f" · {zclass}"
             if indicator == "RETAIL_SALES" and str(release.get("price_adjusted")).lower() in {"false", "0", "no"}:
                 context += " · nominal / not price-adjusted"
             lines.append(f"<div class='econ-indicator'><b>{label}</b><div class='econ-reading'>{' · '.join(parts)}</div><div class='econ-context'>{context}</div></div>")
@@ -749,6 +752,7 @@ def economic() -> None:
             lines = ["<div class='econ-context'>No published evidence.</div>"]
         with col:
             st.markdown(f"<div class='econ-group'><div class='econ-group-title'>{group_name}</div>{''.join(lines)}</div>", unsafe_allow_html=True)
+    st.caption("Newly integrated series are shown from published releases. Historical normalization activates only after sufficient point-in-time history is available.")
 
     # Dimension pulse ---------------------------------------------------
     st.subheader("Dimension Pulse")
