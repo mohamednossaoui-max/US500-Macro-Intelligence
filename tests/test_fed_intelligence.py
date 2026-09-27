@@ -146,3 +146,42 @@ def test_fed_ui_exposes_current_previous_and_quality_sections():
     assert 'st.subheader("Communication — Current vs Previous")' in source
     assert 'st.subheader("Fed Evidence Quality")' in source
     assert '"Quality Gate"' in source
+
+
+def test_latest_published_minutes_are_selected_independently_of_latest_fomc():
+    links = {
+        "statement": {fed.date(2026, 9, 16): "statement-sep"},
+        "minutes": {
+            fed.date(2026, 7, 29): "minutes-jul",
+            fed.date(2026, 6, 18): "minutes-jun",
+        },
+        "press": {fed.date(2026, 9, 16): "press-sep"},
+        "sep": {},
+    }
+    latest = fed.latest_document_date(links, "minutes", fed.date(2026, 9, 27))
+    assert latest == fed.date(2026, 7, 29)
+    assert latest != fed.latest_completed_fomc(links, fed.date(2026, 9, 27))
+    assert fed.previous_document_date(links, "minutes", latest) == fed.date(2026, 6, 18)
+
+
+def test_fed_quality_contract_marks_published_prior_meeting_minutes_as_lagged():
+    data = {
+        "document_status": {
+            "statement": {"available": True},
+            "minutes": {"available": True, "lagged": True},
+            "chair_press": {"available": True},
+        },
+        "sep_current": {"available": True},
+        "beige_book": {"available": True},
+    }
+    q = fed.fed_quality_contract(data, fed.date(2026, 9, 27))
+    assert q["quality_gate"] == "DEGRADED"
+    assert q["quality_reason"] == "LATEST_MINUTES_LAG_LATEST_FOMC"
+    assert q["pit_status"] == "PIT_SAFE"
+
+
+def test_fed_ui_labels_lagged_minutes_without_relabeling_them_current():
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "Latest published FOMC Minutes cover the" in source
+    assert "lagged research evidence" in source
+    assert "are not relabeled as current-meeting minutes" in source
