@@ -91,9 +91,9 @@ def test_fed_ui_exposes_required_report_sections():
         'st.subheader("SEP Pulse — Current vs Previous")',
         'st.subheader("Fed Synthesis")',
         'st.subheader("Beige Book Context")',
-        'st.subheader("Fed Bottom Line")',
+        "<div class='title'>FED BOTTOM LINE</div>",
         'with st.expander("View detailed data")',
-        '"Not yet published / unavailable"',
+        '"Minutes are pending and are not treated as evidence."',
     ]
     for marker in required:
         assert marker in source
@@ -101,8 +101,8 @@ def test_fed_ui_exposes_required_report_sections():
 
 def test_fed_ui_does_not_mislabel_legacy_available_evidence_as_excluded():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "Included in analysis · weight metadata pending refresh" in source
-    assert "Excluded until published" in source
+    assert "included · weight metadata pending refresh" in source
+    assert "excluded until published" in source
     assert "explicit_weight" in source
     assert "explicit_availability" in source
 
