@@ -28,6 +28,7 @@ jobs:
           test -f economic_surprise_engine_v1.1.py
           test -f economic_regime_classifier_v1.5.py
           test -f economic_canonical_input_v2.py
+          test -f economic_pce_historical_backfill_v2.py
 
       - name: Syntax check
         run: |
@@ -36,6 +37,10 @@ jobs:
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
           python -m py_compile economic_canonical_input_v2.py
+          python -m py_compile economic_pce_historical_backfill_v2.py
+
+      - name: Backfill PIT-safe PCE history from BEA archived releases
+        run: python economic_pce_historical_backfill_v2.py --start 2024-01 --end 2026-07 --min-months 18
 
       - name: Stage canonical Economic input (14-indicator foundation)
         run: python economic_canonical_input_v2.py
@@ -90,6 +95,8 @@ jobs:
           assert latest["release_date"] >= pd.Timestamp("2026-09-17")
           assert {"PCE_PRICE_INDEX", "CORE_PCE"} <= set(h["indicator"].astype(str))
           assert h["indicator"].nunique() > 7
+          assert (h["indicator"] == "PCE_PRICE_INDEX").sum() >= 18
+          assert (h["indicator"] == "CORE_PCE").sum() >= 18
 
           print("Historical records:", len(h))
           print("Latest historical release:", h["release_date"].max().date())
