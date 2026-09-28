@@ -61,3 +61,28 @@ def test_research_only_and_pit_outputs_remain_closed():
     assert r["pit_safe"].fillna(False).astype(bool).all()
     assert r["research_only"].fillna(False).astype(bool).all()
     assert not r["decision_engine_ready"].fillna(True).astype(bool).any()
+
+
+def test_dimension_sufficiency_counts_independent_families_not_variants():
+    df = pd.DataFrame([
+        {"indicator":"CPI","release_date":"2026-09-01","pit_safe":True,"directional_shock_z":1.0,"regime_eligible":True},
+        {"indicator":"CORE_CPI","release_date":"2026-09-01","pit_safe":True,"directional_shock_z":3.0,"regime_eligible":True},
+    ])
+    df["release_date"] = pd.to_datetime(df["release_date"])
+    result = mod.build_dimension(df, pd.Timestamp("2026-09-02"), "INFLATION")
+    assert pd.isna(result["score"])
+    assert result["indicator_count"] == 2
+    assert result["family_count"] == 1
+    assert result["method"] == "INSUFFICIENT_FRESH_FAMILIES"
+
+
+def test_two_independent_families_are_sufficient():
+    df = pd.DataFrame([
+        {"indicator":"CPI","release_date":"2026-09-01","pit_safe":True,"directional_shock_z":1.0,"regime_eligible":True},
+        {"indicator":"CORE_CPI","release_date":"2026-09-01","pit_safe":True,"directional_shock_z":3.0,"regime_eligible":True},
+        {"indicator":"PPI_FINAL_DEMAND","release_date":"2026-09-01","pit_safe":True,"directional_shock_z":0.0,"regime_eligible":True},
+    ])
+    df["release_date"] = pd.to_datetime(df["release_date"])
+    result = mod.build_dimension(df, pd.Timestamp("2026-09-02"), "INFLATION")
+    assert result["score"] == 1.0
+    assert result["family_count"] == 2
