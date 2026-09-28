@@ -93,28 +93,28 @@
       "sha256": "57a5ce7ee9f10e9bc75bf026457365cb27e4837f9d192b44a7eab59d7181e0ce"
     },
     "economic_historical_events_v1.csv": {
-      "bytes": 107386,
-      "sha256": "f2522c1eafa35edffa42c8385ef13d11d06baf970c57b8583dd1c35e3d112724"
+      "bytes": 121813,
+      "sha256": "e5bc55c3243e4763df1575d65c662bee3efd3a2adcf4175d9b5a778357632612"
     },
     "economic_historical_quality_v1.csv": {
-      "bytes": 38995,
-      "sha256": "582c6dd571e4a928b2d45f1870c317575f38fcd7b0f2efa648d94fe290ea661f"
+      "bytes": 43341,
+      "sha256": "cb115d3dc35af57f7aaf0cb0a60a746745d8496bfbb079c1548fa9e227708ba0"
     },
     "economic_regime_events_v1.csv": {
-      "bytes": 90994,
-      "sha256": "592360fb688ac9337e8451c5fc747cb0ea15d4d01369bf14a5d38f937d84d84d"
+      "bytes": 101349,
+      "sha256": "b3cacf3f9ef405c869a52566e7808fdaf7bc5cee15951a56bd73507c31a43105"
     },
     "economic_regime_summary_v1.csv": {
-      "bytes": 125,
-      "sha256": "a7d811b714ec3288adb48aecc72a2442ae08b97e77bab13c1232fcc23889d989"
+      "bytes": 282,
+      "sha256": "197da770564a7a79324f31b771649d0a14c79c860e2583b0de7cc71f4f2d6b30"
     },
     "economic_surprise_engine_v1.csv": {
-      "bytes": 205728,
-      "sha256": "ffc8bd1b0572b2207d682c301c3f3eb0e74cec1dad155db3889b789a5091957c"
+      "bytes": 229704,
+      "sha256": "e1bd20ce2212d57d3bd7ef3983721f8912042948885c245396fd7407d44e0f65"
     },
     "economic_surprise_summary_v1.csv": {
-      "bytes": 703,
-      "sha256": "06b33c8cabae0d4cd2cbfe70f874b56429dcf1414ac5583fb68a40155bfb2358"
+      "bytes": 713,
+      "sha256": "37050c59fc0eb3c2167576f95656d511473cfa4ddd0a197bda3ef3113755cf0f"
     },
     "event_news_research_summary_v2.json": {
       "bytes": 1004,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36404588808",
+  "source_run_id": "36436263142",
   "source_workflow": "Economic Intelligence Full Pipeline v2.3 Refresh"
 }
