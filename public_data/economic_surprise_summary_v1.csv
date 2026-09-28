@@ -1,7 +1,7 @@
 indicator,records,pit_safe_records,historical_consensus_records,directional_shock_records,zscore_records,insufficient_history_records,official_previous_delta_records,prior_observation_delta_records,no_delta_records
 AVERAGE_HOURLY_EARNINGS,1,1,0,1,0,1,1,0,0
 CORE_CPI,63,63,0,62,59,4,29,33,1
-CORE_PCE,1,1,0,1,0,1,1,0,0
+CORE_PCE,8,8,0,7,4,4,1,6,1
 CORE_PPI,1,1,0,1,0,1,1,0,0
 CPI,63,63,0,62,59,4,29,33,1
 GDP,41,41,0,41,38,3,21,20,0
@@ -9,7 +9,7 @@ INITIAL_JOBLESS_CLAIMS,146,146,0,145,142,4,15,130,1
 ISM_MANUFACTURING_PMI,57,57,0,56,53,4,21,35,1
 ISM_SERVICES_PMI,1,1,0,1,0,1,1,0,0
 NFP,64,64,0,62,59,5,17,45,2
-PCE_PRICE_INDEX,1,1,0,1,0,1,1,0,0
+PCE_PRICE_INDEX,8,8,0,7,4,4,1,6,1
 PPI_FINAL_DEMAND,1,1,0,1,0,1,1,0,0
 RETAIL_SALES,1,1,0,1,0,1,1,0,0
 UNEMPLOYMENT_RATE,63,63,0,62,59,4,28,34,1

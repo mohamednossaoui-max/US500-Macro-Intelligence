@@ -1,3 +1,4 @@
 economic_regime,observations,research_only,decision_engine_ready
-PARTIAL_DATA,299,True,False
-INSUFFICIENT_DATA,51,True,False
+PARTIAL_DATA,296,True,False
+INSUFFICIENT_DATA,55,True,False
+MIXED,3,True,False
