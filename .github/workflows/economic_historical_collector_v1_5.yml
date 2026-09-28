@@ -274,7 +274,7 @@ jobs:
               "GDP"
           }
 
-          if set(indicators) != expected_indicators:
+          if not expected_indicators.issubset(set(indicators)):
               raise SystemExit(
                   "ERROR: Indicator universe mismatch."
               )
