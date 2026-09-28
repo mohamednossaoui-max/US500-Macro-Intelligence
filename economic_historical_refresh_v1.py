@@ -9,8 +9,8 @@ Research-only; no fabricated consensus; Decision Engine disabled.
 from pathlib import Path
 import pandas as pd
 
-INPUT = "economic_historical_events_v1.csv"
-QUALITY = "economic_historical_quality_v1.csv"
+INPUT = "public_data/economic_historical_events_v1.csv"
+QUALITY = "public_data/economic_historical_quality_v1.csv"
 
 REFRESH = [
     dict(indicator="CPI", agency="BLS", release_date="2026-09-11", release_time="08:30 ET",

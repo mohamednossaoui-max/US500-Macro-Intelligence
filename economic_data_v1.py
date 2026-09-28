@@ -66,6 +66,13 @@ SUPPORTED_INDICATORS = {
         "unit": "percent_annualized",
         "source_type": "official_release",
     },
+    "PPI_FINAL_DEMAND": {"agency": "BLS", "unit": "percent", "source_type": "official_release"},
+    "CORE_PPI": {"agency": "BLS", "unit": "percent", "source_type": "official_release"},
+    "PCE_PRICE_INDEX": {"agency": "BEA", "unit": "percent", "source_type": "official_release"},
+    "CORE_PCE": {"agency": "BEA", "unit": "percent", "source_type": "official_release"},
+    "AVERAGE_HOURLY_EARNINGS": {"agency": "BLS", "unit": "percent", "source_type": "official_release"},
+    "ISM_SERVICES_PMI": {"agency": "ISM", "unit": "index", "source_type": "official_release"},
+    "RETAIL_SALES": {"agency": "CENSUS", "unit": "percent", "source_type": "official_release"},
 }
 
 REQUIRED_COLUMNS = [
