@@ -37,10 +37,15 @@ def test_expanded_series_reach_release_shock_layer():
     sub = s[s["indicator"].isin(EXPANDED)]
     assert set(sub["indicator"].astype(str)) == EXPANDED
     assert sub["point_in_time_safe"].fillna(False).astype(bool).all()
-    # One verified release per new series is not enough for a historical z-score,
-    # but official previous values still produce a PIT-safe release shock.
-    assert sub["directional_release_shock"].notna().all()
-    assert (sub["zscore_class"] == "INSUFFICIENT_HISTORY").all()
+    # The first observation of a series may have no release shock when neither
+    # an official previous nor a prior PIT observation exists. Every subsequent
+    # PCE/Core-PCE observation must have a PIT-safe sequential shock.
+    for indicator, g in sub.groupby("indicator"):
+        g = g.sort_values("release_date")
+        if len(g) > 1:
+            assert g.iloc[1:]["directional_release_shock"].notna().all()
+    pce = sub[sub["indicator"].isin({"PCE_PRICE_INDEX", "CORE_PCE"})]
+    assert pce["directional_zscore"].notna().any()
 
 
 def test_research_only_boundary_remains_closed():

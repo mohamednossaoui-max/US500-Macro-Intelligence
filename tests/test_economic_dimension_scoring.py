@@ -31,16 +31,21 @@ def test_related_variants_share_families_to_avoid_double_counting():
     assert mod.INDICATOR_FAMILY["RETAIL_SALES"] == mod.INDICATOR_FAMILY["RETAIL_SALES_EX_AUTOS"]
 
 
-def test_insufficient_history_series_do_not_enter_dimension_score():
+def test_only_series_with_sufficient_pit_history_enter_dimension_score():
     s = pd.read_csv(SHOCK)
     sub = s[s["indicator"].isin(EXPANDED)]
-    assert (sub["zscore_class"] == "INSUFFICIENT_HISTORY").all()
-    assert sub["directional_zscore"].isna().all()
+    # Historical coverage expansion intentionally gives PCE/Core PCE enough
+    # original-release history for PIT z-scores. Other one-release expansion
+    # series remain fail-closed until their own history is backfilled.
+    pce = sub[sub["indicator"].isin({"PCE_PRICE_INDEX", "CORE_PCE"})]
+    assert pce["directional_zscore"].notna().any()
+    thin = sub[~sub["indicator"].isin({"PCE_PRICE_INDEX", "CORE_PCE"})]
+    assert (thin["zscore_class"] == "INSUFFICIENT_HISTORY").all()
+    assert thin["directional_zscore"].isna().all()
     r = pd.read_csv(REGIME)
-    latest = r.iloc[-1]
-    used = "|".join(str(latest[c]) for c in ["inflation_indicators", "labor_indicators", "growth_indicators"])
-    for indicator in EXPANDED:
-        assert indicator not in used
+    latest = r.sort_values("release_date").iloc[-1]
+    assert pd.notna(latest["inflation_score"])
+    assert int(latest["inflation_family_count"]) >= 2
 
 
 def test_family_balancing_math():
