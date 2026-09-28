@@ -53,8 +53,8 @@
       "sha256": "e370173c3e5eda42af537cad0d583a5d643ed45ec288765050e8987002030d19"
     },
     "decision_engine_evidence_registry_v2.csv": {
-      "bytes": 958,
-      "sha256": "ada36c0b0f92b542303f20445c47f79a5dffef0978c37c518c8070bb7668caca"
+      "bytes": 1201,
+      "sha256": "9c8967191e5cebd97256cd75521291182cd8d15b36dc0ee55ac25cdef8a9765c"
     },
     "decision_engine_research_evidence_v1.csv": {
       "bytes": 378,
@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "6a6c11e560cf1a59a5906a15b53243410cbfab9f2656b24112117201d0401ba9"
+      "sha256": "769d6fa59ce0710c205f6624f2c663f74cf3d63ccf5613fa45f9dc6c55c6c166"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -101,12 +101,12 @@
       "sha256": "582c6dd571e4a928b2d45f1870c317575f38fcd7b0f2efa648d94fe290ea661f"
     },
     "economic_regime_events_v1.csv": {
-      "bytes": 104233,
-      "sha256": "a684b86341c8b1eca4205771492a51ce5df13690642c43a073cc0d062d259ce6"
+      "bytes": 90994,
+      "sha256": "592360fb688ac9337e8451c5fc747cb0ea15d4d01369bf14a5d38f937d84d84d"
     },
     "economic_regime_summary_v1.csv": {
-      "bytes": 284,
-      "sha256": "bf8b3587fe55933656efc0a2fc4ae2af736270f72de794b9f1535a4238965eee"
+      "bytes": 125,
+      "sha256": "a7d811b714ec3288adb48aecc72a2442ae08b97e77bab13c1232fcc23889d989"
     },
     "economic_surprise_engine_v1.csv": {
       "bytes": 205728,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "e180a151417313d0cc29236623671bb1ee0f9ed1fde6d8f057fec1ce23f414af"
+      "sha256": "1920fed2a08f9716f436884545f39a9849bb67e4e0b79efd7c9e9a0de8982f44"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36349624513",
-  "source_workflow": "Fed Intelligence"
+  "source_run_id": "36404588808",
+  "source_workflow": "Economic Intelligence Full Pipeline v2.3 Refresh"
 }
