@@ -83,8 +83,8 @@ FRESHNESS_DAYS = {
     "GDP": 120, "RETAIL_SALES": 45, "RETAIL_SALES_EX_AUTOS": 45,
 }
 
-MIN_LABOR_INDICATORS = 2
-MIN_OTHER_DIMENSION_INDICATORS = 1
+MIN_LABOR_FAMILIES = 2
+MIN_OTHER_DIMENSION_FAMILIES = 2
 
 
 def classify_regime(inflation, labor, growth):
@@ -225,28 +225,32 @@ def build_dimension(df, snapshot_date, dimension):
         df, snapshot_date, indicators
     )
 
-    required = (
-        MIN_LABOR_INDICATORS
+    # Sufficiency is enforced by independent indicator families, not raw
+    # indicator count. Headline/core variants from the same release family
+    # must not make a dimension appear diversified when it is not.
+    families = {}
+    for item in selected:
+        family = INDICATOR_FAMILY[item["indicator"]]
+        families.setdefault(family, []).append(item["z"])
+
+    required_families = (
+        MIN_LABOR_FAMILIES
         if dimension == "LABOR"
-        else MIN_OTHER_DIMENSION_INDICATORS
+        else MIN_OTHER_DIMENSION_FAMILIES
     )
 
-    if len(selected) < required:
+    if len(families) < required_families:
         return {
             "score": np.nan,
             "observation_date": None,
             "age_days": np.nan,
             "indicator_count": len(selected),
+            "family_count": len(families),
             "indicators": "|".join(x["indicator"] for x in selected),
             "zscore_count": len(selected),
             "raw_shock_count": 0,
-            "method": "INSUFFICIENT_FRESH_ZSCORES",
+            "method": "INSUFFICIENT_FRESH_FAMILIES",
         }
-
-    families = {}
-    for item in selected:
-        family = INDICATOR_FAMILY[item["indicator"]]
-        families.setdefault(family, []).append(item["z"])
     family_scores = [float(np.mean(values)) for values in families.values()]
     score = float(np.mean(family_scores))
     latest_date = max(x["release_date"] for x in selected)
@@ -257,6 +261,7 @@ def build_dimension(df, snapshot_date, dimension):
         "observation_date": latest_date,
         "age_days": int(age),
         "indicator_count": len(selected),
+        "family_count": len(families),
         "indicators": "|".join(x["indicator"] for x in selected),
         "zscore_count": len(selected),
         "raw_shock_count": 0,
@@ -325,6 +330,13 @@ def main():
             "growth_indicator_count":
                 dimensions["GROWTH"]["indicator_count"],
 
+            "inflation_family_count":
+                dimensions["INFLATION"]["family_count"],
+            "labor_family_count":
+                dimensions["LABOR"]["family_count"],
+            "growth_family_count":
+                dimensions["GROWTH"]["family_count"],
+
             "inflation_indicators":
                 dimensions["INFLATION"]["indicators"],
             "labor_indicators":
@@ -392,7 +404,12 @@ def main():
 
     # GDP revisions must never be selected as the current Growth observation.
     gdp_input = df[df["indicator"] == "GDP"]
-    assert not (gdp_input.loc[gdp_input["regime_eligible"] == False, "release_type"] != "SAME_PERIOD_REVISION").any()
+    assert not gdp_input.loc[
+        gdp_input["release_type"] == "SAME_PERIOD_REVISION", "regime_eligible"
+    ].fillna(True).astype(bool).any()
+    assert gdp_input.loc[
+        gdp_input["release_type"] == "NEW_PERIOD_RELEASE", "regime_eligible"
+    ].fillna(False).astype(bool).all()
 
     raw_counts = [
         out["inflation_raw_shock_count"].sum(),

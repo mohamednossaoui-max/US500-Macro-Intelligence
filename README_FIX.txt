@@ -1,17 +1,10 @@
-US500 Sentiment dynamic_card hotfix only
+Macro Context + Economic Intelligence hardening — corrected files only
 
-Replace only: ui_v3.py
+Changes:
+- Dimension sufficiency now counts independent indicator families, not raw variants.
+- CPI + Core CPI alone no longer masquerade as two independent inflation inputs.
+- Inflation/Labor/Growth require >=2 fresh independent families before a dimension score is eligible.
+- GDP revision gate strengthened: SAME_PERIOD_REVISION must be regime_eligible=False; NEW_PERIOD_RELEASE must be True.
+- No Decision Engine, Fed Intelligence, UI, PIT contract, or public_data files changed.
 
-Change:
-- dynamic_card note now accepts Any and normalizes through _s() before HTML rendering.
-- Fixes Sentiment Intelligence crash when unified_sentiment_score is numeric/NaN.
-- No CSS/theme, app.py, data, scoring, PIT, Fed, Decision Engine, or navigation changes.
-
-Validation:
-- Python compile: PASS
-- Existing pytest suite: 91 passed / 0 failed
-- Numeric/NaN note regression: PASS
-- Static navigation registry check: PASS (20 expected pages)
-- dynamic_card microbenchmark with Streamlit output stubbed: see assistant report.
-
-Note: full browser/Streamlit navigation timing could not be executed in the validation runtime because the Streamlit package is not installed there. No claim is made that browser navigation was runtime-tested.
+Validation: 93 passed, 0 failed; Python compilation PASS.
