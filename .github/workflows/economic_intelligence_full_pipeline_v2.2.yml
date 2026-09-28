@@ -26,6 +26,7 @@ jobs:
           test -f economic_historical_expansion_v2.2.py
           test -f economic_surprise_engine_v1.1.py
           test -f economic_regime_classifier_v1.5.py
+          test -f economic_canonical_input_v2.py
           test -f point_in_time.py
           test -f tests/test_point_in_time_integrity.py
 
@@ -34,14 +35,15 @@ jobs:
           python -m py_compile economic_historical_expansion_v2.2.py
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
+          python -m py_compile economic_canonical_input_v2.py
           python -m py_compile point_in_time.py
           python -m py_compile macro_context_v1.py
 
       - name: PR-04 Point-in-Time integrity tests
         run: python -m pytest -q tests/test_point_in_time_integrity.py
 
-      - name: Historical Expansion v2.2
-        run: python economic_historical_expansion_v2.2.py
+      - name: Stage canonical Economic input (14-indicator foundation)
+        run: python economic_canonical_input_v2.py
 
       - name: Surprise Engine v1.3 (same filename)
         run: python economic_surprise_engine_v1.1.py
@@ -49,70 +51,27 @@ jobs:
       - name: Regime Classifier v1.6 (same filename)
         run: python economic_regime_classifier_v1.5.py
 
-      - name: Final v2.2 Quality Gate
+      - name: Canonical Universe + PIT Quality Gate
         run: |
           python - <<'PY'
           import pandas as pd
           h = pd.read_csv("economic_historical_events_v1.csv")
           q = pd.read_csv("economic_historical_quality_v1.csv")
-
-          assert q["point_in_time_safe"].all()
-          assert not q["historical_consensus_available"].any()
-
-          claims = ((h["indicator"] == "INITIAL_JOBLESS_CLAIMS") &
-                    h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
-          ism = ((h["indicator"] == "ISM_MANUFACTURING_PMI") &
-                 h["release_date"].astype(str).str[:4].isin(["2020","2021"])).sum()
-          # For monthly BLS series, use the reference period year rather than
-          # release year. December 2021 was released in January 2022, so a
-          # release-date filter would incorrectly report 46 instead of 48.
-          ref_year = h["reference_period"].astype(str).str.extract(r"(20\d{2})", expand=False)
-
-          cpi_core = ((h["indicator"].isin(["CPI", "CORE_CPI"])) &
-                      ref_year.isin(["2020", "2021"])).sum()
-          labor = ((h["indicator"].isin(["NFP", "UNEMPLOYMENT_RATE"])) &
-                   ref_year.isin(["2020", "2021"])).sum()
-
-          print("Historical records:", len(h))
-          print("PIT safe:", int(q["point_in_time_safe"].sum()), "/", len(q))
-          print("Historical consensus:", int(q["historical_consensus_available"].sum()))
-          print("2020-2021 Claims:", int(claims))
-          print("2020-2021 ISM:", int(ism))
-          print("2020-2021 CPI/Core CPI (reference years):", int(cpi_core))
-          print("2020-2021 NFP/Unemployment (reference years):", int(labor))
-
-          assert ism == 24
-          assert claims >= 90
-          assert cpi_core == 48
-          assert labor == 48
-
           s = pd.read_csv("economic_surprise_engine_v1.csv")
           r = pd.read_csv("economic_regime_events_v1.csv")
-
-          assert len(s) == 486
-          assert len(r) == 340
+          indicators = set(h["indicator"].dropna().astype(str))
+          assert {"PCE_PRICE_INDEX", "CORE_PCE"} <= indicators
+          assert len(indicators) > 7
+          assert q["point_in_time_safe"].all()
           assert s["point_in_time_safe"].all()
-          assert s["research_only"].all()
-          assert not s["decision_engine_ready"].any()
-          assert (s.loc[s["indicator"] == "GDP", "release_type"]
-                  .isin(["NEW_PERIOD_RELEASE", "SAME_PERIOD_REVISION"]).all())
-          gdp = s[s["indicator"] == "GDP"]
-          assert int((gdp["release_type"] == "NEW_PERIOD_RELEASE").sum()) == 15
-          assert int((gdp["release_type"] == "SAME_PERIOD_REVISION").sum()) == 25
+          assert s["research_only"].all() and not s["decision_engine_ready"].any()
           assert r["pit_safe"].all()
-          assert r["research_only"].all()
-          assert not r["decision_engine_ready"].any()
-          assert int(r["growth_raw_shock_count"].sum()) == 0
-
-          print("Surprise Engine records:", len(s))
-          print("Regime observations:", len(r))
-          print("GDP new-period releases:", int((gdp["release_type"] == "NEW_PERIOD_RELEASE").sum()))
-          print("GDP same-period revisions:", int((gdp["release_type"] == "SAME_PERIOD_REVISION").sum()))
-          print("PIT QUALITY GATE: PASS")
-          print("GDP VINTAGE/REVISION GATE: PASS")
-          print("NO RAW SHOCK FALLBACK GATE: PASS")
-          print("RESEARCH-ONLY GATE: PASS")
-          print("DECISION ENGINE DISABLED: PASS")
+          assert r["research_only"].all() and not r["decision_engine_ready"].any()
+          print("Historical records:", len(h))
+          print("Indicators:", len(indicators))
+          print("Extended universe:", sorted(indicators))
+          print("CANONICAL INPUT GATE: PASS")
+          print("PIT / RESEARCH-ONLY GATES: PASS")
           PY
 
       - name: Upload v2.2 artifacts

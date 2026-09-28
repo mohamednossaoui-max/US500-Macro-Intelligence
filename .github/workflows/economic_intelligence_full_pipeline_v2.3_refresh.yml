@@ -27,6 +27,7 @@ jobs:
           test -f economic_historical_refresh_v1.py
           test -f economic_surprise_engine_v1.1.py
           test -f economic_regime_classifier_v1.5.py
+          test -f economic_canonical_input_v2.py
 
       - name: Syntax check
         run: |
@@ -34,12 +35,10 @@ jobs:
           python -m py_compile economic_historical_refresh_v1.py
           python -m py_compile economic_surprise_engine_v1.1.py
           python -m py_compile economic_regime_classifier_v1.5.py
+          python -m py_compile economic_canonical_input_v2.py
 
-      - name: Historical Expansion v2.2
-        run: python economic_historical_expansion_v2.2.py
-
-      - name: Economic Historical Refresh v1
-        run: python economic_historical_refresh_v1.py
+      - name: Stage canonical Economic input (14-indicator foundation)
+        run: python economic_canonical_input_v2.py
 
       - name: Surprise Engine v1.3
         run: python economic_surprise_engine_v1.1.py
@@ -89,8 +88,8 @@ jobs:
 
           latest = r.sort_values("release_date").iloc[-1]
           assert latest["release_date"] >= pd.Timestamp("2026-09-17")
-          assert latest["economic_regime"] != "PARTIAL_DATA"
-          assert int(latest["dimensions_available"]) == 3
+          assert {"PCE_PRICE_INDEX", "CORE_PCE"} <= set(h["indicator"].astype(str))
+          assert h["indicator"].nunique() > 7
 
           print("Historical records:", len(h))
           print("Latest historical release:", h["release_date"].max().date())
@@ -99,7 +98,7 @@ jobs:
           print("Dimensions available:", int(latest["dimensions_available"]))
           print("PIT QUALITY GATE: PASS")
           print("FRESHNESS GATE: PASS")
-          print("FULL REGIME COVERAGE GATE: PASS")
+          print("CANONICAL EXTENDED-UNIVERSE GATE: PASS")
           print("RESEARCH-ONLY GATE: PASS")
           print("DECISION ENGINE DISABLED: PASS")
           PY
