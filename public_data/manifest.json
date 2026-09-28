@@ -217,12 +217,12 @@
       "sha256": "db5130123d2baa4bdc547de1cbfb62418604a26f064ed2c73888155a0eae2aaf"
     },
     "macro_context_v1.csv": {
-      "bytes": 915,
-      "sha256": "2d276b518901dcd25f2c6e7a5238919a42d1ec6d64235a205620c4f01c2fb50a"
+      "bytes": 910,
+      "sha256": "49900f44d2ba4f87a10be7bad33cb01fe2905654867f6d4c6078e1262de06968"
     },
     "macro_context_v1.json": {
-      "bytes": 8917,
-      "sha256": "b5dfbe97b2abe8293b451d6a42a4d13296a59773bca8bd288e8910ee5a908779"
+      "bytes": 9826,
+      "sha256": "b0f62dad8dae8962a8fc000d8caa7bbd4f4b9f50f3b1c961e1f12ba0244dae03"
     },
     "market_breadth_analysis_summary_v1.json": {
       "bytes": 2188,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36436263142",
-  "source_workflow": "Economic Intelligence Full Pipeline v2.3 Refresh"
+  "source_run_id": "36444838833",
+  "source_workflow": "Macro Context v1"
 }
