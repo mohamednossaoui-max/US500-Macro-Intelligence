@@ -277,6 +277,16 @@ jobs:
                       f"ERROR: Missing indicator column: {indicator}"
                   )
 
+              for suffix in ("_available_at", "_age_days", "_fresh"):
+                  col = indicator + suffix
+                  if col not in df.columns:
+                      raise SystemExit(f"ERROR: Missing freshness/provenance column: {col}")
+
+          latest = df.iloc[-1]
+          stale = [i for i in expected_indicators if not bool(latest[i + "_fresh"])]
+          if stale:
+              print("WARNING: stale latest liquidity components excluded from derived metrics:", stale)
+
           # -----------------------------------------------------
           # Output information
           # -----------------------------------------------------
