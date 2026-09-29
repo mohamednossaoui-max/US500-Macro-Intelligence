@@ -28,3 +28,10 @@ def test_hardening_validation_passes():
     q=json.loads((P/'final_remaining_layers_hardening_v1.json').read_text())
     assert q['status']=='PASS'
     assert q['decision_semantics_changed'] is False
+
+def test_recurring_fomc_statements_are_not_false_duplicates():
+    d=pd.read_csv(P/'event_news_research_v2.csv')
+    x=d[d['title'].str.lower().eq('federal reserve issues fomc statement')]
+    assert len(x) >= 2
+    assert not x['is_duplicate'].astype(bool).any()
+    assert x['dedup_key'].nunique()==len(x)

@@ -38,3 +38,26 @@ def test_validation_boundary():
     assert v["status"]=="PASS" and v["research_only"] is True
     assert v["forecast"] is False and v["trading_signal"] is False
     assert v["decision_semantics_changed"] is False
+
+def test_event_news_freshness_is_context_relative_not_hardcoded_current():
+    df=pd.read_csv(PUB/'event_news_research_v2.csv')
+    assert 'age_days' in df.columns
+    assert (df['freshness_status']=='STALE').any()
+    assert not df['freshness_status'].eq('CURRENT').all()
+
+def test_earnings_reaction_horizons_have_separate_availability():
+    df=pd.read_csv(PUB/'earnings_market_reaction_v3.csv')
+    assert 'event_available_at' in df.columns
+    for h in ['1d','3d','5d','20d','1m','3m']:
+        c=f'reaction_available_at_{h}'
+        assert c in df.columns
+        event=pd.to_datetime(df['event_available_at'],errors='coerce')
+        reaction=pd.to_datetime(df[c],errors='coerce')
+        m=event.notna() & reaction.notna()
+        assert (reaction[m] > event[m]).all()
+
+def test_contextual_layers_never_promoted_to_core():
+    r=pd.read_csv(PUB/'decision_engine_evidence_registry_v2.csv')
+    x=r[r['source'].isin(['Event / News','Corporate Earnings'])]
+    assert set(x['decision_role'])=={'CONTEXTUAL'}
+    assert not x['included_in_state'].astype(bool).any()
