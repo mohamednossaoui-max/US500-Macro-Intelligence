@@ -872,6 +872,7 @@ def build_output(
     evidence: List[Evidence],
     classification: Dict[str, Any],
     validation_errors: List[str],
+    context_row: Optional[pd.Series] = None,
 ) -> Dict[str, Any]:
 
     missing: List[str] = []
@@ -883,6 +884,15 @@ def build_output(
         )
 
     missing.extend(validation_errors)
+
+    # CORE PIT describes the evidence actually used by Decision Engine V1.
+    # OVERALL PIT/quality describes the complete Research Context evidence universe.
+    overall_quality = get_text(context_row, ["evidence_quality_status"]) if context_row is not None else None
+    overall_pit = get_text(context_row, ["evidence_pit_status"]) if context_row is not None else None
+    overall_freshness = get_text(context_row, ["evidence_freshness_status"]) if context_row is not None else None
+    overall_coverage = get_number(context_row, ["evidence_coverage_pct"]) if context_row is not None else None
+    overall_pit_safe_pct = get_number(context_row, ["evidence_pit_safe_pct"]) if context_row is not None else None
+    overall_current_pct = get_number(context_row, ["evidence_freshness_current_pct"]) if context_row is not None else None
 
     return {
         "engine": ENGINE_VERSION,
@@ -914,9 +924,15 @@ def build_output(
 
         "missing": missing,
 
-        "point_in_time_safe": (
-            len(validation_errors) == 0
-        ),
+        # Backward-compatible CORE PIT flag: applies only to evidence included in V1 state.
+        "point_in_time_safe": (len(validation_errors) == 0),
+        "core_point_in_time_safe": (len(validation_errors) == 0),
+        "overall_evidence_quality": overall_quality,
+        "overall_evidence_coverage_pct": overall_coverage,
+        "overall_evidence_freshness": overall_freshness,
+        "overall_evidence_freshness_current_pct": overall_current_pct,
+        "overall_evidence_pit_status": overall_pit,
+        "overall_evidence_pit_safe_pct": overall_pit_safe_pct,
 
         "research_only": True,
 
@@ -1038,6 +1054,14 @@ def write_outputs(
                 "point_in_time_safe": output[
                     "point_in_time_safe"
                 ],
+
+                "core_point_in_time_safe": output["core_point_in_time_safe"],
+                "overall_evidence_quality": output["overall_evidence_quality"],
+                "overall_evidence_coverage_pct": output["overall_evidence_coverage_pct"],
+                "overall_evidence_freshness": output["overall_evidence_freshness"],
+                "overall_evidence_freshness_current_pct": output["overall_evidence_freshness_current_pct"],
+                "overall_evidence_pit_status": output["overall_evidence_pit_status"],
+                "overall_evidence_pit_safe_pct": output["overall_evidence_pit_safe_pct"],
 
                 "research_only": output[
                     "research_only"
@@ -1367,6 +1391,7 @@ def main() -> int:
         evidence=evidence,
         classification=classification,
         validation_errors=validation_errors,
+        context_row=row,
     )
 
     # --------------------------------------------------------

@@ -38,3 +38,31 @@ def test_fed_artifact_remains_research_only_contextual():
     assert q['research_only'] is True
     assert q['decision_role'] == 'CONTEXTUAL'
     assert q['pit_status'] == 'PIT_SAFE'
+
+
+def test_decision_summary_separates_core_and_overall_pit_semantics(tmp_path):
+    input_file = ROOT / 'public_data' / 'research_context_summary_v1.csv'
+    subprocess.run([
+        sys.executable, str(ROOT / 'tests' / 'decision_engine' / 'decision_engine_v1.py'),
+        '--input', str(input_file), '--output-dir', str(tmp_path)
+    ], cwd=ROOT, check=True)
+    summary = pd.read_csv(tmp_path / 'decision_engine_research_summary_v1.csv').iloc[-1]
+    assert str(summary['core_point_in_time_safe']).lower() == 'true'
+    assert summary['overall_evidence_pit_status'] == 'PIT_LIMITED'
+    assert float(summary['overall_evidence_pit_safe_pct']) == 75.0
+    assert summary['overall_evidence_quality'] == 'MEDIUM'
+    assert float(summary['overall_evidence_coverage_pct']) == 92.5
+    assert summary['overall_evidence_freshness'] == 'CURRENT'
+    assert float(summary['overall_evidence_freshness_current_pct']) == 100.0
+
+
+def test_decision_quality_propagation_does_not_change_state(tmp_path):
+    input_file = ROOT / 'public_data' / 'research_context_summary_v1.csv'
+    subprocess.run([
+        sys.executable, str(ROOT / 'tests' / 'decision_engine' / 'decision_engine_v1.py'),
+        '--input', str(input_file), '--output-dir', str(tmp_path)
+    ], cwd=ROOT, check=True)
+    summary = pd.read_csv(tmp_path / 'decision_engine_research_summary_v1.csv').iloc[-1]
+    assert summary['state'] == 'SUPPORTIVE'
+    assert int(summary['evidence_count']) == 4
+    assert bool(summary['research_only']) is True
