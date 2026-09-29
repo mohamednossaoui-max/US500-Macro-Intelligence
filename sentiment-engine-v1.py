@@ -83,6 +83,15 @@ EXTREMES = Path(
 
 MIN_COMPONENTS = 2
 
+# Maximum age since the source became available before it may contribute to
+# the unified score. Availability (not observation) dates are used so these
+# gates remain point-in-time safe across mixed source frequencies.
+FRESHNESS_LIMIT_DAYS = {
+    "cot": 10,   # weekly CFTC release
+    "aaii": 10,  # weekly survey release
+    "vix": 5,    # daily market series; allows weekends/holidays
+}
+
 RESEARCH_ONLY = True
 
 DECISION_ENGINE_READY = False
@@ -503,13 +512,32 @@ result["vix_available"] = (
 )
 
 result["available_component_count"] = (
-    result[
-        [
-            "cot_available",
-            "aaii_available",
-            "vix_available",
-        ]
-    ]
+    result[["cot_available", "aaii_available", "vix_available"]]
+    .sum(axis=1)
+)
+
+# Freshness is measured from the actual availability timestamp carried by the
+# as-of merge. A source may remain available for provenance while becoming
+# ineligible for the current composite.
+for component in ("cot", "aaii", "vix"):
+    availability_col = f"{component}_availability_date"
+    age_col = f"{component}_age_days"
+    fresh_col = f"{component}_fresh"
+    eligible_col = f"{component}_eligible"
+    available_col = f"{component}_available"
+
+    result[age_col] = (
+        result["asof_date"] - result[availability_col]
+    ).dt.days
+    result[fresh_col] = (
+        result[available_col]
+        & result[age_col].ge(0)
+        & result[age_col].le(FRESHNESS_LIMIT_DAYS[component])
+    )
+    result[eligible_col] = result[available_col] & result[fresh_col]
+
+result["eligible_component_count"] = (
+    result[["cot_eligible", "aaii_eligible", "vix_eligible"]]
     .sum(axis=1)
 )
 
@@ -518,25 +546,23 @@ result["available_component_count"] = (
 # UNIFIED SCORE
 # ============================================================
 
-component_columns = [
-    "cot_sentiment_score",
-    "aaii_sentiment_score",
-    "vix_sentiment_score",
-]
-
-result["unified_sentiment_score"] = (
-    result[
-        component_columns
-    ]
-    .mean(
-        axis=1,
-        skipna=True,
+# Stale values remain visible in the output for provenance but are masked out
+# of the unified score. This prevents silent forward-carry from becoming a
+# neutral/bullish/bearish signal.
+eligible_scores = pd.DataFrame(index=result.index)
+for component in ("cot", "aaii", "vix"):
+    score_col = f"{component}_sentiment_score"
+    eligible_scores[score_col] = result[score_col].where(
+        result[f"{component}_eligible"]
     )
+
+result["unified_sentiment_score"] = eligible_scores.mean(
+    axis=1,
+    skipna=True,
 )
 
 result.loc[
-    result["available_component_count"]
-    < MIN_COMPONENTS,
+    result["eligible_component_count"] < MIN_COMPONENTS,
     "unified_sentiment_score",
 ] = np.nan
 
@@ -712,10 +738,20 @@ output_columns = [
     "vix_sentiment_score",
 
     "cot_available",
+    "cot_age_days",
+    "cot_fresh",
+    "cot_eligible",
     "aaii_available",
+    "aaii_age_days",
+    "aaii_fresh",
+    "aaii_eligible",
     "vix_available",
+    "vix_age_days",
+    "vix_fresh",
+    "vix_eligible",
 
     "available_component_count",
+    "eligible_component_count",
 
     "unified_sentiment_score",
 
@@ -790,9 +826,17 @@ summary_rows = [
 
     {
         "metric": "latest_component_count",
-        "value": latest[
-            "available_component_count"
-        ],
+        "value": latest["available_component_count"],
+    },
+
+    {
+        "metric": "latest_eligible_component_count",
+        "value": latest["eligible_component_count"],
+    },
+
+    {
+        "metric": "freshness_limits_days",
+        "value": str(FRESHNESS_LIMIT_DAYS),
     },
 
     {
