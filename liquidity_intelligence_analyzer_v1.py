@@ -80,6 +80,14 @@ CHANGE_WINDOWS = {
     "1Y": 365,
 }
 
+# Maximum age of the latest *available* observation that may be used
+# in derived liquidity research metrics.  The allowance is deliberately
+# wider for weekly H.4.1 series than for daily money-market series.
+FRESHNESS_LIMIT_DAYS = {
+    "Daily": 7,
+    "Weekly": 14,
+}
+
 
 # ============================================================
 # Utility
@@ -373,17 +381,24 @@ def build_indicator_panel(
             )
         )
 
+        # Frequency is source metadata used to apply the correct
+        # freshness allowance after the PIT-safe backward join.
         sub = sub[
             [
                 "availability_date",
                 "observation_date",
                 "actual",
+                "frequency",
             ]
         ].rename(
             columns={
                 "actual": indicator,
                 "observation_date":
                     f"{indicator}_observation_date",
+                "availability_date":
+                    f"{indicator}_available_at",
+                "frequency":
+                    f"{indicator}_frequency",
             }
         )
 
@@ -392,21 +407,36 @@ def build_indicator_panel(
                 "asof_date"
             ),
             sub.sort_values(
-                "availability_date"
+                f"{indicator}_available_at"
             ),
             left_on="asof_date",
-            right_on="availability_date",
+            right_on=f"{indicator}_available_at",
             direction="backward",
         )
 
-        result = result.drop(
-            columns=[
-                "availability_date"
-            ],
-            errors="ignore",
-        )
+    return add_freshness_fields(result)
 
-    return result
+
+def add_freshness_fields(panel: pd.DataFrame) -> pd.DataFrame:
+    """Attach component availability, age and eligibility metadata.
+
+    Values remain visible for provenance, but stale observations are
+    excluded from all derived calculations through *_eligible_value.
+    """
+    panel = panel.copy()
+    for indicator in sorted(EXPECTED_INDICATORS):
+        available_col = f"{indicator}_available_at"
+        frequency_col = f"{indicator}_frequency"
+        if available_col not in panel.columns:
+            continue
+        available = pd.to_datetime(panel[available_col], errors="coerce")
+        age = (panel["asof_date"] - available).dt.days
+        limit = panel[frequency_col].map(FRESHNESS_LIMIT_DAYS)
+        fresh = available.notna() & limit.notna() & age.ge(0) & age.le(limit)
+        panel[f"{indicator}_age_days"] = age.astype("Int64")
+        panel[f"{indicator}_fresh"] = fresh
+        panel[f"{indicator}_eligible_value"] = panel[indicator].where(fresh)
+    return panel
 
 
 # ============================================================
@@ -453,7 +483,8 @@ def add_changes(
         if indicator not in panel.columns:
             continue
 
-        current = panel[indicator]
+        eligible_col = f"{indicator}_eligible_value"
+        current = panel[eligible_col] if eligible_col in panel.columns else panel[indicator]
 
         for label, days in CHANGE_WINDOWS.items():
 
@@ -616,8 +647,8 @@ def add_rates_and_spreads(
         panel[
             "SOFR_EFFR_SPREAD_BPS"
         ] = (
-            panel["SOFR"]
-            - panel["EFFR"]
+            panel.get("SOFR_eligible_value", panel["SOFR"])
+            - panel.get("EFFR_eligible_value", panel["EFFR"])
         ) * 100.0
 
     return panel
@@ -651,15 +682,15 @@ def add_net_liquidity_proxy(
     panel[
         "ON_RRP_MILLIONS"
     ] = (
-        panel["ON_RRP"]
+        panel.get("ON_RRP_eligible_value", panel["ON_RRP"])
         * 1000.0
     )
 
     panel[
         "NET_LIQUIDITY_PROXY_MILLIONS"
     ] = (
-        panel["FED_TOTAL_ASSETS"]
-        - panel["TREASURY_GENERAL_ACCOUNT"]
+        panel.get("FED_TOTAL_ASSETS_eligible_value", panel["FED_TOTAL_ASSETS"])
+        - panel.get("TREASURY_GENERAL_ACCOUNT_eligible_value", panel["TREASURY_GENERAL_ACCOUNT"])
         - panel["ON_RRP_MILLIONS"]
     )
 
@@ -733,10 +764,10 @@ def build_summary(
             np.nan,
         )
 
-        observation_date = latest.get(
-            observation_col,
-            pd.NaT,
-        )
+        observation_date = latest.get(observation_col, pd.NaT)
+        available_at = latest.get(f"{indicator}_available_at", pd.NaT)
+        age_days = latest.get(f"{indicator}_age_days", pd.NA)
+        fresh = bool(latest.get(f"{indicator}_fresh", False))
 
         row = {
             "asof_date":
@@ -760,6 +791,14 @@ def build_summary(
                     )
                     else None
                 ),
+
+            "latest_available_at": (
+                available_at.strftime("%Y-%m-%d")
+                if pd.notna(available_at) else None
+            ),
+            "age_days": age_days,
+            "fresh": fresh,
+            "eligible": fresh and pd.notna(value),
 
             "research_only":
                 True,
@@ -1039,6 +1078,9 @@ def main() -> None:
             [
                 indicator,
                 f"{indicator}_observation_date",
+                f"{indicator}_available_at",
+                f"{indicator}_age_days",
+                f"{indicator}_fresh",
             ]
         )
 
