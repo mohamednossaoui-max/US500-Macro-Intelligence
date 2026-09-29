@@ -74,10 +74,11 @@
     "point_in_time_safe_all": true,
     "required_columns_present": true,
     "research_only_all": true,
+    "session_aware_pit_safe": false,
     "trading_signals_disabled": true,
     "unified_decision_disabled": true
   },
-  "columns": 44,
+  "columns": 46,
   "date_end": "2026-09-25",
   "date_start": "2000-01-03",
   "methodology": {
@@ -86,7 +87,9 @@
     "frequency": "daily",
     "historical_union_start": "2000-01-01",
     "missing_session_policy": "No forward-fill across different asset sessions",
-    "pit_convention": "availability_date = observation_date + 1 calendar day",
+    "pit_convention": "availability_date = observation_date + 1 calendar day; mechanical anti-lookahead proxy only",
+    "pit_limitation": "Exchange/session-aware availability timestamps are not represented",
+    "pit_status": "PIT_LIMITED",
     "price_source": "Yahoo Finance via yfinance",
     "return_definition": "1-day close-to-close percentage return",
     "volatility_definition": "20-observation rolling standard deviation annualized by sqrt(252)"
@@ -114,6 +117,6 @@
   ],
   "rows": 8121,
   "validator": "Cross-Asset Intelligence v1",
-  "version": "1.0",
+  "version": "1.1",
   "warnings": []
 }

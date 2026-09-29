@@ -8,7 +8,7 @@
   "research_only_violations": 0,
   "trading_field_violations": 0,
   "warnings": [
-    "Current artifact uses observation_date + 1 calendar day; session-aware availability is not yet represented",
+    "Calendar-day availability proxy only; exchange/session-aware availability is not represented. No cross-session forward-fill.",
     "Historical constituent membership is a free-public reconstruction; pit_perfect=false; membership_quality=RESEARCH_GRADE; price_pit_perfect=false"
   ]
 }

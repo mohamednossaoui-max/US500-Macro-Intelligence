@@ -49,18 +49,21 @@
     "WTI",
     "BITCOIN"
   ],
-  "columns": 44,
+  "columns": 46,
   "correlation_feature_count": 10,
   "date_end": "2026-09-25",
   "date_start": "2000-01-03",
   "decision_engine_ready": false,
   "forecast_generated": false,
+  "mechanical_availability_gate_passed": true,
   "passed": true,
-  "point_in_time_safe": true,
+  "pit_status": "PIT_LIMITED",
+  "point_in_time_safe": false,
   "research_only": true,
   "rows": 8121,
+  "session_aware_pit_safe": false,
   "trading_signal_generated": false,
   "unified_decision_generated": false,
   "validator": "Cross-Asset Intelligence v1",
-  "version": "1.0"
+  "version": "1.1"
 }
