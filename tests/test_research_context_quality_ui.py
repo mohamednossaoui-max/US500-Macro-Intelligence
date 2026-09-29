@@ -32,5 +32,11 @@ def test_current_published_quality_is_not_silently_promoted():
     row = pd.read_csv(SUMMARY).iloc[-1]
     assert row["evidence_quality_status"] == "MEDIUM"
     assert row["evidence_pit_status"] == "PIT_LIMITED"
-    assert float(row["evidence_coverage_pct"]) == 92.5
-    assert int(row["evidence_degraded_count"]) == 7
+    q = pd.read_csv(ROOT / "public_data/research_evidence_quality_v1.csv")
+    expected_coverage = round(100.0 * (q["availability_status"] == "AVAILABLE").sum() / len(q), 1)
+    expected_degraded = int(((q["availability_status"] == "AVAILABLE") & ~q["decision_engine_eligible"].astype(bool)).sum())
+    assert float(row["evidence_coverage_pct"]) == expected_coverage
+    assert int(row["evidence_degraded_count"]) == expected_degraded
+    breadth = q[q["module"] == "MARKET_BREADTH"].iloc[-1]
+    assert breadth["freshness_status"] == "STALE"
+    assert bool(breadth["decision_engine_eligible"]) is False

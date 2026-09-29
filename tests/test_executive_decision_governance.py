@@ -49,11 +49,12 @@ def test_decision_summary_separates_core_and_overall_pit_semantics(tmp_path):
     summary = pd.read_csv(tmp_path / 'decision_engine_research_summary_v1.csv').iloc[-1]
     assert str(summary['core_point_in_time_safe']).lower() == 'true'
     assert summary['overall_evidence_pit_status'] == 'PIT_LIMITED'
-    assert float(summary['overall_evidence_pit_safe_pct']) == 75.0
-    assert summary['overall_evidence_quality'] == 'MEDIUM'
-    assert float(summary['overall_evidence_coverage_pct']) == 92.5
-    assert summary['overall_evidence_freshness'] == 'CURRENT'
-    assert float(summary['overall_evidence_freshness_current_pct']) == 100.0
+    context = pd.read_csv(input_file).iloc[-1]
+    assert float(summary['overall_evidence_pit_safe_pct']) == float(context['evidence_pit_safe_pct'])
+    assert summary['overall_evidence_quality'] == context['evidence_quality_status']
+    assert float(summary['overall_evidence_coverage_pct']) == float(context['evidence_coverage_pct'])
+    assert summary['overall_evidence_freshness'] == context['evidence_freshness_status']
+    assert float(summary['overall_evidence_freshness_current_pct']) == float(context['evidence_freshness_current_pct'])
 
 
 def test_decision_quality_propagation_does_not_change_state(tmp_path):

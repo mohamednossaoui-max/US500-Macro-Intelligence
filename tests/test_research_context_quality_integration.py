@@ -21,10 +21,13 @@ def test_rollup_does_not_promote_pit_limited():
 def test_published_summary_has_quality_metadata():
     df = pd.read_csv(ROOT / "public_data/research_context_summary_v1.csv")
     row = df.iloc[-1]
-    assert row["evidence_as_of_date"] == "2026-09-26"
-    assert int(row["evidence_evidence_count"]) == 40
-    assert int(row["evidence_eligible_count"]) == 30
-    assert float(row["evidence_pit_safe_pct"]) == 75.0
+    q = pd.read_csv(ROOT / "public_data/research_evidence_quality_v1.csv")
+    contract = pd.read_csv(ROOT / "public_data/research_evidence_contract_v1.csv")
+    assert row["evidence_as_of_date"] == contract["as_of_date"].max()
+    assert int(row["evidence_evidence_count"]) == len(q)
+    assert int(row["evidence_eligible_count"]) == int(q["decision_engine_eligible"].astype(bool).sum())
+    expected_pit = round(100.0 * (q["pit_status"] == "PIT_SAFE").sum() / len(q), 1)
+    assert float(row["evidence_pit_safe_pct"]) == expected_pit
 
 
 def test_breadth_and_cross_asset_remain_pit_limited():
