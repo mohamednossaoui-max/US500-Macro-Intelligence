@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "9a959e944ad589490ce3ade080d34210b65a553d3a6d3ddcd36c97e30450eb16"
+      "sha256": "00d8726a4a9971ebb77281464f9e32897a9a788eb11bbbfd4917743650fc0376"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "d1c7b1096cd2518d0c98740c00d563143338f0d71ef1c6fb179392fd9c5e94ea"
+      "sha256": "694a448f7d7a7d016c1f8c824602ad6b5b8370848e6d657864b1eb1ba3848e27"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -289,28 +289,28 @@
       "sha256": "61e257955349b86ad300ea5a165b4e4045ea169204d9e918ebc86d2d9185796a"
     },
     "research_context_summary_v1.csv": {
-      "bytes": 5174,
-      "sha256": "1746f04b419645ac2b6c27effa5c94ed24dadccc2531b7d9c9424da0bc37be5d"
+      "bytes": 5169,
+      "sha256": "b9de7aa56d9c7738e737fc5b4feb7d1e7cec01dfaee79a6bbca75d54dca893a8"
     },
     "research_context_v1.csv": {
       "bytes": 7236927,
       "sha256": "d12e1ec34400e38d8e830e4392052a1d5c17afb542254fa4b2d7d06f832a595d"
     },
     "research_evidence_contract_v1.csv": {
-      "bytes": 13400,
-      "sha256": "4c3111c8f28d69d1c27527ce61144d3f0a829bbdf9e1c884bcc3087ddb27bb1f"
+      "bytes": 14281,
+      "sha256": "cdf0c0034d1e4efe35c110ad2b0c81644ad3db9a16dcee5d8eb2cb2ae6fef3ac"
     },
     "research_evidence_quality_summary_v1.json": {
-      "bytes": 409,
-      "sha256": "b463f41b6af2e6f34627fa0bc5d91ecd812e9430dea9139382ffc375dc845ea3"
+      "bytes": 411,
+      "sha256": "0ff5e6d2a6a6f71c8e6a0a5d31a9780fde028f95b1bcfb347daf68a346c90ab0"
     },
     "research_evidence_quality_v1.csv": {
-      "bytes": 3502,
-      "sha256": "3e924c1e07aece3b15cfe0cdd24d8d5f6cd2e7cd3c6dc1373bae79d3c09e9873"
+      "bytes": 3600,
+      "sha256": "667aceae18ed2dfbb0a55c3e4dec2f107d94c9f59dbbd66ceac738dd07ec5c12"
     },
     "research_evidence_validation_v1.json": {
-      "bytes": 494,
-      "sha256": "1c773ea602502be21132d042d7615d427eae94e0b496a5a7f82981c7c40f067f"
+      "bytes": 514,
+      "sha256": "dc9aadd2d97d6ead947976c7e18cad7ab375c6e62c6e58904ecdad03c3dd3878"
     },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 670819,

@@ -9,7 +9,6 @@
   "trading_field_violations": 0,
   "warnings": [
     "Current artifact uses observation_date + 1 calendar day; session-aware availability is not yet represented",
-    "Historical constituent membership is a free-public reconstruction; pit_perfect=false",
-    "NOT_YET_PUBLISHED_OR_UNAVAILABLE"
+    "Historical constituent membership is a free-public reconstruction; pit_perfect=false; membership_quality=RESEARCH_GRADE; price_pit_perfect=false"
   ]
 }
