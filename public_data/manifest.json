@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "bd1a185388f0f411de523a6e53d605d706a3220793dbb255f492c81c6426e15b"
+      "sha256": "d8d36439925615be907e89401fca2cd423470838a72f78c474b6645e3dbcde43"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "8986dd164c16c5f7b9f3226d71620260baf724c6cd1bb4bf5ce64afe4e9fcba4"
+      "sha256": "66474b5317f21175e29c8500c9db6bb96c9b0e2f9e1a8b569da176b027792cc8"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -343,6 +343,14 @@
     "vix_sentiment_research_v1.csv": {
       "bytes": 4434578,
       "sha256": "77f41a48c131c31b4c9e55c19702cb153055f07f8f58838e3adaf9e766947936"
+    },
+    "unified_state_vector_v1.csv": {
+      "bytes": 2616,
+      "sha256": "69d742f711e71e5044e99714e272510f545baec15d5cc6b1ef3d46d3ffe5323b"
+    },
+    "unified_state_vector_summary_v1.json": {
+      "bytes": 559,
+      "sha256": "012da70e65430bbf69624607b08162b99606d9c1eba372e5bca825f6b36aa053"
     }
   },
   "publisher": "US500 Macro Intelligence",
