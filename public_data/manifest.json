@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "8b0163525553496328b58d2446267e276e1144bd6172c3d39ecad28a2d7643cd"
+      "sha256": "a138b6ece1a1e3a0f078dfe5369ef873cfc01024fe83d6a0132aba45d6471afe"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "7d8c019a73824bd7dda6d2ca0edf941ec24b0741e4b3cabc8ae80c97eb1f31cb"
+      "sha256": "2913d554a6e74316ea9bcc147a636187d7b39d4649a60a62173e5822bb68cd81"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -162,11 +162,11 @@
     },
     "financial_stress_research_summary_v1.csv": {
       "bytes": 471,
-      "sha256": "5161cd24b4e485e2b4262aef59c5e4b078adca2458cbf7e90c283aacc6a5401c"
+      "sha256": "452e9177b5a05f9a6282b7f60c1118afe18e5f4a2844b32b8443e8027d8029f0"
     },
     "financial_stress_research_v1.csv": {
-      "bytes": 609862,
-      "sha256": "d305ce7b672f037276953808e9dd763a65fb0a7348927a6b8267553d2a82e41a"
+      "bytes": 840673,
+      "sha256": "7292a5ddc877be5a73445cfdb896693e293b51bbc03ebf92e79b34c5838375c9"
     },
     "historical_event_study_baseline_v2.csv": {
       "bytes": 268,
