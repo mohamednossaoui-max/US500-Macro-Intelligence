@@ -3,6 +3,6 @@ Macro Context,economic,MIXED,Economic regime is MIXED.,MIXED,ELIGIBLE,CORE,True,
 Financial Stress,financial_stress,SUPPORTIVE,Financial stress regime is LOW_RESEARCH_STRESS.,LOW_RESEARCH_STRESS,ELIGIBLE,CORE,True,FROM_RESEARCH_CONTEXT
 Sentiment Engine,sentiment,MIXED,Unified sentiment regime is NEUTRAL.,NEUTRAL,ELIGIBLE,CORE,True,FROM_RESEARCH_CONTEXT
 Technical Intelligence,technical,SUPPORTIVE,Technical research regime is BULLISH.,BULLISH,ELIGIBLE,CORE,True,FROM_RESEARCH_CONTEXT
-Event / News,event_news,CONTEXTUAL,97 official items; 45 high-relevance; 3 duplicates flagged.,FULL,ELIGIBLE,CONTEXTUAL,False,PIT_SAFE_BY_PUBLICATION_TIME
+Event / News,event_news,CONTEXTUAL,97 official items; 45 high-relevance; 5 duplicates flagged.,FULL,ELIGIBLE,CONTEXTUAL,False,PIT_SAFE_BY_PUBLICATION_TIME
 Corporate Earnings,earnings,CONTEXTUAL,1203 historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.,2026-08-26,DEGRADED,CONTEXTUAL,False,PIT_LIMITED
 Fed Intelligence (current),fed,CONTEXTUAL,Independent Fed artifact as of 2026-09-27; LATEST_MINUTES_LAG_LATEST_FOMC. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.,56.2,DEGRADED,CONTEXTUAL,False,PIT_SAFE

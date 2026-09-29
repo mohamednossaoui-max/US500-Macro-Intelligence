@@ -31,7 +31,7 @@
     "MEDIUM": 52,
     "HIGH": 45
   },
-  "duplicate_rows": 3,
+  "duplicate_rows": 5,
   "decision_role": "CONTEXTUAL",
   "included_in_decision_state": false,
   "interpretation": "Rule-based relevance and event class are research metadata only; no sentiment, forecast, or trading score is inferred."
