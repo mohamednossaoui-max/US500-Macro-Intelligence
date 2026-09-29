@@ -16,7 +16,13 @@ def event_class(t):
     if any(k in t for k in ['approval of application','enforcement action','termination of enforcement','consent order']): return 'ADMINISTRATIVE'
     return 'OTHER_OFFICIAL'
 ev['event_class']=[event_class(t) for t in titles]
-ev['dedup_key']=(ev['source'].fillna('').astype(str).str.lower().str.strip()+'|'+titles.str.replace(r'\s+',' ',regex=True).str.strip())
+# Event identity must not collapse recurring official releases that reuse a title.
+# Prefer canonical URL; fall back to source + exact publication timestamp + normalized title.
+urls=ev.get('url',pd.Series('',index=ev.index)).fillna('').astype(str).str.strip().str.lower()
+pubts=ev.get('published_at',pd.Series('',index=ev.index)).fillna('').astype(str).str.strip()
+normalized_titles=titles.str.replace(r'\s+',' ',regex=True).str.strip()
+fallback=ev['source'].fillna('').astype(str).str.lower().str.strip()+'|'+pubts+'|'+normalized_titles
+ev['dedup_key']=urls.where(urls.ne(''),fallback)
 ev['is_duplicate']=ev.duplicated('dedup_key',keep='first')
 rel=pd.to_numeric(ev.get('topic_relevance_title'),errors='coerce').fillna(0)
 ev['research_relevance']='LOW'

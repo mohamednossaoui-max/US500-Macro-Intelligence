@@ -9,6 +9,7 @@ Data Explorer and Methodology.
 """
 from __future__ import annotations
 import argparse, hashlib, json
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 import pandas as pd
@@ -37,40 +38,63 @@ def _status(available:bool,pit:str,freshness:str="CURRENT",quality:str="MEDIUM")
     if quality in {"LOW","INSUFFICIENT","UNKNOWN"}: reasons.append(quality)
     return ("DEGRADED",";".join(reasons)) if reasons else ("ELIGIBLE","")
 
+def _context_date(pub:Path):
+    p=pub/"research_context_summary_v1.csv"
+    if p.exists():
+        d=pd.read_csv(p)
+        for c in ["context_date","asof_date","as_of_date"]:
+            if c in d.columns and len(d):
+                x=pd.to_datetime(d[c].iloc[-1],errors="coerce",utc=True)
+                if pd.notna(x): return x
+    return pd.Timestamp.now(tz="UTC").normalize()
+
 def annotate_event_news(pub:Path)->dict:
     p=pub/"event_news_research_v2.csv"
     if not p.exists(): return {"available":False,"rows":0,"pit":"UNKNOWN","freshness":"UNKNOWN","quality":"INSUFFICIENT","note":"artifact missing"}
     df=pd.read_csv(p)
+    ctx=_context_date(pub)
     pubdt=pd.to_datetime(df.get("published_at"),errors="coerce",utc=True)
     avdt=pd.to_datetime(df.get("availability_date"),errors="coerce",utc=True)
-    chronology=(avdt.isna()|pubdt.isna()|(avdt>=pubdt.dt.normalize()))
+    chronology=(avdt.isna()|pubdt.isna()|(avdt>=pubdt))
     safe=df.get("point_in_time_safe",pd.Series([False]*len(df))).map(_bool).fillna(False)
     df["pit_status"]=["PIT_SAFE" if a and b else "PIT_LIMITED" for a,b in zip(safe,chronology)]
-    df["freshness_status"]="CURRENT"
+    age=(ctx-avdt).dt.total_seconds()/86400.0
+    df["age_days"]=age.round(3)
+    # Event/news is current contextual evidence only for a short publication window.
+    df["freshness_status"]=["CURRENT" if pd.notna(x) and 0<=x<=7 else ("AGING" if pd.notna(x) and 0<=x<=30 else "STALE") for x in age]
     df["quality_status"]="MEDIUM"
-    df["quality_gate"]=[_status(True,x)[0] for x in df["pit_status"]]
-    df["decision_role"]="CONTEXTUAL"
-    df["research_only"]=True
+    df["quality_gate"]=[_status(True,pit,fresh)[0] for pit,fresh in zip(df["pit_status"],df["freshness_status"])]
+    df["decision_role"]="CONTEXTUAL"; df["research_only"]=True
     df.to_csv(p,index=False)
     pit="PIT_SAFE" if (df["pit_status"]=="PIT_SAFE").all() else "PIT_LIMITED"
-    return {"available":True,"rows":len(df),"pit":pit,"freshness":"CURRENT","quality":"MEDIUM","note":"publication-time chronology audited; contextual only"}
+    latest_age=float(age[age>=0].min()) if (age>=0).any() else None
+    freshness="CURRENT" if latest_age is not None and latest_age<=7 else ("AGING" if latest_age is not None and latest_age<=30 else "STALE")
+    return {"available":True,"rows":len(df),"pit":pit,"freshness":freshness,"quality":"MEDIUM","note":"publication-time chronology and context-date freshness audited; historical events remain research history"}
 
 def annotate_earnings(pub:Path)->dict:
     p=pub/"earnings_market_reaction_v3.csv"
     if not p.exists(): return {"available":False,"rows":0,"pit":"UNKNOWN","freshness":"UNKNOWN","quality":"INSUFFICIENT","note":"artifact missing"}
-    df=pd.read_csv(p)
+    df=pd.read_csv(p); ctx=_context_date(pub)
     datecol="reported_date" if "reported_date" in df else ("event_date" if "event_date" in df else None)
-    base=pd.to_datetime(df[datecol],errors="coerce") if datecol else pd.Series(pd.NaT,index=df.index)
-    df["available_at"]=base.dt.strftime("%Y-%m-%d")
-    # Existing V3 contains post-event reaction outcomes; exact release session is not published.
-    df["pit_status"]="PIT_LIMITED"
-    df["freshness_status"]="CURRENT"
-    df["quality_status"]="MEDIUM"
-    df["quality_gate"]="DEGRADED"
-    df["decision_role"]="CONTEXTUAL"
-    df["research_only"]=True
+    base=pd.to_datetime(df[datecol],errors="coerce",utc=True) if datecol else pd.Series(pd.NaT,index=df.index)
+    df["event_available_at"]=base.dt.strftime("%Y-%m-%d")
+    # Preserve compatibility: available_at means event fact availability only.
+    df["available_at"]=df["event_available_at"]
+    horizons={"1d":"sp500_date_1d","3d":"sp500_date_3d","5d":"sp500_date_5d","20d":"sp500_date_20d","1m":"sp500_date_1m","3m":"sp500_date_3m"}
+    for h,c in horizons.items():
+        d=pd.to_datetime(df[c],errors="coerce",utc=True) if c in df else pd.Series(pd.NaT,index=df.index)
+        df[f"reaction_available_at_{h}"]=d.dt.strftime("%Y-%m-%d")
+        # A reaction can never be contemporaneous with the event fact.
+        bad=d.notna() & base.notna() & (d<=base)
+        if bad.any():
+            raise ValueError(f"invalid earnings reaction chronology for {h}: {int(bad.sum())} rows")
+    latest=base.max(); age=(ctx-latest).total_seconds()/86400 if pd.notna(latest) else None
+    freshness="CURRENT" if age is not None and 0<=age<=45 else ("AGING" if age is not None and 0<=age<=120 else "STALE")
+    df["pit_status"]="PIT_LIMITED"; df["freshness_status"]=freshness
+    df["quality_status"]="MEDIUM"; df["quality_gate"]="DEGRADED"
+    df["decision_role"]="CONTEXTUAL"; df["research_only"]=True
     df.to_csv(p,index=False)
-    return {"available":True,"rows":len(df),"pit":"PIT_LIMITED","freshness":"CURRENT","quality":"MEDIUM","note":"post-event reaction data cannot be treated as contemporaneous decision evidence"}
+    return {"available":True,"rows":len(df),"pit":"PIT_LIMITED","freshness":freshness,"quality":"MEDIUM","note":"event facts and post-event reaction-horizon availability are separated; reactions are never contemporaneous decision evidence"}
 
 def audit(pub:Path)->pd.DataFrame:
     event=annotate_event_news(pub); earn=annotate_earnings(pub)
