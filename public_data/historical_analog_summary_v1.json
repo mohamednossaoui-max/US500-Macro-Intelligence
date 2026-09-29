@@ -1,0 +1,20 @@
+{
+  "analog_engine_version": "HAE1.0",
+  "state_vector_version": "USV1.0",
+  "context_date": "2026-09-27",
+  "candidate_count": 56,
+  "selected_analog_count": 8,
+  "minimum_comparable_features": 7,
+  "core_feature_count": 9,
+  "minimum_coverage_pct": 77.78,
+  "temporal_decluster_days": 30,
+  "recent_exclusion_days": 90,
+  "historical_fed_available": false,
+  "historical_fed_policy": "Missing historical Fed feature is never imputed; similarity coverage is reduced accordingly.",
+  "missing_to_neutral": false,
+  "outcomes_used_in_selection": false,
+  "research_only": true,
+  "decision_engine_ready": false,
+  "forecast_generated": false,
+  "trading_signal_generated": false
+}

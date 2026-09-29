@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "d8d36439925615be907e89401fca2cd423470838a72f78c474b6645e3dbcde43"
+      "sha256": "f28f4e9ec1a2fab563f94fcd3b004be743f4bf883d5372bff5676cf1bc2bc08c"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "66474b5317f21175e29c8500c9db6bb96c9b0e2f9e1a8b569da176b027792cc8"
+      "sha256": "c050c944539f5dda463d3c3fa7aa6714d9567827258234f1802fa130e6c9a202"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -167,6 +167,18 @@
     "financial_stress_research_v1.csv": {
       "bytes": 840673,
       "sha256": "7292a5ddc877be5a73445cfdb896693e293b51bbc03ebf92e79b34c5838375c9"
+    },
+    "historical_analog_candidates_v1.csv": {
+      "bytes": 14089,
+      "sha256": "d34f47e56cfd6ce3d8163f79b1184f6028fde119b8fd2e9c41d9a73af7beb3f1"
+    },
+    "historical_analog_summary_v1.json": {
+      "bytes": 680,
+      "sha256": "80d0b7181ffa2816781bddebd99ae4fc169f3a6c931f9ccd96471006572c9ba6"
+    },
+    "historical_analog_top_v1.csv": {
+      "bytes": 2198,
+      "sha256": "e76a857e4d139b4ff439fa2298015fd3abd3aa9ed90b5990899086d8d481e246"
     },
     "historical_event_study_baseline_v2.csv": {
       "bytes": 268,
@@ -324,6 +336,14 @@
       "bytes": 1484962,
       "sha256": "973e2bb990ec99b5a612b56074d454ea0ce7ba0ba80ced4cb607579d552accca"
     },
+    "unified_state_vector_summary_v1.json": {
+      "bytes": 559,
+      "sha256": "012da70e65430bbf69624607b08162b99606d9c1eba372e5bca825f6b36aa053"
+    },
+    "unified_state_vector_v1.csv": {
+      "bytes": 2616,
+      "sha256": "69d742f711e71e5044e99714e272510f545baec15d5cc6b1ef3d46d3ffe5323b"
+    },
     "vix_historical_collection_summary_v1.csv": {
       "bytes": 389,
       "sha256": "700f459436208e67e09970c527c6d1a9ead3ad2258e5f649ea4a150b5a255311"
@@ -343,14 +363,6 @@
     "vix_sentiment_research_v1.csv": {
       "bytes": 4434578,
       "sha256": "77f41a48c131c31b4c9e55c19702cb153055f07f8f58838e3adaf9e766947936"
-    },
-    "unified_state_vector_v1.csv": {
-      "bytes": 2616,
-      "sha256": "69d742f711e71e5044e99714e272510f545baec15d5cc6b1ef3d46d3ffe5323b"
-    },
-    "unified_state_vector_summary_v1.json": {
-      "bytes": 559,
-      "sha256": "012da70e65430bbf69624607b08162b99606d9c1eba372e5bca825f6b36aa053"
     }
   },
   "publisher": "US500 Macro Intelligence",
