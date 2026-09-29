@@ -286,7 +286,14 @@ jobs:
 
           INPUT_FILE=""
 
-          if [ -f "decision_engine_input/research_context_v1.csv" ]; then
+          # Decision Engine V1 must consume the quality-integrated Research Context
+          # summary when available. Falling back to raw research_context_v1.csv would
+          # silently discard overall evidence quality/PIT metadata.
+          if [ -f "public_data/research_context_summary_v1.csv" ]; then
+            INPUT_FILE="public_data/research_context_summary_v1.csv"
+          elif [ -f "decision_engine_input/research_context_summary_v1.csv" ]; then
+            INPUT_FILE="decision_engine_input/research_context_summary_v1.csv"
+          elif [ -f "decision_engine_input/research_context_v1.csv" ]; then
             INPUT_FILE="decision_engine_input/research_context_v1.csv"
           else
             INPUT_FILE=$(
