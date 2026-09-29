@@ -289,12 +289,12 @@
       "sha256": "61e257955349b86ad300ea5a165b4e4045ea169204d9e918ebc86d2d9185796a"
     },
     "research_context_summary_v1.csv": {
-      "bytes": 5174,
-      "sha256": "451a523edea0e07fc7e908e21587cfa1a22dcf3f4463b271db7412ebda18ce1e"
+      "bytes": 957,
+      "sha256": "e2a261dd85b112db5e30193944e6536aef095637dcd3501e0bacf637c7b5c1d1"
     },
     "research_context_v1.csv": {
-      "bytes": 7235794,
-      "sha256": "fc881082ddeb17ac53d85ad3982df502330a6c11073b95a1d240184890830ace"
+      "bytes": 7236927,
+      "sha256": "d12e1ec34400e38d8e830e4392052a1d5c17afb542254fa4b2d7d06f832a595d"
     },
     "research_evidence_contract_v1.csv": {
       "bytes": 13400,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36543339584",
-  "source_workflow": "Macro Context v1"
+  "source_run_id": "36543961292",
+  "source_workflow": "Research Context v1"
 }
