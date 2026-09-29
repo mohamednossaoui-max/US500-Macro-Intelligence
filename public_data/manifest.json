@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "ee77e36352109065df8f49b79671424f8942a6f5de1d9c9174afdc06c1b7bf4d"
+      "sha256": "8b0163525553496328b58d2446267e276e1144bd6172c3d39ecad28a2d7643cd"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "f4ba2da2fa1966cc08d310ce9bd14d3c58b4e57bd99bfd34c6890ba965ed677b"
+      "sha256": "7d8c019a73824bd7dda6d2ca0edf941ec24b0741e4b3cabc8ae80c97eb1f31cb"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -348,6 +348,6 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36544082873",
+  "source_run_id": "36625648326",
   "source_workflow": "Decision Engine V1"
 }
