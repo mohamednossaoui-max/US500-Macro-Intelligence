@@ -1420,14 +1420,26 @@ def decision() -> None:
         ("Supportive", safe_value(row, ["supportive_count"])),
         ("Contradictory", safe_value(row, ["contradictory_count"])),
         ("Mixed", safe_value(row, ["mixed_count"])),
-        ("PIT", safe_value(row, ["point_in_time_safe"])),
-        ("Research Only", safe_value(row, ["research_only"])),
+        ("CORE PIT", safe_value(row, ["core_point_in_time_safe", "point_in_time_safe"])),
+        ("Overall PIT", safe_value(row, ["overall_evidence_pit_status"])),
     ]
     for col, (label, value) in zip(cols, metrics):
         with col:
             card(label, value)
 
-    st.subheader("Evidence Matrix")
+
+    qcols = st.columns(4)
+    qmetrics = [
+        ("Overall Quality", safe_value(row, ["overall_evidence_quality"])),
+        ("Overall Coverage", safe_value(row, ["overall_evidence_coverage_pct"])),
+        ("Overall Freshness", safe_value(row, ["overall_evidence_freshness"])),
+        ("Overall PIT Safe %", safe_value(row, ["overall_evidence_pit_safe_pct"])),
+    ]
+    for col, (label, value) in zip(qcols, qmetrics):
+        with col:
+            card(label, value)
+
+        st.subheader("Evidence Matrix")
     st.caption("CORE evidence may determine the published V1 research state. CONTEXTUAL evidence is integrated for visibility but has included_in_state = FALSE and cannot change the state.")
     table(registry if isinstance(registry, pd.DataFrame) else evidence, 420)
     source("Decision Evidence Registry", registry_src)
