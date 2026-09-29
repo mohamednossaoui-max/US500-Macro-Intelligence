@@ -29,7 +29,7 @@ import pandas as pd
 import yfinance as yf
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 
 RESEARCH_ONLY_FLAGS = {
@@ -526,21 +526,15 @@ def build_dataset(
         "%Y-%m-%d"
     )
 
-    output[
-        "point_in_time_safe"
-    ] = (
-        pd.to_datetime(
-            output[
-                "availability_date"
-            ]
-        )
-        >
-        pd.to_datetime(
-            output[
-                "observation_date"
-            ]
-        )
+    # Mechanical anti-lookahead check only.  This does NOT make the
+    # source session-aware PIT-safe; Yahoo daily bars do not provide a
+    # canonical exchange-session availability timestamp here.
+    output["point_in_time_safe"] = (
+        pd.to_datetime(output["availability_date"])
+        > pd.to_datetime(output["observation_date"])
     )
+    output["pit_status"] = "PIT_LIMITED"
+    output["session_aware_pit_safe"] = False
 
     # ========================================================
     # RESEARCH-ONLY FLAGS
@@ -642,6 +636,8 @@ def validate(
         "forecast_generated",
         "unified_decision_generated",
         "cross_asset_observation_id",
+        "pit_status",
+        "session_aware_pit_safe",
     ]
 
     for asset in ASSETS:
@@ -1238,8 +1234,14 @@ def validate(
                 "of daily returns",
 
             "pit_convention":
-                "availability_date = observation_date + "
-                "1 calendar day",
+                "availability_date = observation_date + 1 calendar day; "
+                "mechanical anti-lookahead proxy only",
+
+            "pit_status":
+                "PIT_LIMITED",
+
+            "pit_limitation":
+                "Exchange/session-aware availability timestamps are not represented",
 
             "missing_session_policy":
                 "No forward-fill across different asset sessions",
@@ -1339,12 +1341,15 @@ def validate(
                 correlation_columns
             ),
 
-        "point_in_time_safe":
-            bool(
-                checks[
-                    "point_in_time_safe_all"
-                ]
-            ),
+        # Overall PIT classification is deliberately conservative.
+        # The mechanical availability gate passes, but session-aware
+        # timestamps are not represented.
+        "point_in_time_safe": False,
+        "mechanical_availability_gate_passed": bool(
+            checks["point_in_time_safe_all"]
+        ),
+        "pit_status": "PIT_LIMITED",
+        "session_aware_pit_safe": False,
 
         "passed":
             bool(passed),
