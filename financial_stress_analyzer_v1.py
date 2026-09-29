@@ -66,6 +66,17 @@ ROLLING_WINDOW = 252
 
 MIN_PERIODS = 60
 
+# Maximum calendar age allowed for a component to contribute to the
+# composite. Daily market/rate series get a small weekend/holiday buffer;
+# weekly Chicago Fed series get a two-week publication buffer.
+FRESHNESS_LIMIT_DAYS = {
+    "VIX": 5,
+    "TREASURY_2Y": 5,
+    "TREASURY_10Y": 5,
+    "NFCI": 14,
+    "ANFCI": 14,
+}
+
 
 # ============================================================
 # Input discovery
@@ -363,66 +374,41 @@ def asof_series(
     source: pd.DataFrame,
     dates: pd.DatetimeIndex,
     indicator: str,
-) -> pd.Series:
+) -> pd.DataFrame:
+    """Reconstruct value plus provenance/freshness as known on each date."""
 
-    sub = source[
-        source["indicator"] == indicator
-    ].copy()
-
+    sub = source[source["indicator"] == indicator].copy()
     if sub.empty:
+        raise RuntimeError(f"Missing required indicator: {indicator}")
 
-        raise RuntimeError(
-            f"Missing required indicator: "
-            f"{indicator}"
-        )
-
-    sub = sub.sort_values(
-        [
-            "availability_date",
-            "observation_date",
-        ]
-    )
-
-    right = sub[
-        [
-            "availability_date",
-            "observation_date",
-            "actual",
-        ]
-    ].copy()
+    sub = sub.sort_values(["availability_date", "observation_date"])
+    right = sub[["availability_date", "observation_date", "actual"]].copy()
 
     result = pd.merge_asof(
-        pd.DataFrame(
-            {
-                "asof_date": dates
-            }
-        ),
-        right.sort_values(
-            "availability_date"
-        ),
+        pd.DataFrame({"asof_date": dates}),
+        right.sort_values("availability_date"),
         left_on="asof_date",
         right_on="availability_date",
         direction="backward",
         allow_exact_matches=True,
     )
 
-    # --------------------------------------------------------
-    # Anti-lookahead gate.
-    # --------------------------------------------------------
+    # Anti-lookahead: an observation dated after the as-of date is unusable.
+    lookahead = result["observation_date"] > result["asof_date"]
+    result.loc[lookahead, "actual"] = np.nan
 
-    result.loc[
-        result["observation_date"]
-        > result["asof_date"],
-        "actual",
-    ] = np.nan
-
-    return pd.Series(
-        result["actual"].to_numpy(
-            dtype=float
-        ),
-        index=dates,
-        name=indicator,
+    result["age_days"] = (
+        result["asof_date"] - result["availability_date"]
+    ).dt.days
+    limit = FRESHNESS_LIMIT_DAYS[indicator]
+    result["fresh"] = (
+        result["actual"].notna()
+        & result["age_days"].notna()
+        & (result["age_days"] >= 0)
+        & (result["age_days"] <= limit)
     )
+    result["eligible_actual"] = result["actual"].where(result["fresh"])
+    return result.set_index("asof_date")
 
 
 # ============================================================
@@ -472,6 +458,19 @@ def classify(score):
         return "ELEVATED_RESEARCH_STRESS"
 
     return "LOW_RESEARCH_STRESS"
+
+
+# ============================================================
+# Composite eligibility
+# ============================================================
+
+def apply_composite_eligibility(panel: pd.DataFrame, components: list[str]) -> pd.DataFrame:
+    """Compute the composite only from fresh/eligible component z-scores."""
+    panel = panel.copy()
+    panel["stress_component_count"] = panel[components].notna().sum(axis=1)
+    panel["composite_stress_score"] = panel[components].mean(axis=1)
+    panel.loc[panel["stress_component_count"] < 2, "composite_stress_score"] = np.nan
+    return panel
 
 
 # ============================================================
@@ -655,10 +654,16 @@ def main():
             f"Building PIT series: {indicator}"
         )
 
-        panel[indicator] = asof_series(
-            df,
-            dates,
-            indicator,
+        reconstructed = asof_series(df, dates, indicator)
+        panel[indicator] = reconstructed["eligible_actual"].reindex(dates).to_numpy()
+        panel[f"{indicator}_LAST_AVAILABLE_DATE"] = (
+            reconstructed["availability_date"].reindex(dates).to_numpy()
+        )
+        panel[f"{indicator}_AGE_DAYS"] = (
+            reconstructed["age_days"].reindex(dates).to_numpy()
+        )
+        panel[f"{indicator}_FRESH"] = (
+            reconstructed["fresh"].reindex(dates).fillna(False).to_numpy()
         )
 
     panel.index.name = "asof_date"
@@ -708,36 +713,9 @@ def main():
         "YIELD_CURVE_STRESS_Z",
     ]
 
-    # --------------------------------------------------------
-    # Number of available stress components.
-    # --------------------------------------------------------
-
-    panel[
-        "stress_component_count"
-    ] = (
-        panel[components]
-        .notna()
-        .sum(axis=1)
-    )
-
-    # --------------------------------------------------------
-    # Composite stress score.
-    # --------------------------------------------------------
-
-    panel[
-        "composite_stress_score"
-    ] = (
-        panel[components]
-        .mean(axis=1)
-    )
-
-    # At least two components are required.
-    panel.loc[
-        panel[
-            "stress_component_count"
-        ] < 2,
-        "composite_stress_score",
-    ] = np.nan
+    # Composite is computed only from fresh/eligible components.
+    # At least two eligible components are required.
+    panel = apply_composite_eligibility(panel, components)
 
     # --------------------------------------------------------
     # Research regime.
@@ -783,6 +761,21 @@ def main():
         "YIELD_10Y_2Y_SPREAD",
         "NFCI",
         "ANFCI",
+        "VIX_LAST_AVAILABLE_DATE",
+        "VIX_AGE_DAYS",
+        "VIX_FRESH",
+        "TREASURY_2Y_LAST_AVAILABLE_DATE",
+        "TREASURY_2Y_AGE_DAYS",
+        "TREASURY_2Y_FRESH",
+        "TREASURY_10Y_LAST_AVAILABLE_DATE",
+        "TREASURY_10Y_AGE_DAYS",
+        "TREASURY_10Y_FRESH",
+        "NFCI_LAST_AVAILABLE_DATE",
+        "NFCI_AGE_DAYS",
+        "NFCI_FRESH",
+        "ANFCI_LAST_AVAILABLE_DATE",
+        "ANFCI_AGE_DAYS",
+        "ANFCI_FRESH",
         "VIX_Z",
         "NFCI_Z",
         "ANFCI_Z",
