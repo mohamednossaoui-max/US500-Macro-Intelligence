@@ -2,6 +2,11 @@ name: US500 Macro Intelligence - Master Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      changed_sources:
+        description: "Space-separated root source IDs. Blank = full source refresh."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -232,11 +237,29 @@ jobs:
 
           echo "Workflow runner created."
 
+      - name: Build Dependency-Aware Execution Plan
+        id: autonomy_plan
+        shell: bash
+        env:
+          CHANGED_SOURCES: ${{ inputs.changed_sources }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CHANGED_SOURCES}" ]; then
+            CHANGED_SOURCES="economic stress_historical fed event_news cot_historical vix_historical aaii_historical technical liquidity_historical breadth cross_asset earnings"
+          fi
+          read -r -a CHANGED <<< "${CHANGED_SOURCES}"
+          PLAN_JSON="$(python autonomy_dependency_planner_v1.py --changed "${CHANGED[@]}" --json)"
+          PLAN_CSV="$(printf '%s' "${PLAN_JSON}" | python -c 'import json,sys; x=json.load(sys.stdin); print(","+",".join(i["id"] for i in x["plan"])+",")')"
+          echo "plan_csv=${PLAN_CSV}" >> "${GITHUB_OUTPUT}"
+          echo "Changed roots: ${CHANGED_SOURCES}"
+          echo "Plan: ${PLAN_CSV}"
+
       # ============================================================
       # 4. ECONOMIC INTELLIGENCE
       # ============================================================
 
       - name: 01 - Economic Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',economic,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -248,6 +271,7 @@ jobs:
       # ============================================================
 
       - name: 02 - Financial Stress Historical
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',stress_historical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -259,6 +283,7 @@ jobs:
       # ============================================================
 
       - name: 03 - Financial Stress Research
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',stress,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -270,6 +295,7 @@ jobs:
       # ============================================================
 
       - name: 04 - Fed Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',fed,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -281,6 +307,7 @@ jobs:
       # ============================================================
 
       - name: 05 - Event News Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',event_news,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -292,6 +319,7 @@ jobs:
       # ============================================================
 
       - name: 06 - COT Historical
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',cot_historical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -303,6 +331,7 @@ jobs:
       # ============================================================
 
       - name: 07 - COT Positioning
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',cot,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -314,6 +343,7 @@ jobs:
       # ============================================================
 
       - name: 08 - VIX Historical
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',vix_historical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -325,6 +355,7 @@ jobs:
       # ============================================================
 
       - name: 09 - VIX Sentiment
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',vix_sentiment,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -336,6 +367,7 @@ jobs:
       # ============================================================
 
       - name: 10 - AAII Historical
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',aaii_historical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -347,6 +379,7 @@ jobs:
       # ============================================================
 
       - name: 11 - AAII Sentiment
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',aaii_sentiment,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -358,6 +391,7 @@ jobs:
       # ============================================================
 
       - name: 12 - Technical Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',technical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -369,6 +403,7 @@ jobs:
       # ============================================================
 
       - name: 13 - Liquidity Historical
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',liquidity_historical,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -380,6 +415,7 @@ jobs:
       # ============================================================
 
       - name: 14 - Liquidity Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',liquidity,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -391,6 +427,7 @@ jobs:
       # ============================================================
 
       - name: 15 - Market Breadth
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',breadth,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -402,6 +439,7 @@ jobs:
       # ============================================================
 
       - name: 16 - Cross Asset Intelligence
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',cross_asset,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -413,6 +451,7 @@ jobs:
       # ============================================================
 
       - name: 17 - Earnings Market Reaction
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',earnings,')
         shell: bash
         run: |
           /tmp/run_workflow.sh \
@@ -420,7 +459,34 @@ jobs:
             "Earnings Market Reaction"
 
       # ============================================================
-      # 21. PIPELINE SUMMARY
+      # 21. SENTIMENT COMPOSITE
+      # ============================================================
+      - name: 18 - Sentiment Engine
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',sentiment,')
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh ".github/workflows/sentiment-engine-v1.yml" "Sentiment Engine"
+
+      # ============================================================
+      # 22. MACRO CONTEXT
+      # ============================================================
+      - name: 19 - Macro Context
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',macro_context,')
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh ".github/workflows/macro_context_v1.yml" "Macro Context"
+
+      # ============================================================
+      # 23. RESEARCH CONTEXT
+      # ============================================================
+      - name: 20 - Research Context
+        if: contains(steps.autonomy_plan.outputs.plan_csv, ',research_context,')
+        shell: bash
+        run: |
+          /tmp/run_workflow.sh ".github/workflows/research-context-v1.yml" "Research Context"
+
+      # ============================================================
+      # 24. PIPELINE SUMMARY
       # ============================================================
 
       - name: Research Pipeline Summary
@@ -667,6 +733,30 @@ jobs:
           echo ""
           echo "Final public_data contents:"
           find public_data -maxdepth 1 -type f | sort
+
+      # ============================================================
+      # AUTONOMOUS DOWNSTREAM REBUILD (STAGES 01-12)
+      # ============================================================
+      - name: Rebuild Integrated Intelligence Layers
+        if: success() && contains(steps.autonomy_plan.outputs.plan_csv, ',research_context,')
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+          python research_evidence_contract_v1.py
+          python research_context_quality_integration_v1.py
+          rm -rf decision_engine_output
+          python tests/decision_engine/decision_engine_v1.py --input public_data/research_context_summary_v1.csv --output-dir decision_engine_output
+          cp decision_engine_output/* public_data/
+          python final_remaining_layers_hardening_v1.py
+          python unified_state_vector_v1.py
+          python historical_analog_engine_v1.py
+          python historical_market_reaction_v1.py
+          python decision_intelligence_v2.py
+          python -m pytest -q
+          python scripts/rebuild_publication_manifest.py --public-data public_data --source autonomous-intelligence-pipeline-v1
+          python scripts/verify_publication_integrity.py --public-data public_data
 
       # ============================================================
       # 25. PUBLICATION MANIFEST OWNERSHIP

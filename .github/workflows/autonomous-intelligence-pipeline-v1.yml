@@ -1,0 +1,52 @@
+name: US500 Autonomous Intelligence Pipeline v1
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: us500-autonomous-intelligence
+  cancel-in-progress: false
+
+jobs:
+  detect-and-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Detect due root sources
+        id: due
+        shell: bash
+        run: |
+          set -euo pipefail
+          JSON="$(python autonomy_due_detector_v1.py --json)"
+          echo "${JSON}"
+          ROOTS="$(printf '%s' "${JSON}" | python -c 'import json,sys; print(" ".join(json.load(sys.stdin)["due_roots"]))')"
+          echo "roots=${ROOTS}" >> "${GITHUB_OUTPUT}"
+      - name: No due sources
+        if: steps.due.outputs.roots == ''
+        run: echo "No root source is due; no pipeline dispatched."
+      - name: Dispatch dependency-aware master pipeline
+        if: steps.due.outputs.roots != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ROOTS: ${{ steps.due.outputs.roots }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run us500-full-research-pipeline.yml --ref main -f changed_sources="${ROOTS}"
+          sleep 5
+          RUN_ID="$(gh run list --workflow us500-full-research-pipeline.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')"
+          test -n "${RUN_ID}"
+          echo "Master run: ${RUN_ID}"
+          gh run watch "${RUN_ID}" --exit-status
