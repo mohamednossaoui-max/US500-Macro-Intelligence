@@ -1,0 +1,468 @@
+[
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "macro_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 45.0,
+    "id": "economic",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-11-14T19:24:13+00:00",
+    "pit_status": "release-aware",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "stress"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "stress_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "availability-date",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "macro_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "stress",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "macro_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 60.0,
+    "id": "fed",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-11-29T19:24:13+00:00",
+    "pit_status": "publication-time",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.0,
+    "criticality": "contextual",
+    "downstream_impact": [
+      "macro_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 14.0,
+    "id": "event_news",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:33:33.127306+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-14T19:33:33.127306+00:00",
+    "pit_status": "publication-time",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "cot"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "cot_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "publication-lag-aware",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "sentiment"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "cot",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "vix_sentiment"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 5.0,
+    "id": "vix_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-05T19:24:13+00:00",
+    "pit_status": "market-close-aware",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "sentiment"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 5.0,
+    "id": "vix_sentiment",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-05T19:24:13+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "aaii_sentiment"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "aaii_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "publication-time",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "sentiment"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "aaii_sentiment",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 5.0,
+    "id": "technical",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-05T19:24:13+00:00",
+    "pit_status": "market-close-aware",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "liquidity"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "liquidity_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "release-aware",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 10.0,
+    "id": "liquidity",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-10T19:24:13+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "contextual",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 5.0,
+    "id": "breadth",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-05T19:24:13+00:00",
+    "pit_status": "PIT_LIMITED",
+    "state": "PIT_LIMITED"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "contextual",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 5.0,
+    "id": "cross_asset",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-05T19:24:13+00:00",
+    "pit_status": "PIT_LIMITED-session-aware-unavailable",
+    "state": "PIT_LIMITED"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "contextual",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 30.0,
+    "id": "earnings",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-30T19:24:13+00:00",
+    "pit_status": "event-fact-plus-horizon-availability",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": null,
+    "criticality": "critical",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "No published output/ledger success available",
+    "freshness_sla_days": 10.0,
+    "id": "sentiment",
+    "kind": "composite_layer",
+    "last_attempt": null,
+    "last_data_update": null,
+    "last_known_good": false,
+    "last_success": null,
+    "next_expected_check": null,
+    "pit_status": "inherit",
+    "state": "UNKNOWN"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "macro_context",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:24:13+00:00",
+    "pit_status": "inherit-and-disclose",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "evidence_quality"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "research_context",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:24:13+00:00",
+    "pit_status": "inherit-and-disclose",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "critical",
+    "downstream_impact": [
+      "decision_engine"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "evidence_quality",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:24:13+00:00",
+    "pit_status": "measure-not-promote",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.0,
+    "criticality": "critical",
+    "downstream_impact": [
+      "usv"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "decision_engine",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:33:33.146377+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:33:33.146377+00:00",
+    "pit_status": "core-vs-overall-separated",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.0,
+    "criticality": "critical",
+    "downstream_impact": [
+      "analogs"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "usv",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:33:39.713492+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:33:39.713492+00:00",
+    "pit_status": "inherit",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "market_reaction"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "analogs",
+    "kind": "research_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:24:13+00:00",
+    "pit_status": "historical-PIT-only",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.01,
+    "criticality": "important",
+    "downstream_impact": [
+      "decision_intelligence"
+    ],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "market_reaction",
+    "kind": "research_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:24:13+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:24:13+00:00",
+    "pit_status": "outcome-separated-from-selection",
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.0,
+    "criticality": "critical",
+    "downstream_impact": [],
+    "failure_reason": "",
+    "freshness_sla_days": 2.0,
+    "id": "decision_intelligence",
+    "kind": "integration_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-09-30T19:33:32.535906+00:00",
+    "last_known_good": true,
+    "last_success": null,
+    "next_expected_check": "2026-10-02T19:33:32.535906+00:00",
+    "pit_status": "research-only-no-forecast",
+    "state": "HEALTHY"
+  }
+]

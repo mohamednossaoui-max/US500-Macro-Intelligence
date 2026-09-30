@@ -90,7 +90,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "1d07ac2df133886e4f044a72d63e6be36c8ba98cfdfe9f4c1c27a03313721762"
+      "sha256": "02d61e9bf88c8ef166128d3b4175669747728ffdb42904b1207c863cace898d0"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -162,7 +162,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "059eb5dde4856d72179c3ce70206eb591a53c5296414ed900667c15ffe2a8059"
+      "sha256": "96f85e535b538985113a0d30175567e59cb4a3354037934acb9043d1bb5df97d"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -339,6 +339,14 @@
     "research_evidence_validation_v1.json": {
       "bytes": 532,
       "sha256": "c1f2cc5a3e569c44cda696938f5ad34114b9545627fe7dd59fc80db60577a3a1"
+    },
+    "system_health_layers_v1.json": {
+      "bytes": 12606,
+      "sha256": "61b41826c116b5ba01d10f73e990856aea21df251bc0cc45cabe646b281f196c"
+    },
+    "system_health_summary_v1.json": {
+      "bytes": 215,
+      "sha256": "e2acbc5a65f7801ab2affdd8aa3e5dec9b4836458df107d2a27b812f20d40611"
     },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 670819,
