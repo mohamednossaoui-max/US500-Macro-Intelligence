@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "1a03c0a3e40ec10b2ea95219a3078d6436122a46c09137f570055324c0aa1470"
+      "sha256": "3a53560631a4f5c66d065c71513fd4380c6ee5b207151e3c2ef7f78527f0bf08"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "07738f8bd0b96284438bc1e5a8bf0c98b18f70f1967ad964e93b8936188dbc49"
+      "sha256": "bc35ace81ac03937e32376180938849c6a3d0d52da0e7a33f4c1407c3d4b9004"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
