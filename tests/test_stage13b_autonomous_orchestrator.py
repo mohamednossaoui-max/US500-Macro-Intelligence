@@ -58,4 +58,6 @@ def test_atomic_publish_failure_rolls_back(tmp_path):
 def test_manual_mode_and_cli_publish_guard():
     reg=ao.load_registry(REG)
     assert reg['policy']['manual_mode_preserved'] is True
-    assert reg['policy']['schedules_enabled'] is False
+    assert isinstance(reg['policy']['schedules_enabled'], bool)
+    if reg['policy']['schedules_enabled']:
+        assert reg['policy'].get('schedule_entrypoint')

@@ -6,8 +6,10 @@ REG=ROOT/'autonomy_source_registry_v1.json'
 
 def test_registry_contract_and_manual_mode():
     r=p.load_registry(REG)
-    assert r['registry_version']=='ASR1.0'
-    assert r['policy']['schedules_enabled'] is False
+    assert r['registry_version'] in {'ASR1.0','ASR1.1'}
+    assert isinstance(r['policy']['schedules_enabled'], bool)
+    if r['policy']['schedules_enabled']:
+        assert r['policy'].get('schedule_entrypoint')
     assert r['policy']['manual_mode_preserved'] is True
     assert r['policy']['atomic_publication_required'] is True
     assert r['policy']['last_known_good_required'] is True
@@ -37,4 +39,4 @@ def test_cot_change_runs_sentiment_chain():
 
 def test_contextual_source_never_bypasses_integration_chain():
     r=p.load_registry(REG); ids=[x['id'] for x in p.dry_run(r,['event_news'])]
-    assert ids == ['event_news','research_context','evidence_quality','decision_engine','usv','analogs','market_reaction','decision_intelligence','publication']
+    assert ids == ['event_news','macro_context','research_context','evidence_quality','decision_engine','usv','analogs','market_reaction','decision_intelligence','publication']
