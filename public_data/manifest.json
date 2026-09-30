@@ -82,7 +82,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "f28f4e9ec1a2fab563f94fcd3b004be743f4bf883d5372bff5676cf1bc2bc08c"
+      "sha256": "d15865a337a219ace32c858a23d875160ed4023a95b59938b7274e5cea9d08d4"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +154,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "c050c944539f5dda463d3c3fa7aa6714d9567827258234f1802fa130e6c9a202"
+      "sha256": "e9b3dcd1554b0383d08bc5429822d58960d6e7ccc312bc2b0e73bc53354e7732"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -211,6 +211,14 @@
     "historical_event_study_validation_v2.json": {
       "bytes": 1031,
       "sha256": "e630f8fc8bd72b169ff58113d88bb1c36881cc308680693d76c2c5124e6f1523"
+    },
+    "historical_market_reaction_summary_v1.json": {
+      "bytes": 2145,
+      "sha256": "6b625655b4037ecb470c4dd3e0e6c2fbc49bd7c2f3b6fc7e7fa8a37135a75718"
+    },
+    "historical_market_reaction_v1.csv": {
+      "bytes": 4463,
+      "sha256": "caf8672427de5400df4a10069cffe2050127a73bcc3a98d7ca9637b70d4ca07f"
     },
     "liquidity_historical_collection_summary_v1.csv": {
       "bytes": 1728,
