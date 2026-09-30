@@ -122,6 +122,8 @@ DATASETS = {
     "Decision Evidence": "decision_engine_research_evidence_v1.csv",
     "Decision Evidence Registry": "decision_engine_evidence_registry_v2.csv",
     "Decision JSON": "decision_engine_research_v1.json",
+    "Decision Intelligence V2": "decision_intelligence_v2.json",
+    "Decision Intelligence Summary V2": "decision_intelligence_summary_v2.csv",
     "Final Validation": "final_end_to_end_validation_report.csv",
     "Final Validation Summary": "final_end_to_end_validation_summary.csv",
     "Final Validation JSON": "final_end_to_end_validation.json",
@@ -1453,6 +1455,34 @@ def decision() -> None:
         with st.expander("Complete Decision JSON"):
             st.json(obj)
     source("Decision JSON", json_src)
+
+    di, di_src = load_named("Decision Intelligence V2")
+    if isinstance(di, dict):
+        st.subheader("Decision Intelligence V2 — Research Synthesis")
+        st.caption("Historical analog outcomes are conditional evidence only; they are not expected returns, forecasts, or trading signals.")
+        st.markdown("**Current Environment**")
+        st.write(di.get("current_environment", "—"))
+        changed = di.get("what_changed", {})
+        st.markdown("**What Changed**")
+        if changed.get("status") == "UNAVAILABLE":
+            st.info(changed.get("reason", "Prior canonical state unavailable."))
+        else:
+            st.write(changed)
+        a = di.get("historical_analogs", {})
+        cols2 = st.columns(3)
+        with cols2[0]: card("Closest Analog", a.get("closest_date", "—"))
+        with cols2[1]: card("Similarity", a.get("closest_similarity_pct", "—"))
+        with cols2[2]: card("Comparable Coverage", a.get("closest_coverage_pct", "—"))
+        st.write(a.get("summary", ""))
+        st.markdown("**Historical US500 Reaction**")
+        st.write(di.get("historical_market_reaction", {}).get("summary", "—"))
+        st.markdown("**Important Differences**")
+        st.write(di.get("important_differences", "—"))
+        st.markdown("**Risks & Data Limitations**")
+        for item in di.get("risks_and_limitations", []): st.write("• " + str(item))
+        st.markdown("**Final Research Synthesis**")
+        st.write(di.get("final_research_synthesis", "—"))
+        source("Decision Intelligence V2", di_src)
 
     st.info(
         "Research gate only. No trading signal, forecast, order, execution, "
