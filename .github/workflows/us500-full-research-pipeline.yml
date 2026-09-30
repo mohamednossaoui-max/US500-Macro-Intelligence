@@ -754,6 +754,7 @@ jobs:
           python historical_analog_engine_v1.py
           python historical_market_reaction_v1.py
           python decision_intelligence_v2.py
+          python system_health_monitor_v1.py
           python -m pytest -q
           python scripts/rebuild_publication_manifest.py --public-data public_data --source autonomous-intelligence-pipeline-v1
           python scripts/verify_publication_integrity.py --public-data public_data
