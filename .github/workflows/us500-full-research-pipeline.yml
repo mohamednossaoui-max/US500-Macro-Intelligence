@@ -920,6 +920,37 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # Tests/builders create runtime-only files. Some cache files existed in
+          # older repository snapshots and may therefore still be tracked. Restore
+          # tracked runtime caches, then remove ignored runtime files only. Never
+          # discard unexpected source changes here.
+          echo "Sanitizing runtime-only Git artifacts..."
+
+          TRACKED_RUNTIME=$(git ls-files | grep -E '(^|/)(\.pytest_cache/|__pycache__/)|\.py[co]$' || true)
+          if [ -n "${TRACKED_RUNTIME}" ]; then
+            printf '%s\n' "${TRACKED_RUNTIME}" | while IFS= read -r path; do
+              [ -n "${path}" ] && git restore --worktree -- "${path}"
+            done
+          fi
+
+          # -X removes ignored files only; it cannot delete untracked source files.
+          git clean -fdX
+
+          if ! git diff --quiet; then
+            echo "ERROR: tracked unstaged non-runtime changes remain before final synchronization."
+            git status --short
+            exit 1
+          fi
+
+          UNTRACKED_NONIGNORED=$(git ls-files --others --exclude-standard)
+          if [ -n "${UNTRACKED_NONIGNORED}" ]; then
+            echo "ERROR: untracked non-ignored files remain before final synchronization."
+            printf '%s\n' "${UNTRACKED_NONIGNORED}"
+            exit 1
+          fi
+
+          echo "Git hygiene gate passed: working tree is safe for rebase."
+
           MAX_PUSH_ATTEMPTS=5
           PUSH_SUCCESS=0
 
