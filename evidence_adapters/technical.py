@@ -16,8 +16,19 @@ def _context_date(p, fallback):
 
 def build(p):
     d = pd.read_csv(p / 'technical_intelligence_research_v1.csv')
-    x = d.iloc[-1]
-    context_date = _context_date(p, x.availability_date)
+    # Freeze one canonical Research Context clock for this build.
+    # Select the newest Technical row that was actually available by that clock;
+    # never take a newer row and then relabel it as contemporaneous evidence.
+    fallback = d.iloc[-1].availability_date
+    context_date = _context_date(p, fallback)
+    context_ts = pd.to_datetime(context_date, errors='coerce')
+    availability = pd.to_datetime(d['availability_date'], errors='coerce')
+    eligible = d.loc[availability.notna() & (availability <= context_ts)].copy()
+    if eligible.empty:
+        # Preserve strict PIT semantics: expose no Technical evidence rather than
+        # silently using a row that was not yet available at context_date.
+        return []
+    x = eligible.iloc[-1]
     out = []
     for dim, ind, state, val, unit in [
         ('TREND', 'Trend Structure', x.trend_structure, x.Close, 'index'),
