@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-09-27",
+  "context_date": "2026-09-30",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-09-17",
-    "age_days": 10,
+    "age_days": 13,
     "economic_regime": "MIXED",
     "inflation_score": 1.0585026808856153,
     "labor_score": 0.0265094293115017,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-09-27",
+    "as_of_date": "2026-09-30",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,19 +328,19 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-09-23",
-    "age_days": 4,
-    "composite_stress_score": -0.24770822860017,
+    "source_date": "2026-09-30",
+    "age_days": 0,
+    "composite_stress_score": -0.3341955301667191,
     "research_regime": "LOW_RESEARCH_STRESS",
-    "vix": 14.21,
-    "treasury_2y": 4.85,
-    "treasury_10y": 5.11,
-    "yield_10y_2y_spread": 0.2600000000000007,
+    "vix": 16.04,
+    "treasury_2y": 4.89,
+    "treasury_10y": 5.26,
+    "yield_10y_2y_spread": 0.3700000000000001,
     "pit_safe": true
   },
   "event_news": {
     "source_date": "2026-09-25",
-    "age_days": 2,
+    "age_days": 5,
     "latest_published_at": "2026-09-25T20:30:00+00:00",
     "latest_title": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
     "latest_source": "Federal Reserve",
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 10,
-    "financial_stress_age_days": 4,
-    "event_news_age_days": 2,
+    "economic_age_days": 13,
+    "financial_stress_age_days": 0,
+    "event_news_age_days": 5,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

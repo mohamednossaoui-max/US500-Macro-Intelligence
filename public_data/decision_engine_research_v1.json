@@ -1,23 +1,23 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-09-27",
-  "state": "SUPPORTIVE",
+  "as_of_date": "2026-09-30",
+  "state": "MIXED",
   "confidence": 1.0,
   "confidence_type": "evidence_coverage",
   "evidence_count": 4,
-  "supportive_count": 2,
-  "contradictory_count": 0,
+  "supportive_count": 1,
+  "contradictory_count": 1,
   "mixed_count": 2,
   "missing": [],
   "point_in_time_safe": true,
   "core_point_in_time_safe": true,
   "overall_evidence_quality": "MEDIUM",
-  "overall_evidence_coverage_pct": 92.5,
-  "overall_evidence_freshness": "CURRENT",
-  "overall_evidence_freshness_current_pct": 100.0,
+  "overall_evidence_coverage_pct": 100.0,
+  "overall_evidence_freshness": "AGING",
+  "overall_evidence_freshness_current_pct": 78.6,
   "overall_evidence_pit_status": "PIT_LIMITED",
-  "overall_evidence_pit_safe_pct": 75.0,
+  "overall_evidence_pit_safe_pct": 78.6,
   "research_only": true,
   "decision_engine_enabled": true,
   "trading_signal": null,
@@ -46,16 +46,16 @@
     {
       "source": "Sentiment Engine",
       "category": "sentiment",
-      "stance": "MIXED",
-      "reason": "Unified sentiment regime is NEUTRAL.",
-      "value": "NEUTRAL"
+      "stance": "CONTRADICTORY",
+      "reason": "Unified sentiment regime is BEARISH.",
+      "value": "BEARISH"
     },
     {
       "source": "Technical Intelligence",
       "category": "technical",
-      "stance": "SUPPORTIVE",
-      "reason": "Technical research regime is BULLISH.",
-      "value": "BULLISH"
+      "stance": "MIXED",
+      "reason": "Technical research regime is NEUTRAL.",
+      "value": "NEUTRAL"
     }
   ]
 }
