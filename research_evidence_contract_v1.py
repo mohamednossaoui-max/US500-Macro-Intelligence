@@ -30,8 +30,14 @@ def main():
  total=len(df); pct=lambda mask: round(float(mask.sum())/total*100,2) if total else 0
  summary={'as_of_date':str(df.as_of_date.max()),'evidence_total':total,'available':int((df.availability_status=='AVAILABLE').sum()),'eligible':int(df.decision_engine_eligible.sum()),'pit_safe_pct':pct(df.pit_status=='PIT_SAFE'),'current_pct':pct(df.freshness_status=='CURRENT'),'high_quality_pct':pct(df.quality_status=='HIGH'),'modules':df.groupby('module').size().to_dict()}
  (PUBLIC/'research_evidence_quality_summary_v1.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
- validation={'status':'PASS' if not errors else 'FAIL','schema_valid':'schema_columns' not in errors,'chronology_valid':int((df.pit_status=='NOT_PIT_SAFE').sum())==0,'future_evidence_count':int((df.pit_status=='NOT_PIT_SAFE').sum()),'invalid_enum_count':sum(e.startswith('invalid_') for e in errors),'missing_required_count':0,'research_only_violations':int((~df.research_only.fillna(False).astype(bool)).sum()),'trading_field_violations':0,'warnings':sorted(set(df.loc[df.pit_status.isin(['PIT_LIMITED','UNKNOWN']),'limitations'].astype(str)) - {''})}
+ future = df.loc[df.pit_status == 'NOT_PIT_SAFE'].copy()
+ validation={'status':'PASS' if not errors and future.empty else 'FAIL','schema_valid':'schema_columns' not in errors,'chronology_valid':future.empty,'future_evidence_count':int(len(future)),'invalid_enum_count':sum(e.startswith('invalid_') for e in errors),'missing_required_count':0,'research_only_violations':int((~df.research_only.fillna(False).astype(bool)).sum()),'trading_field_violations':0,'warnings':sorted(set(df.loc[df.pit_status.isin(['PIT_LIMITED','UNKNOWN']),'limitations'].astype(str)) - {''})}
  (PUBLIC/'research_evidence_validation_v1.json').write_text(json.dumps(validation,indent=2),encoding='utf-8')
- if errors: raise SystemExit(errors)
+ if not future.empty:
+  cols=['evidence_id','module','indicator','observation_date','available_at','as_of_date','source_artifact','pit_status']
+  print('FUTURE EVIDENCE DETECTED')
+  print(future[cols].to_string(index=False))
+ if errors or not future.empty:
+  raise SystemExit(errors or [f"future_evidence_count={len(future)}"])
  print(json.dumps(summary,indent=2)); print(json.dumps(validation,indent=2))
 if __name__=='__main__': main()
