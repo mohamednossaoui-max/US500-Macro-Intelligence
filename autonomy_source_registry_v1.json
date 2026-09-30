@@ -1,13 +1,15 @@
 {
-  "registry_version": "ASR1.0",
+  "registry_version": "ASR1.1",
   "research_only": true,
   "default_branch": "main",
   "policy": {
     "single_orchestrator": true,
-    "schedules_enabled": false,
+    "schedules_enabled": true,
     "atomic_publication_required": true,
     "last_known_good_required": true,
-    "manual_mode_preserved": true
+    "manual_mode_preserved": true,
+    "schedule_entrypoint": ".github/workflows/autonomous-intelligence-pipeline-v1.yml",
+    "schedule_cadence": "daily"
   },
   "nodes": [
     {
@@ -281,6 +283,26 @@
       ]
     },
     {
+      "id": "macro_context",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/macro_context_v1.yml",
+      "freshness_sla_days": 2,
+      "pit_policy": "inherit-and-disclose",
+      "criticality": "critical",
+      "depends_on": [
+        "economic",
+        "stress",
+        "fed",
+        "event_news"
+      ],
+      "outputs": [
+        "macro_context_v1.csv",
+        "macro_context_v1.json"
+      ]
+    },
+    {
       "id": "research_context",
       "kind": "integration_layer",
       "authority": "derived",
@@ -290,10 +312,7 @@
       "pit_policy": "inherit-and-disclose",
       "criticality": "critical",
       "depends_on": [
-        "economic",
-        "stress",
-        "fed",
-        "event_news",
+        "macro_context",
         "sentiment",
         "technical",
         "liquidity",
