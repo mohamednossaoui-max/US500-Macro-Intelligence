@@ -124,6 +124,8 @@ DATASETS = {
     "Decision JSON": "decision_engine_research_v1.json",
     "Decision Intelligence V2": "decision_intelligence_v2.json",
     "Decision Intelligence Summary V2": "decision_intelligence_summary_v2.csv",
+    "System Health Summary": "system_health_summary_v1.json",
+    "System Health Layers": "system_health_layers_v1.json",
     "Final Validation": "final_end_to_end_validation_report.csv",
     "Final Validation Summary": "final_end_to_end_validation_summary.csv",
     "Final Validation JSON": "final_end_to_end_validation.json",
@@ -1490,6 +1492,42 @@ def decision() -> None:
     )
 
 
+
+def system_health() -> None:
+    st.header("System Health — Autonomous Research Pipeline")
+    st.caption("Operational visibility only. Health states do not alter research scores, Decision Engine state, or trading semantics.")
+    summary, ssrc = load_named("System Health Summary")
+    layers, lsrc = load_named("System Health Layers")
+    if not isinstance(summary, dict):
+        st.error("System Health summary is not published.")
+        return
+    overall = summary.get("overall_health", "UNKNOWN")
+    st.markdown(f"<div class='fed-strip'><div class='kicker'>SYSTEM HEALTH</div><div class='headline'>{overall}</div><div class='detail'>Autonomous pipeline health derived from the Source Registry, published outputs, freshness SLAs and Run Ledger. Last Known Good remains visible during failures.</div></div>", unsafe_allow_html=True)
+    cols=st.columns(5)
+    vals=[("Layers",summary.get("layer_count","—")),("Healthy",summary.get("healthy","—")),("Attention",summary.get("attention","—")),("Failed",summary.get("failed","—")),("LKG Available",summary.get("lkg_available","—"))]
+    for c,(a,b) in zip(cols,vals):
+        with c: card(a,b)
+    if isinstance(layers,list):
+        attention=[x for x in layers if x.get("state")!="HEALTHY"]
+        st.subheader("Needs Attention")
+        if not attention: st.success("No layer currently requires attention.")
+        for x in attention[:12]:
+            reason=x.get("failure_reason") or f"age {x.get('age_days','—')}d / SLA {x.get('freshness_sla_days','—')}d"
+            st.markdown(f"<div class='pulse'><div class='pulse-name'>{x.get('id','—')}</div><div class='pulse-value'>{x.get('state','—')}</div><div class='pulse-note'>{reason} · LKG: {x.get('last_known_good',False)}</div></div>",unsafe_allow_html=True)
+        st.subheader("Layer Status")
+        for x in layers:
+            with st.expander(f"{x.get('id')} — {x.get('state')}"):
+                c1,c2,c3,c4=st.columns(4)
+                with c1: card("Age", x.get("age_days","—"))
+                with c2: card("SLA days", x.get("freshness_sla_days","—"))
+                with c3: card("PIT", x.get("pit_status","—"))
+                with c4: card("LKG", x.get("last_known_good",False))
+                st.caption(f"Last success: {x.get('last_success') or 'No ledger success recorded'} · Last attempt: {x.get('last_attempt') or 'No ledger attempt recorded'} · Next expected check: {x.get('next_expected_check') or '—'}")
+                if x.get("failure_reason"): st.warning(x["failure_reason"])
+                if x.get("downstream_impact"): st.caption("Direct downstream: " + ", ".join(x["downstream_impact"]))
+    source("System Health Summary", ssrc); source("System Health Layers", lsrc)
+
+
 def event_study() -> None:
     st.header("Historical Event Study V2")
 
@@ -1788,6 +1826,7 @@ PAGES = {
     "Event / News": event_news,
     "Earnings": earnings,
     "Decision Engine": decision,
+    "System Health": system_health,
     "Historical Event Study": event_study,
     "Historical Edge": historical_edge,
     "Final Validation": final_validation,

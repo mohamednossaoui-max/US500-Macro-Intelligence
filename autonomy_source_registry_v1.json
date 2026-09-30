@@ -233,7 +233,8 @@
       "criticality": "contextual",
       "depends_on": [],
       "outputs": [
-        "market_breadth_full_validation_v1.json"
+        "market_breadth_analysis_v1.csv",
+        "market_breadth_analysis_summary_v1.json"
       ]
     },
     {
@@ -247,7 +248,8 @@
       "criticality": "contextual",
       "depends_on": [],
       "outputs": [
-        "cross_asset_intelligence_v1.csv"
+        "cross_asset_research_v1.csv",
+        "cross_asset_summary_v1.json"
       ]
     },
     {
