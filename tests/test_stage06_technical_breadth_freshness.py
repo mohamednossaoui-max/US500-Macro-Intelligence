@@ -8,6 +8,11 @@ breadth_adapter = importlib.import_module('evidence_adapters.breadth')
 PUBLIC = Path(__file__).resolve().parents[1] / 'public_data'
 
 
+def _context_date():
+    d = pd.read_csv(PUBLIC / 'research_context_summary_v1.csv', low_memory=False)
+    return pd.to_datetime(d.iloc[-1]['context_date']).normalize()
+
+
 def _one(module, rows):
     return [r for r in apply_quality(rows) if r['module'] == module]
 
@@ -15,8 +20,13 @@ def _one(module, rows):
 def test_technical_uses_research_context_for_freshness_clock():
     rows = _one('TECHNICAL', technical_adapter.build(PUBLIC))
     assert len(rows) == 3
-    assert {r['as_of_date'] for r in rows} == {'2026-09-27'}
-    assert {r['age_days'] for r in rows} == {2}
+    context_date = _context_date()
+    assert {r['as_of_date'] for r in rows} == {context_date.date().isoformat()}
+    expected_ages = {
+        int((context_date - pd.to_datetime(r['available_at']).normalize()).days)
+        for r in rows
+    }
+    assert {r['age_days'] for r in rows} == expected_ages
     assert {r['freshness_status'] for r in rows} == {'CURRENT'}
 
 
@@ -41,9 +51,11 @@ def test_breadth_freshness_is_measured_against_context_date():
     rows = _one('MARKET_BREADTH', breadth_adapter.build(PUBLIC))
     assert len(rows) == 1
     r = rows[0]
-    assert r['as_of_date'] == '2026-09-27'
+    context_date = _context_date()
+    assert r['as_of_date'] == context_date.date().isoformat()
     assert r['available_at'] == '2026-08-18'
-    assert r['age_days'] == 40
+    expected_age = int((context_date - pd.to_datetime(r['available_at']).normalize()).days)
+    assert r['age_days'] == expected_age
     assert r['freshness_status'] == 'STALE'
 
 

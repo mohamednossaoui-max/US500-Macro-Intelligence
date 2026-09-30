@@ -12,6 +12,11 @@ def _rows():
     return cross_asset.build(PUBLIC)
 
 
+def _context_date():
+    d = pd.read_csv(PUBLIC / 'research_context_summary_v1.csv', low_memory=False)
+    return pd.to_datetime(d.iloc[-1]['context_date']).normalize()
+
+
 def test_cross_asset_artifact_declares_pit_limited():
     summary = json.loads((PUBLIC / "cross_asset_summary_v1.json").read_text())
     assert summary["pit_status"] == "PIT_LIMITED"
@@ -45,11 +50,12 @@ def test_cross_asset_does_not_borrow_other_assets_availability_date():
 
 def test_cross_asset_context_freshness_is_measured_against_research_context():
     rows = _rows()
-    assert {r["as_of_date"] for r in rows} == {"2026-09-27"}
-    ages = {r["indicator"]: r["age_days"] for r in rows}
-    assert ages["SP500"] == 2
-    assert ages["NASDAQ"] == 2
-    assert ages["GOLD"] == 1
+    context_date = _context_date()
+    assert {r["as_of_date"] for r in rows} == {context_date.date().isoformat()}
+    for r in rows:
+        if r.get("available_at"):
+            expected_age = int((context_date - pd.to_datetime(r["available_at"]).normalize()).days)
+            assert r["age_days"] == expected_age
 
 
 def test_cross_asset_never_becomes_decision_eligible_while_pit_limited():

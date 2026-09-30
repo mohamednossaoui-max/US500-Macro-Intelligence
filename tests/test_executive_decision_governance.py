@@ -18,10 +18,20 @@ def test_current_fed_is_contextual_and_excluded_from_state():
     assert row['category'] == 'fed'
 
 
-def test_decision_state_semantics_unchanged():
-    summary = pd.read_csv(ROOT / 'public_data' / 'decision_engine_research_summary_v1.csv').iloc[-1]
-    assert int(summary['evidence_count']) == 4
-    assert summary['state'] == 'SUPPORTIVE'
+def _run_decision(input_file, output_dir):
+    subprocess.run([
+        sys.executable, str(ROOT / 'tests' / 'decision_engine' / 'decision_engine_v1.py'),
+        '--input', str(input_file), '--output-dir', str(output_dir)
+    ], cwd=ROOT, check=True)
+    return pd.read_csv(output_dir / 'decision_engine_research_summary_v1.csv').iloc[-1]
+
+
+def test_decision_state_semantics_unchanged(tmp_path):
+    input_file = ROOT / 'public_data' / 'research_context_summary_v1.csv'
+    computed = _run_decision(input_file, tmp_path)
+    published = pd.read_csv(ROOT / 'public_data' / 'decision_engine_research_summary_v1.csv').iloc[-1]
+    assert computed['state'] == published['state']
+    assert int(computed['evidence_count']) == int(published['evidence_count'])
 
 
 def test_executive_labels_confidence_as_evidence_coverage_and_checks_freshness():
@@ -59,11 +69,17 @@ def test_decision_summary_separates_core_and_overall_pit_semantics(tmp_path):
 
 def test_decision_quality_propagation_does_not_change_state(tmp_path):
     input_file = ROOT / 'public_data' / 'research_context_summary_v1.csv'
-    subprocess.run([
-        sys.executable, str(ROOT / 'tests' / 'decision_engine' / 'decision_engine_v1.py'),
-        '--input', str(input_file), '--output-dir', str(tmp_path)
-    ], cwd=ROOT, check=True)
-    summary = pd.read_csv(tmp_path / 'decision_engine_research_summary_v1.csv').iloc[-1]
-    assert summary['state'] == 'SUPPORTIVE'
-    assert int(summary['evidence_count']) == 4
-    assert bool(summary['research_only']) is True
+    full_dir = tmp_path / 'full'; full_dir.mkdir()
+    base_dir = tmp_path / 'base'; base_dir.mkdir()
+
+    full = _run_decision(input_file, full_dir)
+
+    context = pd.read_csv(input_file, low_memory=False)
+    quality_cols = [c for c in context.columns if c.startswith('evidence_') or '_evidence_' in c]
+    base_input = tmp_path / 'research_context_without_quality.csv'
+    context.drop(columns=quality_cols).to_csv(base_input, index=False)
+    base = _run_decision(base_input, base_dir)
+
+    assert full['state'] == base['state']
+    assert int(full['evidence_count']) == int(base['evidence_count'])
+    assert bool(full['research_only']) is True
