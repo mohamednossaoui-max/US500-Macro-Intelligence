@@ -10,31 +10,415 @@
     "manual_mode_preserved": true
   },
   "nodes": [
-    {"id":"economic","kind":"source_layer","authority":"BEA/BLS/FRED official-public sources","frequency":"release_driven","workflow":".github/workflows/economic_intelligence_full_pipeline_v2.3_refresh.yml","freshness_sla_days":45,"pit_policy":"release-aware","criticality":"critical","depends_on":[],"outputs":["economic_historical_events_v1.csv","economic_regime_summary_v1.csv"]},
-    {"id":"stress_historical","kind":"source_layer","authority":"FRED/CBOE public series","frequency":"daily_weekly","workflow":".github/workflows/financial-stress-historical-v1.yml","freshness_sla_days":10,"pit_policy":"availability-date","criticality":"critical","depends_on":[],"outputs":["financial_stress_records_input_v1.csv"]},
-    {"id":"stress","kind":"analysis_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/financial-stress-research-v1.yml","freshness_sla_days":10,"pit_policy":"inherit","criticality":"critical","depends_on":["stress_historical"],"outputs":["financial_stress_research_v1.csv","financial_stress_research_summary_v1.csv"]},
-    {"id":"fed","kind":"source_analysis","authority":"Federal Reserve official publications","frequency":"release_driven","workflow":".github/workflows/test-fed.yml","freshness_sla_days":60,"pit_policy":"publication-time","criticality":"critical","depends_on":[],"outputs":["fed_intelligence_output_v1.json"]},
-    {"id":"event_news","kind":"source_analysis","authority":"official event/news sources","frequency":"release_driven","workflow":".github/workflows/event-news-intelligence-v1.yml","freshness_sla_days":14,"pit_policy":"publication-time","criticality":"contextual","depends_on":[],"outputs":["event_news_research_v2.csv","event_news_research_summary_v2.json"]},
-    {"id":"cot_historical","kind":"source_layer","authority":"CFTC","frequency":"weekly","workflow":".github/workflows/cot-historical-v1.yml","freshness_sla_days":10,"pit_policy":"publication-lag-aware","criticality":"important","depends_on":[],"outputs":["cot_historical_records_input_v1.csv"]},
-    {"id":"cot","kind":"analysis_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/cot-positioning-analyzer-v1.yml","freshness_sla_days":10,"pit_policy":"inherit","criticality":"important","depends_on":["cot_historical"],"outputs":["cot_positioning_research_v1.csv"]},
-    {"id":"vix_historical","kind":"source_layer","authority":"CBOE/public market data","frequency":"daily","workflow":".github/workflows/vix-historical-v1.yml","freshness_sla_days":5,"pit_policy":"market-close-aware","criticality":"important","depends_on":[],"outputs":["vix_historical_records_input_v1.csv"]},
-    {"id":"vix_sentiment","kind":"analysis_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/vix-sentiment-analyzer-v1.yml","freshness_sla_days":5,"pit_policy":"inherit","criticality":"important","depends_on":["vix_historical"],"outputs":["vix_sentiment_research_v1.csv"]},
-    {"id":"aaii_historical","kind":"source_layer","authority":"AAII public survey","frequency":"weekly","workflow":".github/workflows/aaii-historical-v1.yml","freshness_sla_days":10,"pit_policy":"publication-time","criticality":"important","depends_on":[],"outputs":["aaii_historical_records_input_v1.csv"]},
-    {"id":"aaii_sentiment","kind":"analysis_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/aaii-sentiment-analyzer-v1.yml","freshness_sla_days":10,"pit_policy":"inherit","criticality":"important","depends_on":["aaii_historical"],"outputs":["aaii_sentiment_research_v1.csv"]},
-    {"id":"technical","kind":"source_analysis","authority":"US500 OHLCV public market data","frequency":"daily","workflow":".github/workflows/technical-intelligence-v1.yml","freshness_sla_days":5,"pit_policy":"market-close-aware","criticality":"critical","depends_on":[],"outputs":["technical_intelligence_research_v1.csv"]},
-    {"id":"liquidity_historical","kind":"source_layer","authority":"Federal Reserve/FRED public series","frequency":"daily_weekly","workflow":".github/workflows/liquidity-historical-v1.yml","freshness_sla_days":10,"pit_policy":"release-aware","criticality":"critical","depends_on":[],"outputs":["liquidity_historical_records_input_v1.csv"]},
-    {"id":"liquidity","kind":"analysis_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/liquidity-intelligence-v1.yml","freshness_sla_days":10,"pit_policy":"inherit","criticality":"critical","depends_on":["liquidity_historical"],"outputs":["liquidity_intelligence_research_v1.csv","liquidity_intelligence_summary_v1.csv"]},
-    {"id":"breadth","kind":"source_analysis","authority":"historically reconstructed constituent/price sources","frequency":"daily","workflow":".github/workflows/market-breadth-full-validation-v1.yml","freshness_sla_days":5,"pit_policy":"PIT_LIMITED","criticality":"contextual","depends_on":[],"outputs":["market_breadth_full_validation_v1.json"]},
-    {"id":"cross_asset","kind":"source_analysis","authority":"public multi-asset market data","frequency":"daily","workflow":".github/workflows/cross-asset-intelligence-v1.yml","freshness_sla_days":5,"pit_policy":"PIT_LIMITED-session-aware-unavailable","criticality":"contextual","depends_on":[],"outputs":["cross_asset_intelligence_v1.csv"]},
-    {"id":"earnings","kind":"source_analysis","authority":"public corporate earnings data","frequency":"release_driven","workflow":".github/workflows/earnings_reaction_v3.yml","freshness_sla_days":30,"pit_policy":"event-fact-plus-horizon-availability","criticality":"contextual","depends_on":[],"outputs":["earnings_market_reaction_v3.csv"]},
-    {"id":"sentiment","kind":"composite_layer","authority":"derived","frequency":"after_source_change","command":"python sentiment_engine_v1.py","freshness_sla_days":10,"pit_policy":"inherit","criticality":"critical","depends_on":["cot","vix_sentiment","aaii_sentiment"],"outputs":["sentiment_engine_research_v1.csv"]},
-    {"id":"research_context","kind":"integration_layer","authority":"derived","frequency":"after_source_change","workflow":".github/workflows/research-context-v1.yml","freshness_sla_days":2,"pit_policy":"inherit-and-disclose","criticality":"critical","depends_on":["economic","stress","fed","event_news","sentiment","technical","liquidity","breadth","cross_asset","earnings"],"outputs":["research_context_summary_v1.csv"]},
-    {"id":"evidence_quality","kind":"integration_layer","authority":"derived","frequency":"after_research_context","workflow":".github/workflows/research_context_quality_v1.yml","freshness_sla_days":2,"pit_policy":"measure-not-promote","criticality":"critical","depends_on":["research_context"],"outputs":["research_evidence_quality_v1.csv","research_evidence_quality_summary_v1.json"]},
-    {"id":"decision_engine","kind":"integration_layer","authority":"derived","frequency":"after_quality","workflow":".github/workflows/decision_engine_v1.yml","freshness_sla_days":2,"pit_policy":"core-vs-overall-separated","criticality":"critical","depends_on":["evidence_quality"],"outputs":["decision_engine_summary_v2.json"]},
-    {"id":"usv","kind":"integration_layer","authority":"derived","frequency":"after_decision","command":"python unified_state_vector_v1.py","freshness_sla_days":2,"pit_policy":"inherit","criticality":"critical","depends_on":["decision_engine"],"outputs":["unified_state_vector_v1.json","unified_state_vector_summary_v1.json"]},
-    {"id":"analogs","kind":"research_layer","authority":"derived","frequency":"after_usv","command":"python historical_analog_engine_v1.py","freshness_sla_days":2,"pit_policy":"historical-PIT-only","criticality":"important","depends_on":["usv"],"outputs":["historical_analog_top_v1.csv"]},
-    {"id":"market_reaction","kind":"research_layer","authority":"derived","frequency":"after_analogs","command":"python historical_market_reaction_v1.py","freshness_sla_days":2,"pit_policy":"outcome-separated-from-selection","criticality":"important","depends_on":["analogs"],"outputs":["historical_market_reaction_v1.csv"]},
-    {"id":"decision_intelligence","kind":"integration_layer","authority":"derived","frequency":"after_market_reaction","command":"python decision_intelligence_v2.py","freshness_sla_days":2,"pit_policy":"research-only-no-forecast","criticality":"critical","depends_on":["market_reaction"],"outputs":["decision_intelligence_v2.json"]},
-    {"id":"publication","kind":"publication_gate","authority":"derived","frequency":"after_successful_build","workflow":".github/workflows/publish_research_data_v1.yml","freshness_sla_days":0,"pit_policy":"atomic-after-validation","criticality":"critical","depends_on":["decision_intelligence"],"outputs":["manifest.json"]}
+    {
+      "id": "economic",
+      "kind": "source_layer",
+      "authority": "BEA/BLS/FRED official-public sources",
+      "frequency": "release_driven",
+      "workflow": ".github/workflows/economic_intelligence_full_pipeline_v2.3_refresh.yml",
+      "freshness_sla_days": 45,
+      "pit_policy": "release-aware",
+      "criticality": "critical",
+      "depends_on": [],
+      "outputs": [
+        "economic_historical_events_v1.csv",
+        "economic_regime_summary_v1.csv"
+      ]
+    },
+    {
+      "id": "stress_historical",
+      "kind": "source_layer",
+      "authority": "FRED/CBOE public series",
+      "frequency": "daily_weekly",
+      "workflow": ".github/workflows/financial-stress-historical-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "availability-date",
+      "criticality": "critical",
+      "depends_on": [],
+      "outputs": [
+        "financial_stress_records_input_v1.csv"
+      ]
+    },
+    {
+      "id": "stress",
+      "kind": "analysis_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/financial-stress-research-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "inherit",
+      "criticality": "critical",
+      "depends_on": [
+        "stress_historical"
+      ],
+      "outputs": [
+        "financial_stress_research_v1.csv",
+        "financial_stress_research_summary_v1.csv"
+      ]
+    },
+    {
+      "id": "fed",
+      "kind": "source_analysis",
+      "authority": "Federal Reserve official publications",
+      "frequency": "release_driven",
+      "workflow": ".github/workflows/test-fed.yml",
+      "freshness_sla_days": 60,
+      "pit_policy": "publication-time",
+      "criticality": "critical",
+      "depends_on": [],
+      "outputs": [
+        "fed_intelligence_output_v1.json"
+      ]
+    },
+    {
+      "id": "event_news",
+      "kind": "source_analysis",
+      "authority": "official event/news sources",
+      "frequency": "release_driven",
+      "workflow": ".github/workflows/event-news-intelligence-v1.yml",
+      "freshness_sla_days": 14,
+      "pit_policy": "publication-time",
+      "criticality": "contextual",
+      "depends_on": [],
+      "outputs": [
+        "event_news_research_v2.csv",
+        "event_news_research_summary_v2.json"
+      ]
+    },
+    {
+      "id": "cot_historical",
+      "kind": "source_layer",
+      "authority": "CFTC",
+      "frequency": "weekly",
+      "workflow": ".github/workflows/cot-historical-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "publication-lag-aware",
+      "criticality": "important",
+      "depends_on": [],
+      "outputs": [
+        "cot_historical_records_input_v1.csv"
+      ]
+    },
+    {
+      "id": "cot",
+      "kind": "analysis_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/cot-positioning-analyzer-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "inherit",
+      "criticality": "important",
+      "depends_on": [
+        "cot_historical"
+      ],
+      "outputs": [
+        "cot_positioning_research_v1.csv"
+      ]
+    },
+    {
+      "id": "vix_historical",
+      "kind": "source_layer",
+      "authority": "CBOE/public market data",
+      "frequency": "daily",
+      "workflow": ".github/workflows/vix-historical-v1.yml",
+      "freshness_sla_days": 5,
+      "pit_policy": "market-close-aware",
+      "criticality": "important",
+      "depends_on": [],
+      "outputs": [
+        "vix_historical_records_input_v1.csv"
+      ]
+    },
+    {
+      "id": "vix_sentiment",
+      "kind": "analysis_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/vix-sentiment-analyzer-v1.yml",
+      "freshness_sla_days": 5,
+      "pit_policy": "inherit",
+      "criticality": "important",
+      "depends_on": [
+        "vix_historical"
+      ],
+      "outputs": [
+        "vix_sentiment_research_v1.csv"
+      ]
+    },
+    {
+      "id": "aaii_historical",
+      "kind": "source_layer",
+      "authority": "AAII public survey",
+      "frequency": "weekly",
+      "workflow": ".github/workflows/aaii-historical-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "publication-time",
+      "criticality": "important",
+      "depends_on": [],
+      "outputs": [
+        "aaii_historical_records_input_v1.csv"
+      ]
+    },
+    {
+      "id": "aaii_sentiment",
+      "kind": "analysis_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/aaii-sentiment-analyzer-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "inherit",
+      "criticality": "important",
+      "depends_on": [
+        "aaii_historical"
+      ],
+      "outputs": [
+        "aaii_sentiment_research_v1.csv"
+      ]
+    },
+    {
+      "id": "technical",
+      "kind": "source_analysis",
+      "authority": "US500 OHLCV public market data",
+      "frequency": "daily",
+      "workflow": ".github/workflows/technical-intelligence-v1.yml",
+      "freshness_sla_days": 5,
+      "pit_policy": "market-close-aware",
+      "criticality": "critical",
+      "depends_on": [],
+      "outputs": [
+        "technical_intelligence_research_v1.csv"
+      ]
+    },
+    {
+      "id": "liquidity_historical",
+      "kind": "source_layer",
+      "authority": "Federal Reserve/FRED public series",
+      "frequency": "daily_weekly",
+      "workflow": ".github/workflows/liquidity-historical-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "release-aware",
+      "criticality": "critical",
+      "depends_on": [],
+      "outputs": [
+        "liquidity_historical_records_input_v1.csv"
+      ]
+    },
+    {
+      "id": "liquidity",
+      "kind": "analysis_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/liquidity-intelligence-v1.yml",
+      "freshness_sla_days": 10,
+      "pit_policy": "inherit",
+      "criticality": "critical",
+      "depends_on": [
+        "liquidity_historical"
+      ],
+      "outputs": [
+        "liquidity_intelligence_research_v1.csv",
+        "liquidity_intelligence_summary_v1.csv"
+      ]
+    },
+    {
+      "id": "breadth",
+      "kind": "source_analysis",
+      "authority": "historically reconstructed constituent/price sources",
+      "frequency": "daily",
+      "workflow": ".github/workflows/market-breadth-full-validation-v1.yml",
+      "freshness_sla_days": 5,
+      "pit_policy": "PIT_LIMITED",
+      "criticality": "contextual",
+      "depends_on": [],
+      "outputs": [
+        "market_breadth_full_validation_v1.json"
+      ]
+    },
+    {
+      "id": "cross_asset",
+      "kind": "source_analysis",
+      "authority": "public multi-asset market data",
+      "frequency": "daily",
+      "workflow": ".github/workflows/cross-asset-intelligence-v1.yml",
+      "freshness_sla_days": 5,
+      "pit_policy": "PIT_LIMITED-session-aware-unavailable",
+      "criticality": "contextual",
+      "depends_on": [],
+      "outputs": [
+        "cross_asset_intelligence_v1.csv"
+      ]
+    },
+    {
+      "id": "earnings",
+      "kind": "source_analysis",
+      "authority": "public corporate earnings data",
+      "frequency": "release_driven",
+      "workflow": ".github/workflows/earnings_reaction_v3.yml",
+      "freshness_sla_days": 30,
+      "pit_policy": "event-fact-plus-horizon-availability",
+      "criticality": "contextual",
+      "depends_on": [],
+      "outputs": [
+        "earnings_market_reaction_v3.csv"
+      ]
+    },
+    {
+      "id": "sentiment",
+      "kind": "composite_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "command": "python sentiment_engine_v1.py",
+      "freshness_sla_days": 10,
+      "pit_policy": "inherit",
+      "criticality": "critical",
+      "depends_on": [
+        "cot",
+        "vix_sentiment",
+        "aaii_sentiment"
+      ],
+      "outputs": [
+        "sentiment_engine_research_v1.csv"
+      ]
+    },
+    {
+      "id": "research_context",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_source_change",
+      "workflow": ".github/workflows/research-context-v1.yml",
+      "freshness_sla_days": 2,
+      "pit_policy": "inherit-and-disclose",
+      "criticality": "critical",
+      "depends_on": [
+        "economic",
+        "stress",
+        "fed",
+        "event_news",
+        "sentiment",
+        "technical",
+        "liquidity",
+        "breadth",
+        "cross_asset",
+        "earnings"
+      ],
+      "outputs": [
+        "research_context_summary_v1.csv"
+      ]
+    },
+    {
+      "id": "evidence_quality",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_research_context",
+      "workflow": ".github/workflows/research_context_quality_v1.yml",
+      "freshness_sla_days": 2,
+      "pit_policy": "measure-not-promote",
+      "criticality": "critical",
+      "depends_on": [
+        "research_context"
+      ],
+      "outputs": [
+        "research_evidence_quality_v1.csv",
+        "research_evidence_quality_summary_v1.json"
+      ]
+    },
+    {
+      "id": "decision_engine",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_quality",
+      "workflow": ".github/workflows/decision_engine_v1.yml",
+      "freshness_sla_days": 2,
+      "pit_policy": "core-vs-overall-separated",
+      "criticality": "critical",
+      "depends_on": [
+        "evidence_quality"
+      ],
+      "outputs": [
+        "decision_engine_research_v1.json",
+        "decision_engine_evidence_registry_v2.csv"
+      ]
+    },
+    {
+      "id": "usv",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_decision",
+      "command": "python unified_state_vector_v1.py",
+      "freshness_sla_days": 2,
+      "pit_policy": "inherit",
+      "criticality": "critical",
+      "depends_on": [
+        "decision_engine"
+      ],
+      "outputs": [
+        "unified_state_vector_v1.csv",
+        "unified_state_vector_summary_v1.json"
+      ]
+    },
+    {
+      "id": "analogs",
+      "kind": "research_layer",
+      "authority": "derived",
+      "frequency": "after_usv",
+      "command": "python historical_analog_engine_v1.py",
+      "freshness_sla_days": 2,
+      "pit_policy": "historical-PIT-only",
+      "criticality": "important",
+      "depends_on": [
+        "usv"
+      ],
+      "outputs": [
+        "historical_analog_top_v1.csv"
+      ]
+    },
+    {
+      "id": "market_reaction",
+      "kind": "research_layer",
+      "authority": "derived",
+      "frequency": "after_analogs",
+      "command": "python historical_market_reaction_v1.py",
+      "freshness_sla_days": 2,
+      "pit_policy": "outcome-separated-from-selection",
+      "criticality": "important",
+      "depends_on": [
+        "analogs"
+      ],
+      "outputs": [
+        "historical_market_reaction_v1.csv"
+      ]
+    },
+    {
+      "id": "decision_intelligence",
+      "kind": "integration_layer",
+      "authority": "derived",
+      "frequency": "after_market_reaction",
+      "command": "python decision_intelligence_v2.py",
+      "freshness_sla_days": 2,
+      "pit_policy": "research-only-no-forecast",
+      "criticality": "critical",
+      "depends_on": [
+        "market_reaction"
+      ],
+      "outputs": [
+        "decision_intelligence_v2.json"
+      ]
+    },
+    {
+      "id": "publication",
+      "kind": "publication_gate",
+      "authority": "derived",
+      "frequency": "after_successful_build",
+      "workflow": ".github/workflows/publish_research_data_v1.yml",
+      "freshness_sla_days": 0,
+      "pit_policy": "atomic-after-validation",
+      "criticality": "critical",
+      "depends_on": [
+        "decision_intelligence"
+      ],
+      "outputs": [
+        "manifest.json"
+      ]
+    }
   ]
 }
