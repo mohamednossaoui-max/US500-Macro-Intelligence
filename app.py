@@ -67,6 +67,15 @@ background:rgba(128,140,155,.04);min-height:88px}
 .bottom-line{border:1px solid rgba(128,140,155,.28);border-radius:14px;padding:15px 16px;background:rgba(128,140,155,.055);margin:.25rem 0 1rem}
 .bottom-line .title{font-size:.68rem;font-weight:850;letter-spacing:.09em;color:#8b96a5}.bottom-line .read{font-size:1.12rem;font-weight:850;margin:.25rem 0}.bottom-line .body{font-size:.84rem;line-height:1.5;color:#8b96a5}
 @media (max-width: 700px){.block-container{padding-left:.75rem;padding-right:.75rem}.hero{padding:14px 14px}.hero h1{font-size:1.45rem}.card{min-height:76px;padding:11px 12px}.value{font-size:1.02rem}.pulse{display:grid;grid-template-columns:1fr auto;gap:2px 10px}.pulse-note{grid-column:2;text-align:right}.timeline{font-size:.8rem;white-space:normal}.signal-card{min-height:0}.fed-strip,.bottom-line{padding:12px 13px}}
+
+.command-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:.55rem 0 1rem}
+.command-cell{border:1px solid rgba(128,140,155,.24);border-radius:13px;padding:12px 14px;background:linear-gradient(145deg,rgba(15,34,53,.88),rgba(7,20,33,.88))}
+.command-cell .k{font-size:.65rem;font-weight:850;letter-spacing:.08em;color:#8298aa;text-transform:uppercase}.command-cell .v{font-size:1.02rem;font-weight:900;margin-top:4px}.command-cell .n{font-size:.71rem;color:#8298aa;margin-top:3px}
+.reaction-row{display:grid;grid-template-columns:72px 1fr 90px 90px;gap:10px;align-items:center;padding:9px 11px;margin:6px 0;border:1px solid rgba(128,140,155,.2);border-radius:11px;background:rgba(10,23,37,.62)}
+.reaction-bar{height:8px;border-radius:999px;background:rgba(128,140,155,.16);overflow:hidden}.reaction-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#35a7ff,#19e6a2)}
+.health-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:currentColor;box-shadow:0 0 12px currentColor}.health-healthy{color:#19e6a2}.health-degraded,.health-aging,.health-pit_limited{color:#ffb84d}.health-failed,.health-blocked,.health-stale{color:#ff6170}.health-unknown{color:#8298aa}
+@media(max-width:900px){.command-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.reaction-row{grid-template-columns:60px 1fr 70px}.reaction-row .hide-mobile{display:none}}
+@media(max-width:560px){.command-strip{grid-template-columns:1fr}.reaction-row{grid-template-columns:52px 1fr 66px}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -479,6 +488,8 @@ def executive() -> None:
     dec, dec_src = load_named("Decision Summary")
     evidence, evidence_src = load_named("Decision Evidence")
     fed_obj, fed_src = load_named("Fed Intelligence")
+    health, health_src = load_named("System Health Summary")
+    di, di_src = load_named("Decision Intelligence V2")
 
     rc_row = latest_row(rc)
     dec_row = latest_row(dec)
@@ -489,7 +500,12 @@ def executive() -> None:
 
     st.markdown('<div class="v3-kicker">US500 MACRO INTELLIGENCE · RESEARCH TERMINAL</div>', unsafe_allow_html=True)
     st.markdown('<div class="v3-title">Executive Dashboard</div>', unsafe_allow_html=True)
-    st.markdown('<div class="v3-sub">Published research state, evidence quality, freshness and alerts. Research-only · no forecast · no execution.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v3-sub">Published research state, evidence quality, historical context and autonomous-system health. Research-only · no forecast · no execution.</div>', unsafe_allow_html=True)
+    if isinstance(health, dict) or isinstance(di, dict):
+        hv = health.get("overall_health","UNKNOWN") if isinstance(health,dict) else "UNKNOWN"
+        av = di.get("historical_analogs",{}) if isinstance(di,dict) else {}
+        quick=[("System Health",hv,"Autonomous pipeline"),("Closest Analog",av.get("closest_date","—"),"Historical context"),("Similarity",f"{av.get('closest_similarity_pct','—')}%","Not probability"),("Context Date",di.get("context_date","—") if isinstance(di,dict) else rc_date,"Published synthesis")]
+        st.markdown("<div class='command-strip'>"+"".join(f"<div class='command-cell'><div class='k'>{k}</div><div class='v'>{v}</div><div class='n'>{n}</div></div>" for k,v,n in quick)+"</div>",unsafe_allow_html=True)
 
     ui_section("Command Status", "SYSTEM STATE")
     cols = st.columns(5)
@@ -1408,124 +1424,128 @@ def earnings() -> None:
 
 
 def decision() -> None:
-    st.header("Decision Engine V1 — Research Gate")
-    st.caption("Decision semantics are preserved. Quality/PIT metadata is shown separately and never converted into a trading signal or forecast.")
+    # Stage 15: presentation-only Decision Intelligence command view.
+    # All values below are read from published artifacts; no state, score,
+    # analog ranking, return, eligibility or PIT status is recomputed here.
     df, src = load_named("Decision Summary")
     evidence, evidence_src = load_named("Decision Evidence")
     registry, registry_src = load_named("Decision Evidence Registry")
     obj, json_src = load_named("Decision JSON")
+    di, di_src = load_named("Decision Intelligence V2")
     row = latest_row(df)
 
-    cols = st.columns(8)
+    st.markdown('<div class="v3-kicker">DECISION INTELLIGENCE · RESEARCH ONLY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v3-title">Decision Command Center</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v3-sub">Current environment → historical analogs → observed US500 reactions → limitations. No forecast, expected return, or execution.</div>', unsafe_allow_html=True)
+
+    cols = st.columns(5)
     metrics = [
-        ("State", safe_value(row, ["state"])),
-        ("Evidence Coverage", safe_value(row, ["confidence"])),
-        ("Evidence", safe_value(row, ["evidence_count"])),
-        ("Supportive", safe_value(row, ["supportive_count"])),
-        ("Contradictory", safe_value(row, ["contradictory_count"])),
-        ("Mixed", safe_value(row, ["mixed_count"])),
-        ("CORE PIT", safe_value(row, ["core_point_in_time_safe", "point_in_time_safe"])),
-        ("Overall PIT", safe_value(row, ["overall_evidence_pit_status"])),
+        ("Decision State", safe_value(row,["state"]), "Published V1 state"),
+        ("CORE PIT", safe_value(row,["core_point_in_time_safe","point_in_time_safe"]), "Eligible CORE evidence"),
+        ("Overall Quality", safe_value(row,["overall_evidence_quality"]), "Published quality"),
+        ("Coverage", safe_value(row,["overall_evidence_coverage_pct"]), "% evidence available"),
+        ("Overall PIT", safe_value(row,["overall_evidence_pit_status"]), "Universe-level integrity"),
     ]
-    for col, (label, value) in zip(cols, metrics):
-        with col:
-            card(label, value)
+    for c,(label,value,note) in zip(cols,metrics):
+        with c: card(label,value,note)
 
-
-    qcols = st.columns(4)
-    qmetrics = [
-        ("Overall Quality", safe_value(row, ["overall_evidence_quality"])),
-        ("Overall Coverage", safe_value(row, ["overall_evidence_coverage_pct"])),
-        ("Overall Freshness", safe_value(row, ["overall_evidence_freshness"])),
-        ("Overall PIT Safe %", safe_value(row, ["overall_evidence_pit_safe_pct"])),
-    ]
-    for col, (label, value) in zip(qcols, qmetrics):
-        with col:
-            card(label, value)
-
-        st.subheader("Evidence Matrix")
-    st.caption("CORE evidence may determine the published V1 research state. CONTEXTUAL evidence is integrated for visibility but has included_in_state = FALSE and cannot change the state.")
-    table(registry if isinstance(registry, pd.DataFrame) else evidence, 420)
-    source("Decision Evidence Registry", registry_src)
-    source("Decision Evidence", evidence_src)
-
-    st.subheader("Decision Summary")
-    table(df, 240)
-    source("Decision Summary", src)
-
-    if isinstance(obj, dict):
-        with st.expander("Complete Decision JSON"):
-            st.json(obj)
-    source("Decision JSON", json_src)
-
-    di, di_src = load_named("Decision Intelligence V2")
     if isinstance(di, dict):
-        st.subheader("Decision Intelligence V2 — Research Synthesis")
-        st.caption("Historical analog outcomes are conditional evidence only; they are not expected returns, forecasts, or trading signals.")
-        st.markdown("**Current Environment**")
-        st.write(di.get("current_environment", "—"))
-        changed = di.get("what_changed", {})
-        st.markdown("**What Changed**")
-        if changed.get("status") == "UNAVAILABLE":
-            st.info(changed.get("reason", "Prior canonical state unavailable."))
-        else:
-            st.write(changed)
-        a = di.get("historical_analogs", {})
-        cols2 = st.columns(3)
-        with cols2[0]: card("Closest Analog", a.get("closest_date", "—"))
-        with cols2[1]: card("Similarity", a.get("closest_similarity_pct", "—"))
-        with cols2[2]: card("Comparable Coverage", a.get("closest_coverage_pct", "—"))
-        st.write(a.get("summary", ""))
-        st.markdown("**Historical US500 Reaction**")
-        st.write(di.get("historical_market_reaction", {}).get("summary", "—"))
-        st.markdown("**Important Differences**")
-        st.write(di.get("important_differences", "—"))
-        st.markdown("**Risks & Data Limitations**")
-        for item in di.get("risks_and_limitations", []): st.write("• " + str(item))
-        st.markdown("**Final Research Synthesis**")
-        st.write(di.get("final_research_synthesis", "—"))
-        source("Decision Intelligence V2", di_src)
+        ui_section("Current Environment", "NOW")
+        st.markdown(f"<div class='bottom-line'><div class='title'>PUBLISHED SYNTHESIS</div><div class='read'>{di.get('decision_state','—')}</div><div class='body'>{di.get('current_environment','—')}</div></div>", unsafe_allow_html=True)
 
-    st.info(
-        "Research gate only. No trading signal, forecast, order, execution, "
-        "broker integration, position sizing, stop loss, or take profit."
-    )
+        changed=di.get("what_changed",{})
+        if isinstance(changed,dict) and changed.get("status")=="UNAVAILABLE":
+            alert_item("What Changed · UNAVAILABLE", changed.get("reason","Prior canonical state unavailable."), "warning")
 
+        q=di.get("evidence_quality",{})
+        a=di.get("historical_analogs",{})
+        strip=[
+            ("Closest Analog",a.get("closest_date","—"),"Locked Stage-10 selection"),
+            ("Similarity",f"{a.get('closest_similarity_pct','—')}%","Not a probability"),
+            ("Comparable Coverage",f"{a.get('closest_coverage_pct','—')}%","Comparable CORE dimensions"),
+            ("Evidence Quality",q.get("overall_quality","—"),f"PIT: {q.get('overall_pit_status','—')}"),
+        ]
+        html="<div class='command-strip'>"+"".join(f"<div class='command-cell'><div class='k'>{k}</div><div class='v'>{v}</div><div class='n'>{n}</div></div>" for k,v,n in strip)+"</div>"
+        st.markdown(html,unsafe_allow_html=True)
+
+        ui_section("Historical US500 Reaction", "LOCKED ANALOG SET")
+        st.caption("Observed conditional outcomes from Stage 11. Bar length shows positive hit rate only; it is not forecast confidence.")
+        horizons=di.get("historical_market_reaction",{}).get("horizons",{})
+        for key in ("5d","20d","60d","120d"):
+            h=horizons.get(key,{})
+            hit=float(h.get("positive_hit_rate_pct",0) or 0)
+            med=h.get("median_return_pct","—")
+            dd=h.get("median_max_drawdown_pct","—")
+            st.markdown(f"<div class='reaction-row'><b>{key.upper()}</b><div class='reaction-bar'><div class='reaction-fill' style='width:{max(0,min(100,hit))}%'></div></div><b>{med:+.2f}%</b><span class='hide-mobile'>{hit:.1f}% +</span></div>",unsafe_allow_html=True)
+            st.caption(f"Median max drawdown {dd:+.2f}% · {h.get('available_analogs','—')}/{h.get('total_analogs','—')} analogs available")
+
+        left,right=st.columns([1.1,1])
+        with left:
+            ui_section("Important Differences", "DO NOT OVERFIT")
+            st.write(di.get("important_differences","—"))
+        with right:
+            ui_section("Risks & Limitations", "ATTENTION")
+            for item in di.get("risks_and_limitations",[]): alert_item("Constraint",str(item),"warning")
+
+        ui_section("Final Research Synthesis", "BOTTOM LINE")
+        st.markdown(f"<div class='bottom-line'><div class='title'>CONDITIONAL HISTORICAL CONTEXT</div><div class='read'>Research synthesis</div><div class='body'>{di.get('final_research_synthesis','—')}</div></div>",unsafe_allow_html=True)
+        source("Decision Intelligence V2",di_src)
+    else:
+        st.warning("Decision Intelligence V2 is not published.")
+
+    ui_section("Evidence & Audit Trail", "DETAIL ON DEMAND")
+    tab1,tab2,tab3=st.tabs(["Evidence Matrix","Published Decision","Governance JSON"])
+    with tab1:
+        table(registry if isinstance(registry,pd.DataFrame) else evidence,420); source("Decision Evidence Registry",registry_src); source("Decision Evidence",evidence_src)
+    with tab2:
+        table(df,240); source("Decision Summary",src)
+    with tab3:
+        if isinstance(obj,dict): st.json(obj)
+        source("Decision JSON",json_src)
+    st.info("Research gate only. No trading signal, forecast, expected return, order, execution, broker integration, position sizing, stop loss, or take profit.")
 
 
 def system_health() -> None:
-    st.header("System Health — Autonomous Research Pipeline")
-    st.caption("Operational visibility only. Health states do not alter research scores, Decision Engine state, or trading semantics.")
+    # Stage 15: operational command view only. Health never changes research state.
     summary, ssrc = load_named("System Health Summary")
     layers, lsrc = load_named("System Health Layers")
-    if not isinstance(summary, dict):
-        st.error("System Health summary is not published.")
-        return
-    overall = summary.get("overall_health", "UNKNOWN")
-    st.markdown(f"<div class='fed-strip'><div class='kicker'>SYSTEM HEALTH</div><div class='headline'>{overall}</div><div class='detail'>Autonomous pipeline health derived from the Source Registry, published outputs, freshness SLAs and Run Ledger. Last Known Good remains visible during failures.</div></div>", unsafe_allow_html=True)
+    st.markdown('<div class="v3-kicker">AUTONOMOUS PIPELINE · OPERATIONS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v3-title">System Health Command Center</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v3-sub">Freshness, PIT policy, failures and Last Known Good visibility. Operational status never changes research scores.</div>', unsafe_allow_html=True)
+    if not isinstance(summary,dict): st.error("System Health summary is not published."); return
+    overall=str(summary.get("overall_health","UNKNOWN"))
+    tone="positive" if overall=="HEALTHY" else "warning" if overall=="DEGRADED" else "negative"
+    alert_item(f"SYSTEM {overall}",f"{summary.get('healthy','—')} healthy · {summary.get('attention','—')} need attention · {summary.get('failed','—')} failed · {summary.get('lkg_available','—')} with Last Known Good",tone)
     cols=st.columns(5)
-    vals=[("Layers",summary.get("layer_count","—")),("Healthy",summary.get("healthy","—")),("Attention",summary.get("attention","—")),("Failed",summary.get("failed","—")),("LKG Available",summary.get("lkg_available","—"))]
-    for c,(a,b) in zip(cols,vals):
-        with c: card(a,b)
+    for c,(a,b,n) in zip(cols,[("Layers",summary.get("layer_count","—"),"Registry nodes"),("Healthy",summary.get("healthy","—"),"Within operational gates"),("Attention",summary.get("attention","—"),"Review required"),("Failed",summary.get("failed","—"),"Active failures"),("LKG",summary.get("lkg_available","—"),"Recoverable layers")]):
+        with c: card(a,b,n)
     if isinstance(layers,list):
         attention=[x for x in layers if x.get("state")!="HEALTHY"]
-        st.subheader("Needs Attention")
+        ui_section("Needs Attention", "PRIORITY QUEUE")
         if not attention: st.success("No layer currently requires attention.")
-        for x in attention[:12]:
-            reason=x.get("failure_reason") or f"age {x.get('age_days','—')}d / SLA {x.get('freshness_sla_days','—')}d"
-            st.markdown(f"<div class='pulse'><div class='pulse-name'>{x.get('id','—')}</div><div class='pulse-value'>{x.get('state','—')}</div><div class='pulse-note'>{reason} · LKG: {x.get('last_known_good',False)}</div></div>",unsafe_allow_html=True)
-        st.subheader("Layer Status")
-        for x in layers:
-            with st.expander(f"{x.get('id')} — {x.get('state')}"):
-                c1,c2,c3,c4=st.columns(4)
-                with c1: card("Age", x.get("age_days","—"))
-                with c2: card("SLA days", x.get("freshness_sla_days","—"))
-                with c3: card("PIT", x.get("pit_status","—"))
-                with c4: card("LKG", x.get("last_known_good",False))
-                st.caption(f"Last success: {x.get('last_success') or 'No ledger success recorded'} · Last attempt: {x.get('last_attempt') or 'No ledger attempt recorded'} · Next expected check: {x.get('next_expected_check') or '—'}")
-                if x.get("failure_reason"): st.warning(x["failure_reason"])
-                if x.get("downstream_impact"): st.caption("Direct downstream: " + ", ".join(x["downstream_impact"]))
-    source("System Health Summary", ssrc); source("System Health Layers", lsrc)
+        for x in attention:
+            state=str(x.get("state","UNKNOWN")); reason=x.get("failure_reason") or f"Age {x.get('age_days','—')}d · SLA {x.get('freshness_sla_days','—')}d"
+            cls=state.lower().replace(" ","_")
+            st.markdown(f"<div class='pulse'><div class='pulse-name'><span class='health-dot health-{cls}'></span>{x.get('id','—')}</div><div class='pulse-value'>{state}</div><div class='pulse-note'>{reason} · LKG {x.get('last_known_good',False)}</div></div>",unsafe_allow_html=True)
+        ui_section("Pipeline Map", "ALL LAYERS")
+        tabs=st.tabs(["Status Cards","Layer Detail"])
+        with tabs[0]:
+            for i in range(0,len(layers),4):
+                cs=st.columns(4)
+                for c,x in zip(cs,layers[i:i+4]):
+                    with c: card(str(x.get("id","—")),x.get("state","UNKNOWN"),f"Age {x.get('age_days','—')}d · SLA {x.get('freshness_sla_days','—')}d")
+        with tabs[1]:
+            for x in layers:
+                with st.expander(f"{x.get('id')} — {x.get('state')}"):
+                    c1,c2,c3,c4=st.columns(4)
+                    with c1: card("Age",x.get("age_days","—"))
+                    with c2: card("SLA days",x.get("freshness_sla_days","—"))
+                    with c3: card("PIT",x.get("pit_status","—"))
+                    with c4: card("LKG",x.get("last_known_good",False))
+                    st.caption(f"Last success: {x.get('last_success') or 'No ledger success recorded'} · Last attempt: {x.get('last_attempt') or 'No ledger attempt recorded'} · Next expected check: {x.get('next_expected_check') or '—'}")
+                    if x.get("failure_reason"): st.warning(x["failure_reason"])
+                    if x.get("downstream_impact"): st.caption("Direct downstream: "+", ".join(x["downstream_impact"]))
+    source("System Health Summary",ssrc); source("System Health Layers",lsrc)
 
 
 def event_study() -> None:
