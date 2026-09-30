@@ -72,6 +72,14 @@
       "bytes": 1691,
       "sha256": "e5e6f66cac2f48b9584d58c248595df0b4a7a044b14c0063784d4e0a1a9eab4b"
     },
+    "decision_intelligence_summary_v2.csv": {
+      "bytes": 685,
+      "sha256": "a76dd4ed663f8e79aeaaf1aa6bd4103457a01971ae859c99c9dead1a1af77ac6"
+    },
+    "decision_intelligence_v2.json": {
+      "bytes": 4913,
+      "sha256": "e2f3b7b7470c610690f02066b473e11040999e2feb9d72ae5f02abd08344f0a5"
+    },
     "earnings_market_reaction_summary_v3.csv": {
       "bytes": 1084,
       "sha256": "22b48cd9734bccb7b0bb6355efe70f11eada5abc25c536b58aec0e1bf78d0af7"
@@ -82,7 +90,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "c8e8b0763d418f1f5d6c7276d427c5c5d8ea0ab0392f86e68733d3522af98a9b"
+      "sha256": "1d07ac2df133886e4f044a72d63e6be36c8ba98cfdfe9f4c1c27a03313721762"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -154,7 +162,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "6b76cc76e55af211ff13a39f70d3ad9c82f77fb703d15f6c3d410eea29e0282d"
+      "sha256": "059eb5dde4856d72179c3ce70206eb591a53c5296414ed900667c15ffe2a8059"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -371,19 +379,10 @@
     "vix_sentiment_research_v1.csv": {
       "bytes": 4434578,
       "sha256": "77f41a48c131c31b4c9e55c19702cb153055f07f8f58838e3adaf9e766947936"
-    },
-    "decision_intelligence_v2.json": {
-      "bytes": 4913,
-      "sha256": "e2f3b7b7470c610690f02066b473e11040999e2feb9d72ae5f02abd08344f0a5"
-    },
-    "decision_intelligence_summary_v2.csv": {
-      "bytes": 685,
-      "sha256": "a76dd4ed663f8e79aeaaf1aa6bd4103457a01971ae859c99c9dead1a1af77ac6"
     }
   },
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_run_id": "36625648326",
-  "source_workflow": "Decision Engine V1"
+  "source_workflow": "stage13c-baseline-reconciliation"
 }
