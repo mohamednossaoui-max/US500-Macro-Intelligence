@@ -1,0 +1,12 @@
+# Python runtime/cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest runtime cache
+.pytest_cache/
+
+# Autonomous/master runtime workspaces (not canonical publication data)
+decision_engine_output/
+master_artifacts/
+master_runs/
