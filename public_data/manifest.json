@@ -90,7 +90,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "3781e4ca0485ee2a4255f5618c6b5c7f81425b9a8451b6390375b681b0d11ee2"
+      "sha256": "391e5e3a43682da069db17c6a150582568e8dc257b6064fe4dc88c15d8015501"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -162,7 +162,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "9ff5433789d3cab6d84156a88ae0543731282d70fca31adb0b1b392a48a65be9"
+      "sha256": "69c1efbcfd07a011480030b3549de68090963d000bf58ff9a5ca16e90d357ff7"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1766424,
@@ -392,5 +392,5 @@
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_workflow": "stage13c-baseline-reconciliation"
+  "source_workflow": "autonomous-intelligence-pipeline-v1"
 }
