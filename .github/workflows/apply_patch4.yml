@@ -1,134 +1,451 @@
-name: Apply Corrected Patch 4
+name: Diagnose Patch 4 Baseline
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-patch4:
+  diagnose-patch4:
+    name: Diagnose V6.3 Patch 4 Baseline
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------------------------
+      # 1. Checkout
+      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ------------------------------------------------------------
+      # 2. Python
+      # ------------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Verify exact baseline
+      # ------------------------------------------------------------
+      # 3. Repository information
+      # ------------------------------------------------------------
+      - name: Show repository state
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "----- Baseline -----"
+          echo "=========================================="
+          echo "REPOSITORY STATE"
+          echo "=========================================="
 
-          test -f app.py
-          test -f scripts/apply_patch4.py
+          echo
+          echo "----- Current branch -----"
+          git branch --show-current
 
-          grep -Fq 'APP_VERSION = "V6.3"' app.py
-          grep -Fq 'def fed() -> None:' app.py
-          grep -Fq 'st.subheader("Communication — Current vs Previous")' app.py
-          grep -Fq 'st.subheader("SEP Pulse — Current vs Previous")' app.py
-          grep -Fq 'st.subheader("Fed Synthesis")' app.py
-          grep -Fq 'with st.expander("Complete Fed JSON")' app.py
+          echo
+          echo "----- Current commit -----"
+          git log -1 --oneline
 
-          echo "V6.3 Fed baseline verified."
-
-      - name: Syntax check before patch
-        run: |
-          python -m py_compile app.py
-          python -m py_compile scripts/apply_patch4.py
-
-      - name: Apply corrected Patch 4
-        run: |
-          python scripts/apply_patch4.py
-
-      - name: Verify backup
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -f app.py.pre_patch4
-
-          echo "Backup exists:"
-          ls -lh app.py.pre_patch4
-
-          grep -Fq 'APP_VERSION = "V6.3"' app.py.pre_patch4
-          grep -Fq 'def fed() -> None:' app.py.pre_patch4
-
-          echo "Backup verification PASSED."
-
-      - name: Verify corrected presentation targets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          grep -Fq 'PATCH 4 CORRECTED — DYNAMIC FED PRESENTATION' app.py
-          grep -Fq "fed-compare-grid" app.py
-          grep -Fq "fed-compare-card" app.py
-          grep -Fq "Raw communication comparison data" app.py
-          grep -Fq "expanded=False" app.py
-
-          echo "Corrected Patch 4 presentation targets verified."
-
-      - name: Syntax check after patch
-        run: |
-          python -m py_compile app.py
-
-      - name: Show changed files
-        shell: bash
-        run: |
+          echo
           echo "----- Git status -----"
           git status --short
 
           echo
-          echo "----- app.py diff summary -----"
-          git diff --stat -- app.py
+          echo "----- Root files -----"
+          ls -la
 
-          echo
-          echo "----- app.py diff -----"
-          git diff -- app.py
-
-      - name: Guard against unexpected tracked changes
+      # ------------------------------------------------------------
+      # 4. Verify required files
+      # ------------------------------------------------------------
+      - name: Verify required files
         shell: bash
         run: |
           set -euo pipefail
 
-          changed="$(git diff --name-only)"
+          echo "=========================================="
+          echo "REQUIRED FILES"
+          echo "=========================================="
 
-          if [ "$changed" != "app.py" ]; then
-            echo "Unexpected tracked changes:"
-            printf '%s\n' "$changed"
+          if [ ! -f app.py ]; then
+            echo "FAIL: app.py does not exist."
             exit 1
           fi
 
-          echo "Only app.py was modified among tracked files."
+          echo "PASS: app.py exists"
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f scripts/apply_patch4.py ]; then
+            echo "PASS: scripts/apply_patch4.py exists"
+          else
+            echo "INFO: scripts/apply_patch4.py does not exist"
+            echo "      This diagnostic workflow can continue."
+          fi
 
-      - name: Commit corrected Patch 4
+          if [ -f app.py.pre_patch4 ]; then
+            echo "INFO: app.py.pre_patch4 already exists"
+          else
+            echo "INFO: app.py.pre_patch4 does not currently exist"
+          fi
+
+      # ------------------------------------------------------------
+      # 5. Python syntax
+      # ------------------------------------------------------------
+      - name: Check current app.py syntax
         shell: bash
         run: |
           set -euo pipefail
 
-          git add app.py app.py.pre_patch4
+          echo "=========================================="
+          echo "PYTHON SYNTAX"
+          echo "=========================================="
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
+          python -m py_compile app.py
+
+          echo "PASS: app.py compiles successfully"
+
+      # ------------------------------------------------------------
+      # 6. Diagnostic baseline checks
+      # ------------------------------------------------------------
+      - name: Verify V6.3 baseline
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=========================================="
+          echo "V6.3 BASELINE DIAGNOSTICS"
+          echo "=========================================="
+
+          failed=0
+
+          check() {
+            label="$1"
+            pattern="$2"
+
+            if grep -Fq "$pattern" app.py; then
+              echo "PASS: $label"
+            else
+              echo "FAIL: $label"
+              echo "      Expected text:"
+              echo "      $pattern"
+              failed=1
+            fi
+          }
+
+          check \
+            "APP_VERSION V6.3" \
+            'APP_VERSION = "V6.3"'
+
+          check \
+            "fed() function" \
+            'def fed() -> None:'
+
+          check \
+            "Policy Pulse" \
+            'st.subheader("Policy Pulse")'
+
+          check \
+            "What Changed" \
+            'st.subheader("What Changed?")'
+
+          check \
+            "FOMC Communication" \
+            'st.subheader("FOMC Communication")'
+
+          check \
+            "SEP Pulse" \
+            'st.subheader("SEP Pulse — Current vs Previous")'
+
+          check \
+            "Communication comparison" \
+            'st.subheader("Communication — Current vs Previous")'
+
+          check \
+            "Fed Synthesis" \
+            'st.subheader("Fed Synthesis")'
+
+          check \
+            "Beige Book Context" \
+            'st.subheader("Beige Book Context")'
+
+          check \
+            "Fed Evidence Quality" \
+            'st.subheader("Fed Evidence Quality")'
+
+          check \
+            "Complete Fed JSON" \
+            'with st.expander("Complete Fed JSON")'
+
+          echo
+          echo "=========================================="
+          echo "BASELINE RESULT"
+          echo "=========================================="
+
+          if [ "$failed" -ne 0 ]; then
+            echo "BASELINE VERIFICATION FAILED"
+            echo
+            echo "One or more expected V6.3 presentation"
+            echo "fingerprints are different in the current app.py."
+            echo
+            echo "No file has been modified."
+            exit 1
           fi
 
-          git commit -m "Apply corrected Patch 4 presentation"
+          echo "BASELINE VERIFICATION PASSED"
 
-      - name: Push corrected Patch 4
+      # ------------------------------------------------------------
+      # 7. Locate fed() structurally with AST
+      # ------------------------------------------------------------
+      - name: Inspect fed function with Python AST
+        shell: bash
         run: |
-          git push
+          set -euo pipefail
+
+          echo "=========================================="
+          echo "FED FUNCTION AST INSPECTION"
+          echo "=========================================="
+
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path("app.py")
+          text = path.read_text(encoding="utf-8")
+
+          tree = ast.parse(text)
+
+          matches = [
+              node
+              for node in tree.body
+              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+              and node.name == "fed"
+          ]
+
+          if len(matches) != 1:
+              raise SystemExit(
+                  f"ERROR: expected exactly one top-level fed() function; "
+                  f"found {len(matches)}"
+              )
+
+          node = matches[0]
+
+          print("PASS: exactly one top-level fed() function found")
+          print(f"fed() starts at line: {node.lineno}")
+          print(f"fed() ends at line:   {node.end_lineno}")
+          print(
+              "fed() length:          "
+              f"{node.end_lineno - node.lineno + 1} lines"
+          )
+          PY
+
+      # ------------------------------------------------------------
+      # 8. Show Fed section headings from actual source
+      # ------------------------------------------------------------
+      - name: Show actual Fed presentation headings
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=========================================="
+          echo "ACTUAL FED PRESENTATION HEADINGS"
+          echo "=========================================="
+
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          text = Path("app.py").read_text(encoding="utf-8")
+          lines = text.splitlines()
+
+          try:
+              tree = ast.parse(text)
+          except SyntaxError as exc:
+              print(f"Unable to parse app.py: {exc}")
+              raise SystemExit(0)
+
+          matches = [
+              node
+              for node in tree.body
+              if isinstance(node, ast.FunctionDef)
+              and node.name == "fed"
+          ]
+
+          if len(matches) != 1:
+              print(
+                  "Could not uniquely locate fed(). "
+                  f"Found {len(matches)} matches."
+              )
+              raise SystemExit(0)
+
+          fed = matches[0]
+
+          print(
+              f"fed() source range: "
+              f"{fed.lineno}-{fed.end_lineno}"
+          )
+          print()
+
+          keywords = (
+              "st.header(",
+              "st.subheader(",
+              "st.expander(",
+              "with st.expander(",
+          )
+
+          found = False
+
+          for number in range(fed.lineno, fed.end_lineno + 1):
+              line = lines[number - 1]
+
+              if any(keyword in line for keyword in keywords):
+                  print(f"{number:5}: {line.strip()}")
+                  found = True
+
+          if not found:
+              print("No presentation headings were detected.")
+          PY
+
+      # ------------------------------------------------------------
+      # 9. Show Patch 4 markers
+      # ------------------------------------------------------------
+      - name: Detect previous Patch 4 attempts
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=========================================="
+          echo "PATCH 4 MARKERS"
+          echo "=========================================="
+
+          patterns=(
+            "PATCH 4"
+            "research-grid"
+            "research-panel"
+            "fed-compare-grid"
+            "fed-compare-card"
+            "Raw communication comparison data"
+            "Raw validation summary"
+            "Raw validation report"
+          )
+
+          found=0
+
+          for pattern in "${patterns[@]}"; do
+            echo
+            echo "----- $pattern -----"
+
+            if grep -Fn "$pattern" app.py; then
+              found=1
+            else
+              echo "NOT FOUND"
+            fi
+          done
+
+          echo
+          if [ "$found" -eq 1 ]; then
+            echo "INFO: at least one previous Patch 4 marker exists."
+          else
+            echo "INFO: no known Patch 4 marker was detected."
+          fi
+
+      # ------------------------------------------------------------
+      # 10. Show the actual communication area
+      # ------------------------------------------------------------
+      - name: Show communication comparison source
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=========================================="
+          echo "COMMUNICATION COMPARISON SOURCE"
+          echo "=========================================="
+
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          text = Path("app.py").read_text(encoding="utf-8")
+          lines = text.splitlines()
+
+          try:
+              tree = ast.parse(text)
+          except SyntaxError as exc:
+              print(f"Unable to parse app.py: {exc}")
+              raise SystemExit(0)
+
+          matches = [
+              node
+              for node in tree.body
+              if isinstance(node, ast.FunctionDef)
+              and node.name == "fed"
+          ]
+
+          if len(matches) != 1:
+              print("fed() could not be uniquely located.")
+              raise SystemExit(0)
+
+          fed = matches[0]
+
+          needles = (
+              "Communication — Current vs Previous",
+              "communication_comparison",
+              "comparison_rows",
+              "Fed Synthesis",
+          )
+
+          hits = []
+
+          for number in range(fed.lineno, fed.end_lineno + 1):
+              line = lines[number - 1]
+
+              if any(needle in line for needle in needles):
+                  hits.append(number)
+
+          if not hits:
+              print(
+                  "No communication-comparison markers "
+                  "were found inside fed()."
+              )
+              raise SystemExit(0)
+
+          start = max(fed.lineno, min(hits) - 15)
+          end = min(fed.end_lineno, max(hits) + 25)
+
+          print(f"Showing app.py lines {start}-{end}")
+          print()
+
+          for number in range(start, end + 1):
+              print(f"{number:5}: {lines[number - 1]}")
+          PY
+
+      # ------------------------------------------------------------
+      # 11. Final repository safety check
+      # ------------------------------------------------------------
+      - name: Confirm diagnostic workflow changed nothing
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          echo "=========================================="
+          echo "FINAL SAFETY CHECK"
+          echo "=========================================="
+
+          echo
+          echo "----- Git status -----"
+          git status --short
+
+          echo
+          echo "----- Tracked diff -----"
+          git diff --stat
+
+          if [ -n "$(git diff --name-only)" ]; then
+            echo
+            echo "WARNING: tracked files differ from checkout."
+          else
+            echo
+            echo "PASS: diagnostic workflow modified no tracked files."
+          fi
