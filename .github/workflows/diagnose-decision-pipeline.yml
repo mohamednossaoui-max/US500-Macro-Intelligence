@@ -1,0 +1,947 @@
+name: Read-Only Decision Pipeline Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-decision-pipeline:
+    name: Read-Only Decision Pipeline Diagnostic
+    runs-on: ubuntu-latest
+
+    steps:
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ============================================================
+      # 2. SET UP PYTHON
+      # ============================================================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ============================================================
+      # 3. REPOSITORY BASELINE
+      # ============================================================
+      - name: Repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "REPOSITORY BASELINE"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          echo "Repository:"
+          git remote -v || true
+          echo
+
+          echo "Branch / HEAD:"
+          git branch --show-current || true
+          git rev-parse HEAD
+          echo
+
+          echo "Latest commit:"
+          git log -1 --format='%H | %cI | %s'
+          echo
+
+          echo "Working tree:"
+          git status --short
+          echo
+
+          echo "========================================"
+          echo "BASELINE COMPLETE"
+          echo "========================================"
+
+      # ============================================================
+      # 4. FIND DECISION PIPELINE CALL CHAIN
+      # ============================================================
+      - name: Show Decision pipeline call chain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION PIPELINE CALL CHAIN"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          python - <<'PY'
+          from pathlib import Path
+
+          needles = (
+              "decision_engine",
+              "decision_intelligence",
+              "decision_intelligence_v2.py",
+          )
+
+          suffixes = {
+              ".yml",
+              ".yaml",
+              ".py",
+              ".sh",
+          }
+
+          excluded = {
+              ".git",
+              ".venv",
+              "venv",
+              "__pycache__",
+              "node_modules",
+          }
+
+          results = []
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+
+              if path.suffix.lower() not in suffixes:
+                  continue
+
+              if any(part in excluded for part in path.parts):
+                  continue
+
+              try:
+                  text = path.read_text(
+                      encoding="utf-8",
+                      errors="replace",
+                  )
+              except Exception:
+                  continue
+
+              lines = text.splitlines()
+
+              hits = []
+
+              for number, line in enumerate(lines, 1):
+                  lower = line.lower()
+
+                  if any(
+                      needle.lower() in lower
+                      for needle in needles
+                  ):
+                      hits.append(
+                          (number, line)
+                      )
+
+              if hits:
+                  results.append(
+                      (path, hits)
+                  )
+
+          if not results:
+              print("STATUS: no Decision pipeline references found.")
+              raise SystemExit(1)
+
+          for path, hits in results:
+              print("=" * 88)
+              print(f"FILE: {path.as_posix()}")
+              print("=" * 88)
+
+              for number, line in hits:
+                  print(
+                      f"{number:5}: {line}"
+                  )
+
+              print()
+
+          print("========================================")
+          print("CALL CHAIN SEARCH COMPLETE")
+          print("========================================")
+          PY
+
+      # ============================================================
+      # 5. DECISION INTELLIGENCE INVOCATION CONTEXT
+      #
+      # IMPORTANT:
+      # This version searches the whole repository instead of
+      # assuming a specific workflow filename.
+      # ============================================================
+      - name: Inspect Decision Intelligence invocation context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE INVOCATION CONTEXT"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          python - <<'PY'
+          from pathlib import Path
+
+          TARGET = "decision_intelligence_v2.py"
+
+          allowed_suffixes = {
+              ".yml",
+              ".yaml",
+              ".py",
+              ".sh",
+          }
+
+          excluded_parts = {
+              ".git",
+              ".venv",
+              "venv",
+              "__pycache__",
+              "node_modules",
+          }
+
+          matches = []
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+
+              if path.suffix.lower() not in allowed_suffixes:
+                  continue
+
+              if any(
+                  part in excluded_parts
+                  for part in path.parts
+              ):
+                  continue
+
+              try:
+                  text = path.read_text(
+                      encoding="utf-8",
+                      errors="replace",
+                  )
+              except Exception:
+                  continue
+
+              lines = text.splitlines()
+
+              for idx, line in enumerate(lines):
+                  if TARGET not in line:
+                      continue
+
+                  matches.append(
+                      (
+                          path,
+                          idx,
+                          lines,
+                      )
+                  )
+
+          if not matches:
+              print(
+                  "STATUS: no textual reference to "
+                  "decision_intelligence_v2.py found."
+              )
+              raise SystemExit(1)
+
+          print(
+              f"REFERENCES FOUND: {len(matches)}"
+          )
+          print()
+
+          for number, (path, idx, lines) in enumerate(
+              matches,
+              1,
+          ):
+              start = max(
+                  0,
+                  idx - 30,
+              )
+
+              end = min(
+                  len(lines),
+                  idx + 31,
+              )
+
+              print("=" * 88)
+              print(
+                  f"MATCH {number}"
+              )
+              print(
+                  f"FILE: {path.as_posix()}"
+              )
+              print(
+                  f"LINE: {idx + 1}"
+              )
+              print("=" * 88)
+
+              for pos in range(
+                  start,
+                  end,
+              ):
+                  marker = (
+                      ">>>"
+                      if pos == idx
+                      else "   "
+                  )
+
+                  print(
+                      f"{marker} "
+                      f"{pos + 1:5}: "
+                      f"{lines[pos]}"
+                  )
+
+              print()
+
+          print("========================================")
+          print("INVOCATION CONTEXT COMPLETE")
+          print("========================================")
+          PY
+
+      # ============================================================
+      # 6. INSPECT DECISION INTELLIGENCE PRODUCER
+      # ============================================================
+      - name: Inspect Decision Intelligence producer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE PRODUCER"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          if [ ! -f "decision_intelligence_v2.py" ]; then
+            echo "STATUS: decision_intelligence_v2.py not found."
+            exit 1
+          fi
+
+          echo "FILE: decision_intelligence_v2.py"
+          echo
+
+          nl -ba decision_intelligence_v2.py
+
+          echo
+          echo "========================================"
+          echo "PRODUCER INSPECTION COMPLETE"
+          echo "========================================"
+
+      # ============================================================
+      # 7. INSPECT CURRENT CANONICAL DECISION ARTIFACTS
+      # Uses only Python standard library.
+      # No pandas dependency.
+      # ============================================================
+      - name: Inspect current canonical Decision artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "CURRENT CANONICAL DECISION ARTIFACTS"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          python - <<'PY'
+          from pathlib import Path
+          import csv
+          import json
+
+          files = [
+              Path(
+                  "public_data/"
+                  "decision_engine_research_summary_v1.csv"
+              ),
+              Path(
+                  "public_data/"
+                  "decision_engine_research_v1.csv"
+              ),
+              Path(
+                  "public_data/"
+                  "decision_engine_research_v1.json"
+              ),
+              Path(
+                  "public_data/"
+                  "decision_intelligence_v2.json"
+              ),
+              Path(
+                  "public_data/"
+                  "decision_intelligence_summary_v2.csv"
+              ),
+          ]
+
+          for path in files:
+              print()
+              print("-" * 88)
+              print(path.as_posix())
+              print("-" * 88)
+
+              if not path.exists():
+                  print("STATUS: MISSING")
+                  continue
+
+              print("STATUS: PRESENT")
+              print(
+                  f"SIZE: {path.stat().st_size} bytes"
+              )
+
+              if path.suffix.lower() == ".json":
+                  try:
+                      obj = json.loads(
+                          path.read_text(
+                              encoding="utf-8",
+                          )
+                      )
+
+                      print(
+                          json.dumps(
+                              obj,
+                              indent=2,
+                              ensure_ascii=False,
+                          )
+                      )
+
+                  except Exception as exc:
+                      print(
+                          f"JSON READ ERROR: {exc}"
+                      )
+
+              elif path.suffix.lower() == ".csv":
+                  try:
+                      with path.open(
+                          "r",
+                          encoding="utf-8-sig",
+                          newline="",
+                      ) as handle:
+                          reader = csv.DictReader(
+                              handle
+                          )
+
+                          rows = list(reader)
+
+                      print(
+                          f"ROWS: {len(rows)}"
+                      )
+
+                      print(
+                          "COLUMNS:",
+                          reader.fieldnames,
+                      )
+
+                      if rows:
+                          print(
+                              "LAST ROW:"
+                          )
+
+                          print(
+                              json.dumps(
+                                  rows[-1],
+                                  indent=2,
+                                  ensure_ascii=False,
+                              )
+                          )
+
+                  except Exception as exc:
+                      print(
+                          f"CSV READ ERROR: {exc}"
+                      )
+
+          print()
+          print("========================================")
+          print("CURRENT ARTIFACT INSPECTION COMPLETE")
+          print("========================================")
+          PY
+
+      # ============================================================
+      # 8. FIND SNAPSHOT / HISTORY LOGIC
+      # ============================================================
+      - name: Find snapshot and history logic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "SNAPSHOT / HISTORY LOGIC"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          python - <<'PY'
+          from pathlib import Path
+
+          needles = (
+              "prior canonical",
+              "previous canonical",
+              "what_changed",
+              "what changed",
+              "snapshot",
+              "history",
+              "decision_intelligence_v2",
+          )
+
+          suffixes = {
+              ".py",
+              ".yml",
+              ".yaml",
+              ".sh",
+              ".json",
+          }
+
+          excluded = {
+              ".git",
+              ".venv",
+              "venv",
+              "__pycache__",
+              "node_modules",
+          }
+
+          results = []
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+
+              if path.suffix.lower() not in suffixes:
+                  continue
+
+              if any(part in excluded for part in path.parts):
+                  continue
+
+              try:
+                  text = path.read_text(
+                      encoding="utf-8",
+                      errors="replace",
+                  )
+              except Exception:
+                  continue
+
+              lines = text.splitlines()
+
+              matched_indexes = []
+
+              for idx, line in enumerate(lines):
+                  lower = line.lower()
+
+                  if any(
+                      needle.lower() in lower
+                      for needle in needles
+                  ):
+                      matched_indexes.append(idx)
+
+              if matched_indexes:
+                  results.append(
+                      (
+                          path,
+                          lines,
+                          matched_indexes,
+                      )
+                  )
+
+          print(
+              f"FILES WITH RELEVANT LOGIC: "
+              f"{len(results)}"
+          )
+          print()
+
+          for path, lines, indexes in results:
+              print("=" * 88)
+              print(
+                  f"FILE: {path.as_posix()}"
+              )
+              print("=" * 88)
+
+              displayed = set()
+
+              for idx in indexes:
+                  start = max(
+                      0,
+                      idx - 3,
+                  )
+
+                  end = min(
+                      len(lines),
+                      idx + 4,
+                  )
+
+                  block = (
+                      start,
+                      end,
+                  )
+
+                  if block in displayed:
+                      continue
+
+                  displayed.add(block)
+
+                  print(
+                      f"\nLines "
+                      f"{start + 1}-{end}:"
+                  )
+
+                  for pos in range(
+                      start,
+                      end,
+                  ):
+                      print(
+                          f"{pos + 1:5}: "
+                          f"{lines[pos]}"
+                      )
+
+          print()
+          print("========================================")
+          print("SNAPSHOT / HISTORY SEARCH COMPLETE")
+          print("========================================")
+          PY
+
+      # ============================================================
+      # 9. RECENT DECISION ARTIFACT GIT HISTORY
+      #
+      # Standard git only.
+      # No pandas.
+      # No mutation.
+      # ============================================================
+      - name: Show recent Decision artifact git history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "RECENT DECISION ARTIFACT HISTORY"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          files=(
+            "public_data/decision_engine_research_summary_v1.csv"
+            "public_data/decision_engine_research_v1.csv"
+            "public_data/decision_engine_research_v1.json"
+            "public_data/decision_intelligence_v2.json"
+            "public_data/decision_intelligence_summary_v2.csv"
+          )
+
+          for file in "${files[@]}"; do
+            echo
+            echo "----------------------------------------"
+            echo "$file"
+            echo "----------------------------------------"
+
+            if git log -1 -- "$file" >/dev/null 2>&1; then
+              git log \
+                -10 \
+                --date=iso \
+                --format='%h | %ad | %s' \
+                -- "$file" || true
+            else
+              echo "NO GIT HISTORY"
+            fi
+          done
+
+          echo
+          echo "========================================"
+          echo "ARTIFACT HISTORY COMPLETE"
+          echo "========================================"
+
+      # ============================================================
+      # 10. SHOW RECENT ARTIFACT CONTENT FROM GIT
+      #
+      # This is intentionally READ ONLY.
+      # It reads historical versions directly from Git.
+      # ============================================================
+      - name: Show recent Decision artifact values from git
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "RECENT HISTORICAL VALUES FROM GIT"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          python - <<'PY'
+          import csv
+          import io
+          import json
+          import subprocess
+
+          files = [
+              "public_data/"
+              "decision_engine_research_summary_v1.csv",
+
+              "public_data/"
+              "decision_engine_research_v1.csv",
+
+              "public_data/"
+              "decision_engine_research_v1.json",
+
+              "public_data/"
+              "decision_intelligence_v2.json",
+          ]
+
+          def run_git(*args):
+              result = subprocess.run(
+                  ["git", *args],
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  check=False,
+              )
+
+              return result
+
+          def first_value(
+              obj,
+              keys,
+          ):
+              if not isinstance(
+                  obj,
+                  dict,
+              ):
+                  return None
+
+              for key in keys:
+                  value = obj.get(key)
+
+                  if value not in (
+                      None,
+                      "",
+                  ):
+                      return value
+
+              return None
+
+          def inspect_csv(text):
+              reader = csv.DictReader(
+                  io.StringIO(text)
+              )
+
+              rows = list(reader)
+
+              if not rows:
+                  return {}
+
+              row = rows[-1]
+
+              return {
+                  "context": first_value(
+                      row,
+                      (
+                          "context_date",
+                          "asof_date",
+                          "research_date",
+                          "date",
+                      ),
+                  ),
+                  "state": first_value(
+                      row,
+                      (
+                          "decision_state",
+                          "state",
+                          "published_decision_state",
+                      ),
+                  ),
+                  "what_changed": first_value(
+                      row,
+                      (
+                          "what_changed",
+                          "change",
+                      ),
+                  ),
+              }
+
+          def inspect_json(text):
+              try:
+                  obj = json.loads(text)
+              except Exception:
+                  return {}
+
+              if isinstance(
+                  obj,
+                  list,
+              ):
+                  if not obj:
+                      return {}
+
+                  obj = obj[-1]
+
+              if not isinstance(
+                  obj,
+                  dict,
+              ):
+                  return {}
+
+              changed = obj.get(
+                  "what_changed"
+              )
+
+              changed_status = None
+              changed_reason = None
+
+              if isinstance(
+                  changed,
+                  dict,
+              ):
+                  changed_status = changed.get(
+                      "status"
+                  )
+
+                  changed_reason = changed.get(
+                      "reason"
+                  )
+
+              elif changed not in (
+                  None,
+                  "",
+              ):
+                  changed_status = changed
+
+              return {
+                  "context": first_value(
+                      obj,
+                      (
+                          "context_date",
+                          "asof_date",
+                          "research_date",
+                          "date",
+                      ),
+                  ),
+                  "state": first_value(
+                      obj,
+                      (
+                          "decision_state",
+                          "state",
+                          "published_decision_state",
+                      ),
+                  ),
+                  "what_changed": changed_status,
+                  "reason": changed_reason,
+              }
+
+          for file in files:
+              print()
+              print("-" * 88)
+              print(file)
+              print("-" * 88)
+
+              log = run_git(
+                  "log",
+                  "-8",
+                  "--format=%H|%cI|%s",
+                  "--",
+                  file,
+              )
+
+              lines = [
+                  line
+                  for line in log.stdout.splitlines()
+                  if line.strip()
+              ]
+
+              if not lines:
+                  print(
+                      "NO HISTORY"
+                  )
+                  continue
+
+              for line in lines:
+                  parts = line.split(
+                      "|",
+                      2,
+                  )
+
+                  if len(parts) != 3:
+                      continue
+
+                  commit, timestamp, subject = parts
+
+                  shown = run_git(
+                      "show",
+                      f"{commit}:{file}",
+                  )
+
+                  if shown.returncode != 0:
+                      continue
+
+                  if file.endswith(
+                      ".csv"
+                  ):
+                      info = inspect_csv(
+                          shown.stdout
+                      )
+                  else:
+                      info = inspect_json(
+                          shown.stdout
+                      )
+
+                  context = (
+                      info.get("context")
+                      or "—"
+                  )
+
+                  state = (
+                      info.get("state")
+                      or "—"
+                  )
+
+                  changed = (
+                      info.get("what_changed")
+                      or "—"
+                  )
+
+                  print(
+                      f"{commit[:8]} | "
+                      f"{timestamp} | "
+                      f"context={context} | "
+                      f"state={state} | "
+                      f"what_changed={changed} | "
+                      f"{subject}"
+                  )
+
+                  reason = info.get(
+                      "reason"
+                  )
+
+                  if reason:
+                      print(
+                          f"    reason: {reason}"
+                      )
+
+          print()
+          print("========================================")
+          print("HISTORICAL VALUE INSPECTION COMPLETE")
+          print("========================================")
+          PY
+
+      # ============================================================
+      # 11. VERIFY NOTHING WAS MODIFIED
+      # ============================================================
+      - name: Verify workflow remained read only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "READ-ONLY INTEGRITY CHECK"
+          echo "========================================"
+          echo
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ERROR:"
+            echo "Diagnostic workflow changed repository files."
+            echo
+            git status --short
+            exit 1
+          fi
+
+          echo "PASS:"
+          echo "Repository remained unchanged."
+          echo
+          echo "No production artifact was modified."
+          echo "No manifest was rebuilt."
+          echo "No Decision state was regenerated."
+          echo "No historical snapshot was created."
+          echo
+          echo "========================================"
+          echo "DIAGNOSTIC COMPLETE"
+          echo "========================================"
