@@ -9,6 +9,17 @@ now=datetime.now(timezone.utc).isoformat()
 
 # 1. Event/News: deterministic research classification; remains contextual only.
 ev=pd.read_csv(P/'event_news_research_v2.csv')
+# decision_role is owned by remaining_layers_quality_v1.  Final hardening is a
+# validator/consumer of that contract and must never silently synthesize it.
+required_event_contract = {'decision_role', 'research_only', 'pit_status', 'quality_gate'}
+missing_event_contract = sorted(required_event_contract - set(ev.columns))
+if missing_event_contract:
+    raise RuntimeError(
+        'Event News quality contract missing columns: '
+        + ', '.join(missing_event_contract)
+        + '. Run remaining_layers_quality_v1.py after synchronizing fresh child artifacts '
+          'and before final_remaining_layers_hardening_v1.py.'
+    )
 titles=ev['title'].fillna('').str.lower()
 def event_class(t):
     if any(k in t for k in ['consumer price','producer price','employment situation','retail sales','gross domestic product','personal income','pce','ism','job openings']): return 'MACRO_RELEASE'
