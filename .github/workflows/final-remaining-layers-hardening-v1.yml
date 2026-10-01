@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'final_remaining_layers_hardening_v1.py'
+      - 'remaining_layers_quality_v1.py'
       - 'app.py'
       - 'tests/test_final_remaining_layers_hardening.py'
       - 'public_data/**'
@@ -17,6 +18,7 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install --upgrade pip
       - run: pip install pandas pytest
+      - run: python remaining_layers_quality_v1.py --public-data public_data
       - run: python final_remaining_layers_hardening_v1.py
       - run: python -m pytest -q tests/test_final_remaining_layers_hardening.py
       - run: python -m py_compile app.py final_remaining_layers_hardening_v1.py

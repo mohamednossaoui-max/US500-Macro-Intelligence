@@ -749,6 +749,10 @@ jobs:
           rm -rf decision_engine_output
           python tests/decision_engine/decision_engine_v1.py --input public_data/research_context_summary_v1.csv --output-dir decision_engine_output
           cp decision_engine_output/* public_data/
+          # Refresh contextual quality/schema metadata after child artifacts are synchronized.
+          # Event News and Earnings producers publish raw research artifacts; this audit owns
+          # decision_role/research_only/PIT/freshness annotations consumed by final hardening.
+          python remaining_layers_quality_v1.py --public-data public_data
           python final_remaining_layers_hardening_v1.py
           python unified_state_vector_v1.py
           python historical_analog_engine_v1.py
