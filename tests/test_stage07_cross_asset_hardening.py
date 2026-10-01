@@ -24,9 +24,13 @@ def _source():
 
 def _expected_latest_row(asset):
     d = _source()
-    valid = d.loc[d[asset].notna()]
-    assert not valid.empty, f"Expected at least one observation for {asset}"
-    return valid.iloc[-1]
+    context_date = _context_date()
+    availability = pd.to_datetime(d["availability_date"], errors="coerce").dt.normalize()
+    valid = d.loc[d[asset].notna() & availability.notna() & (availability <= context_date)].copy()
+    assert not valid.empty, f"Expected at least one PIT-eligible observation for {asset}"
+    valid["_observation_ts"] = pd.to_datetime(valid["observation_date"], errors="coerce")
+    dated = valid.loc[valid["_observation_ts"].notna()]
+    return dated.sort_values("_observation_ts").iloc[-1] if not dated.empty else valid.iloc[-1]
 
 
 def _iso_date(value):
@@ -92,3 +96,24 @@ def test_cross_asset_never_becomes_decision_eligible_while_pit_limited():
     assert all(r["pit_status"] == "PIT_LIMITED" for r in rows)
     assert all(r["decision_engine_eligible"] is False for r in rows)
     assert all(r["exclusion_reason"] == "PIT_LIMITED_EVIDENCE" for r in rows)
+
+
+def test_cross_asset_filters_future_availability_before_selecting_latest(tmp_path):
+    # Canonical clock is Oct-01.  The numerically newest SP500 row is only
+    # available Oct-02 and must not leak into the Oct-01 research snapshot.
+    pd.DataFrame([{"context_date": "2026-10-01"}]).to_csv(
+        tmp_path / "research_context_summary_v1.csv", index=False
+    )
+    base = {asset: None for asset in ASSETS}
+    rows = [
+        {**base, "observation_date": "2026-09-30", "availability_date": "2026-10-01", "SP500": 100.0},
+        {**base, "observation_date": "2026-10-01", "availability_date": "2026-10-02", "SP500": 101.0},
+    ]
+    pd.DataFrame(rows).to_csv(tmp_path / "cross_asset_research_v1.csv", index=False)
+
+    evidence = {r["indicator"]: r for r in cross_asset.build(tmp_path)}
+    sp500 = evidence["SP500"]
+    assert sp500["observation_date"] == "2026-09-30"
+    assert sp500["available_at"] == "2026-10-01"
+    assert sp500["as_of_date"] == "2026-10-01"
+    assert pd.to_datetime(sp500["available_at"]).normalize() <= pd.Timestamp("2026-10-01")
