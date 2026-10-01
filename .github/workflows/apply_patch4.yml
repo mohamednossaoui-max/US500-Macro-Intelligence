@@ -1,0 +1,139 @@
+name: Apply Patch 4
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch4:
+    name: Apply Patch 4 to V6.3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify required files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Checking Patch 4 files..."
+
+          test -f app.py || {
+            echo "ERROR: app.py not found"
+            exit 1
+          }
+
+          test -f apply_patch4.py || {
+            echo "ERROR: apply_patch4.py not found"
+            exit 1
+          }
+
+          echo "Required files found."
+
+      - name: Verify V6.3 before patch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("app.py")
+          text = path.read_text(encoding="utf-8")
+
+          required = [
+              'APP_VERSION = "V6.3"',
+              'from ui_v3 import',
+              'def fed() -> None:',
+              'def decision() -> None:',
+              'def system_health() -> None:',
+          ]
+
+          missing = [marker for marker in required if marker not in text]
+
+          if missing:
+              print("ERROR: app.py does not match expected V6.3 fingerprints.")
+              for marker in missing:
+                  print("MISSING:", marker)
+              raise SystemExit(1)
+
+          print("V6.3 fingerprints verified.")
+          PY
+
+      - name: Check Python syntax before patch
+        run: |
+          python -m py_compile app.py
+          python -m py_compile apply_patch4.py
+          echo "Pre-patch syntax check passed."
+
+      - name: Apply Patch 4
+        run: |
+          python apply_patch4.py
+
+      - name: Verify backup
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f app.py.pre_patch4 || {
+            echo "ERROR: app.py.pre_patch4 was not created."
+            exit 1
+          }
+
+          test -s app.py.pre_patch4 || {
+            echo "ERROR: app.py.pre_patch4 is empty."
+            exit 1
+          }
+
+          echo "Backup verified: app.py.pre_patch4"
+
+      - name: Verify patched app syntax
+        run: |
+          python -m py_compile app.py
+          echo "Patched app.py syntax passed."
+
+      - name: Show changed files
+        shell: bash
+        run: |
+          echo "----- Git status -----"
+          git status --short
+
+          echo
+          echo "----- app.py diff summary -----"
+          git diff --stat -- app.py
+
+          echo
+          echo "----- app.py diff -----"
+          git diff -- app.py
+
+      - name: Commit Patch 4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- app.py; then
+            echo "No app.py changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Commit only the patched application.
+          # app.py.pre_patch4 remains a workflow safety backup
+          # and is intentionally not committed.
+          git add app.py
+
+          git commit -m "Apply V6.3 Patch 4 presentation update"
+          git push
+
+          echo "Patch 4 committed and pushed successfully."
