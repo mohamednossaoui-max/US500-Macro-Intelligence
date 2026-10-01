@@ -84,6 +84,19 @@ background:rgba(128,140,155,.04);min-height:88px}
 .research-panel .rp-line:last-child{border-bottom:0}.research-panel .rp-k{color:#8298aa}.research-panel .rp-v{font-weight:800;text-align:right;overflow-wrap:anywhere}
 @media(max-width:900px){.research-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.research-grid{grid-template-columns:1fr}}
+
+/* PATCH 4.1 — Fed UI polish; presentation only */
+.fed-brief{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:.35rem 0 1rem}
+.fed-brief-cell{border:1px solid rgba(128,140,155,.24);border-radius:12px;padding:11px 13px;background:rgba(128,140,155,.035);min-width:0}
+.fed-brief-cell span{display:block;font-size:.63rem;font-weight:850;letter-spacing:.075em;color:#8b96a5;margin-bottom:5px}
+.fed-brief-cell b{display:block;font-size:.94rem;overflow-wrap:anywhere}
+.sep-row{display:grid;grid-template-columns:minmax(110px,1.25fr) 72px 24px 72px minmax(86px,.8fr);gap:8px;align-items:center;padding:9px 12px;margin:5px 0;border:1px solid rgba(128,140,155,.18);border-radius:10px;background:rgba(128,140,155,.025);font-variant-numeric:tabular-nums}
+.sep-name{font-weight:850}.sep-prev{color:#8b96a5;text-align:right}.sep-arrow{text-align:center;color:#8b96a5}.sep-current{font-weight:900;text-align:right}.sep-delta{text-align:right;font-size:.78rem;font-weight:850}
+.comm-shift{border:1px solid rgba(128,140,155,.22);border-radius:12px;padding:11px 13px;margin:7px 0;background:rgba(128,140,155,.03)}
+.comm-shift-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.shift-badge{font-size:.66rem;font-weight:900;letter-spacing:.04em;border:1px solid rgba(128,140,155,.25);border-radius:999px;padding:3px 8px;white-space:nowrap}.shift-badge.hawk{color:#ff9a86}.shift-badge.dove{color:#79b8ff}.shift-badge.flat{color:#a8b3c0}
+.comm-shift-flow{display:grid;grid-template-columns:1fr 28px 1fr;align-items:center;gap:8px;margin-top:9px}.comm-shift-flow span{font-weight:850}.comm-shift-flow span:last-child{text-align:right}.comm-shift-flow small{display:block;font-size:.6rem;letter-spacing:.07em;color:#8b96a5;margin-bottom:2px}.comm-shift-flow strong{text-align:center;color:#8b96a5}.comm-shift-date{text-align:right;font-size:.68rem;color:#8b96a5;margin-top:5px}
+@media(max-width:900px){.fed-brief{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.fed-brief{grid-template-columns:1fr 1fr}.fed-brief-cell{padding:9px 10px}.sep-row{grid-template-columns:1fr 54px 18px 54px 70px;padding:8px}.comm-shift-head{align-items:flex-start}.shift-badge{white-space:normal;text-align:right}.comm-shift-flow{font-size:.83rem}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -1021,6 +1034,24 @@ def fed() -> None:
             changes.append((abs(change), key, label, detail))
     changes.sort(reverse=True, key=lambda x: x[0])
 
+    # PATCH 4.1 — compact decision brief; presentation only.
+    quality = obj.get("quality") if isinstance(obj.get("quality"), dict) else {}
+    biggest = changes[0] if changes else None
+    biggest_text = "No comparable SEP move"
+    if biggest:
+        _, _, biggest_label, biggest_detail = biggest
+        biggest_delta = biggest_detail.get("change")
+        biggest_text = f"{biggest_label} {biggest_delta:+.1f}" if isinstance(biggest_delta, (int, float)) else biggest_label
+    st.markdown(
+        "<div class='fed-brief'>"
+        f"<div class='fed-brief-cell'><span>POLICY STANCE</span><b>{fmt(classification)}</b></div>"
+        f"<div class='fed-brief-cell'><span>DIRECTION</span><b>{fmt(sep_direction)}</b></div>"
+        f"<div class='fed-brief-cell'><span>BIGGEST SEP MOVE</span><b>{biggest_text}</b></div>"
+        f"<div class='fed-brief-cell'><span>EVIDENCE QUALITY</span><b>{fmt(quality.get('quality_gate', 'UNKNOWN'))}</b></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
     st.subheader("What Changed?")
     if changes:
         change_cols = st.columns(min(3, len(changes)))
@@ -1131,10 +1162,12 @@ def fed() -> None:
         prev = detail.get("previous", previous.get(key))
         delta = detail.get("change")
         delta_text = f"{delta:+.1f}" if isinstance(delta, (int, float)) else "—"
+        arrow = "▲" if isinstance(delta, (int, float)) and delta > 0 else "▼" if isinstance(delta, (int, float)) and delta < 0 else "—"
         st.markdown(
-            f"<div class='pulse'><span class='pulse-name'>{label}</span>"
-            f"<span class='pulse-value'>{fmt(prev,1)} to {fmt(cur,1)}</span>"
-            f"<span class='pulse-note'>Δ {delta_text}</span></div>",
+            f"<div class='sep-row'><span class='sep-name'>{label}</span>"
+            f"<span class='sep-prev'>{fmt(prev,1)}</span><span class='sep-arrow'>→</span>"
+            f"<span class='sep-current'>{fmt(cur,1)}</span>"
+            f"<span class='sep-delta'>{arrow} {delta_text}</span></div>",
             unsafe_allow_html=True,
         )
     st.caption(
@@ -1211,16 +1244,14 @@ def fed() -> None:
         else:
             signal = "LIMITED / NEUTRAL SHIFT"
 
+        shift_icon = "↑" if signal == "HAWKISH SHIFT" else "↓" if signal == "DOVISH SHIFT" else "—"
+        shift_class = "hawk" if signal == "HAWKISH SHIFT" else "dove" if signal == "DOVISH SHIFT" else "flat"
         st.markdown(
-            f"<div class='signal-card'>"
-            f"<div class='signal-title'>{label}</div>"
-            f"<div class='signal-main'>"
-            f"{fmt(previous_tone)} → {fmt(current_tone)}"
-            f"</div>"
-            f"<div class='signal-why'>"
-            f"<b>{signal}</b> · "
-            f"{fmt(previous_date)} → {fmt(current_date)}"
-            f"</div>"
+            f"<div class='comm-shift'>"
+            f"<div class='comm-shift-head'><b>{label}</b><span class='shift-badge {shift_class}'>{shift_icon} {signal}</span></div>"
+            f"<div class='comm-shift-flow'><span><small>PREVIOUS</small>{fmt(previous_tone)}</span>"
+            f"<strong>→</strong><span><small>CURRENT</small>{fmt(current_tone)}</span></div>"
+            f"<div class='comm-shift-date'>{fmt(previous_date)} → {fmt(current_date)}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1296,7 +1327,6 @@ def fed() -> None:
             st.markdown(f"[Official Beige Book source]({beige.get('url')})")
         st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
 
-    quality = obj.get("quality") if isinstance(obj.get("quality"), dict) else {}
     st.subheader("Fed Evidence Quality")
     qcols = st.columns(4)
     for col, (label, value) in zip(qcols, [
