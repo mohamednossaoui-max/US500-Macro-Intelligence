@@ -1,0 +1,18 @@
+PATCH 3 — PRESENTATION ONLY
+
+Changes:
+- Economic directional glyphs removed from presentation.
+- Economic/Fed change cards use textual "to" plus numeric Δ.
+- FOMC ✓ / ⏳ changed to AVAILABLE / PENDING.
+- SEP arrows removed.
+- Hero version uses APP_VERSION.
+
+Untouched:
+- backend/data loading
+- manifest/public_data
+- scoring
+- PIT/chronology
+- Decision Engine
+- evidence eligibility
+- governance
+- system health logic
