@@ -6,6 +6,7 @@ cross_asset = importlib.import_module("evidence_adapters.cross_asset")
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "public_data"
+ASSETS = tuple(cross_asset.ASSETS)
 
 
 def _rows():
@@ -13,8 +14,24 @@ def _rows():
 
 
 def _context_date():
-    d = pd.read_csv(PUBLIC / 'research_context_summary_v1.csv', low_memory=False)
-    return pd.to_datetime(d.iloc[-1]['context_date']).normalize()
+    d = pd.read_csv(PUBLIC / "research_context_summary_v1.csv", low_memory=False)
+    return pd.to_datetime(d.iloc[-1]["context_date"]).normalize()
+
+
+def _source():
+    return pd.read_csv(PUBLIC / "cross_asset_research_v1.csv", low_memory=False)
+
+
+def _expected_latest_row(asset):
+    d = _source()
+    valid = d.loc[d[asset].notna()]
+    assert not valid.empty, f"Expected at least one observation for {asset}"
+    return valid.iloc[-1]
+
+
+def _iso_date(value):
+    parsed = pd.to_datetime(value, errors="raise")
+    return parsed.date().isoformat()
 
 
 def test_cross_asset_artifact_declares_pit_limited():
@@ -34,18 +51,23 @@ def test_cross_asset_rows_preserve_mechanical_gate_but_not_overpromote_pit():
 
 def test_cross_asset_evidence_uses_latest_observation_per_asset():
     rows = {r["indicator"]: r for r in _rows()}
-    assert rows["SP500"]["observation_date"] == "2026-09-24"
-    assert rows["NASDAQ"]["observation_date"] == "2026-09-24"
-    assert rows["GOLD"]["observation_date"] == "2026-09-25"
-    assert rows["BITCOIN"]["observation_date"] == "2026-09-25"
+    assert set(rows) == set(ASSETS)
+
+    for asset in ASSETS:
+        expected = _expected_latest_row(asset)
+        assert rows[asset]["observation_date"] == _iso_date(expected["observation_date"])
 
 
 def test_cross_asset_does_not_borrow_other_assets_availability_date():
     rows = {r["indicator"]: r for r in _rows()}
-    assert rows["SP500"]["available_at"] == "2026-09-25"
-    assert rows["NASDAQ"]["available_at"] == "2026-09-25"
-    assert rows["GOLD"]["available_at"] == "2026-09-26"
-    assert rows["SP500"]["available_at"] != rows["GOLD"]["available_at"]
+
+    for asset in ASSETS:
+        expected = _expected_latest_row(asset)
+        # Availability must travel with the same source row selected for this
+        # asset.  This prevents a sparse asset from borrowing another asset's
+        # newer calendar date as the research dataset advances.
+        assert rows[asset]["available_at"] == _iso_date(expected["availability_date"])
+        assert rows[asset]["observation_date"] == _iso_date(expected["observation_date"])
 
 
 def test_cross_asset_context_freshness_is_measured_against_research_context():
@@ -54,14 +76,19 @@ def test_cross_asset_context_freshness_is_measured_against_research_context():
     assert {r["as_of_date"] for r in rows} == {context_date.date().isoformat()}
     for r in rows:
         if r.get("available_at"):
-            expected_age = int((context_date - pd.to_datetime(r["available_at"]).normalize()).days)
+            available_at = pd.to_datetime(r["available_at"]).normalize()
+            assert available_at <= context_date, (
+                f"Future cross-asset evidence: {r['indicator']} "
+                f"available_at={r['available_at']} context_date={context_date.date().isoformat()}"
+            )
+            expected_age = int((context_date - available_at).days)
             assert r["age_days"] == expected_age
 
 
 def test_cross_asset_never_becomes_decision_eligible_while_pit_limited():
     from research_evidence_quality_v1 import apply_quality
     rows = apply_quality(_rows())
-    assert len(rows) == 8
+    assert len(rows) == len(ASSETS)
     assert all(r["pit_status"] == "PIT_LIMITED" for r in rows)
     assert all(r["decision_engine_eligible"] is False for r in rows)
     assert all(r["exclusion_reason"] == "PIT_LIMITED_EVIDENCE" for r in rows)
