@@ -1,0 +1,91 @@
+name: Patch 4.2 - Dynamic Research Tables
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - app.py
+      - .github/workflows/patch42-dynamic-research-tables.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-patch42:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests streamlit pytest
+
+      - name: Verify Python syntax
+        run: python -m py_compile app.py
+
+      - name: Verify Patch 4.1 Fed UI is preserved
+        run: |
+          grep -q "FED DECISION BRIEF" app.py
+          grep -q "COMMUNICATION SHIFT" app.py
+          grep -q "SEP COMPARISON" app.py
+
+      - name: Verify Patch 4.2 presentation targets
+        run: |
+          grep -q "def research_panels" app.py
+          grep -q "Raw Research Context Summary" app.py
+          grep -q "Raw Macro Context" app.py
+          grep -q "Raw Event Study Summary" app.py
+          grep -q "Raw configured dataset status" app.py
+          grep -q "Raw evidence matrix" app.py
+          grep -q "Raw published decision" app.py
+
+      - name: Guard backend loading and governance contracts
+        run: |
+          grep -q 'def get_manifest' app.py
+          grep -q 'def fetch_raw' app.py
+          grep -q 'def load_bytes' app.py
+          grep -q 'def load_csv' app.py
+          grep -q 'def load_json' app.py
+          grep -q 'def load_named' app.py
+          grep -q 'point_in_time_safe' app.py
+          grep -q 'research_only' app.py
+          grep -q 'included_in_state = FALSE' app.py
+
+      - name: Run publication integrity test when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f verify_publication_integrity.py ]; then
+            python verify_publication_integrity.py
+          else
+            echo "verify_publication_integrity.py not present; skipped."
+          fi
+
+      - name: Run PIT tests when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f tests/test_point_in_time_integrity.py ]; then
+            python -m pytest -q tests/test_point_in_time_integrity.py
+          else
+            echo "PIT test file not present; skipped."
+          fi
+
+      - name: Confirm Data Explorer remains a raw-data tool
+        run: |
+          grep -q 'def explorer' app.py
+          grep -q 'table(obj, 700)' app.py
+
+      - name: Summary
+        run: |
+          echo "Patch 4.2 verification passed."
+          echo "Presentation-only dynamic research panels are present."
+          echo "Raw tables remain available inside expanders, except Data Explorer by design."
