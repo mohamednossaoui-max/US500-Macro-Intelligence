@@ -25,8 +25,17 @@ def build(p):
     as_of = _context_date(p, d)
     out = []
 
+    availability = pd.to_datetime(d["availability_date"], errors="coerce").dt.normalize()
+
     for asset in ASSETS:
-        valid = d.loc[d[asset].notna()] if asset in d.columns else d.iloc[0:0]
+        # Apply the canonical Research Context clock *before* selecting the
+        # latest observation. A row published after as_of is future evidence
+        # for this research snapshot, even when its observation date is older.
+        valid = (
+            d.loc[d[asset].notna() & availability.notna() & (availability <= as_of)]
+            .copy()
+            if asset in d.columns else d.iloc[0:0]
+        )
         if valid.empty:
             out.append(row(
                 "CROSS_ASSET", "CROSS_ASSET", asset,
@@ -40,7 +49,10 @@ def build(p):
             ))
             continue
 
-        x = valid.iloc[-1]
+        observation = pd.to_datetime(valid["observation_date"], errors="coerce")
+        valid = valid.assign(_observation_ts=observation)
+        dated = valid.loc[valid["_observation_ts"].notna()]
+        x = (dated.sort_values("_observation_ts").iloc[-1] if not dated.empty else valid.iloc[-1])
         available_at = pd.to_datetime(x["availability_date"], errors="coerce")
         age = int((as_of - available_at.normalize()).days) if pd.notna(available_at) else None
         out.append(row(
