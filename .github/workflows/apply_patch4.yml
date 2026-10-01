@@ -1,451 +1,576 @@
-name: Diagnose Patch 4 Baseline
+# .github/workflows/apply-patch4.yml
+
+name: Apply Patch 4 - Fed Intelligence
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose-patch4:
-    name: Diagnose V6.3 Patch 4 Baseline
+  apply-patch4:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------------------------------------
-      # 1. Checkout
-      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
-      # ------------------------------------------------------------
-      # 2. Python
-      # ------------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      # ------------------------------------------------------------
-      # 3. Repository information
-      # ------------------------------------------------------------
-      - name: Show repository state
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "=========================================="
-          echo "REPOSITORY STATE"
-          echo "=========================================="
-
-          echo
-          echo "----- Current branch -----"
-          git branch --show-current
-
-          echo
-          echo "----- Current commit -----"
-          git log -1 --oneline
-
-          echo
-          echo "----- Git status -----"
-          git status --short
-
-          echo
-          echo "----- Root files -----"
-          ls -la
-
-      # ------------------------------------------------------------
-      # 4. Verify required files
-      # ------------------------------------------------------------
       - name: Verify required files
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=========================================="
-          echo "REQUIRED FILES"
-          echo "=========================================="
-
-          if [ ! -f app.py ]; then
-            echo "FAIL: app.py does not exist."
+          test -f app.py || {
+            echo "ERROR: app.py not found"
             exit 1
-          fi
+          }
 
-          echo "PASS: app.py exists"
+          echo "app.py found."
 
-          if [ -f scripts/apply_patch4.py ]; then
-            echo "PASS: scripts/apply_patch4.py exists"
-          else
-            echo "INFO: scripts/apply_patch4.py does not exist"
-            echo "      This diagnostic workflow can continue."
-          fi
-
-          if [ -f app.py.pre_patch4 ]; then
-            echo "INFO: app.py.pre_patch4 already exists"
-          else
-            echo "INFO: app.py.pre_patch4 does not currently exist"
-          fi
-
-      # ------------------------------------------------------------
-      # 5. Python syntax
-      # ------------------------------------------------------------
-      - name: Check current app.py syntax
+      - name: Verify current app.py syntax
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "=========================================="
-          echo "PYTHON SYNTAX"
-          echo "=========================================="
 
           python -m py_compile app.py
 
-          echo "PASS: app.py compiles successfully"
+          echo "PASS: current app.py syntax is valid."
 
-      # ------------------------------------------------------------
-      # 6. Diagnostic baseline checks
-      # ------------------------------------------------------------
-      - name: Verify V6.3 baseline
-        shell: bash
-        run: |
-          set -uo pipefail
-
-          echo "=========================================="
-          echo "V6.3 BASELINE DIAGNOSTICS"
-          echo "=========================================="
-
-          failed=0
-
-          check() {
-            label="$1"
-            pattern="$2"
-
-            if grep -Fq "$pattern" app.py; then
-              echo "PASS: $label"
-            else
-              echo "FAIL: $label"
-              echo "      Expected text:"
-              echo "      $pattern"
-              failed=1
-            fi
-          }
-
-          check \
-            "APP_VERSION V6.3" \
-            'APP_VERSION = "V6.3"'
-
-          check \
-            "fed() function" \
-            'def fed() -> None:'
-
-          check \
-            "Policy Pulse" \
-            'st.subheader("Policy Pulse")'
-
-          check \
-            "What Changed" \
-            'st.subheader("What Changed?")'
-
-          check \
-            "FOMC Communication" \
-            'st.subheader("FOMC Communication")'
-
-          check \
-            "SEP Pulse" \
-            'st.subheader("SEP Pulse — Current vs Previous")'
-
-          check \
-            "Communication comparison" \
-            'st.subheader("Communication — Current vs Previous")'
-
-          check \
-            "Fed Synthesis" \
-            'st.subheader("Fed Synthesis")'
-
-          check \
-            "Beige Book Context" \
-            'st.subheader("Beige Book Context")'
-
-          check \
-            "Fed Evidence Quality" \
-            'st.subheader("Fed Evidence Quality")'
-
-          check \
-            "Complete Fed JSON" \
-            'with st.expander("Complete Fed JSON")'
-
-          echo
-          echo "=========================================="
-          echo "BASELINE RESULT"
-          echo "=========================================="
-
-          if [ "$failed" -ne 0 ]; then
-            echo "BASELINE VERIFICATION FAILED"
-            echo
-            echo "One or more expected V6.3 presentation"
-            echo "fingerprints are different in the current app.py."
-            echo
-            echo "No file has been modified."
-            exit 1
-          fi
-
-          echo "BASELINE VERIFICATION PASSED"
-
-      # ------------------------------------------------------------
-      # 7. Locate fed() structurally with AST
-      # ------------------------------------------------------------
-      - name: Inspect fed function with Python AST
+      - name: Verify actual fed function structure
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "=========================================="
-          echo "FED FUNCTION AST INSPECTION"
-          echo "=========================================="
 
           python - <<'PY'
           import ast
           from pathlib import Path
 
           path = Path("app.py")
-          text = path.read_text(encoding="utf-8")
+          source = path.read_text(encoding="utf-8")
+          tree = ast.parse(source)
 
-          tree = ast.parse(text)
-
-          matches = [
+          fed_nodes = [
               node
               for node in tree.body
               if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
               and node.name == "fed"
           ]
 
-          if len(matches) != 1:
+          if len(fed_nodes) != 1:
               raise SystemExit(
-                  f"ERROR: expected exactly one top-level fed() function; "
-                  f"found {len(matches)}"
+                  f"ERROR: expected exactly one fed() function, found {len(fed_nodes)}"
               )
 
-          node = matches[0]
-
-          print("PASS: exactly one top-level fed() function found")
-          print(f"fed() starts at line: {node.lineno}")
-          print(f"fed() ends at line:   {node.end_lineno}")
-          print(
-              "fed() length:          "
-              f"{node.end_lineno - node.lineno + 1} lines"
+          fed = fed_nodes[0]
+          fed_source = "\n".join(
+              source.splitlines()[fed.lineno - 1:fed.end_lineno]
           )
-          PY
-
-      # ------------------------------------------------------------
-      # 8. Show Fed section headings from actual source
-      # ------------------------------------------------------------
-      - name: Show actual Fed presentation headings
-        if: always()
-        shell: bash
-        run: |
-          set -uo pipefail
-
-          echo "=========================================="
-          echo "ACTUAL FED PRESENTATION HEADINGS"
-          echo "=========================================="
-
-          python - <<'PY'
-          import ast
-          from pathlib import Path
-
-          text = Path("app.py").read_text(encoding="utf-8")
-          lines = text.splitlines()
-
-          try:
-              tree = ast.parse(text)
-          except SyntaxError as exc:
-              print(f"Unable to parse app.py: {exc}")
-              raise SystemExit(0)
-
-          matches = [
-              node
-              for node in tree.body
-              if isinstance(node, ast.FunctionDef)
-              and node.name == "fed"
-          ]
-
-          if len(matches) != 1:
-              print(
-                  "Could not uniquely locate fed(). "
-                  f"Found {len(matches)} matches."
-              )
-              raise SystemExit(0)
-
-          fed = matches[0]
 
           print(
-              f"fed() source range: "
+              f"PASS: fed() found at lines "
               f"{fed.lineno}-{fed.end_lineno}"
           )
-          print()
 
-          keywords = (
-              "st.header(",
-              "st.subheader(",
-              "st.expander(",
-              "with st.expander(",
-          )
+          required_markers = [
+              'st.header("Fed Intelligence")',
+              'st.subheader("Policy Pulse")',
+              'st.subheader("What Changed?")',
+              'st.subheader("FOMC Communication")',
+              'st.subheader("SEP Pulse — Current vs Previous")',
+              'st.subheader("Communication — Current vs Previous")',
+              'st.subheader("Fed Synthesis")',
+              'st.subheader("Beige Book Context")',
+              'st.subheader("Fed Evidence Quality")',
+              'communication_comparison',
+              'research_panels',
+          ]
 
-          found = False
+          missing = [
+              marker
+              for marker in required_markers
+              if marker not in fed_source
+          ]
 
-          for number in range(fed.lineno, fed.end_lineno + 1):
-              line = lines[number - 1]
+          if missing:
+              print("ERROR: fed() does not match the expected Patch 4 baseline.")
+              print("Missing markers:")
+              for marker in missing:
+                  print(" -", marker)
+              raise SystemExit(1)
 
-              if any(keyword in line for keyword in keywords):
-                  print(f"{number:5}: {line.strip()}")
-                  found = True
-
-          if not found:
-              print("No presentation headings were detected.")
+          print("PASS: actual Patch 4 Fed structure detected.")
           PY
 
-      # ------------------------------------------------------------
-      # 9. Show Patch 4 markers
-      # ------------------------------------------------------------
-      - name: Detect previous Patch 4 attempts
-        if: always()
+      - name: Create backup
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
-          echo "=========================================="
-          echo "PATCH 4 MARKERS"
-          echo "=========================================="
+          cp app.py app.py.pre_patch4_final
 
-          patterns=(
-            "PATCH 4"
-            "research-grid"
-            "research-panel"
-            "fed-compare-grid"
-            "fed-compare-card"
-            "Raw communication comparison data"
-            "Raw validation summary"
-            "Raw validation report"
+          echo "Backup created: app.py.pre_patch4_final"
+
+      - name: Apply corrected Patch 4 presentation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/apply_patch4.py <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path("app.py")
+          source = path.read_text(encoding="utf-8")
+
+          # ------------------------------------------------------------
+          # 1. Locate fed() using Python AST.
+          #    No fragile whole-function exact-string matching.
+          # ------------------------------------------------------------
+          tree = ast.parse(source)
+
+          fed_nodes = [
+              node
+              for node in tree.body
+              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+              and node.name == "fed"
+          ]
+
+          if len(fed_nodes) != 1:
+              raise SystemExit(
+                  f"ERROR: expected exactly one fed() function, "
+                  f"found {len(fed_nodes)}"
+              )
+
+          fed = fed_nodes[0]
+
+          lines = source.splitlines(keepends=True)
+
+          start = fed.lineno - 1
+          end = fed.end_lineno
+
+          fed_source = "".join(lines[start:end])
+
+          # ------------------------------------------------------------
+          # 2. Guard against applying this to the wrong Fed implementation.
+          # ------------------------------------------------------------
+          required = [
+              'st.subheader("Policy Pulse")',
+              'st.subheader("What Changed?")',
+              'st.subheader("FOMC Communication")',
+              'st.subheader("SEP Pulse — Current vs Previous")',
+              'st.subheader("Communication — Current vs Previous")',
+              'st.subheader("Fed Synthesis")',
+              'st.subheader("Beige Book Context")',
+              'st.subheader("Fed Evidence Quality")',
+          ]
+
+          missing = [x for x in required if x not in fed_source]
+
+          if missing:
+              print("ERROR: unexpected fed() structure.")
+              print("Missing:")
+              for item in missing:
+                  print(" -", item)
+              raise SystemExit(1)
+
+          # ------------------------------------------------------------
+          # 3. Replace only the Communication Current vs Previous block.
+          #
+          #    We use stable section boundaries from the real fed()
+          #    implementation instead of line numbers.
+          # ------------------------------------------------------------
+          block_start_marker = (
+              "    # --- Communication current vs previous "
+              "-----------------------------\n"
           )
 
-          found=0
+          block_end_marker = (
+              "    # --- Synthesis "
+              "------------------------------------------------------\n"
+          )
 
-          for pattern in "${patterns[@]}"; do
-            echo
-            echo "----- $pattern -----"
+          if fed_source.count(block_start_marker) != 1:
+              raise SystemExit(
+                  "ERROR: Communication comparison start marker "
+                  "was not found exactly once."
+              )
 
-            if grep -Fn "$pattern" app.py; then
-              found=1
-            else
-              echo "NOT FOUND"
-            fi
-          done
+          if fed_source.count(block_end_marker) != 1:
+              raise SystemExit(
+                  "ERROR: Synthesis boundary was not found exactly once."
+              )
 
-          echo
-          if [ "$found" -eq 1 ]; then
-            echo "INFO: at least one previous Patch 4 marker exists."
-          else
-            echo "INFO: no known Patch 4 marker was detected."
-          fi
+          before, remainder = fed_source.split(
+              block_start_marker,
+              1,
+          )
 
-      # ------------------------------------------------------------
-      # 10. Show the actual communication area
-      # ------------------------------------------------------------
-      - name: Show communication comparison source
-        if: always()
+          old_block, after = remainder.split(
+              block_end_marker,
+              1,
+          )
+
+          new_block = r'''    # --- Communication current vs previous -----------------------------
+              comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
+              st.subheader("Communication — Current vs Previous")
+
+              comparison_rows = []
+
+              for key, label in (
+                  ("statement", "FOMC Statement"),
+                  ("minutes", "FOMC Minutes"),
+                  ("chair_press", "Press Conference"),
+              ):
+                  item = comparison.get(key) if isinstance(comparison.get(key), dict) else {}
+                  comp = item.get("comparison") if isinstance(item.get("comparison"), dict) else {}
+                  previous_doc = item.get("previous") if isinstance(item.get("previous"), dict) else {}
+
+                  current_doc = obj.get(
+                      "chair_press" if key == "chair_press" else key
+                  )
+                  current_doc = current_doc if isinstance(current_doc, dict) else {}
+
+                  current_tone = current_doc.get("tone", "UNAVAILABLE")
+                  previous_tone = previous_doc.get("tone", "UNAVAILABLE")
+                  change = comp.get("classification", "UNAVAILABLE")
+
+                  current_date = item.get("current_date")
+                  previous_date = item.get("previous_date")
+
+                  comparison_rows.append({
+                      "Report": label,
+                      "Current": current_date,
+                      "Previous": previous_date,
+                      "Current tone": current_tone,
+                      "Previous tone": previous_tone,
+                      "Change": change,
+                  })
+
+                  change_text = str(change or "UNAVAILABLE")
+                  change_upper = change_text.upper()
+
+                  if any(
+                      token in change_upper
+                      for token in (
+                          "HAWK",
+                          "TIGHT",
+                          "HIGHER",
+                          "FIRM",
+                      )
+                  ):
+                      signal = "HAWKISH SHIFT"
+                  elif any(
+                      token in change_upper
+                      for token in (
+                          "DOV",
+                          "EAS",
+                          "LOWER",
+                          "SOFT",
+                      )
+                  ):
+                      signal = "DOVISH SHIFT"
+                  elif change_upper in (
+                      "UNAVAILABLE",
+                      "PENDING",
+                      "NONE",
+                      "",
+                  ):
+                      signal = "NOT AVAILABLE"
+                  else:
+                      signal = "LIMITED / NEUTRAL SHIFT"
+
+                  st.markdown(
+                      f"<div class='signal-card'>"
+                      f"<div class='signal-title'>{label}</div>"
+                      f"<div class='signal-main'>"
+                      f"{fmt(previous_tone)} → {fmt(current_tone)}"
+                      f"</div>"
+                      f"<div class='signal-why'>"
+                      f"<b>{signal}</b> · "
+                      f"{fmt(previous_date)} → {fmt(current_date)}"
+                      f"</div>"
+                      f"</div>",
+                      unsafe_allow_html=True,
+                  )
+
+              comparison_df = pd.DataFrame(comparison_rows)
+
+              with st.expander(
+                  "Raw communication comparison",
+                  expanded=False,
+              ):
+                  table(comparison_df, 260)
+
+              st.caption(
+                  "Unavailable or not-yet-published reports remain unavailable; "
+                  "they are never converted into neutral evidence."
+              )
+
+          '''
+
+          new_fed_source = (
+              before
+              + new_block
+              + block_end_marker
+              + after
+          )
+
+          if new_fed_source == fed_source:
+              raise SystemExit(
+                  "ERROR: patch produced no change."
+              )
+
+          # ------------------------------------------------------------
+          # 4. Rebuild app.py.
+          # ------------------------------------------------------------
+          new_source = (
+              "".join(lines[:start])
+              + new_fed_source
+              + "".join(lines[end:])
+          )
+
+          # ------------------------------------------------------------
+          # 5. Validate syntax BEFORE writing.
+          # ------------------------------------------------------------
+          try:
+              ast.parse(new_source)
+          except SyntaxError as exc:
+              raise SystemExit(
+                  f"ERROR: patched app.py is invalid Python: {exc}"
+              )
+
+          path.write_text(
+              new_source,
+              encoding="utf-8",
+          )
+
+          print("PATCH 4 APPLIED SUCCESSFULLY")
+          print(
+              f"fed() baseline was lines "
+              f"{fed.lineno}-{fed.end_lineno}"
+          )
+          PY
+
+          python /tmp/apply_patch4.py
+
+      - name: Verify patched app syntax
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
-          echo "=========================================="
-          echo "COMMUNICATION COMPARISON SOURCE"
-          echo "=========================================="
+          python -m py_compile app.py
+
+          echo "PASS: patched app.py compiles."
+
+      - name: Verify corrected presentation targets
+        shell: bash
+        run: |
+          set -euo pipefail
 
           python - <<'PY'
           import ast
           from pathlib import Path
 
-          text = Path("app.py").read_text(encoding="utf-8")
-          lines = text.splitlines()
+          source = Path("app.py").read_text(encoding="utf-8")
+          tree = ast.parse(source)
 
-          try:
-              tree = ast.parse(text)
-          except SyntaxError as exc:
-              print(f"Unable to parse app.py: {exc}")
-              raise SystemExit(0)
-
-          matches = [
+          fed = next(
               node
               for node in tree.body
               if isinstance(node, ast.FunctionDef)
               and node.name == "fed"
-          ]
-
-          if len(matches) != 1:
-              print("fed() could not be uniquely located.")
-              raise SystemExit(0)
-
-          fed = matches[0]
-
-          needles = (
-              "Communication — Current vs Previous",
-              "communication_comparison",
-              "comparison_rows",
-              "Fed Synthesis",
           )
 
-          hits = []
+          fed_source = "\n".join(
+              source.splitlines()[fed.lineno - 1:fed.end_lineno]
+          )
 
-          for number in range(fed.lineno, fed.end_lineno + 1):
-              line = lines[number - 1]
+          checks = {
+              "Fed header":
+                  'st.header("Fed Intelligence")',
 
-              if any(needle in line for needle in needles):
-                  hits.append(number)
+              "Policy Pulse":
+                  'st.subheader("Policy Pulse")',
 
-          if not hits:
-              print(
-                  "No communication-comparison markers "
-                  "were found inside fed()."
+              "What Changed":
+                  'st.subheader("What Changed?")',
+
+              "FOMC Communication":
+                  'st.subheader("FOMC Communication")',
+
+              "SEP comparison":
+                  'st.subheader("SEP Pulse — Current vs Previous")',
+
+              "Communication comparison":
+                  'st.subheader("Communication — Current vs Previous")',
+
+              "Fed Synthesis":
+                  'st.subheader("Fed Synthesis")',
+
+              "Beige Book":
+                  'st.subheader("Beige Book Context")',
+
+              "Evidence Quality":
+                  'st.subheader("Fed Evidence Quality")',
+
+              "Dynamic communication cards":
+                  "signal = \"HAWKISH SHIFT\"",
+
+              "Raw comparison expander":
+                  '"Raw communication comparison"',
+          }
+
+          failed = []
+
+          for name, marker in checks.items():
+              if marker in fed_source:
+                  print(f"PASS: {name}")
+              else:
+                  print(f"FAIL: {name}")
+                  failed.append(name)
+
+          if failed:
+              raise SystemExit(
+                  "ERROR: presentation verification failed: "
+                  + ", ".join(failed)
               )
-              raise SystemExit(0)
 
-          start = max(fed.lineno, min(hits) - 15)
-          end = min(fed.end_lineno, max(hits) + 25)
-
-          print(f"Showing app.py lines {start}-{end}")
           print()
-
-          for number in range(start, end + 1):
-              print(f"{number:5}: {lines[number - 1]}")
+          print("PATCH 4 PRESENTATION VERIFICATION PASSED")
           PY
 
-      # ------------------------------------------------------------
-      # 11. Final repository safety check
-      # ------------------------------------------------------------
-      - name: Confirm diagnostic workflow changed nothing
-        if: always()
+      - name: Ensure scoring and governance were not modified
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
-          echo "=========================================="
-          echo "FINAL SAFETY CHECK"
-          echo "=========================================="
+          python - <<'PY'
+          from pathlib import Path
+          import difflib
 
-          echo
+          old = Path(
+              "app.py.pre_patch4_final"
+          ).read_text(
+              encoding="utf-8"
+          ).splitlines()
+
+          new = Path(
+              "app.py"
+          ).read_text(
+              encoding="utf-8"
+          ).splitlines()
+
+          diff = list(
+              difflib.unified_diff(
+                  old,
+                  new,
+                  fromfile="baseline/app.py",
+                  tofile="patched/app.py",
+                  lineterm="",
+              )
+          )
+
+          forbidden = [
+              "fed_score =",
+              "document_weights",
+              "document_score_eligibility",
+              "score_100",
+              "quality_gate",
+              "pit_status",
+          ]
+
+          changed_lines = [
+              line
+              for line in diff
+              if (
+                  line.startswith("+")
+                  or line.startswith("-")
+              )
+              and not line.startswith("+++")
+              and not line.startswith("---")
+          ]
+
+          violations = []
+
+          for line in changed_lines:
+              for token in forbidden:
+                  if token in line:
+                      violations.append(
+                          (token, line)
+                      )
+
+          if violations:
+              print(
+                  "ERROR: protected scoring/governance "
+                  "content changed:"
+              )
+              for token, line in violations:
+                  print(token, "=>", line)
+              raise SystemExit(1)
+
+          print(
+              "PASS: protected scoring/PIT/governance "
+              "logic was not modified."
+          )
+          PY
+
+      - name: Show changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+
           echo "----- Git status -----"
           git status --short
 
           echo
-          echo "----- Tracked diff -----"
-          git diff --stat
+          echo "----- Diff summary -----"
+          git diff --stat -- app.py
 
-          if [ -n "$(git diff --name-only)" ]; then
-            echo
-            echo "WARNING: tracked files differ from checkout."
-          else
-            echo
-            echo "PASS: diagnostic workflow modified no tracked files."
+          echo
+          echo "----- app.py diff -----"
+          git diff -- app.py
+
+      - name: Remove temporary backup
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -f app.py.pre_patch4_final
+
+      - name: Commit Patch 4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- app.py; then
+            echo "ERROR: app.py has no changes to commit."
+            exit 1
           fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add app.py
+
+          git commit \
+            -m "Patch 4: improve Fed Intelligence presentation"
+
+      - name: Push Patch 4
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git push origin HEAD:main
+
+          echo
+          echo "PATCH 4 COMPLETE"
