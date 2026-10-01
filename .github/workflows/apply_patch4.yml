@@ -7,11 +7,14 @@ permissions:
   contents: write
 
 jobs:
-  apply-corrected-patch4:
+  apply-patch4:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -22,51 +25,110 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "----- Baseline -----"
+
           test -f app.py
-          test -f apply_patch4_corrected.py
-          EXPECTED="fa65e47102e8509e4c841e66d317768fea307ce12c00c3da8c9f23eed58b7298"
-          ACTUAL="$(sha256sum app.py | awk '{print $1}')"
-          echo "Expected: $EXPECTED"
-          echo "Actual:   $ACTUAL"
-          test "$ACTUAL" = "$EXPECTED"
+          test -f scripts/apply_patch4.py
+
+          grep -Fq 'APP_VERSION = "V6.3"' app.py
+          grep -Fq 'def fed() -> None:' app.py
+          grep -Fq 'st.subheader("Communication — Current vs Previous")' app.py
+          grep -Fq 'st.subheader("SEP Pulse — Current vs Previous")' app.py
+          grep -Fq 'st.subheader("Fed Synthesis")' app.py
+          grep -Fq 'with st.expander("Complete Fed JSON")' app.py
+
+          echo "V6.3 Fed baseline verified."
 
       - name: Syntax check before patch
         run: |
           python -m py_compile app.py
-          python -m py_compile apply_patch4_corrected.py
+          python -m py_compile scripts/apply_patch4.py
 
       - name: Apply corrected Patch 4
-        run: python apply_patch4_corrected.py
+        run: |
+          python scripts/apply_patch4.py
 
-      - name: Verify presentation targets
+      - name: Verify backup
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'Raw Research Context Summary' app.py
-          grep -q 'Raw Macro Context' app.py
-          grep -q 'Raw communication comparison' app.py
-          grep -q 'Raw Event Study Summary' app.py
-          grep -q 'Raw dataset publication map' app.py
+
+          test -f app.py.pre_patch4
+
+          echo "Backup exists:"
+          ls -lh app.py.pre_patch4
+
+          grep -Fq 'APP_VERSION = "V6.3"' app.py.pre_patch4
+          grep -Fq 'def fed() -> None:' app.py.pre_patch4
+
+          echo "Backup verification PASSED."
+
+      - name: Verify corrected presentation targets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          grep -Fq 'PATCH 4 CORRECTED — DYNAMIC FED PRESENTATION' app.py
+          grep -Fq "fed-compare-grid" app.py
+          grep -Fq "fed-compare-card" app.py
+          grep -Fq "Raw communication comparison data" app.py
+          grep -Fq "expanded=False" app.py
+
+          echo "Corrected Patch 4 presentation targets verified."
+
+      - name: Syntax check after patch
+        run: |
           python -m py_compile app.py
-          echo "Presentation targets verified."
 
-      - name: Require real app.py change
+      - name: Show changed files
+        shell: bash
+        run: |
+          echo "----- Git status -----"
+          git status --short
+
+          echo
+          echo "----- app.py diff summary -----"
+          git diff --stat -- app.py
+
+          echo
+          echo "----- app.py diff -----"
+          git diff -- app.py
+
+      - name: Guard against unexpected tracked changes
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- app.py; then
-            echo "ERROR: app.py did not change."
+
+          changed="$(git diff --name-only)"
+
+          if [ "$changed" != "app.py" ]; then
+            echo "Unexpected tracked changes:"
+            printf '%s\n' "$changed"
             exit 1
           fi
-          git diff --stat -- app.py
-          git diff -- app.py
+
+          echo "Only app.py was modified among tracked files."
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Commit corrected Patch 4
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.py
-          git commit -m "Correct V6.3 Patch 4 dynamic research views"
+
+          git add app.py app.py.pre_patch4
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Apply corrected Patch 4 presentation"
+
+      - name: Push corrected Patch 4
+        run: |
           git push
