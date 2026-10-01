@@ -177,3 +177,1066 @@ jobs:
           if not interesting:
               print("  NONE")
           else:
+              for name in interesting:
+                  print(" ", name)
+          PY
+
+      - name: Inspect current published Decision state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "CURRENT PUBLISHED DECISION STATE"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import csv
+
+
+          ROOT = Path("public_data")
+
+
+          def show_json(filename):
+              path = ROOT / filename
+
+              print()
+              print(
+                  "----------------------------------------"
+              )
+              print(filename)
+              print(
+                  "----------------------------------------"
+              )
+
+              if not path.exists():
+                  print("FOUND: NO")
+                  return
+
+              print("FOUND: YES")
+
+              try:
+                  obj = json.loads(
+                      path.read_text(encoding="utf-8")
+                  )
+              except Exception as exc:
+                  print(
+                      "READ ERROR:",
+                      type(exc).__name__,
+                      str(exc),
+                  )
+                  return
+
+              if not isinstance(obj, dict):
+                  print(
+                      "TYPE:",
+                      type(obj).__name__,
+                  )
+                  return
+
+              keys = (
+                  "context_date",
+                  "as_of_date",
+                  "date",
+                  "decision_state",
+                  "state",
+                  "current_environment",
+                  "research_only",
+                  "point_in_time_safe",
+                  "core_point_in_time_safe",
+                  "overall_evidence_quality",
+                  "overall_evidence_pit_status",
+              )
+
+              for key in keys:
+                  if key in obj:
+                      print(
+                          f"{key}: {obj.get(key)}"
+                      )
+
+              changed = obj.get("what_changed")
+
+              if isinstance(changed, dict):
+                  print()
+                  print("what_changed:")
+                  for key, value in changed.items():
+                      print(
+                          f"  {key}: {value}"
+                      )
+
+
+          def show_csv(filename):
+              path = ROOT / filename
+
+              print()
+              print(
+                  "----------------------------------------"
+              )
+              print(filename)
+              print(
+                  "----------------------------------------"
+              )
+
+              if not path.exists():
+                  print("FOUND: NO")
+                  return
+
+              print("FOUND: YES")
+
+              try:
+                  with path.open(
+                      "r",
+                      encoding="utf-8-sig",
+                      newline="",
+                  ) as fh:
+                      rows = list(
+                          csv.DictReader(fh)
+                      )
+              except Exception as exc:
+                  print(
+                      "READ ERROR:",
+                      type(exc).__name__,
+                      str(exc),
+                  )
+                  return
+
+              print("ROWS:", len(rows))
+
+              if not rows:
+                  return
+
+              row = rows[-1]
+
+              keys = (
+                  "context_date",
+                  "asof_date",
+                  "as_of_date",
+                  "date",
+                  "state",
+                  "decision_state",
+                  "confidence",
+                  "point_in_time_safe",
+                  "core_point_in_time_safe",
+                  "overall_evidence_quality",
+                  "overall_evidence_pit_status",
+                  "overall_evidence_coverage_pct",
+              )
+
+              for key in keys:
+                  if key in row:
+                      print(
+                          f"{key}: {row.get(key)}"
+                      )
+
+
+          show_csv(
+              "decision_engine_research_summary_v1.csv"
+          )
+
+          show_csv(
+              "decision_engine_research_v1.csv"
+          )
+
+          show_json(
+              "decision_engine_research_v1.json"
+          )
+
+          show_json(
+              "decision_intelligence_v2.json"
+          )
+          PY
+
+      - name: Inspect What Changed payload deeply
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "WHAT CHANGED PAYLOAD"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          path = Path(
+              "public_data/decision_intelligence_v2.json"
+          )
+
+          if not path.exists():
+              print(
+                  "decision_intelligence_v2.json "
+                  "not found"
+              )
+              raise SystemExit(0)
+
+          try:
+              obj = json.loads(
+                  path.read_text(encoding="utf-8")
+              )
+          except Exception as exc:
+              print(
+                  "Could not read Decision "
+                  "Intelligence JSON:",
+                  type(exc).__name__,
+                  str(exc),
+              )
+              raise SystemExit(0)
+
+          if not isinstance(obj, dict):
+              print(
+                  "Decision Intelligence root "
+                  "is not an object."
+              )
+              raise SystemExit(0)
+
+          print(
+              "context_date:",
+              obj.get("context_date", "—"),
+          )
+
+          print(
+              "decision_state:",
+              obj.get(
+                  "decision_state",
+                  obj.get("state", "—"),
+              ),
+          )
+
+          changed = obj.get("what_changed")
+
+          print()
+          print(
+              "what_changed type:",
+              type(changed).__name__,
+          )
+
+          if isinstance(changed, dict):
+              print(
+                  json.dumps(
+                      changed,
+                      indent=2,
+                      ensure_ascii=False,
+                      default=str,
+                  )
+              )
+          else:
+              print(
+                  repr(changed)
+              )
+          PY
+
+      - name: Search repository for canonical snapshot logic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "CANONICAL SNAPSHOT LOGIC"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+
+          SKIP = {
+              ".git",
+              ".venv",
+              "venv",
+              "__pycache__",
+              "node_modules",
+          }
+
+          terms = (
+              "prior canonical",
+              "previous canonical",
+              "canonical snapshot",
+              "what_changed",
+              "what changed",
+              "prior snapshot",
+              "previous snapshot",
+              "decision_intelligence_v2",
+          )
+
+          matches = []
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+
+              if any(
+                  part in SKIP
+                  for part in path.parts
+              ):
+                  continue
+
+              if path.suffix.lower() not in {
+                  ".py",
+                  ".json",
+                  ".yml",
+                  ".yaml",
+                  ".md",
+                  ".txt",
+              }:
+                  continue
+
+              try:
+                  text = path.read_text(
+                      encoding="utf-8",
+                      errors="ignore",
+                  )
+              except OSError:
+                  continue
+
+              lower = text.lower()
+
+              hit_terms = [
+                  term
+                  for term in terms
+                  if term in lower
+              ]
+
+              if hit_terms:
+                  matches.append(
+                      (
+                          str(path),
+                          hit_terms,
+                          text,
+                      )
+                  )
+
+          print(
+              "FILES WITH RELEVANT LOGIC:",
+              len(matches),
+          )
+
+          for filename, hit_terms, text in matches:
+              print()
+              print(
+                  "----------------------------------------"
+              )
+              print("FILE:", filename)
+              print(
+                  "MATCHES:",
+                  ", ".join(hit_terms),
+              )
+
+              lines = text.splitlines()
+
+              shown = set()
+
+              for index, line in enumerate(
+                  lines,
+                  start=1,
+              ):
+                  line_lower = line.lower()
+
+                  if not any(
+                      term in line_lower
+                      for term in terms
+                  ):
+                      continue
+
+                  start = max(
+                      1,
+                      index - 3,
+                  )
+                  end = min(
+                      len(lines),
+                      index + 3,
+                  )
+
+                  key = (start, end)
+
+                  if key in shown:
+                      continue
+
+                  shown.add(key)
+
+                  print(
+                      f"\nLines {start}-{end}:"
+                  )
+
+                  for number in range(
+                      start,
+                      end + 1,
+                  ):
+                      print(
+                          f"{number:5}: "
+                          f"{lines[number - 1]}"
+                      )
+          PY
+
+      - name: Search published data for historical Decision states
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "HISTORICAL DECISION STATE SEARCH"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import csv
+
+
+          root = Path("public_data")
+
+          records = []
+
+
+          def add_record(
+              path,
+              location,
+              state,
+              date,
+          ):
+              if state in (
+                  None,
+                  "",
+              ):
+                  return
+
+              records.append(
+                  {
+                      "file": str(path),
+                      "location": location,
+                      "date": date,
+                      "state": state,
+                  }
+              )
+
+
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+
+              name = path.name.lower()
+
+              if not any(
+                  token in name
+                  for token in (
+                      "decision",
+                      "snapshot",
+                      "history",
+                      "context",
+                  )
+              ):
+                  continue
+
+              if path.suffix.lower() == ".csv":
+                  try:
+                      with path.open(
+                          "r",
+                          encoding="utf-8-sig",
+                          newline="",
+                      ) as fh:
+                          reader = csv.DictReader(
+                              fh
+                          )
+
+                          for index, row in enumerate(
+                              reader,
+                              start=1,
+                          ):
+                              state = (
+                                  row.get("decision_state")
+                                  or row.get("state")
+                              )
+
+                              date = (
+                                  row.get("context_date")
+                                  or row.get("as_of_date")
+                                  or row.get("asof_date")
+                                  or row.get("date")
+                              )
+
+                              add_record(
+                                  path,
+                                  f"row {index}",
+                                  state,
+                                  date,
+                              )
+
+                  except Exception as exc:
+                      print(
+                          "CSV READ WARNING:",
+                          path,
+                          type(exc).__name__,
+                          str(exc),
+                      )
+
+              elif path.suffix.lower() == ".json":
+                  try:
+                      obj = json.loads(
+                          path.read_text(
+                              encoding="utf-8"
+                          )
+                      )
+                  except Exception as exc:
+                      print(
+                          "JSON READ WARNING:",
+                          path,
+                          type(exc).__name__,
+                          str(exc),
+                      )
+                      continue
+
+                  def walk(
+                      value,
+                      location="$",
+                  ):
+                      if isinstance(value, dict):
+                          state = (
+                              value.get(
+                                  "decision_state"
+                              )
+                              or value.get("state")
+                          )
+
+                          date = (
+                              value.get(
+                                  "context_date"
+                              )
+                              or value.get(
+                                  "as_of_date"
+                              )
+                              or value.get("date")
+                          )
+
+                          if state is not None:
+                              add_record(
+                                  path,
+                                  location,
+                                  state,
+                                  date,
+                              )
+
+                          for key, child in value.items():
+                              walk(
+                                  child,
+                                  f"{location}.{key}",
+                              )
+
+                      elif isinstance(value, list):
+                          for index, child in enumerate(
+                              value
+                          ):
+                              walk(
+                                  child,
+                                  f"{location}[{index}]",
+                              )
+
+                  walk(obj)
+
+
+          print(
+              "STATE RECORDS FOUND:",
+              len(records),
+          )
+
+          if not records:
+              print(
+                  "No historical Decision state "
+                  "records detected in published data."
+              )
+              raise SystemExit(0)
+
+          print()
+
+          for record in records:
+              print(
+                  f"{record['date'] or '—'}"
+                  f" | {record['state']}"
+                  f" | {record['file']}"
+                  f" | {record['location']}"
+              )
+
+          print()
+          print(
+              "----- MIXED records -----"
+          )
+
+          mixed = [
+              record
+              for record in records
+              if str(
+                  record["state"]
+              ).strip().upper() == "MIXED"
+          ]
+
+          if not mixed:
+              print(
+                  "NO MIXED RECORD FOUND"
+              )
+          else:
+              for record in mixed:
+                  print(
+                      f"{record['date'] or '—'}"
+                      f" | {record['file']}"
+                      f" | {record['location']}"
+                  )
+
+          print()
+          print(
+              "----- SUPPORTIVE records -----"
+          )
+
+          supportive = [
+              record
+              for record in records
+              if str(
+                  record["state"]
+              ).strip().upper()
+                  == "SUPPORTIVE"
+          ]
+
+          if not supportive:
+              print(
+                  "NO SUPPORTIVE RECORD FOUND"
+              )
+          else:
+              for record in supportive:
+                  print(
+                      f"{record['date'] or '—'}"
+                      f" | {record['file']}"
+                      f" | {record['location']}"
+                  )
+          PY
+
+      - name: Inspect git history for Decision state changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "GIT HISTORY - DECISION ARTIFACTS"
+          echo "========================================"
+
+          FILES=(
+            "public_data/decision_engine_research_summary_v1.csv"
+            "public_data/decision_engine_research_v1.csv"
+            "public_data/decision_engine_research_v1.json"
+            "public_data/decision_intelligence_v2.json"
+          )
+
+          for file in "${FILES[@]}"; do
+            echo
+            echo "----------------------------------------"
+            echo "$file"
+            echo "----------------------------------------"
+
+            if git log \
+              --oneline \
+              --all \
+              -- "$file" \
+              | head -20 \
+              | grep -q .; then
+
+              git log \
+                --oneline \
+                --all \
+                -- "$file" \
+                | head -20
+            else
+              echo \
+                "No git history detected for this path."
+            fi
+          done
+
+      - name: Recover recent historical Decision values from git
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "RECENT HISTORICAL VALUES FROM GIT"
+          echo "READ ONLY"
+          echo "========================================"
+
+          python - <<'PY'
+          import subprocess
+          import json
+          import csv
+          import io
+
+
+          files = (
+              "public_data/"
+              "decision_engine_research_summary_v1.csv",
+
+              "public_data/"
+              "decision_engine_research_v1.csv",
+
+              "public_data/"
+              "decision_engine_research_v1.json",
+
+              "public_data/"
+              "decision_intelligence_v2.json",
+          )
+
+
+          def run(*args):
+              result = subprocess.run(
+                  args,
+                  text=True,
+                  capture_output=True,
+              )
+
+              if result.returncode != 0:
+                  return None
+
+              return result.stdout
+
+
+          for filename in files:
+              print()
+              print(
+                  "----------------------------------------"
+              )
+              print(filename)
+              print(
+                  "----------------------------------------"
+              )
+
+              history = run(
+                  "git",
+                  "log",
+                  "--format=%H|%cI|%s",
+                  "-12",
+                  "--",
+                  filename,
+              )
+
+              if not history:
+                  print(
+                      "No git history."
+                  )
+                  continue
+
+              for entry in history.splitlines():
+                  parts = entry.split(
+                      "|",
+                      2,
+                  )
+
+                  if len(parts) != 3:
+                      continue
+
+                  commit, when, subject = parts
+
+                  content = run(
+                      "git",
+                      "show",
+                      f"{commit}:{filename}",
+                  )
+
+                  if content is None:
+                      continue
+
+                  state = None
+                  date = None
+                  changed_status = None
+                  changed_reason = None
+
+                  try:
+                      if filename.endswith(
+                          ".json"
+                      ):
+                          obj = json.loads(
+                              content
+                          )
+
+                          if isinstance(
+                              obj,
+                              dict,
+                          ):
+                              state = (
+                                  obj.get(
+                                      "decision_state"
+                                  )
+                                  or obj.get(
+                                      "state"
+                                  )
+                              )
+
+                              date = (
+                                  obj.get(
+                                      "context_date"
+                                  )
+                                  or obj.get(
+                                      "as_of_date"
+                                  )
+                                  or obj.get(
+                                      "date"
+                                  )
+                              )
+
+                              changed = obj.get(
+                                  "what_changed"
+                              )
+
+                              if isinstance(
+                                  changed,
+                                  dict,
+                              ):
+                                  changed_status = (
+                                      changed.get(
+                                          "status"
+                                      )
+                                  )
+                                  changed_reason = (
+                                      changed.get(
+                                          "reason"
+                                      )
+                                  )
+
+                      elif filename.endswith(
+                          ".csv"
+                      ):
+                          rows = list(
+                              csv.DictReader(
+                                  io.StringIO(
+                                      content
+                                  )
+                              )
+                          )
+
+                          if rows:
+                              row = rows[-1]
+
+                              state = (
+                                  row.get(
+                                      "decision_state"
+                                  )
+                                  or row.get(
+                                      "state"
+                                  )
+                              )
+
+                              date = (
+                                  row.get(
+                                      "context_date"
+                                  )
+                                  or row.get(
+                                      "as_of_date"
+                                  )
+                                  or row.get(
+                                      "asof_date"
+                                  )
+                                  or row.get(
+                                      "date"
+                                  )
+                              )
+
+                  except Exception as exc:
+                      print(
+                          commit[:8],
+                          "PARSE ERROR",
+                          type(exc).__name__,
+                          str(exc),
+                      )
+                      continue
+
+                  print(
+                      f"{commit[:8]}"
+                      f" | {when}"
+                      f" | context={date or '—'}"
+                      f" | state={state or '—'}"
+                      f" | what_changed="
+                      f"{changed_status or '—'}"
+                      f" | {subject}"
+                  )
+
+                  if changed_reason:
+                      print(
+                          "    reason:",
+                          changed_reason,
+                      )
+          PY
+
+      - name: Check whether current artifacts are single snapshots or histories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "SNAPSHOT SHAPE DIAGNOSTIC"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import csv
+
+
+          root = Path("public_data")
+
+          files = (
+              "decision_engine_research_summary_v1.csv",
+              "decision_engine_research_v1.csv",
+              "decision_engine_research_v1.json",
+              "decision_intelligence_v2.json",
+          )
+
+
+          for filename in files:
+              path = root / filename
+
+              print()
+              print(filename)
+
+              if not path.exists():
+                  print("  MISSING")
+                  continue
+
+              if path.suffix.lower() == ".csv":
+                  try:
+                      with path.open(
+                          "r",
+                          encoding="utf-8-sig",
+                          newline="",
+                      ) as fh:
+                          rows = list(
+                              csv.DictReader(fh)
+                          )
+
+                      print(
+                          "  shape: CSV"
+                      )
+                      print(
+                          "  rows:",
+                          len(rows),
+                      )
+
+                      if len(rows) <= 1:
+                          print(
+                              "  interpretation: "
+                              "single/current snapshot candidate"
+                          )
+                      else:
+                          print(
+                              "  interpretation: "
+                              "multi-row artifact; "
+                              "may contain history"
+                          )
+
+                  except Exception as exc:
+                      print(
+                          "  ERROR:",
+                          type(exc).__name__,
+                          str(exc),
+                      )
+
+              elif path.suffix.lower() == ".json":
+                  try:
+                      obj = json.loads(
+                          path.read_text(
+                              encoding="utf-8"
+                          )
+                      )
+
+                      print(
+                          "  root type:",
+                          type(obj).__name__,
+                      )
+
+                      if isinstance(
+                          obj,
+                          dict,
+                      ):
+                          history_keys = [
+                              key
+                              for key, value
+                              in obj.items()
+                              if isinstance(
+                                  value,
+                                  list,
+                              )
+                              and any(
+                                  token
+                                  in key.lower()
+                                  for token in (
+                                      "history",
+                                      "snapshot",
+                                      "previous",
+                                  )
+                              )
+                          ]
+
+                          print(
+                              "  history-like keys:",
+                              history_keys
+                              or "NONE",
+                          )
+
+                  except Exception as exc:
+                      print(
+                          "  ERROR:",
+                          type(exc).__name__,
+                          str(exc),
+                      )
+          PY
+
+      - name: Final read-only integrity check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "READ-ONLY INTEGRITY CHECK"
+          echo "========================================"
+
+          echo "----- Git status -----"
+          git status --short
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo \
+              "FAIL: diagnostic workflow modified the working tree."
+            git diff
+            exit 1
+          fi
+
+          echo \
+            "PASS: diagnostic workflow made no repository changes."
+
+      - name: Diagnostic summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DIAGNOSTIC COLLECTION COMPLETE"
+          echo "========================================"
+          echo \
+            "No application files were modified."
+          echo \
+            "No public_data files were modified."
+          echo \
+            "No scoring was executed or changed."
+          echo \
+            "No PIT policy was changed."
+          echo \
+            "No governance rule was changed."
+          echo \
+            "No commit or push was performed."
+          echo
+          echo \
+            "Review these sections in the log:"
+          echo \
+            "1. CURRENT PUBLISHED DECISION STATE"
+          echo \
+            "2. WHAT CHANGED PAYLOAD"
+          echo \
+            "3. CANONICAL SNAPSHOT LOGIC"
+          echo \
+            "4. HISTORICAL DECISION STATE SEARCH"
+          echo \
+            "5. RECENT HISTORICAL VALUES FROM GIT"
+          echo \
+            "6. SNAPSHOT SHAPE DIAGNOSTIC"
+          echo "========================================"
