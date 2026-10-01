@@ -1,0 +1,413 @@
+name: Diagnose Decision Pipeline Call Chain
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-decision-pipeline:
+    name: Read-Only Decision Pipeline Diagnostic
+    runs-on: ubuntu-latest
+
+    steps:
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ============================================================
+      # 2. REPOSITORY BASELINE
+      # ============================================================
+      - name: Repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "REPOSITORY BASELINE"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          echo "Branch:"
+          git branch --show-current || true
+
+          echo
+          echo "HEAD:"
+          git rev-parse HEAD
+
+          echo
+          echo "Status:"
+          git status --short
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 3. SHOW DECISION PIPELINE CALL CHAIN
+      # ============================================================
+      - name: Show Decision pipeline call chain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION PIPELINE CALL CHAIN"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          FILE=".github/workflows/autonomous-intelligence-pipeline-v1.yml"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: $FILE not found"
+            exit 1
+          fi
+
+          echo "Workflow:"
+          echo "$FILE"
+          echo
+
+          echo "----------------------------------------"
+          echo "LINES 700-775"
+          echo "----------------------------------------"
+
+          sed -n '700,775p' "$FILE" | nl -ba -v700
+
+          echo
+          echo "----------------------------------------"
+          echo "DECISION-RELATED COMMANDS"
+          echo "----------------------------------------"
+
+          grep -nEi \
+            'decision_engine|decision_intelligence|decision.*research|snapshot|publish|manifest' \
+            "$FILE" || true
+
+          echo
+          echo "========================================"
+          echo "CALL CHAIN DIAGNOSTIC COMPLETE"
+          echo "NO FILES MODIFIED"
+          echo "========================================"
+
+      # ============================================================
+      # 4. LOCATE DECISION ENGINE INVOCATIONS
+      # ============================================================
+      - name: Find Decision Engine invocations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION ENGINE INVOCATIONS"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          grep -RniE \
+            --exclude-dir=.git \
+            --exclude='*.pyc' \
+            'python[[:space:]]+.*decision.*engine|decision_engine_research|decision_intelligence_v2\.py' \
+            .github scripts *.py 2>/dev/null || true
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 5. INSPECT DECISION INTELLIGENCE INVOCATION CONTEXT
+      # ============================================================
+      - name: Inspect Decision Intelligence invocation context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE INVOCATION CONTEXT"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          FILE=".github/workflows/autonomous-intelligence-pipeline-v1.yml"
+
+          LINE="$(grep -n 'python decision_intelligence_v2.py' "$FILE" \
+            | head -1 \
+            | cut -d: -f1 || true)"
+
+          if [ -z "$LINE" ]; then
+            echo "decision_intelligence_v2.py invocation not found."
+            exit 0
+          fi
+
+          echo "Invocation line: $LINE"
+          echo
+
+          START=$((LINE - 40))
+          END=$((LINE + 20))
+
+          if [ "$START" -lt 1 ]; then
+            START=1
+          fi
+
+          echo "Showing workflow lines $START-$END"
+          echo "----------------------------------------"
+
+          sed -n "${START},${END}p" "$FILE" \
+            | nl -ba -v"$START"
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 6. INSPECT DECISION INTELLIGENCE PRODUCER
+      # ============================================================
+      - name: Inspect Decision Intelligence producer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE PRODUCER"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          FILE="decision_intelligence_v2.py"
+
+          if [ ! -f "$FILE" ]; then
+            echo "ERROR: $FILE not found"
+            exit 1
+          fi
+
+          echo "File:"
+          echo "$FILE"
+          echo
+
+          echo "----------------------------------------"
+          echo "FULL FILE WITH LINE NUMBERS"
+          echo "----------------------------------------"
+
+          nl -ba "$FILE"
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 7. INSPECT CURRENT CANONICAL DECISION ARTIFACTS
+      # ============================================================
+      - name: Inspect current canonical Decision artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "CURRENT CANONICAL DECISION ARTIFACTS"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          FILES=(
+            "public_data/decision_engine_research_summary_v1.csv"
+            "public_data/decision_engine_research_v1.csv"
+            "public_data/decision_engine_research_v1.json"
+            "public_data/decision_intelligence_v2.json"
+            "public_data/decision_intelligence_summary_v2.csv"
+          )
+
+          for FILE in "${FILES[@]}"; do
+            echo
+            echo "----------------------------------------"
+            echo "$FILE"
+            echo "----------------------------------------"
+
+            if [ -f "$FILE" ]; then
+              echo "STATUS: PRESENT"
+              echo "SIZE: $(wc -c < "$FILE") bytes"
+
+              case "$FILE" in
+                *.json)
+                  python - "$FILE" <<'PY'
+          import json
+          import sys
+
+          path = sys.argv[1]
+
+          try:
+              with open(path, "r", encoding="utf-8") as f:
+                  obj = json.load(f)
+
+              if isinstance(obj, dict):
+                  keys = [
+                      "context_date",
+                      "decision_state",
+                      "state",
+                      "what_changed",
+                      "current_environment",
+                  ]
+
+                  for key in keys:
+                      if key in obj:
+                          print(f"{key}: {obj[key]}")
+              else:
+                  print(f"JSON root type: {type(obj).__name__}")
+
+          except Exception as exc:
+              print(f"Could not inspect JSON: {exc}")
+          PY
+                  ;;
+
+                *.csv)
+                  python - "$FILE" <<'PY'
+          import sys
+          import pandas as pd
+
+          path = sys.argv[1]
+
+          try:
+              df = pd.read_csv(path)
+
+              print("columns:", list(df.columns))
+              print("rows:", len(df))
+
+              if len(df):
+                  row = df.iloc[0]
+
+                  for key in [
+                      "context_date",
+                      "decision_state",
+                      "state",
+                      "what_changed",
+                  ]:
+                      if key in df.columns:
+                          print(f"{key}: {row[key]}")
+
+          except Exception as exc:
+              print(f"Could not inspect CSV: {exc}")
+          PY
+                  ;;
+              esac
+            else
+              echo "STATUS: MISSING"
+            fi
+          done
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 8. FIND SNAPSHOT / HISTORY LOGIC
+      # ============================================================
+      - name: Find snapshot and history logic
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "SNAPSHOT / HISTORY LOGIC"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          grep -RniE \
+            --exclude-dir=.git \
+            --exclude='*.pyc' \
+            --exclude='manifest.json' \
+            'prior canonical|previous canonical|canonical snapshot|snapshot|what_changed|what changed|decision history|historical decision' \
+            . 2>/dev/null || true
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 9. SHOW RECENT DECISION ARTIFACT HISTORY
+      # ============================================================
+      - name: Show recent Decision artifact git history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "RECENT DECISION ARTIFACT HISTORY"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          FILES=(
+            "public_data/decision_engine_research_summary_v1.csv"
+            "public_data/decision_engine_research_v1.csv"
+            "public_data/decision_engine_research_v1.json"
+            "public_data/decision_intelligence_v2.json"
+          )
+
+          for FILE in "${FILES[@]}"; do
+            echo
+            echo "----------------------------------------"
+            echo "$FILE"
+            echo "----------------------------------------"
+
+            git log \
+              --date=iso \
+              --format='%h | %ad | %s' \
+              -8 \
+              -- "$FILE" || true
+          done
+
+          echo
+          echo "========================================"
+
+      # ============================================================
+      # 10. VERIFY READ-ONLY CONTRACT
+      # ============================================================
+      - name: Verify workflow remained read only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "READ-ONLY VERIFICATION"
+          echo "========================================"
+          echo
+
+          STATUS="$(git status --porcelain)"
+
+          if [ -n "$STATUS" ]; then
+            echo "ERROR: Diagnostic workflow changed repository files."
+            echo
+            echo "$STATUS"
+            exit 1
+          fi
+
+          echo "PASS: repository working tree remains unchanged."
+          echo "PASS: no Decision artifacts were generated."
+          echo "PASS: no publication files were modified."
+          echo "PASS: no manifest was rebuilt."
+          echo
+          echo "READ-ONLY DIAGNOSTIC PASSED"
+          echo "========================================"
+
+      # ============================================================
+      # 11. SUMMARY
+      # ============================================================
+      - name: Diagnostic summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DIAGNOSTIC COMPLETE"
+          echo "========================================"
+          echo
+          echo "This workflow:"
+          echo "  - inspected the master pipeline ordering"
+          echo "  - located Decision Engine invocations"
+          echo "  - inspected Decision Intelligence V2"
+          echo "  - inspected current canonical artifacts"
+          echo "  - searched for snapshot/history logic"
+          echo "  - inspected recent artifact history"
+          echo "  - modified nothing"
+          echo
+          echo "SAFE TO REVIEW RESULTS"
+          echo "========================================"
