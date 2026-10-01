@@ -714,14 +714,14 @@ def economic() -> None:
         "Growth": {"score": safe_value(row, ["growth_score"], None), "indicators": safe_value(row, ["growth_indicators"], "—"), "age": safe_value(row, ["growth_age_days"], None)},
     }
 
-    def _direction(value: Any) -> str:
+    def _direction(value: Any) -> tuple[str, str]:
         if not isinstance(value, (int, float)):
-            return "Unavailable"
+            return "—", "Unavailable"
         if value >= 0.15:
-            return "Positive directional pressure"
+            return "↑", "Positive directional pressure"
         if value <= -0.15:
-            return "Negative directional pressure"
-        return "Near neutral"
+            return "↓", "Negative directional pressure"
+        return "→", "Near neutral"
 
     def _latest_release(indicator: str) -> Optional[pd.Series]:
         if not isinstance(surprise_df, pd.DataFrame) or surprise_df.empty or "indicator" not in surprise_df.columns:
@@ -750,8 +750,9 @@ def economic() -> None:
     st.subheader("Economic Pulse")
     headline_parts = []
     for name, data in dims.items():
+        arrow, _ = _direction(data["score"])
         score_text = f"{data['score']:+.2f}" if isinstance(data["score"], (int, float)) else "—"
-        headline_parts.append(f"{name} {score_text}")
+        headline_parts.append(f"{name} {arrow} {score_text}")
     st.markdown(
         f"<div class='econ-pulse'><div class='label'>CURRENT ECONOMIC REGIME</div>"
         f"<div class='econ-regime'>{fmt(regime)}</div>"
@@ -783,11 +784,12 @@ def economic() -> None:
                 previous = release.get("previous")
             delta = release.get("release_delta")
             shock = release.get("directional_release_shock")
+            arrow = "▲" if isinstance(shock, (int, float)) and not pd.isna(shock) and shock > 0 else "▼" if isinstance(shock, (int, float)) and not pd.isna(shock) and shock < 0 else "→"
             delta_text = f"{delta:+.1f}" if isinstance(delta, (int, float)) and not pd.isna(delta) else "—"
             with col:
                 st.markdown(
                     f"<div class='signal-card'><div class='signal-title'>{indicator.replace('_', ' ')}</div>"
-                    f"<div class='signal-main'>{fmt(previous, 1)} to {fmt(actual, 1)} &nbsp; Δ {delta_text}</div>"
+                    f"<div class='signal-main'>{fmt(previous, 1)} → {fmt(actual, 1)} &nbsp; {arrow} {delta_text}</div>"
                     f"<div class='signal-why'>{_release_interpretation(indicator, shock)}<br>"
                     f"{fmt(release.get('release_date'))} · {fmt(release.get('zscore_class'))}</div></div>",
                     unsafe_allow_html=True,
@@ -858,14 +860,14 @@ def economic() -> None:
     st.subheader("Dimension Pulse")
     cols = st.columns(3)
     for col, (name, data) in zip(cols, dims.items()):
-        direction = _direction(data["score"])
+        arrow, direction = _direction(data["score"])
         score_text = f"{data['score']:+.2f}" if isinstance(data["score"], (int, float)) else "—"
         age_text = f"{int(data['age'])} days" if isinstance(data["age"], (int, float)) else "Unavailable"
         indicators = str(data["indicators"]).replace("|", " · ")
         with col:
             st.markdown(
                 f"<div class='econ-dim'><div class='label'>{name.upper()}</div>"
-                f"<div class='score'>{score_text}</div>"
+                f"<div class='score'>{arrow} {score_text}</div>"
                 f"<div class='small'>{direction}<br>{indicators}<br>Freshness: {age_text}</div></div>",
                 unsafe_allow_html=True,
             )
@@ -996,6 +998,7 @@ def fed() -> None:
             delta = detail.get("change")
             prev = detail.get("previous")
             cur = detail.get("current")
+            arrow = "▲" if delta > 0 else "▼" if delta < 0 else "→"
             if key == "unemployment":
                 implication = "Hawkish" if delta < 0 else "Dovish" if delta > 0 else "Neutral"
                 why = explanations[key][1] if delta < 0 else explanations[key][0]
@@ -1005,7 +1008,7 @@ def fed() -> None:
             with col:
                 st.markdown(
                     f"<div class='signal-card'><div class='signal-title'>{label}</div>"
-                    f"<div class='signal-main'>{fmt(prev,1)} to {fmt(cur,1)} &nbsp; Δ {delta:+.1f}</div>"
+                    f"<div class='signal-main'>{fmt(prev,1)} → {fmt(cur,1)} &nbsp; {arrow} {delta:+.1f}</div>"
                     f"<div class='signal-why'><b>{implication.upper()}</b> · {why}</div></div>",
                     unsafe_allow_html=True,
                 )
@@ -1059,12 +1062,8 @@ def fed() -> None:
     timeline_bits = []
     for label, _, payload, _ in communication:
         payload = payload if isinstance(payload, dict) else {}
-        status = "AVAILABLE" if payload.get("available") else "PENDING"
-        timeline_bits.append(f"{label} · {status}")
-    st.markdown(
-        f"<div class='timeline'>{' &nbsp; · &nbsp; '.join(timeline_bits)}</div>",
-        unsafe_allow_html=True,
-    )
+        timeline_bits.append(f"{label} {'✓' if payload.get('available') else '⏳'}")
+    st.markdown(f"<div class='timeline'>{' &nbsp; ─── &nbsp; '.join(timeline_bits)}</div>", unsafe_allow_html=True)
     for label, key, payload, url in communication:
         payload = payload if isinstance(payload, dict) else {}
         available = bool(payload.get("available"))
@@ -1098,10 +1097,11 @@ def fed() -> None:
         cur = detail.get("current", current.get(key))
         prev = detail.get("previous", previous.get(key))
         delta = detail.get("change")
+        arrow = "▲" if isinstance(delta, (int, float)) and delta > 0 else "▼" if isinstance(delta, (int, float)) and delta < 0 else "→"
         delta_text = f"{delta:+.1f}" if isinstance(delta, (int, float)) else "—"
         st.markdown(
             f"<div class='pulse'><span class='pulse-name'>{label}</span>"
-            f"<span class='pulse-value'>{fmt(prev,1)} to {fmt(cur,1)}</span>"
+            f"<span class='pulse-value'>{fmt(prev,1)} → {fmt(cur,1)} &nbsp; {arrow}</span>"
             f"<span class='pulse-note'>Δ {delta_text}</span></div>",
             unsafe_allow_html=True,
         )
@@ -1865,7 +1865,7 @@ with st.sidebar:
     st.caption(f"Manifest datasets: {get_manifest().get('dataset_count', '—')}")
 
 st.markdown(
-    f'<div class="hero"><h1>US500 Macro Intelligence — Research Terminal {APP_VERSION}</h1>'
+    '<div class="hero"><h1>US500 Macro Intelligence — Research Terminal V6.2</h1>'
     '<p>Published research artifacts • point-in-time fields • transparent evidence</p>'
     '<span class="badge">RESEARCH ONLY</span>'
     '<span class="badge">TOKEN FREE</span>'
