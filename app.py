@@ -1145,23 +1145,98 @@ def fed() -> None:
     # --- Communication current vs previous -----------------------------
     comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
     st.subheader("Communication — Current vs Previous")
+
     comparison_rows = []
-    for key, label in (("statement", "FOMC Statement"), ("minutes", "FOMC Minutes"), ("chair_press", "Press Conference")):
+
+    for key, label in (
+        ("statement", "FOMC Statement"),
+        ("minutes", "FOMC Minutes"),
+        ("chair_press", "Press Conference"),
+    ):
         item = comparison.get(key) if isinstance(comparison.get(key), dict) else {}
         comp = item.get("comparison") if isinstance(item.get("comparison"), dict) else {}
         previous_doc = item.get("previous") if isinstance(item.get("previous"), dict) else {}
-        current_doc = obj.get("chair_press" if key == "chair_press" else key)
+
+        current_doc = obj.get(
+            "chair_press" if key == "chair_press" else key
+        )
         current_doc = current_doc if isinstance(current_doc, dict) else {}
+
+        current_tone = current_doc.get("tone", "UNAVAILABLE")
+        previous_tone = previous_doc.get("tone", "UNAVAILABLE")
+        change = comp.get("classification", "UNAVAILABLE")
+
+        current_date = item.get("current_date")
+        previous_date = item.get("previous_date")
+
         comparison_rows.append({
-            "Report": label, "Current": item.get("current_date"), "Previous": item.get("previous_date"),
-            "Current tone": current_doc.get("tone", "UNAVAILABLE"), "Previous tone": previous_doc.get("tone", "UNAVAILABLE"),
-            "Change": comp.get("classification", "UNAVAILABLE"),
+            "Report": label,
+            "Current": current_date,
+            "Previous": previous_date,
+            "Current tone": current_tone,
+            "Previous tone": previous_tone,
+            "Change": change,
         })
+
+        change_text = str(change or "UNAVAILABLE")
+        change_upper = change_text.upper()
+
+        if any(
+            token in change_upper
+            for token in (
+                "HAWK",
+                "TIGHT",
+                "HIGHER",
+                "FIRM",
+            )
+        ):
+            signal = "HAWKISH SHIFT"
+        elif any(
+            token in change_upper
+            for token in (
+                "DOV",
+                "EAS",
+                "LOWER",
+                "SOFT",
+            )
+        ):
+            signal = "DOVISH SHIFT"
+        elif change_upper in (
+            "UNAVAILABLE",
+            "PENDING",
+            "NONE",
+            "",
+        ):
+            signal = "NOT AVAILABLE"
+        else:
+            signal = "LIMITED / NEUTRAL SHIFT"
+
+        st.markdown(
+            f"<div class='signal-card'>"
+            f"<div class='signal-title'>{label}</div>"
+            f"<div class='signal-main'>"
+            f"{fmt(previous_tone)} → {fmt(current_tone)}"
+            f"</div>"
+            f"<div class='signal-why'>"
+            f"<b>{signal}</b> · "
+            f"{fmt(previous_date)} → {fmt(current_date)}"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     comparison_df = pd.DataFrame(comparison_rows)
-    research_panels(comparison_df, max_rows=3, max_fields=6)
-    with st.expander("Raw communication comparison", expanded=False):
+
+    with st.expander(
+        "Raw communication comparison",
+        expanded=False,
+    ):
         table(comparison_df, 260)
-    st.caption("Unavailable or not-yet-published reports remain unavailable; they are never converted into neutral evidence.")
+
+    st.caption(
+        "Unavailable or not-yet-published reports remain unavailable; "
+        "they are never converted into neutral evidence."
+    )
 
     # --- Synthesis ------------------------------------------------------
     combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
