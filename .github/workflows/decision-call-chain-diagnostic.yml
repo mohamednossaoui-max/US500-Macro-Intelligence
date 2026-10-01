@@ -1,0 +1,496 @@
+name: Decision Call Chain Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Read-Only Decision Pipeline Diagnostic
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION CALL CHAIN DIAGNOSTIC"
+          echo "READ ONLY"
+          echo "========================================"
+          echo
+
+          echo "----- HEAD -----"
+          git log -1 --oneline
+          echo
+
+          echo "----- Git status -----"
+          git status --short
+          echo
+
+          echo "----- Relevant top-level files -----"
+          find . -maxdepth 2 -type f \
+            \( -iname '*decision*' \
+            -o -iname '*pipeline*' \
+            -o -iname '*master*' \
+            -o -iname '*publish*' \
+            -o -iname '*manifest*' \
+            -o -iname '*workflow*' \) \
+            -not -path './.git/*' \
+            | sort
+
+      - name: Find Decision Intelligence invocations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE INVOCATIONS"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          SKIP = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+
+          needles = [
+              "decision_intelligence_v2.py",
+              "decision_intelligence_v2",
+              "decision_intelligence_summary_v2",
+          ]
+
+          for path in sorted(Path(".").rglob("*")):
+              if not path.is_file():
+                  continue
+
+              if any(part in SKIP for part in path.parts):
+                  continue
+
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              lines = text.splitlines()
+              matches = []
+
+              for i, line in enumerate(lines, 1):
+                  if any(n in line for n in needles):
+                      matches.append(i)
+
+              if not matches:
+                  continue
+
+              print()
+              print("-" * 80)
+              print(f"FILE: {path}")
+              print("-" * 80)
+
+              shown = set()
+
+              for line_no in matches:
+                  start = max(1, line_no - 5)
+                  end = min(len(lines), line_no + 5)
+
+                  for n in range(start, end + 1):
+                      if n in shown:
+                          continue
+                      shown.add(n)
+                      print(f"{n:5}: {lines[n-1]}")
+
+                  print()
+          PY
+
+      - name: Find Decision Engine invocations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION ENGINE INVOCATIONS"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          SKIP = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+
+          needles = [
+              "decision_engine_research_v1",
+              "decision_engine",
+              "Decision Engine",
+          ]
+
+          for path in sorted(Path(".").rglob("*")):
+              if not path.is_file():
+                  continue
+
+              if any(part in SKIP for part in path.parts):
+                  continue
+
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              lines = text.splitlines()
+              matches = []
+
+              for i, line in enumerate(lines, 1):
+                  if any(n in line for n in needles):
+                      matches.append(i)
+
+              if not matches:
+                  continue
+
+              print()
+              print("-" * 80)
+              print(f"FILE: {path}")
+              print("-" * 80)
+
+              shown = set()
+
+              for line_no in matches:
+                  start = max(1, line_no - 4)
+                  end = min(len(lines), line_no + 4)
+
+                  for n in range(start, end + 1):
+                      if n in shown:
+                          continue
+                      shown.add(n)
+                      print(f"{n:5}: {lines[n-1]}")
+
+                  print()
+          PY
+
+      - name: Inspect orchestration candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "ORCHESTRATION CANDIDATES"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          SKIP = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+
+          terms = [
+              "subprocess",
+              "runpy",
+              "os.system",
+              "Popen",
+              "python ",
+              "manifest.json",
+              "public_data",
+              "decision_intelligence",
+              "decision_engine",
+          ]
+
+          candidates = []
+
+          for path in sorted(Path(".").rglob("*")):
+              if not path.is_file():
+                  continue
+
+              if any(part in SKIP for part in path.parts):
+                  continue
+
+              if path.suffix.lower() not in {
+                  ".py", ".yml", ".yaml", ".sh", ".ps1", ".toml"
+              }:
+                  continue
+
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              score = sum(1 for term in terms if term in text)
+
+              if score >= 2:
+                  candidates.append((score, path))
+
+          for score, path in sorted(
+              candidates,
+              key=lambda x: (-x[0], str(x[1]))
+          ):
+              print(f"{score:2} | {path}")
+          PY
+
+      - name: Show master pipeline ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "MASTER / PIPELINE ORDERING"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          SKIP = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+
+          important = [
+              "decision",
+              "intelligence",
+              "manifest",
+              "publish",
+              "validation",
+          ]
+
+          for path in sorted(Path(".").rglob("*")):
+              if not path.is_file():
+                  continue
+
+              if any(part in SKIP for part in path.parts):
+                  continue
+
+              name = path.name.lower()
+
+              if not any(
+                  word in name
+                  for word in ("master", "pipeline", "workflow", "publish")
+              ):
+                  continue
+
+              if path.suffix.lower() not in {
+                  ".py", ".yml", ".yaml", ".sh", ".ps1"
+              }:
+                  continue
+
+              try:
+                  lines = path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              relevant = [
+                  (i, line)
+                  for i, line in enumerate(lines, 1)
+                  if any(term in line.lower() for term in important)
+              ]
+
+              if not relevant:
+                  continue
+
+              print()
+              print("=" * 80)
+              print(f"FILE: {path}")
+              print("=" * 80)
+
+              for line_no, line in relevant:
+                  print(f"{line_no:5}: {line}")
+          PY
+
+      - name: Inspect producer input and output contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "DECISION INTELLIGENCE PRODUCER"
+          echo "========================================"
+
+          if [ -f decision_intelligence_v2.py ]; then
+            nl -ba decision_intelligence_v2.py
+          else
+            echo "decision_intelligence_v2.py not found at repository root."
+          fi
+
+      - name: Inspect current canonical Decision artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "CURRENT CANONICAL DECISION ARTIFACTS"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import csv
+
+          files = [
+              Path("public_data/decision_engine_research_summary_v1.csv"),
+              Path("public_data/decision_engine_research_v1.csv"),
+              Path("public_data/decision_engine_research_v1.json"),
+              Path("public_data/decision_intelligence_v2.json"),
+          ]
+
+          for path in files:
+              print()
+              print("-" * 80)
+              print(path)
+              print("-" * 80)
+
+              if not path.exists():
+                  print("MISSING")
+                  continue
+
+              if path.suffix == ".json":
+                  try:
+                      obj = json.loads(path.read_text(encoding="utf-8"))
+                  except Exception as exc:
+                      print(f"UNREADABLE: {exc}")
+                      continue
+
+                  if not isinstance(obj, dict):
+                      print(f"JSON TYPE: {type(obj).__name__}")
+                      continue
+
+                  for key in (
+                      "context_date",
+                      "decision_state",
+                      "state",
+                      "what_changed",
+                      "decision_intelligence_version",
+                  ):
+                      if key in obj:
+                          print(f"{key}: {obj[key]}")
+
+              else:
+                  try:
+                      with path.open(
+                          "r",
+                          encoding="utf-8-sig",
+                          newline=""
+                      ) as handle:
+                          rows = list(csv.DictReader(handle))
+                  except Exception as exc:
+                      print(f"UNREADABLE: {exc}")
+                      continue
+
+                  print(f"rows: {len(rows)}")
+
+                  if rows:
+                      row = rows[-1]
+
+                      for key in (
+                          "context_date",
+                          "asof_date",
+                          "date",
+                          "state",
+                          "decision_state",
+                          "what_changed",
+                      ):
+                          if key in row:
+                              print(f"{key}: {row.get(key)}")
+          PY
+
+      - name: Check publication and manifest ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "PUBLICATION / MANIFEST LOGIC"
+          echo "========================================"
+
+          python - <<'PY'
+          from pathlib import Path
+
+          SKIP = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+
+          terms = [
+              "manifest.json",
+              "write_text",
+              "to_csv",
+              "json.dump",
+              "public_data",
+              "publish",
+          ]
+
+          for path in sorted(Path(".").rglob("*")):
+              if not path.is_file():
+                  continue
+
+              if any(part in SKIP for part in path.parts):
+                  continue
+
+              if path.suffix.lower() not in {
+                  ".py", ".yml", ".yaml", ".sh", ".ps1"
+              }:
+                  continue
+
+              try:
+                  lines = path.read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+              except (UnicodeDecodeError, OSError):
+                  continue
+
+              hits = [
+                  i
+                  for i, line in enumerate(lines, 1)
+                  if any(term in line for term in terms)
+              ]
+
+              if not hits:
+                  continue
+
+              if not any(
+                  "manifest" in lines[i-1].lower()
+                  or "publish" in lines[i-1].lower()
+                  or "decision" in lines[i-1].lower()
+                  for i in hits
+              ):
+                  continue
+
+              print()
+              print("-" * 80)
+              print(f"FILE: {path}")
+              print("-" * 80)
+
+              shown = set()
+
+              for line_no in hits:
+                  start = max(1, line_no - 3)
+                  end = min(len(lines), line_no + 3)
+
+                  for n in range(start, end + 1):
+                      if n in shown:
+                          continue
+                      shown.add(n)
+                      print(f"{n:5}: {lines[n-1]}")
+
+                  print()
+          PY
+
+      - name: Verify workflow remained read only
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "========================================"
+          echo "FINAL READ-ONLY INTEGRITY CHECK"
+          echo "========================================"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ERROR: diagnostic changed repository files."
+            git status --short
+            git diff
+            exit 1
+          fi
+
+          echo "PASS: repository unchanged."
+          echo
+          echo "Decision Call Chain Diagnostic completed."
