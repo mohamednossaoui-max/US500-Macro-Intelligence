@@ -1,4 +1,4 @@
-name: Apply Patch 4
+name: Apply Corrected Patch 4
 
 on:
   workflow_dispatch:
@@ -7,10 +7,8 @@ permissions:
   contents: write
 
 jobs:
-  apply-patch4:
-    name: Apply Patch 4 to V6.3
+  apply-corrected-patch4:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,120 +18,55 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Verify required files
+      - name: Verify exact baseline
         shell: bash
         run: |
           set -euo pipefail
+          test -f app.py
+          test -f apply_patch4_corrected.py
+          EXPECTED="fa65e47102e8509e4c841e66d317768fea307ce12c00c3da8c9f23eed58b7298"
+          ACTUAL="$(sha256sum app.py | awk '{print $1}')"
+          echo "Expected: $EXPECTED"
+          echo "Actual:   $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED"
 
-          echo "Checking Patch 4 files..."
-
-          test -f app.py || {
-            echo "ERROR: app.py not found"
-            exit 1
-          }
-
-          test -f apply_patch4.py || {
-            echo "ERROR: apply_patch4.py not found"
-            exit 1
-          }
-
-          echo "Required files found."
-
-      - name: Verify V6.3 before patch
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("app.py")
-          text = path.read_text(encoding="utf-8")
-
-          required = [
-              'APP_VERSION = "V6.3"',
-              'from ui_v3 import',
-              'def fed() -> None:',
-              'def decision() -> None:',
-              'def system_health() -> None:',
-          ]
-
-          missing = [marker for marker in required if marker not in text]
-
-          if missing:
-              print("ERROR: app.py does not match expected V6.3 fingerprints.")
-              for marker in missing:
-                  print("MISSING:", marker)
-              raise SystemExit(1)
-
-          print("V6.3 fingerprints verified.")
-          PY
-
-      - name: Check Python syntax before patch
+      - name: Syntax check before patch
         run: |
           python -m py_compile app.py
-          python -m py_compile apply_patch4.py
-          echo "Pre-patch syntax check passed."
+          python -m py_compile apply_patch4_corrected.py
 
-      - name: Apply Patch 4
-        run: |
-          python apply_patch4.py
+      - name: Apply corrected Patch 4
+        run: python apply_patch4_corrected.py
 
-      - name: Verify backup
+      - name: Verify presentation targets
         shell: bash
         run: |
           set -euo pipefail
-
-          test -f app.py.pre_patch4 || {
-            echo "ERROR: app.py.pre_patch4 was not created."
-            exit 1
-          }
-
-          test -s app.py.pre_patch4 || {
-            echo "ERROR: app.py.pre_patch4 is empty."
-            exit 1
-          }
-
-          echo "Backup verified: app.py.pre_patch4"
-
-      - name: Verify patched app syntax
-        run: |
+          grep -q 'Raw Research Context Summary' app.py
+          grep -q 'Raw Macro Context' app.py
+          grep -q 'Raw communication comparison' app.py
+          grep -q 'Raw Event Study Summary' app.py
+          grep -q 'Raw dataset publication map' app.py
           python -m py_compile app.py
-          echo "Patched app.py syntax passed."
+          echo "Presentation targets verified."
 
-      - name: Show changed files
+      - name: Require real app.py change
         shell: bash
         run: |
-          echo "----- Git status -----"
-          git status --short
-
-          echo
-          echo "----- app.py diff summary -----"
+          set -euo pipefail
+          if git diff --quiet -- app.py; then
+            echo "ERROR: app.py did not change."
+            exit 1
+          fi
           git diff --stat -- app.py
-
-          echo
-          echo "----- app.py diff -----"
           git diff -- app.py
 
-      - name: Commit Patch 4
+      - name: Commit corrected Patch 4
         shell: bash
         run: |
           set -euo pipefail
-
-          if git diff --quiet -- app.py; then
-            echo "No app.py changes detected."
-            exit 0
-          fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Commit only the patched application.
-          # app.py.pre_patch4 remains a workflow safety backup
-          # and is intentionally not committed.
           git add app.py
-
-          git commit -m "Apply V6.3 Patch 4 presentation update"
+          git commit -m "Correct V6.3 Patch 4 dynamic research views"
           git push
-
-          echo "Patch 4 committed and pushed successfully."
