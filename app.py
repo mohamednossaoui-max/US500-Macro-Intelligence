@@ -76,6 +76,14 @@ background:rgba(128,140,155,.04);min-height:88px}
 .health-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:currentColor;box-shadow:0 0 12px currentColor}.health-healthy{color:#19e6a2}.health-degraded,.health-aging,.health-pit_limited{color:#ffb84d}.health-failed,.health-blocked,.health-stale{color:#ff6170}.health-unknown{color:#8298aa}
 @media(max-width:900px){.command-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.reaction-row{grid-template-columns:60px 1fr 70px}.reaction-row .hide-mobile{display:none}}
 @media(max-width:560px){.command-strip{grid-template-columns:1fr}.reaction-row{grid-template-columns:52px 1fr 66px}}
+/* PATCH 4 — presentation-only dynamic research panels */
+.research-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:.45rem 0 .85rem}
+.research-panel{border:1px solid rgba(128,140,155,.22);border-radius:13px;padding:12px 14px;background:linear-gradient(145deg,rgba(15,34,53,.90),rgba(7,20,33,.90));min-height:92px}
+.research-panel .rp-title{font-size:.72rem;font-weight:900;letter-spacing:.055em;color:#9bb0c1;text-transform:uppercase;margin-bottom:7px}
+.research-panel .rp-line{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid rgba(128,140,155,.10);font-size:.78rem}
+.research-panel .rp-line:last-child{border-bottom:0}.research-panel .rp-k{color:#8298aa}.research-panel .rp-v{font-weight:800;text-align:right;overflow-wrap:anywhere}
+@media(max-width:900px){.research-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.research-grid{grid-template-columns:1fr}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -373,6 +381,30 @@ def table(df: Optional[pd.DataFrame], height: int = 380) -> None:
         st.info("Artifact is published but contains no rows.")
         return
     st.dataframe(df, use_container_width=True, height=height, hide_index=True)
+
+
+def research_panels(df: Optional[pd.DataFrame], max_rows: int = 6, max_fields: int = 5) -> None:
+    """PATCH 4 presentation helper: render published rows as dark research panels.
+
+    Values are displayed exactly from the supplied DataFrame. No scoring, PIT,
+    eligibility, governance, ranking, normalization, or backend state is changed.
+    """
+    if df is None or df.empty:
+        st.info("No published rows are available for this research view.")
+        return
+    view = df.tail(max_rows).iloc[::-1]
+    fields = [str(c) for c in view.columns[:max_fields]]
+    blocks = []
+    for idx, (_, row) in enumerate(view.iterrows(), 1):
+        title = fmt(row.get(fields[0])) if fields else f"Record {idx}"
+        lines = []
+        for field in fields[1:]:
+            lines.append(
+                "<div class='rp-line'><span class='rp-k'>" + str(field).replace("_", " ") +
+                "</span><span class='rp-v'>" + fmt(row.get(field)) + "</span></div>"
+            )
+        blocks.append("<div class='research-panel'><div class='rp-title'>" + title + "</div>" + "".join(lines) + "</div>")
+    st.markdown("<div class='research-grid'>" + "".join(blocks) + "</div>", unsafe_allow_html=True)
 
 
 def source_status(text: str) -> str:
@@ -1125,7 +1157,10 @@ def fed() -> None:
             "Current tone": current_doc.get("tone", "UNAVAILABLE"), "Previous tone": previous_doc.get("tone", "UNAVAILABLE"),
             "Change": comp.get("classification", "UNAVAILABLE"),
         })
-    st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
+    comparison_df = pd.DataFrame(comparison_rows)
+    research_panels(comparison_df, max_rows=3, max_fields=6)
+    with st.expander("Raw communication comparison", expanded=False):
+        table(comparison_df, 260)
     st.caption("Unavailable or not-yet-published reports remain unavailable; they are never converted into neutral evidence.")
 
     # --- Synthesis ------------------------------------------------------
@@ -1380,7 +1415,12 @@ def event_news() -> None:
         qcols = st.columns(4)
         for col, item in zip(qcols, [("High relevance", int(rel.get("HIGH",0))), ("Macro releases", int(classes.get("MACRO_RELEASE",0))), ("Policy events", int(classes.get("POLICY_EVENT",0))), ("Duplicates flagged", int(dups))]):
             with col: card(*item)
-    table(df.tail(300) if isinstance(df,pd.DataFrame) else None,560); source("Event News",src)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        st.subheader("Recent Event Research View")
+        research_panels(df, max_rows=6, max_fields=5)
+    with st.expander("Raw Event / News data", expanded=False):
+        table(df.tail(300) if isinstance(df,pd.DataFrame) else None,560)
+    source("Event News",src)
     if isinstance(summary,dict):
         with st.expander("Published summary"): st.json(summary)
     source("Event News Summary",ss)
@@ -1404,22 +1444,30 @@ def earnings() -> None:
 
     with tabs[0]:
         df, src = load_named("Earnings")
-        table(df.tail(300) if isinstance(df, pd.DataFrame) else None, 560)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander("Raw earnings events", expanded=False):
+            table(df.tail(300) if isinstance(df, pd.DataFrame) else None, 560)
         source("Earnings", src)
 
     with tabs[1]:
         df, src = load_named("Earnings Summary")
-        table(df)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander("Raw earnings summary", expanded=False):
+            table(df)
         source("Earnings Summary", src)
 
     with tabs[2]:
         df, src = load_named("Earnings EPS")
-        table(df)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander("Raw EPS classes", expanded=False):
+            table(df)
         source("Earnings EPS", src)
 
     with tabs[3]:
         df, src = load_named("Earnings Sectors")
-        table(df)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander("Raw sector data", expanded=False):
+            table(df)
         source("Earnings Sectors", src)
 
 
@@ -1595,7 +1643,9 @@ def event_study() -> None:
         st.subheader(title)
         if title == "Sample Adequacy":
             st.caption("Reliability is definition-specific: <5 observations = INSUFFICIENT; 5–9 = LIMITED; 10–24 = MODERATE; ≥25 = ADEQUATE. Even ADEQUATE remains descriptive only and is never treated as causal/predictive evidence.")
-        table(df, 560 if title == "Event x Horizon Summary" else 360)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander(f"Raw {title} data", expanded=False):
+            table(df, 560 if title == "Event x Horizon Summary" else 360)
         source(title, src)
 
 
@@ -1642,7 +1692,9 @@ def final_validation() -> None:
     obj, json_src = load_named("Final Validation JSON")
 
     st.subheader("Validation Summary")
-    table(summary, 220)
+    research_panels(summary, max_rows=6, max_fields=5)
+    with st.expander("Raw validation summary", expanded=False):
+        table(summary, 220)
     source("Final Validation Summary", summary_src)
 
     if isinstance(summary, pd.DataFrame) and {"status","count"}.issubset(summary.columns):
@@ -1653,7 +1705,9 @@ def final_validation() -> None:
                 card(status, sm.get(status, 0 if status != "OVERALL" else "—"))
 
     st.subheader("Validation Report")
-    table(report, 650)
+    research_panels(report, max_rows=6, max_fields=5)
+    with st.expander("Raw validation report", expanded=False):
+        table(report, 650)
     source("Final Validation Report", report_src)
 
     if isinstance(obj, dict):
