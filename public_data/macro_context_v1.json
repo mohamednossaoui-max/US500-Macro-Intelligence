@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-09-30",
+  "context_date": "2026-10-01",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-09-17",
-    "age_days": 13,
+    "age_days": 14,
     "economic_regime": "MIXED",
     "inflation_score": 1.0585026808856153,
     "labor_score": 0.0265094293115017,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-09-30",
+    "as_of_date": "2026-10-01",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -329,25 +329,25 @@
   },
   "financial_stress": {
     "source_date": "2026-09-30",
-    "age_days": 0,
-    "composite_stress_score": -0.3341955301667191,
+    "age_days": 1,
+    "composite_stress_score": -0.3139802136975531,
     "research_regime": "LOW_RESEARCH_STRESS",
-    "vix": 16.04,
+    "vix": 16.34,
     "treasury_2y": 4.89,
     "treasury_10y": 5.26,
     "yield_10y_2y_spread": 0.3700000000000001,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-09-25",
-    "age_days": 5,
-    "latest_published_at": "2026-09-25T20:30:00+00:00",
-    "latest_title": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
-    "latest_source": "Federal Reserve",
-    "latest_topic": "fed",
-    "events_available": 97,
+    "source_date": "2026-10-01",
+    "age_days": 0,
+    "latest_published_at": "2026-10-01T14:00:00+00:00",
+    "latest_title": "Construction Spending",
+    "latest_source": "U.S. Census Bureau",
+    "latest_topic": "growth",
+    "events_available": 98,
     "topic_counts": {
-      "growth": 63,
+      "growth": 64,
       "fed": 31,
       "labor": 2,
       "inflation": 1
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 13,
-    "financial_stress_age_days": 0,
-    "event_news_age_days": 5,
+    "economic_age_days": 14,
+    "financial_stress_age_days": 1,
+    "event_news_age_days": 0,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
