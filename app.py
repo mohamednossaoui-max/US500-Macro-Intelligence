@@ -507,13 +507,18 @@ def module_page(
     chart(df, chart_columns)
 
     st.subheader("Latest Published Data")
-    table(df.tail(250) if isinstance(df, pd.DataFrame) else None, 520)
+    display_df = df.tail(250) if isinstance(df, pd.DataFrame) else None
+    research_panels(display_df, max_rows=6, max_fields=5)
+    with st.expander("Raw published data", expanded=False):
+        table(display_df, 520)
     source(data_name, src)
 
     if summary_name is not None:
         summary, summary_src = load_named(summary_name)
         st.subheader("Summary")
-        table(summary, 280)
+        research_panels(summary, max_rows=6, max_fields=5)
+        with st.expander("Raw summary data", expanded=False):
+            table(summary, 280)
         source(summary_name, summary_src)
 
     if json_names:
@@ -630,7 +635,9 @@ def executive() -> None:
         else:
             st.info("Research Context history is unavailable.")
     with tab_evidence:
-        table(evidence, 340)
+        research_panels(evidence, max_rows=6, max_fields=5)
+        with st.expander("Raw Decision Evidence", expanded=False):
+            table(evidence, 340)
         source("Decision Evidence", evidence_src)
     with tab_sources:
         st.caption(f"Research Context • {rc_src}")
@@ -692,11 +699,16 @@ def research_context() -> None:
         "trading signal, recommendation, or execution input."
     )
 
-    table(df, 300)
+    st.subheader("Published Context Snapshot")
+    research_panels(df, max_rows=6, max_fields=5)
+    with st.expander("Raw Research Context Summary", expanded=False):
+        table(df, 300)
     source("Research Context Summary", src)
 
     st.subheader("Research Context Extremes")
-    table(extremes, 420)
+    research_panels(extremes, max_rows=6, max_fields=5)
+    with st.expander("Raw Research Context Extremes", expanded=False):
+        table(extremes, 420)
     source("Research Context Extremes", extremes_src)
 
 
@@ -720,7 +732,10 @@ def macro_context() -> None:
         with col:
             card(label, value)
 
-    table(df, 280)
+    st.subheader("Published Macro Snapshot")
+    research_panels(df, max_rows=6, max_fields=5)
+    with st.expander("Raw Macro Context", expanded=False):
+        table(df, 280)
     source("Macro Context", src)
 
     if isinstance(obj, dict):
@@ -1649,9 +1664,16 @@ def decision() -> None:
     ui_section("Evidence & Audit Trail", "DETAIL ON DEMAND")
     tab1,tab2,tab3=st.tabs(["Evidence Matrix","Published Decision","Governance JSON"])
     with tab1:
-        table(registry if isinstance(registry,pd.DataFrame) else evidence,420); source("Decision Evidence Registry",registry_src); source("Decision Evidence",evidence_src)
+        audit_df = registry if isinstance(registry,pd.DataFrame) else evidence
+        research_panels(audit_df, max_rows=6, max_fields=5)
+        with st.expander("Raw evidence matrix", expanded=False):
+            table(audit_df,420)
+        source("Decision Evidence Registry",registry_src); source("Decision Evidence",evidence_src)
     with tab2:
-        table(df,240); source("Decision Summary",src)
+        research_panels(df, max_rows=6, max_fields=5)
+        with st.expander("Raw published decision", expanded=False):
+            table(df,240)
+        source("Decision Summary",src)
     with tab3:
         if isinstance(obj,dict): st.json(obj)
         source("Decision JSON",json_src)
@@ -1781,11 +1803,21 @@ def historical_edge() -> None:
     overlap, overlap_src = load_named("Event Study Overlap")
 
     st.subheader("Published Event Study Evidence")
-    table(summary, 560)
+    research_panels(summary, max_rows=6, max_fields=5)
+    with st.expander("Raw Event Study Summary", expanded=False):
+        table(summary, 560)
     source("Event Study Summary", summary_src)
-    table(adequacy, 360)
+
+    st.subheader("Sample Adequacy")
+    research_panels(adequacy, max_rows=6, max_fields=5)
+    with st.expander("Raw Event Study Adequacy", expanded=False):
+        table(adequacy, 360)
     source("Event Study Adequacy", adequacy_src)
-    table(overlap, 360)
+
+    st.subheader("Event Overlap")
+    research_panels(overlap, max_rows=6, max_fields=5)
+    with st.expander("Raw Event Study Overlap", expanded=False):
+        table(overlap, 360)
     source("Event Study Overlap", overlap_src)
 
 
@@ -1826,7 +1858,10 @@ def data_status() -> None:
     quality, qsrc = load_named("Remaining Layers Quality")
     if isinstance(quality,pd.DataFrame):
         st.subheader("Remaining-Layer Quality Contract")
-        table(quality,420); source("Remaining Layers Quality",qsrc)
+        research_panels(quality, max_rows=6, max_fields=5)
+        with st.expander("Raw Remaining-Layer Quality Contract", expanded=False):
+            table(quality,420)
+        source("Remaining Layers Quality",qsrc)
 
     published = set(manifest_files())
     rows = []
@@ -1846,17 +1881,20 @@ def data_status() -> None:
             "Status": status,
         })
 
-    table(pd.DataFrame(rows), 650)
+    status_df = pd.DataFrame(rows)
+    st.subheader("Configured Dataset Status")
+    research_panels(status_df, max_rows=9, max_fields=3)
+    with st.expander("Raw configured dataset status", expanded=False):
+        table(status_df, 650)
 
     configured_files = set(DATASETS.values())
     extra_published = sorted(published - configured_files)
     if extra_published:
         st.subheader("Published Artifacts Not Yet Mapped to a Named Module")
-        st.dataframe(
-            pd.DataFrame({"File": extra_published}),
-            use_container_width=True,
-            hide_index=True,
-        )
+        extra_df = pd.DataFrame({"File": extra_published})
+        research_panels(extra_df, max_rows=9, max_fields=1)
+        with st.expander("Raw unmapped artifact list", expanded=False):
+            table(extra_df, 420)
     else:
         st.success("All artifacts in the current manifest are mapped to the terminal configuration.")
 
