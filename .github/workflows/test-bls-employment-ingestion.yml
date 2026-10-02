@@ -1,0 +1,61 @@
+name: Test BLS Employment Ingestion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-bls-employment-ingestion:
+    name: Fetch BLS Employment Data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show Python version
+        run: python --version
+
+      - name: Verify ingestion script exists
+        run: |
+          test -f economic_bls_employment_ingestion_v1.py
+          echo "PASS: economic_bls_employment_ingestion_v1.py exists"
+
+      - name: Syntax check
+        run: |
+          python -m py_compile economic_bls_employment_ingestion_v1.py
+          echo "PASS: Python syntax check"
+
+      - name: Run BLS Employment ingestion
+        run: |
+          python economic_bls_employment_ingestion_v1.py
+
+      - name: Verify staging artifacts
+        run: |
+          test -f staging/economic/bls_employment_latest_v1.json
+          test -f staging/economic/bls_employment_latest_v1.csv
+
+          echo "PASS: staging artifacts created"
+          echo
+          echo "=== staging/economic/bls_employment_latest_v1.json ==="
+          cat staging/economic/bls_employment_latest_v1.json
+          echo
+          echo "=== staging/economic/bls_employment_latest_v1.csv ==="
+          cat staging/economic/bls_employment_latest_v1.csv
+
+      - name: Upload staging artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bls-employment-staging
+          path: staging/economic/
+          if-no-files-found: warn
+          retention-days: 7
