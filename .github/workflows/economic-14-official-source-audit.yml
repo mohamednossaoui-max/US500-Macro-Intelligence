@@ -1,0 +1,179 @@
+name: Economic 14 — Official Source Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-economic-14:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+      BEA_API_KEY: ${{ secrets.BEA_API_KEY }}
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+
+    steps:
+      - name: Checkout repository (read-only)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install audit dependencies
+        run: python -m pip install --disable-pip-version-check pandas requests
+
+      - name: Verify canonical Economic file
+        run: |
+          test -f public_data/economic_historical_events_v1.csv
+          echo "PASS: canonical Economic history found"
+
+      - name: Audit 14 indicators against source ownership, freshness and PIT/revisions
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          FILE = Path("public_data/economic_historical_events_v1.csv")
+          OUT = Path("audit_output")
+          OUT.mkdir(exist_ok=True)
+
+          # IMPORTANT: this is the actual 14-indicator foundation in the repository.
+          # Two indicators are ISM and one is DOL, so it would be incorrect to label
+          # all 14 as BLS/BEA/Census.
+          REGISTRY = {
+              "NFP": {"agency":"BLS", "source":"https://www.bls.gov/ces/", "cadence_days":40, "revision_expected":True},
+              "UNEMPLOYMENT_RATE": {"agency":"BLS", "source":"https://www.bls.gov/cps/", "cadence_days":40, "revision_expected":False},
+              "AVERAGE_HOURLY_EARNINGS": {"agency":"BLS", "source":"https://www.bls.gov/ces/", "cadence_days":40, "revision_expected":True},
+              "CPI": {"agency":"BLS", "source":"https://www.bls.gov/cpi/", "cadence_days":40, "revision_expected":False},
+              "CORE_CPI": {"agency":"BLS", "source":"https://www.bls.gov/cpi/", "cadence_days":40, "revision_expected":False},
+              "PPI_FINAL_DEMAND": {"agency":"BLS", "source":"https://www.bls.gov/ppi/", "cadence_days":40, "revision_expected":True},
+              "CORE_PPI": {"agency":"BLS", "source":"https://www.bls.gov/ppi/", "cadence_days":40, "revision_expected":True},
+              "GDP": {"agency":"BEA", "source":"https://www.bea.gov/data/gdp/gross-domestic-product", "cadence_days":110, "revision_expected":True},
+              "PCE_PRICE_INDEX": {"agency":"BEA", "source":"https://www.bea.gov/data/personal-consumption-expenditures-price-index", "cadence_days":45, "revision_expected":True},
+              "CORE_PCE": {"agency":"BEA", "source":"https://www.bea.gov/data/personal-consumption-expenditures-price-index", "cadence_days":45, "revision_expected":True},
+              "RETAIL_SALES": {"agency":"CENSUS", "source":"https://www.census.gov/retail/index.html", "cadence_days":45, "revision_expected":True},
+              "INITIAL_JOBLESS_CLAIMS": {"agency":"DOL", "source":"https://www.dol.gov/ui/data.pdf", "cadence_days":10, "revision_expected":True},
+              "ISM_MANUFACTURING_PMI": {"agency":"ISM", "source":"https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/", "cadence_days":40, "revision_expected":False},
+              "ISM_SERVICES_PMI": {"agency":"ISM", "source":"https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/", "cadence_days":40, "revision_expected":False},
+          }
+
+          df = pd.read_csv(FILE)
+          required = {"indicator", "release_date", "reference_period", "actual"}
+          missing_cols = required - set(df.columns)
+          if missing_cols:
+              raise SystemExit(f"FAIL: missing canonical columns: {sorted(missing_cols)}")
+
+          df["release_date"] = pd.to_datetime(df["release_date"], errors="coerce", utc=True)
+          now = pd.Timestamp.now(tz="UTC")
+          rows = []
+          hard_fail = False
+
+          def source_check(url):
+              try:
+                  r = requests.get(url, timeout=20, headers={"User-Agent":"US500-Macro-Intelligence-Audit/1.0"})
+                  return r.status_code, r.url
+              except Exception as e:
+                  return None, f"{type(e).__name__}: {e}"
+
+          for indicator, meta in REGISTRY.items():
+              part = df[df["indicator"].astype(str) == indicator].copy()
+              if part.empty:
+                  rows.append({"indicator":indicator,"agency":meta["agency"],"status":"FAIL_MISSING","latest_release_date":"","age_days":"","source_http":"","source":meta["source"],"revision_check":"NO_DATA"})
+                  hard_fail = True
+                  continue
+
+              latest = part["release_date"].max()
+              age = int((now - latest).total_seconds() // 86400) if pd.notna(latest) else 999999
+              freshness = "PASS" if age <= meta["cadence_days"] else "STALE"
+              if freshness == "STALE": hard_fail = True
+
+              # PIT/revision structural audit: preserve multiple vintages/releases rather
+              # than silently overwriting history. We do not claim an official revision
+              # match unless an agency-specific vintage API is available.
+              revision_col = "revision" if "revision" in part.columns else None
+              vintage_col = "vintage_date" if "vintage_date" in part.columns else None
+              revision_nonempty = False
+              if revision_col:
+                  revision_nonempty = part[revision_col].notna().any() and part[revision_col].astype(str).str.strip().ne("").any()
+              vintage_nonempty = False
+              if vintage_col:
+                  vintage_nonempty = part[vintage_col].notna().any() and part[vintage_col].astype(str).str.strip().ne("").any()
+              revision_check = "TRACKED" if (revision_nonempty or vintage_nonempty) else ("NEEDS_REVIEW" if meta["revision_expected"] else "NOT_REQUIRED")
+
+              code, resolved = source_check(meta["source"])
+              source_ok = code is not None and 200 <= code < 400
+              if not source_ok: hard_fail = True
+
+              status = "PASS" if freshness == "PASS" and source_ok else "FAIL"
+              rows.append({
+                  "indicator": indicator,
+                  "agency": meta["agency"],
+                  "status": status,
+                  "latest_release_date": latest.date().isoformat() if pd.notna(latest) else "",
+                  "age_days": age,
+                  "freshness_limit_days": meta["cadence_days"],
+                  "source_http": code if code is not None else "ERROR",
+                  "source": meta["source"],
+                  "resolved_source": resolved,
+                  "revision_expected": meta["revision_expected"],
+                  "revision_check": revision_check,
+              })
+
+          report = pd.DataFrame(rows)
+          report.to_csv(OUT / "economic_14_source_audit.csv", index=False)
+
+          summary = {
+              "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+              "mode": "READ_ONLY_AUDIT",
+              "canonical_file": str(FILE),
+              "indicator_count": len(REGISTRY),
+              "pass": int((report.status == "PASS").sum()),
+              "fail": int((report.status != "PASS").sum()),
+              "notes": [
+                  "No public_data files were modified.",
+                  "No Autonomous workflow was invoked.",
+                  "Freshness is cadence-based and does not by itself prove that the latest official release value was ingested.",
+                  "Release-date/value parity with official agencies requires agency-specific release metadata adapters; this audit intentionally does not fabricate that proof.",
+                  "Repository's 14 indicators include DOL and ISM in addition to BLS, BEA and Census."
+              ]
+          }
+          (OUT / "economic_14_source_audit.json").write_text(json.dumps({"summary":summary,"indicators":rows}, indent=2), encoding="utf-8")
+
+          print("\n=== ECONOMIC 14 OFFICIAL-SOURCE AUDIT ===")
+          print(report[["indicator","agency","latest_release_date","age_days","source_http","revision_check","status"]].to_string(index=False))
+          print("\nSUMMARY:", json.dumps(summary, indent=2))
+
+          # Do not fail merely because revision metadata needs review; fail on missing,
+          # stale, or unreachable official/authoritative source.
+          if hard_fail:
+              print("\nAUDIT RESULT: FAIL — inspect audit artifacts; no data were changed.")
+              sys.exit(1)
+          print("\nAUDIT RESULT: PASS — read-only checks passed.")
+          PY
+
+      - name: Verify repository was not modified
+        if: always()
+        run: |
+          if ! git diff --exit-code -- public_data; then
+            echo "FAIL: public_data changed during read-only audit"
+            exit 1
+          fi
+          echo "PASS: public_data unchanged"
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-14-official-source-audit
+          path: audit_output/
+          if-no-files-found: warn
+          retention-days: 14
