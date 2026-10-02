@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from economic_official_sources_v1 import Client, MAPPINGS, MetadataError, collect
+import requests
+from economic_official_sources_v1 import Client, MAPPINGS, MetadataError, collect, http_error_diagnostic
 from point_in_time import validate_temporal_order
 
 EVENTS='economic_historical_events_v1.csv'
@@ -131,10 +132,10 @@ def run(root,staging,mode='audit',collector=collect,now=None):
                 report.update(status='REVISION',reason='Latest release matches; earlier reference periods have revised official values')
             reports.append(report);rows.extend(batch)
         except Exception as exc:
-            # Exception text may contain a key-bearing URL. Persist type only
-            # for HTTP errors; explicit metadata diagnostics contain no secrets.
+            # HTTP exception strings/response bodies may expose secrets; use only
+            # sanitized endpoint, method and status for HTTP diagnostics.
             status='METADATA_UNVERIFIED' if isinstance(exc,MetadataError) else 'SOURCE_ERROR'
-            diagnostic=str(exc) if isinstance(exc,(MetadataError,RuntimeError)) else type(exc).__name__
+            diagnostic=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else str(exc) if isinstance(exc,(MetadataError,RuntimeError)) else type(exc).__name__
             row=dict(indicator=indicator,verification_status=status,reason=diagnostic)
             reports.append(compare(row,canonical))
     pd.DataFrame(rows).to_csv(staging/'observations.csv',index=False)

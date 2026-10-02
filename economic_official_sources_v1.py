@@ -45,6 +45,25 @@ DATE = MONTH + r'\s+(\d{1,2}),?\s+(\d{4})'
 class MetadataError(ValueError):
     pass
 
+def http_error_diagnostic(exc):
+    """Describe endpoint/status without response text, query strings or secrets."""
+    response = getattr(exc, 'response', None)
+    request = getattr(exc, 'request', None)
+    if request is None and response is not None:
+        request = getattr(response, 'request', None)
+    url = getattr(request, 'url', None) or getattr(response, 'url', '') or ''
+    parsed = urlparse(url)
+    endpoint = (parsed.scheme + '://' + (parsed.hostname or '') + parsed.path
+                if parsed.scheme in ('https', 'http') and parsed.hostname else 'unknown endpoint')
+    for name in ('BLS_API_KEY', 'CENSUS_API_KEY', 'BEA_API_KEY'):
+        secret = os.environ.get(name, '').strip()
+        if secret:
+            endpoint = endpoint.replace(secret, '[REDACTED]')
+    status = getattr(response, 'status_code', None)
+    method = getattr(request, 'method', None) or 'UNKNOWN'
+    return f'HTTPError status={status if status is not None else "unknown"} method={method} endpoint={endpoint}'
+
+
 class Client:
     def __init__(self, evidence_dir):
         self.directory = evidence_dir
