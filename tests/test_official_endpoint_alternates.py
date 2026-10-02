@@ -80,11 +80,14 @@ def test_census_time_is_predicate_only(monkeypatch):
     class Client:
         def get(self,url,**kwargs):
             if url.endswith('.pdf'):return Response('PDF')
+            if url.endswith('/marts.json'):return Response(payload={'dataset':[{'c_dataset':['timeseries','eits','marts'],'title':'Advance Monthly Sales for Retail and Food Services'}]})
             params=kwargs['params']
             assert 'time' not in params['get'].split(',')
             assert 'time_slot_date' in params['get'].split(',') and ' to ' in params['time']
             assert params['category_code']=='44X72' and params['data_type_code']=='SM' and params['seasonally_adj']=='yes'
-            return Response(payload=[['cell_value','time_slot_date','category_code','data_type_code','seasonally_adj'],['100','2026-07-01','44X72','SM','yes'],['102','2026-08-01','44X72','SM','yes']])
+            response=Response(payload=[['cell_value','time_slot_date','category_code','data_type_code','seasonally_adj'],['100','2026-07-01','44X72','SM','yes'],['102','2026-08-01','44X72','SM','yes']])
+            response.content=b'JSON fixture'
+            return response
     row=sources.collect_retail(Client())[0]
     assert row['actual']==2 and row['reference_period']=='August 2026'
 
@@ -111,3 +114,41 @@ def test_dol_stale_archive_fails_before_pdf_read():
         def post_public_form(self,url,data):
             return Response(f'<a href="/press/{stale.year}/{stale.strftime("%m%d%y")}.pdf">Report</a>')
     with pytest.raises(sources.MetadataError,match='older than latest'):sources.collect_claims(Client())
+
+
+def test_census_mapping_is_sales_not_inventory():
+    assert sources.MAPPINGS['RETAIL_SALES']['url'].endswith('/marts')
+    assert 'MARTS advance monthly sales' in sources.MAPPINGS['RETAIL_SALES']['series']
+
+
+def test_census_inventory_catalog_cannot_be_accepted(monkeypatch):
+    monkeypatch.setenv('CENSUS_API_KEY','TEST_ONLY_KEY')
+    text='FOR RELEASE AT 8:30 AM EDT, WEDNESDAY, SEPTEMBER 16, 2026 ADVANCE MONTHLY SALES FOR RETAIL AND FOOD SERVICES, AUGUST 2026'
+    monkeypatch.setattr(sources,'PdfReader',lambda _:SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda:text)]))
+    class Client:
+        def get(self,url,**kwargs):
+            if url.endswith('.pdf'):return Response('PDF')
+            assert url.endswith('/marts.json')
+            return Response(payload={'dataset':[{'c_dataset':['timeseries','eits','mrtsadv'],'title':'Advance Retail Inventories'}]})
+    with pytest.raises(sources.MetadataError,match='not verified advance retail'):sources.collect_retail(Client())
+
+
+@pytest.mark.parametrize('group,title,label',[
+    ('empsit','THE EMPLOYMENT SITUATION','Employment Situation'),
+    ('cpi','CONSUMER PRICE INDEX','Consumer Price Index'),
+    ('ppi','PRODUCER PRICE INDEXES','Producer Price Index')])
+def test_bls_pdf_when_both_feed_and_html_blocked(group,title,label,monkeypatch):
+    rd=pd.Timestamp.now(tz='America/New_York').normalize()-pd.Timedelta(days=1)
+    reference=(pd.Period(rd.tz_localize(None),freq='M')-1).strftime('%B %Y')
+    text=f'Transmission is embargoed until 8:30 a.m. (ET) {rd.strftime("%A, %B %d, %Y")} {title} — {reference}'
+    monkeypatch.setattr(sources,'PdfReader',lambda _:SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda:text)]))
+    calendar=''.join(f'BEGIN:VEVENT\nSUMMARY:{label}\nDTSTART;TZID=US-Eastern:{d.strftime("%Y%m%d")}T083000\nEND:VEVENT\n' for d in [rd,rd+pd.Timedelta(days=40)])
+    class Client:
+        def get(self,url):
+            if '/feed/' in url or url.endswith('.htm'):raise forbidden(url)
+            if url.endswith('.ics'):return Response(calendar)
+            assert url.endswith(f'/pdf/{group}.pdf')
+            return Response('%PDF fixture')
+    result=sources.bls_release_context(Client(),group)
+    assert result[0]==reference and result[1]==rd.strftime('%Y-%m-%d')
+    assert result[3].endswith('.pdf') and result[4]['metadata_alternate_reason'].count('status=403')==2
