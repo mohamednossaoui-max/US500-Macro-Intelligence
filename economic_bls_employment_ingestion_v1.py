@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import sys
 from dataclasses import asdict, dataclass
@@ -113,7 +114,9 @@ def fetch_bls_series() -> dict[str, Any]:
     return body
 
 
-def parse_monthly_observations(body: dict[str, Any]) -> dict[str, list[Observation]]:
+def parse_monthly_observations(
+    body: dict[str, Any], unavailable: list[dict[str, Any]] | None = None
+) -> dict[str, list[Observation]]:
     """Normalize BLS monthly observations and sort newest first."""
     parsed: dict[str, list[Observation]] = {}
     series_list = (body.get("Results") or {}).get("series") or []
@@ -124,6 +127,7 @@ def parse_monthly_observations(body: dict[str, Any]) -> dict[str, list[Observati
             continue
 
         observations: list[Observation] = []
+        missing_months: list[tuple[int, int]] = []
         for item in series.get("data") or []:
             period = str(item.get("period") or "")
             if not (period.startswith("M") and period != "M13"):
@@ -131,7 +135,22 @@ def parse_monthly_observations(body: dict[str, Any]) -> dict[str, list[Observati
             try:
                 year = int(item["year"])
                 month = _parse_month(period)
-                value = float(str(item["value"]).replace(",", ""))
+                raw_value = str(item["value"]).strip()
+                if raw_value == "-":
+                    missing_months.append((year, month))
+                    diagnostic = {
+                        "series_id": series_id,
+                        "observation_month": f"{year:04d}-{month:02d}",
+                        "status": "SOURCE_DATA_UNAVAILABLE",
+                        "source_value": raw_value,
+                        "footnotes": _footnotes(item),
+                    }
+                    if unavailable is not None:
+                        unavailable.append(diagnostic)
+                    continue
+                value = float(raw_value.replace(",", ""))
+                if not math.isfinite(value):
+                    raise ValueError("Non-finite BLS value")
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f"Malformed BLS observation in {series_id}: {item!r}") from exc
 
@@ -152,6 +171,11 @@ def parse_monthly_observations(body: dict[str, Any]) -> dict[str, list[Observati
         observations.sort(key=lambda x: x.month_key, reverse=True)
         if not observations:
             raise RuntimeError(f"No monthly observations returned for {series_id}")
+        if missing_months and max(missing_months) >= observations[0].month_key:
+            raise RuntimeError(
+                f"Latest BLS observation unavailable for {series_id}; "
+                "refuse previous-month fallback"
+            )
         parsed[series_id] = observations
 
     missing = REQUIRED_SERIES - set(parsed)
@@ -223,7 +247,10 @@ def validate_employment_release(nfp: dict[str, Any], unemployment: dict[str, Any
         raise RuntimeError(f"Unemployment rate is outside sanity bounds: {rate}")
 
 
-def write_staging_artifact(nfp: dict[str, Any], unemployment: dict[str, Any]) -> dict[str, Any]:
+def write_staging_artifact(
+    nfp: dict[str, Any], unemployment: dict[str, Any],
+    unavailable: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Write staging-only artifacts. No canonical/public_data mutation occurs here."""
     STAGING_DIR.mkdir(parents=True, exist_ok=True)
     fetched_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -242,6 +269,7 @@ def write_staging_artifact(nfp: dict[str, Any], unemployment: dict[str, Any]) ->
             "Employment Situation release date. Resolve release metadata before canonical merge."
         ),
         "records": [nfp, unemployment],
+        "unavailable_observations": unavailable or [],
     }
 
     STAGING_JSON.write_text(json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -274,13 +302,16 @@ def write_staging_artifact(nfp: dict[str, Any], unemployment: dict[str, Any]) ->
 def main() -> int:
     try:
         raw = fetch_bls_series()
-        parsed = parse_monthly_observations(raw)
+        unavailable: list[dict[str, Any]] = []
+        parsed = parse_monthly_observations(raw, unavailable)
         nfp = derive_nfp_change(parsed[PAYROLL_SERIES])
         unemployment = build_unemployment_record(
             parsed[UNEMPLOYMENT_SERIES], nfp["observation_month"]
         )
         validate_employment_release(nfp, unemployment)
-        artifact = write_staging_artifact(nfp, unemployment)
+        artifact = write_staging_artifact(nfp, unemployment, unavailable)
+        for gap in unavailable:
+            print(f"SOURCE_DATA_UNAVAILABLE: {gap['series_id']} {gap['observation_month']} — {gap['footnotes']}")
 
         print("BLS EMPLOYMENT INGESTION: PASS (STAGING ONLY)")
         print(f"Observation month: {nfp['observation_month']}")
