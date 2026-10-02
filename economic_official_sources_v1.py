@@ -92,6 +92,22 @@ class Client:
             raise MetadataError('BLS batch omitted required series')
         return {'status': 'REQUEST_SUCCEEDED', 'Results': {'series': [self._bls_batch[series]]}}
 
+    def post_public_form(self, url, data):
+        """Read an official public archive form; never submits credentials."""
+        if url != 'https://oui.doleta.gov/unemploy/archive.asp' or set(data) != {'report','year'}:
+            raise MetadataError('Unsupported official public form')
+        key = url + json.dumps(data, sort_keys=True)
+        if key in self.cache:
+            return self.cache[key]
+        r = self.session.post(url, data=data, timeout=30)
+        r.raise_for_status()
+        if urlparse(r.url).hostname != 'oui.doleta.gov':
+            raise MetadataError('DOL archive cross-host redirect requires review')
+        self.directory.mkdir(parents=True, exist_ok=True)
+        (self.directory / (hashlib.sha256(key.encode()).hexdigest()+'.bin')).write_bytes(r.content)
+        self.cache[key] = r
+        return r
+
     def get(self, url, **kwargs):
         # API keys are never included in evidence filenames or logs.
         key = url + str({k:v for k,v in kwargs.get('params',{}).items() if k not in ('key','registrationkey','UserID')})
@@ -170,6 +186,52 @@ def bls_context(xml, group):
     return period, local.strftime('%Y-%m-%d'), None, url
 
 
+def bls_release_context(client, group):
+    """Explicit official-page alternate when RSS access fails; API values stay primary."""
+    feed_url = f'https://www.bls.gov/feed/{group}.rss'
+    try:
+        return (*bls_context(client.get(feed_url).content, group), None)
+    except requests.HTTPError as exc:
+        failure = http_error_diagnostic(exc)
+    except (MetadataError, ET.ParseError) as exc:
+        failure = str(exc)
+    url = f'https://www.bls.gov/news.release/{group}.nr0.htm'
+    try:
+        soup = BeautifulSoup(client.get(url).content, 'html.parser')
+        pre = soup.find('pre')
+        if pre is None:
+            raise MetadataError('BLS current release has no official release text')
+        text = ' '.join(pre.get_text(' ', strip=True).split())
+        embargo = re.search(r'embargoed until.{0,160}?(\d{1,2}:\d{2})\s*([ap])\.?m\.?\s*\(?(ET)\)?\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*'+DATE, text, re.I)
+        titles = {'empsit': 'THE EMPLOYMENT SITUATION', 'cpi': 'CONSUMER PRICE INDEX', 'ppi': 'PRODUCER PRICE INDEXES'}
+        reference = re.search(titles[group]+r'\s*[-–]\s*'+MONTH+r'\s+(\d{4})', text, re.I)
+        if not embargo or not reference:
+            raise MetadataError('BLS current release date/reference period unverified')
+        rd = date_iso(' '.join(embargo.group(j) for j in (4,5,6)))
+        rt = f'{embargo.group(1)} {embargo.group(2).upper()}M ET'
+        period = f'{reference.group(1).title()} {reference.group(2)}'
+        calendar_url = 'https://www.bls.gov/schedule/news_release/bls.ics'
+        calendar_text = client.get(calendar_url).content.decode('utf-8-sig')
+        calendar_text = re.sub(r'\r?\n[ \t]', '', calendar_text)
+        labels = {'empsit':'Employment Situation', 'cpi':'Consumer Price Index', 'ppi':'Producer Price Index'}
+        events = []
+        for event in re.findall(r'BEGIN:VEVENT(.*?)END:VEVENT', calendar_text, re.S):
+            summary = re.search(r'^SUMMARY:(.*)$', event, re.M)
+            start = re.search(r'^DTSTART;TZID=(?:US-Eastern|America/New_York):(\d{8}T\d{6})\s*$', event, re.M)
+            if summary and summary.group(1).strip() == labels[group] and start:
+                events.append(pd.to_datetime(start.group(1), format='%Y%m%dT%H%M%S').tz_localize('America/New_York'))
+        now = pd.Timestamp.now(tz='America/New_York')
+        due = [d for d in events if d <= now]
+        if not due or not any(d > now for d in events):
+            raise MetadataError('BLS calendar coverage/latest due release unavailable')
+        released = pd.Timestamp(f'{rd} {embargo.group(1)} {embargo.group(2).upper()}M').tz_localize('America/New_York')
+        if released != max(due):
+            raise MetadataError('BLS published release differs from latest due calendar release')
+        return period, rd, rt, url, {'metadata_alternate_reason': failure, 'metadata_source_url': url, 'release_calendar_url': calendar_url}
+    except requests.HTTPError as exc:
+        raise MetadataError(f'BLS values available; release metadata unavailable: {failure}; {http_error_diagnostic(exc)}') from exc
+
+
 def transform_bls(data, method):
     months = {f"{d['year']}-{d['period'][1:]}":d for d in data if re.fullmatch(r'M(0[1-9]|1[0-2])',d['period']) and re.fullmatch(r'-?\d+(?:\.\d+)?',str(d['value']).replace(',',''))}
     result = []
@@ -207,7 +269,7 @@ def collect_bls(client, indicator):
         raise MetadataError('Latest BLS value unavailable; refuse previous-month fallback')
     # Value available even if metadata endpoint is blocked; never invent dates.
     try:
-        period,rd,rt,url = bls_context(client.get(f'https://www.bls.gov/feed/{group}.rss').content,group)
+        period,rd,rt,url,metadata_extra = bls_release_context(client,group)
     except (MetadataError, ET.ParseError) as exc:
         return [observation(indicator, values[-1][0],values[-1][1],None,None,MAPPINGS[indicator]['url'],verification_status='METADATA_UNVERIFIED',reason=str(exc))]
     if period != values[-1][0]:
@@ -215,7 +277,7 @@ def collect_bls(client, indicator):
     out=[]
     # Capture current source values, including revisions, without backdating.
     for p,value,footnotes in values:
-        out.append(observation(indicator,p,value,rd,rt,url,publication_status='PRELIMINARY' if any(f.get('code')=='P' for f in footnotes) else 'CURRENT_VINTAGE', release_time_verification='METADATA_UNVERIFIED', original_release_date=None, value_source_url=MAPPINGS[indicator]['url'], latest_official_period=period))
+        out.append(observation(indicator,p,value,rd,rt,url,publication_status='PRELIMINARY' if any(f.get('code')=='P' for f in footnotes) else 'CURRENT_VINTAGE', release_time_verification='VERIFIED' if rt else 'METADATA_UNVERIFIED', original_release_date=None, value_source_url=MAPPINGS[indicator]['url'], latest_official_period=period, **(metadata_extra or {})))
     if len(out)>1:
         out[-1]['previous']=out[-2]['actual']
     return out
@@ -257,20 +319,69 @@ def collect_bea(client,indicator):
 
 def collect_claims(client):
     url=MAPPINGS['INITIAL_JOBLESS_CLAIMS']['url']
-    text=' '.join(PdfReader(io.BytesIO(client.get(url).content)).pages[0].extract_text().split())
+    alternate = None
+    try:
+        pdf = client.get(url).content
+    except requests.HTTPError as exc:
+        failure = http_error_diagnostic(exc)
+        index_url = 'https://oui.doleta.gov/unemploy/claims_arch.asp'
+        index = BeautifulSoup(client.get(index_url).content, 'html.parser')
+        if 'published each week on Thursday' not in index.get_text(' ', strip=True):
+            raise MetadataError('DOL official publication schedule unverified')
+        now = pd.Timestamp.now(tz='America/New_York')
+        regular = now.normalize()-pd.Timedelta(days=(now.weekday()-3)%7)
+        if regular+pd.Timedelta(hours=8,minutes=30)>now:
+            regular -= pd.Timedelta(days=7)
+        scheduled = regular
+        for tr in index.find_all('tr'):
+            cells = tr.find_all('td')
+            if len(cells) < 2:
+                continue
+            match = re.search(DATE, cells[0].get_text(' ',strip=True))
+            if match:
+                exception = pd.Timestamp(' '.join(match.groups())).tz_localize('America/New_York')
+                # A holiday substitution belongs to the same Monday-Sunday week.
+                week_start = exception-pd.Timedelta(days=exception.weekday())
+                thursday = week_start+pd.Timedelta(days=3)
+                if week_start <= now < week_start+pd.Timedelta(days=7):
+                    scheduled = exception if exception+pd.Timedelta(hours=8,minutes=30)<=now else thursday-pd.Timedelta(days=7)
+        candidates = []
+        for year in {scheduled.year, now.year}:
+            archive_url = 'https://oui.doleta.gov/unemploy/archive.asp'
+            archive = BeautifulSoup(client.post_public_form(archive_url, {'report':'press','year':str(year)}).content,'html.parser')
+            for a in archive.find_all('a',href=True):
+                link = urljoin(archive_url,a['href'])
+                match = re.fullmatch(r'/press/(\d{4})/(\d{2})(\d{2})(\d{2})\.pdf',urlparse(link).path)
+                if urlparse(link).hostname == 'oui.doleta.gov' and match:
+                    y,month,day,short_year=map(int,match.groups())
+                    if y%100 != short_year:
+                        raise MetadataError('DOL archive URL year mismatch')
+                    date = pd.Timestamp(f'{y}-{month:02d}-{day:02d}').tz_localize('America/New_York')
+                    if date+pd.Timedelta(hours=8,minutes=30)<=now:
+                        candidates.append((date,link))
+        if not candidates:
+            raise MetadataError('DOL official archive has no published release')
+        date,url = max(candidates)
+        if date != scheduled:
+            raise MetadataError('DOL archive is older than latest official scheduled release')
+        pdf = client.get(url).content
+        alternate = {'source_alternate_reason':failure,'source_discovery_url':index_url,'archive_release_date':date.strftime('%Y-%m-%d')}
+    text=' '.join(PdfReader(io.BytesIO(pdf)).pages[0].extract_text().split())
     rd,rt=release_timestamp(text)
+    if alternate and rd != alternate['archive_release_date']:
+        raise MetadataError('DOL archive and PDF release dates disagree')
     m=re.search(r'In the week ending '+MONTH+r'\s+(\d{1,2})(?:,\s*(\d{4}))?,?\s+the advance figure for seasonally adjusted initial claims was\s+([\d,]+)',text,re.I)
     if not m:
         raise MetadataError('DOL seasonally adjusted advance claims missing')
     year=int(m.group(3) or rd[:4]);week=pd.Timestamp(f'{m.group(1)} {m.group(2)} {year}')
     if week>pd.Timestamp(rd):
         week=week.replace(year=year-1)
-    row=observation('INITIAL_JOBLESS_CLAIMS','Week ending '+week.strftime('%B %d, %Y'),int(m.group(4).replace(',','')),rd,rt,url,publication_status='ADVANCE')
+    row=observation('INITIAL_JOBLESS_CLAIMS','Week ending '+week.strftime('%B %d, %Y'),int(m.group(4).replace(',','')),rd,rt,url,publication_status='ADVANCE', **(alternate or {}))
     rev=re.search(r"previous week.s level was (?:revised (?:up|down) by [\d,]+ from [\d,]+ to|unrevised at)\s*([\d,]+)",text,re.I)
     rows=[row]
     if rev:
         row['previous']=float(rev.group(1).replace(',',''))
-        rows.insert(0,observation('INITIAL_JOBLESS_CLAIMS','Week ending '+(week-timedelta(days=7)).strftime('%B %d, %Y'),row['previous'],rd,rt,url,publication_status='REVISED',latest_official_period=row['reference_period']))
+        rows.insert(0,observation('INITIAL_JOBLESS_CLAIMS','Week ending '+(week-timedelta(days=7)).strftime('%B %d, %Y'),row['previous'],rd,rt,url,publication_status='REVISED',latest_official_period=row['reference_period'], **(alternate or {})))
     return rows
 
 
@@ -291,7 +402,7 @@ def collect_retail(client):
         return [dict(indicator='RETAIL_SALES',reference_period=period,release_date=rd,release_time=rt,actual=None,verification_status='SOURCE_ERROR',metadata_source_url=url,reason='CENSUS_API_KEY required for current/revised official retail estimates')]
     # Verify runtime category/data type labels; do not silently use a different universe.
     base=MAPPINGS['RETAIL_SALES']['url']
-    payload=client.get(base,params={'get':'cell_value,time,category_code,data_type_code,seasonally_adj','time':'from '+str(int(m.group(2))-1)+'-01','category_code':'44X72','data_type_code':'SM','seasonally_adj':'yes','for':'us:*','key':key}).json()
+    payload=client.get(base,params={'get':'cell_value,time_slot_date,time_slot_id,category_code,data_type_code,seasonally_adj','time':'from '+str(int(m.group(2))-1)+'-01 to '+pd.Timestamp.now(tz='UTC').strftime('%Y-%m'),'category_code':'44X72','data_type_code':'SM','seasonally_adj':'yes','for':'us:*','key':key}).json()
     if not isinstance(payload,list) or len(payload)<3:
         raise ValueError('Census API missing observations')
     values={}
@@ -299,7 +410,13 @@ def collect_retail(client):
         r=dict(zip(payload[0],raw))
         if (r['category_code'],r['data_type_code'],r['seasonally_adj'])!=('44X72','SM','yes'):
             raise ValueError('Census semantic selector mismatch')
-        values[pd.Period(r['time'],freq='M')]=float(r['cell_value'])
+        period_value=r.get('time_slot_date') or r.get('time')
+        if not period_value:
+            raise MetadataError('Census observation reference date unavailable')
+        ref_month=pd.Period(period_value,freq='M')
+        if ref_month in values:
+            raise MetadataError('Duplicate Census reference period')
+        values[ref_month]=float(r['cell_value'])
     ref=pd.Period(period,freq='M')
     if max(values)!=ref or ref-1 not in values:
         raise MetadataError('Census release/API reference period mismatch')
