@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-01",
+  "context_date": "2026-10-02",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-09-17",
-    "age_days": 14,
+    "age_days": 15,
     "economic_regime": "MIXED",
     "inflation_score": 1.0585026808856153,
     "labor_score": 0.0265094293115017,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-01",
+    "as_of_date": "2026-10-02",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,19 +328,19 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-09-30",
+    "source_date": "2026-10-01",
     "age_days": 1,
-    "composite_stress_score": -0.3139802136975531,
+    "composite_stress_score": -0.4007655696696865,
     "research_regime": "LOW_RESEARCH_STRESS",
-    "vix": 16.34,
-    "treasury_2y": 4.89,
-    "treasury_10y": 5.26,
-    "yield_10y_2y_spread": 0.3700000000000001,
+    "vix": 16.39,
+    "treasury_2y": 4.88,
+    "treasury_10y": 5.29,
+    "yield_10y_2y_spread": 0.4100000000000001,
     "pit_safe": true
   },
   "event_news": {
     "source_date": "2026-10-01",
-    "age_days": 0,
+    "age_days": 1,
     "latest_published_at": "2026-10-01T14:00:00+00:00",
     "latest_title": "Construction Spending",
     "latest_source": "U.S. Census Bureau",
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 14,
+    "economic_age_days": 15,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 0,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
