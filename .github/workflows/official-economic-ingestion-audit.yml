@@ -1,4 +1,4 @@
-name: Economic 14 — Official Source Audit
+name: Official Economic Ingestion Audit
 
 on:
   workflow_dispatch:
