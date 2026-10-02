@@ -34,7 +34,7 @@ MAPPINGS.update({
     'GDP':dict(agency='BEA',series='NIPA T10101 A191RL / real GDP annualized quarterly growth',units='percent SA annual rate',url='https://www.bea.gov/news/current-releases'),
     'PCE_PRICE_INDEX':dict(agency='BEA',series='Personal Income and Outlays / PCE monthly price change',units='percent monthly change',url='https://www.bea.gov/news/current-releases'),
     'CORE_PCE':dict(agency='BEA',series='Personal Income and Outlays / PCE excluding food and energy monthly price change',units='percent monthly change',url='https://www.bea.gov/news/current-releases'),
-    'RETAIL_SALES':dict(agency='Census',series='MRTSADV category 44X72, SM, seasonally_adj yes',units='percent monthly SA nominal change',url='https://api.census.gov/data/timeseries/eits/mrtsadv'),
+    'RETAIL_SALES':dict(agency='Census',series='MARTS advance monthly sales, category 44X72, SM, seasonally_adj yes',units='percent monthly SA nominal change',url='https://api.census.gov/data/timeseries/eits/marts'),
     'INITIAL_JOBLESS_CLAIMS':dict(agency='DOL',series='UI weekly initial claims SA',units='claims',url='https://www.dol.gov/ui/data.pdf'),
     'ISM_MANUFACTURING_PMI':dict(agency='ISM',series='Manufacturing headline PMI composite',units='diffusion index',url='https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/'),
     'ISM_SERVICES_PMI':dict(agency='ISM',series='Services headline PMI composite',units='diffusion index',url='https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/'),
@@ -197,14 +197,22 @@ def bls_release_context(client, group):
         failure = str(exc)
     url = f'https://www.bls.gov/news.release/{group}.nr0.htm'
     try:
-        soup = BeautifulSoup(client.get(url).content, 'html.parser')
-        pre = soup.find('pre')
-        if pre is None:
-            raise MetadataError('BLS current release has no official release text')
-        text = ' '.join(pre.get_text(' ', strip=True).split())
+        try:
+            soup = BeautifulSoup(client.get(url).content, 'html.parser')
+            pre = soup.find('pre')
+            if pre is None:
+                raise MetadataError('BLS current release has no official release text')
+            text = ' '.join(pre.get_text(' ', strip=True).split())
+        except requests.HTTPError as exc:
+            failure += '; ' + http_error_diagnostic(exc)
+            url = f'https://www.bls.gov/news.release/pdf/{group}.pdf'
+            pdf = client.get(url).content
+            if not pdf.startswith(b'%PDF'):
+                raise MetadataError('BLS official PDF endpoint returned a non-PDF response')
+            text = ' '.join(PdfReader(io.BytesIO(pdf)).pages[0].extract_text().split())
         embargo = re.search(r'embargoed until.{0,160}?(\d{1,2}:\d{2})\s*([ap])\.?m\.?\s*\(?(ET)\)?\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*'+DATE, text, re.I)
         titles = {'empsit': 'THE EMPLOYMENT SITUATION', 'cpi': 'CONSUMER PRICE INDEX', 'ppi': 'PRODUCER PRICE INDEXES'}
-        reference = re.search(titles[group]+r'\s*[-–]\s*'+MONTH+r'\s+(\d{4})', text, re.I)
+        reference = re.search(titles[group]+r'\s*[-–—]\s*'+MONTH+r'\s+(\d{4})', text, re.I)
         if not embargo or not reference:
             raise MetadataError('BLS current release date/reference period unverified')
         rd = date_iso(' '.join(embargo.group(j) for j in (4,5,6)))
@@ -402,7 +410,18 @@ def collect_retail(client):
         return [dict(indicator='RETAIL_SALES',reference_period=period,release_date=rd,release_time=rt,actual=None,verification_status='SOURCE_ERROR',metadata_source_url=url,reason='CENSUS_API_KEY required for current/revised official retail estimates')]
     # Verify runtime category/data type labels; do not silently use a different universe.
     base=MAPPINGS['RETAIL_SALES']['url']
-    payload=client.get(base,params={'get':'cell_value,time_slot_date,time_slot_id,category_code,data_type_code,seasonally_adj','time':'from '+str(int(m.group(2))-1)+'-01 to '+pd.Timestamp.now(tz='UTC').strftime('%Y-%m'),'category_code':'44X72','data_type_code':'SM','seasonally_adj':'yes','for':'us:*','key':key}).json()
+    # The official catalog distinguishes MARTS sales from MRTSADV inventories.
+    catalog=client.get(base+'.json').json()
+    datasets=catalog.get('dataset',[]) if isinstance(catalog,dict) else []
+    if len(datasets)!=1 or datasets[0].get('c_dataset')!=['timeseries','eits','marts'] or not datasets[0].get('title','').endswith('Advance Monthly Sales for Retail and Food Services'):
+        raise MetadataError('Census dataset is not verified advance retail and food services sales')
+    response=client.get(base,params={'get':'cell_value,time_slot_date,time_slot_id,category_code,data_type_code,seasonally_adj','time':'from '+str(int(m.group(2))-1)+'-01 to '+pd.Timestamp.now(tz='UTC').strftime('%Y-%m'),'category_code':'44X72','data_type_code':'SM','seasonally_adj':'yes','for':'us:*','key':key})
+    if hasattr(response,'content') and not response.content.strip():
+        raise RuntimeError('Census sales API returned an empty response; no official observations verified')
+    try:
+        payload=response.json()
+    except ValueError as exc:
+        raise RuntimeError('Census sales API returned non-JSON; check API key activation and endpoint availability') from exc
     if not isinstance(payload,list) or len(payload)<3:
         raise ValueError('Census API missing observations')
     values={}
