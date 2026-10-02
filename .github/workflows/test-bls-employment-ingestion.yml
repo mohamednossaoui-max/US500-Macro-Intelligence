@@ -11,6 +11,8 @@ jobs:
     name: Fetch BLS Employment Data
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -20,6 +22,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install collector dependencies
+        run: python -m pip install "requests>=2.31,<3"
+
+      - name: Verify requests import
+        run: python -c "import requests; print('PASS requests import')"
 
       - name: Show Python version
         run: python --version
