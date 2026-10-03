@@ -443,6 +443,27 @@ def collect_retail(client):
     return [observation('RETAIL_SALES',period,actual,rd,rt,base,metadata_source_url=url,publication_status='REVISED' if notice else 'ADVANCE')]
 
 
+def ism_latest_release(client, kind):
+    calendar_url='https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/'
+    cal=BeautifulSoup(client.get(calendar_url).text,'html.parser')
+    dates=[]
+    column=2 if kind=='services' else 1
+    for tr in cal.find_all('tr'):
+        cells=tr.find_all(['td','th'])
+        if len(cells)<3:continue
+        label=cells[0].get_text(' ',strip=True)
+        cm=re.fullmatch(MONTH+r'\s+(\d{4})',label,re.I)
+        day=re.match(r'^(\d{1,2})',cells[column].get_text(' ',strip=True))
+        if cm and day:
+            dates.append(pd.Timestamp(f'{cm.group(1)} {day.group(1)} {cm.group(2)}'))
+    now=pd.Timestamp.now(tz='America/New_York')
+    due=[d for d in dates if d.tz_localize('America/New_York')+pd.Timedelta(hours=10)<=now]
+    if not due:
+        raise MetadataError('ISM explicit release calendar unavailable')
+    released=max(due)
+    return released, calendar_url
+
+
 def collect_ism(client,indicator):
     # Discover the dated public release, never a membership/catalog link.
     base=MAPPINGS[indicator]['url']
@@ -469,28 +490,69 @@ def collect_ism(client,indicator):
     # The current report has no publication date in many ISM templates.
     # Join its explicitly named reference period to the official dated calendar;
     # require it to equal the latest release already due for this sector.
-    calendar_url='https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/'
-    cal=BeautifulSoup(client.get(calendar_url).text,'html.parser')
-    dates=[]
-    column=2 if kind=='services' else 1
-    for tr in cal.find_all('tr'):
-        cells=tr.find_all(['td','th'])
-        if len(cells)<3:continue
-        label=cells[0].get_text(' ',strip=True)
-        cm=re.fullmatch(MONTH+r'\s+(\d{4})',label,re.I)
-        day=re.match(r'^(\d{1,2})',cells[column].get_text(' ',strip=True))
-        if cm and day:
-            dates.append(pd.Timestamp(f'{cm.group(1)} {day.group(1)} {cm.group(2)}'))
-    now=pd.Timestamp.now(tz='America/New_York')
-    due=[d for d in dates if d.tz_localize('America/New_York')+pd.Timedelta(hours=10)<=now]
-    if not due:
-        raise MetadataError('ISM explicit release calendar unavailable')
-    released=max(due)
+    released, calendar_url = ism_latest_release(client, kind)
     if pd.Period(period,freq='M')!=pd.Period(released,freq='M')-1:
         raise MetadataError('ISM current-report period differs from latest dated calendar release')
     rd=released.strftime('%Y-%m-%d');rt='10:00 ET'
 
     return [observation(indicator,period,float(val.group(1)),rd,rt,url,metadata_source_url=calendar_url,source_discovery_url=discovery_url)]
+
+
+def collect_ism_distributed_release(client, indicator, direct_failure):
+    """Read ISM's publicly issued press release on its named distributor profile."""
+    if indicator != 'ISM_MANUFACTURING_PMI':
+        raise MetadataError('Distribution alternate is only verified for manufacturing')
+    profile = 'https://www.prnewswire.com/news/institute-for-supply-management/'
+    soup = BeautifulSoup(client.get(profile).text, 'html.parser')
+    heading = soup.find('h1')
+    if heading is None or not heading.get_text(' ',strip=True).startswith('News from Institute for Supply Management'):
+        raise MetadataError('ISM distributor issuer profile unavailable')
+    candidates = []
+    for a in soup.find_all('a',href=True):
+        label = a.get_text(' ',strip=True)
+        ref = re.search(MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+Manufacturing PMI',label,re.I)
+        url = urljoin(profile,a['href'])
+        if ref and urlparse(url).hostname=='www.prnewswire.com' and urlparse(url).path.startswith('/news-releases/manufacturing-pmi-at-'):
+            candidates.append((pd.Period(f'{ref.group(1)} {ref.group(2)}',freq='M'),url))
+    if not candidates:
+        raise MetadataError('ISM distributor has no manufacturing release')
+    latest = max(p for p,u in candidates)
+    urls = {u for p,u in candidates if p==latest}
+    if len(urls)!=1:
+        raise MetadataError('ISM distributor latest release ambiguous')
+    url = urls.pop()
+    article = BeautifulSoup(client.get(url).text,'html.parser')
+    credit = next((h for h in article.find_all('h2') if h.get_text(' ',strip=True)=='News provided by'),None)
+    issuer = credit.find_next_sibling('a') if credit else None
+    if issuer is None or issuer.get_text(' ',strip=True)!='Institute for Supply Management' or urljoin(url,issuer.get('href',''))!=profile:
+        raise MetadataError('Distributed release issuer is not verified ISM')
+    headline = article.find('h1')
+    title = headline.get_text(' ',strip=True) if headline else ''
+    value = re.search(r'^Manufacturing PMI[^\d]{0,20}at\s+(\d+(?:\.\d+)?)%;\s*'+MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+Manufacturing PMI',title,re.I)
+    if not value or pd.Period(f'{value.group(2)} {value.group(3)}',freq='M')!=latest:
+        raise MetadataError('ISM distributed headline/reference period mismatch')
+    schema = []
+    for script in article.find_all('script',type='application/ld+json'):
+        data = json.loads(script.get_text())
+        if isinstance(data,dict) and data.get('@type')=='NewsArticle':schema.append(data)
+    if len(schema)!=1 or schema[0].get('mainEntityOfPage',{}).get('@id')!=url or schema[0].get('headline')!=title:
+        raise MetadataError('ISM distributed publication provenance unavailable')
+    stamp = pd.Timestamp(schema[0].get('datePublished'))
+    if pd.isna(stamp) or stamp.tzinfo is None:
+        raise MetadataError('ISM distributed published timestamp unavailable')
+    stamp = stamp.tz_convert('America/New_York')
+    released,calendar_url = ism_latest_release(client,'pmi')
+    expected = released.tz_localize('America/New_York')+pd.Timedelta(hours=10)
+    if stamp!=expected or latest!=pd.Period(released,freq='M')-1:
+        raise MetadataError('ISM distributed release differs from latest official dated calendar')
+    body = flat(str(article))
+    actual = re.search(r'The Manufacturing PMI[^\d]{0,25}registered\s+(\d+(?:\.\d+)?)\s+percent',body,re.I)
+    if not actual or float(actual.group(1))!=float(value.group(1)):
+        raise MetadataError('ISM distributed headline/body value mismatch')
+    return [observation(indicator,latest.strftime('%B %Y'),float(value.group(1)),stamp.strftime('%Y-%m-%d'),'10:00 ET',url,
+        source='ISM-issued press release distributed via PR Newswire',source_distribution='PR Newswire',
+        source_discovery_url=profile,metadata_source_url=calendar_url,source_alternate_reason=direct_failure,
+        release_time_verification='VERIFIED')]
 
 
 def collect(client,indicator):
@@ -499,4 +561,10 @@ def collect(client,indicator):
     if agency=='BEA':return collect_bea(client,indicator)
     if agency=='DOL':return collect_claims(client)
     if agency=='Census':return collect_retail(client)
-    return collect_ism(client,indicator)
+    try:
+        return collect_ism(client,indicator)
+    except (requests.HTTPError,RuntimeError,MetadataError) as exc:
+        if indicator!='ISM_MANUFACTURING_PMI':
+            raise
+        reason=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else str(exc)
+        return collect_ism_distributed_release(client,indicator,reason)
