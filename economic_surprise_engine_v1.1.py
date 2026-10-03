@@ -78,6 +78,13 @@ def as_date(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, errors="coerce").dt.normalize()
 
 
+def knowledge_dates(df: pd.DataFrame) -> pd.Series:
+    """Effective PIT availability; a revised API snapshot cannot be backdated."""
+    release = pd.to_datetime(df["release_date"], errors="coerce", utc=True)
+    explicit = pd.to_datetime(df.get("available_as_of", pd.Series(pd.NaT,index=df.index)), errors="coerce", utc=True)
+    return explicit.fillna(release).dt.tz_convert(None).dt.normalize()
+
+
 def has_value(value) -> bool:
     return pd.notna(value)
 
@@ -119,7 +126,7 @@ def classify_release_type(row: pd.Series) -> str:
 def finalize_gdp_release_types(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["release_type"] = "NEW_PERIOD_RELEASE"
-    df["regime_eligible"] = True
+    df["regime_eligible"] = ~df.get("source_snapshot_history", pd.Series(False, index=df.index)).fillna(False).astype(bool)
     if "reference_period" not in df.columns:
         return df
 
@@ -187,7 +194,7 @@ def calculate_prior_observation_change(
     """
 
     work = df.copy()
-    work["_release_dt"] = pd.to_datetime(work["release_date"], errors="coerce")
+    work["_release_dt"] = knowledge_dates(work)
     work["_actual_num"] = pd.to_numeric(work["actual"], errors="coerce")
 
     # Stable chronological order. The original row order is retained as a
@@ -202,9 +209,10 @@ def calculate_prior_observation_change(
     prior_release = pd.Series(pd.NaT, index=work.index, dtype="datetime64[ns]")
 
     # Shift is safe because rows are chronological within each indicator.
-    grouped = work.groupby("indicator", sort=False)
-    prior_actual.loc[work.index] = grouped["_actual_num"].shift(1)
-    prior_release.loc[work.index] = grouped["_release_dt"].shift(1)
+    active = work.loc[~work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool)]
+    grouped = active.groupby("indicator", sort=False)
+    prior_actual.loc[active.index] = grouped["_actual_num"].shift(1)
+    prior_release.loc[active.index] = grouped["_release_dt"].shift(1)
 
     # Restore original order/index.
     prior_actual = prior_actual.reindex(df.index)
@@ -227,7 +235,7 @@ def calculate_prior_zscore(
     """
 
     work = df.copy()
-    work["_release_dt"] = pd.to_datetime(work["release_date"], errors="coerce")
+    work["_release_dt"] = knowledge_dates(work)
     work["_row_order"] = np.arange(len(work))
     work[value_column] = pd.to_numeric(work[value_column], errors="coerce")
 
@@ -239,7 +247,8 @@ def calculate_prior_zscore(
     z = pd.Series(np.nan, index=work.index, dtype="float64")
     prior_count = pd.Series(0, index=work.index, dtype="int64")
 
-    for indicator, idx in work.groupby("indicator", sort=False).groups.items():
+    active = work.loc[~work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool)]
+    for indicator, idx in active.groupby("indicator", sort=False).groups.items():
         sub = work.loc[idx].sort_values(
             ["_release_dt", "_row_order"],
             kind="mergesort",
@@ -358,7 +367,7 @@ def main() -> None:
         )
 
     # Stable chronological order for all point-in-time calculations.
-    df["_release_dt"] = pd.to_datetime(df["release_date"], errors="coerce")
+    df["_release_dt"] = knowledge_dates(df)
     df["_row_order"] = np.arange(len(df))
     df = df.sort_values(
         ["indicator", "_release_dt", "_row_order"],
@@ -391,13 +400,14 @@ def main() -> None:
     df["prior_observation_release_date"] = pd.NaT
 
     for indicator, idx in df.groupby("indicator", sort=False).groups.items():
-        sub = df.loc[idx].sort_values(
-            ["release_date", "_row_order"],
+        sub = df.loc[idx]
+        sub = sub.loc[~sub.get("source_snapshot_history", pd.Series(False,index=sub.index)).fillna(False).astype(bool)].sort_values(
+            ["_release_dt", "_row_order"],
             kind="mergesort",
         )
 
         previous_actual = pd.to_numeric(sub["actual"], errors="coerce").shift(1)
-        previous_release = sub["release_date"].shift(1)
+        previous_release = sub["_release_dt"].shift(1)
 
         df.loc[sub.index, "prior_observation"] = previous_actual.values
         df.loc[
@@ -420,7 +430,7 @@ def main() -> None:
         & df["prior_observation_release_date"].notna()
         & (
             df["prior_observation_release_date"]
-            < df["release_date"]
+            < df["_release_dt"]
         )
     )
 

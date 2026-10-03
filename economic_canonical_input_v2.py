@@ -20,9 +20,10 @@ LEGACY_SEVEN = {
 }
 
 
-def stage_canonical_input() -> dict:
-    src_events = PUBLIC / EVENTS
-    src_quality = PUBLIC / QUALITY
+def stage_canonical_input(workspace=False) -> dict:
+    source = ROOT if workspace else PUBLIC
+    src_events = source / EVENTS
+    src_quality = source / QUALITY
     if not src_events.exists() or not src_quality.exists():
         raise FileNotFoundError("Canonical Economic artifacts are missing from public_data/")
 
@@ -41,8 +42,9 @@ def stage_canonical_input() -> dict:
     if pit_col is None or not q[pit_col].fillna(False).astype(bool).all():
         raise RuntimeError("Canonical Economic quality artifact is not fully PIT-safe")
 
-    shutil.copy2(src_events, ROOT / EVENTS)
-    shutil.copy2(src_quality, ROOT / QUALITY)
+    if not workspace:
+        shutil.copy2(src_events, ROOT / EVENTS)
+        shutil.copy2(src_quality, ROOT / QUALITY)
     return {
         "records": len(df),
         "indicators": len(indicators),
@@ -51,6 +53,9 @@ def stage_canonical_input() -> dict:
 
 
 if __name__ == "__main__":
-    result = stage_canonical_input()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--workspace", action="store_true", help="Validate already merged workspace input without copying old public data")
+    result = stage_canonical_input(parser.parse_args().workspace)
     print("CANONICAL ECONOMIC INPUT: PASS")
     print(result)

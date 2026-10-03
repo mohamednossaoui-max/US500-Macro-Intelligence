@@ -200,7 +200,8 @@ def latest_fresh_indicator_rows(df, snapshot_date, indicators):
         if x.empty:
             continue
 
-        x = x.sort_values(["release_date"]).iloc[-1]
+        explicit = pd.to_datetime(x.get("available_as_of", pd.Series(pd.NaT,index=x.index)),errors="coerce")
+        x = x.assign(_known=explicit.fillna(x["release_date"])).sort_values(["_known","release_date"],kind="mergesort").iloc[-1]
         age_days = (snapshot_date - x["release_date"]).days
         max_age = FRESHNESS_DAYS[indicator]
 
@@ -293,9 +294,10 @@ def main():
     if bool(df["decision_engine_ready"].fillna(False).any()):
         raise ValueError("Decision Engine must remain disabled.")
 
-    snapshot_dates = sorted(
-        pd.Series(df["release_date"].dropna().unique())
-    )
+    dates = df["release_date"]
+    if "available_as_of" in df:
+        dates = pd.concat([dates,pd.to_datetime(df["available_as_of"],errors="coerce")])
+    snapshot_dates = sorted(pd.Series(dates.dropna().unique()))
 
     records = []
 
