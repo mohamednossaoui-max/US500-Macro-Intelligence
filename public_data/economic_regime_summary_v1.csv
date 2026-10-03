@@ -2,7 +2,7 @@ economic_regime,observations,research_only,decision_engine_ready
 PARTIAL_DATA,257,True,False
 INSUFFICIENT_DATA,55,True,False
 MIXED,31,True,False
-DISINFLATIONARY_SLOWDOWN,11,True,False
 STAGFLATIONARY,11,True,False
+DISINFLATIONARY_SLOWDOWN,11,True,False
 DISINFLATIONARY_GROWTH,6,True,False
 INFLATIONARY_GROWTH,5,True,False

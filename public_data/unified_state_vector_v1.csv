@@ -1,9 +1,9 @@
 state_vector_version,context_date,feature,module,role,value,state,as_of,available_at,age_days,freshness,pit_status,quality,eligible,source,notes
-USV1.0,2026-10-03,economic_inflation,ECONOMIC,CORE,0.5394965511237497,MIXED,2026-10-03,2026-10-03,29,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-03,economic_labor,ECONOMIC,CORE,-0.025407330640432,MIXED,2026-10-03,2026-10-03,29,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-03,economic_growth,ECONOMIC,CORE,-0.0507334623403759,MIXED,2026-10-03,2026-10-03,29,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-03,economic_regime,ECONOMIC,CORE,,MIXED,2026-10-03,2026-10-03,29,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-03,fed_stance,FED,CORE,56.2,MODERATELY HAWKISH,2026-10-02,2026-10-02,30,CURRENT,PIT_SAFE,MEDIUM,True,fed_intelligence_output_v1.json,Independent Fed feature; legacy Macro Fed field intentionally not duplicated.
+USV1.0,2026-10-03,economic_inflation,ECONOMIC,CORE,0.5394965511237497,MIXED,2026-10-03,2026-10-03,30,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-03,economic_labor,ECONOMIC,CORE,-0.025407330640432,MIXED,2026-10-03,2026-10-03,30,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-03,economic_growth,ECONOMIC,CORE,-0.0507334623403759,MIXED,2026-10-03,2026-10-03,30,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-03,economic_regime,ECONOMIC,CORE,,MIXED,2026-10-03,2026-10-03,30,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-03,fed_stance,FED,CORE,56.2,MODERATELY HAWKISH,2026-10-02,2026-10-02,65,CURRENT,PIT_SAFE,MEDIUM,True,fed_intelligence_output_v1.json,Independent Fed feature; legacy Macro Fed field intentionally not duplicated.
 USV1.0,2026-10-03,financial_stress,FINANCIAL_STRESS,CORE,-0.4007655696696865,LOW_RESEARCH_STRESS,2026-10-03,2026-10-03,0,CURRENT,PIT_SAFE,HIGH,True,research_context_summary_v1.csv,
 USV1.0,2026-10-03,liquidity_coverage,LIQUIDITY,CORE,8.0,8/8_ELIGIBLE,2026-09-21,2026-09-21,4,CURRENT,PIT_SAFE,MEDIUM,True,liquidity_intelligence_summary_v1.csv,No liquidity score generated; coverage only.
 USV1.0,2026-10-03,sentiment,SENTIMENT,CORE,42.979242979242976,NEUTRAL,2026-10-03,2026-10-03,3,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
