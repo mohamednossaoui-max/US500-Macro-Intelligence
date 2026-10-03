@@ -3,118 +3,48 @@ name: Economic Intelligence Full Pipeline v2.3 Refresh
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   economic-intelligence-v2-3:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
+    env:
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas numpy requests beautifulsoup4 pypdf
-
-      - name: Verify files
-        run: |
-          test -f economic_historical_expansion_v2.2.py
-          test -f economic_historical_refresh_v1.py
-          test -f economic_surprise_engine_v1.1.py
-          test -f economic_regime_classifier_v1.5.py
-          test -f economic_canonical_input_v2.py
-          test -f economic_pce_historical_backfill_v2.py
-
-      - name: Syntax check
-        run: |
-          python -m py_compile economic_historical_expansion_v2.2.py
-          python -m py_compile economic_historical_refresh_v1.py
-          python -m py_compile economic_surprise_engine_v1.1.py
-          python -m py_compile economic_regime_classifier_v1.5.py
-          python -m py_compile economic_canonical_input_v2.py
-          python -m py_compile economic_pce_historical_backfill_v2.py
-
-      - name: Backfill PIT-safe PCE history from BEA archived releases
-        run: python economic_pce_historical_backfill_v2.py --start 2024-01 --end 2026-07 --min-months 18
-
-      - name: Stage canonical Economic input (14-indicator foundation)
-        run: python economic_canonical_input_v2.py
-
-      - name: Surprise Engine v1.3
+        run: pip install pandas numpy requests beautifulsoup4 pypdf pytest
+      - name: Official refresh, staging validation and canonical merge
+        run: python economic_official_ingestion_v1.py --mode merge
+      - name: Validate merged canonical Economic input
+        run: python economic_canonical_input_v2.py --workspace
+      - name: Surprise Engine
         run: python economic_surprise_engine_v1.1.py
-
-      - name: Regime Classifier v1.6
+      - name: Regime Classifier
         run: python economic_regime_classifier_v1.5.py
-
-      - name: Freshness and Quality Gate
-        run: |
-          python - <<'PY'
-          import pandas as pd
-
-          h = pd.read_csv("economic_historical_events_v1.csv")
-          q = pd.read_csv("economic_historical_quality_v1.csv")
-          s = pd.read_csv("economic_surprise_engine_v1.csv")
-          r = pd.read_csv("economic_regime_events_v1.csv")
-
-          h["release_date"] = pd.to_datetime(h["release_date"])
-          q["release_date"] = pd.to_datetime(q["release_date"])
-          r["release_date"] = pd.to_datetime(r["release_date"])
-
-          assert h["release_date"].max() >= pd.Timestamp("2026-09-17")
-          assert q["point_in_time_safe"].all()
-          assert not q["historical_consensus_available"].any()
-
-          required_latest = {
-              ("CPI", "2026-09-11"),
-              ("CORE_CPI", "2026-09-11"),
-              ("NFP", "2026-09-04"),
-              ("UNEMPLOYMENT_RATE", "2026-09-04"),
-              ("ISM_MANUFACTURING_PMI", "2026-09-09"),
-              ("GDP", "2026-08-26"),
-              ("INITIAL_JOBLESS_CLAIMS", "2026-09-17"),
-          }
-
-          for indicator, date in required_latest:
-              mask = (h["indicator"] == indicator) & (h["release_date"] == pd.Timestamp(date))
-              assert mask.any(), f"Missing refresh record: {indicator} {date}"
-
-          assert s["point_in_time_safe"].all()
-          assert s["research_only"].all()
-          assert not s["decision_engine_ready"].any()
-
-          assert r["pit_safe"].all()
-          assert r["research_only"].all()
-          assert not r["decision_engine_ready"].any()
-
-          latest = r.sort_values("release_date").iloc[-1]
-          assert latest["release_date"] >= pd.Timestamp("2026-09-17")
-          assert {"PCE_PRICE_INDEX", "CORE_PCE"} <= set(h["indicator"].astype(str))
-          assert h["indicator"].nunique() > 7
-          assert (h["indicator"] == "PCE_PRICE_INDEX").sum() >= 18
-          assert (h["indicator"] == "CORE_PCE").sum() >= 18
-
-          print("Historical records:", len(h))
-          print("Latest historical release:", h["release_date"].max().date())
-          print("Latest regime snapshot:", latest["release_date"].date())
-          print("Latest regime:", latest["economic_regime"])
-          print("Dimensions available:", int(latest["dimensions_available"]))
-          print("PIT QUALITY GATE: PASS")
-          print("FRESHNESS GATE: PASS")
-          print("CANONICAL EXTENDED-UNIVERSE GATE: PASS")
-          print("RESEARCH-ONLY GATE: PASS")
-          print("DECISION ENGINE DISABLED: PASS")
-          PY
-
-      - name: Upload v2.3 artifacts
+      - name: Release-aware canonical gate
+        run: python economic_official_ingestion_v1.py --mode gate
+      - name: PIT and ingestion regressions
+        run: python -m pytest -q tests/test_point_in_time_integrity.py tests/test_economic_official_ingestion_v1.py
+      - name: Upload audit evidence even on source failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-official-source-audit
+          path: economic_official_staging/
+      - name: Upload validated Economic artifacts
         uses: actions/upload-artifact@v4
         with:
           name: economic-intelligence-v2-3-refresh
           path: |
+            economic_ingestion_status_v1.json
             economic_historical_events_v1.csv
             economic_historical_quality_v1.csv
             economic_surprise_engine_v1.csv

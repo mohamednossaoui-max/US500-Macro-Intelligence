@@ -22,6 +22,7 @@ jobs:
     env:
       CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
       BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

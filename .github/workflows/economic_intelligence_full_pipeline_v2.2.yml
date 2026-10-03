@@ -7,6 +7,11 @@ jobs:
   economic-intelligence-v2-2:
     runs-on: ubuntu-latest
 
+    env:
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,14 +47,20 @@ jobs:
       - name: PR-04 Point-in-Time integrity tests
         run: python -m pytest -q tests/test_point_in_time_integrity.py
 
+      - name: Official refresh, staging validation and canonical merge
+        run: python economic_official_ingestion_v1.py --mode merge
+
       - name: Stage canonical Economic input (14-indicator foundation)
-        run: python economic_canonical_input_v2.py
+        run: python economic_canonical_input_v2.py --workspace
 
       - name: Surprise Engine v1.3 (same filename)
         run: python economic_surprise_engine_v1.1.py
 
       - name: Regime Classifier v1.6 (same filename)
         run: python economic_regime_classifier_v1.5.py
+
+      - name: Release-aware official canonical gate
+        run: python economic_official_ingestion_v1.py --mode gate
 
       - name: Canonical Universe + PIT Quality Gate
         run: |
@@ -79,6 +90,7 @@ jobs:
         with:
           name: economic-intelligence-v2-2
           path: |
+            economic_ingestion_status_v1.json
             economic_historical_events_v1.csv
             economic_historical_quality_v1.csv
             economic_surprise_engine_v1.csv

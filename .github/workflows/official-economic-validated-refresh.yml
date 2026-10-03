@@ -1,0 +1,40 @@
+name: Official Economic Validated Refresh
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-economic-validated-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt scipy
+      - name: Preserve current publication for change selection
+        run: cp -R public_data official_before_public_data
+      - name: Official refresh, gates and complete Economic/Research/Decision rebuild
+        run: python refresh_research_data_v2.py --modules economic --mode publish --staging economic_validated_staging
+      - name: Upload diagnostic evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-official-source-audit
+          path: economic_validated_staging/economic/
+      - name: Select affected files from the validated publication
+        run: python scripts/prepare_official_economic_bundle.py --baseline official_before_public_data --validated economic_validated_staging/validated_public_data --output economic_validated_bundle
+      - name: Upload only validated production outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: economic-official-validated
+          path: economic_validated_bundle/
