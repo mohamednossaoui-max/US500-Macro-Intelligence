@@ -35,6 +35,8 @@ Fed Intelligence as_of_date and preserves the age of each source.
 from __future__ import annotations
 
 import json
+import os
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -460,6 +462,32 @@ def safe_float(value):
 # BUILD MACRO CONTEXT
 # ============================================================
 
+def verified_economic_context_date(status):
+    """Recognize a complete verified Economic status for direct Master runs."""
+    from economic_official_sources_v1 import MAPPINGS
+    rows = status.get('indicators', [])
+    if (status.get('source_verification') != 'VERIFIED' or len(rows) != 14
+            or {r.get('indicator') for r in rows} != set(MAPPINGS)
+            or not all(r.get('status') == 'CURRENT' and r.get('source_verification') == 'VERIFIED' for r in rows)):
+        return None
+    if not status.get('as_of_date'):
+        raise ValueError('Verified Economic status missing context date')
+    return status['as_of_date']
+
+
+def resolve_context_date(fed_as_of, economic_as_of=None, today=None):
+    """Use a verified refresh date without changing any layer's source date."""
+    fed_date = parse_date(fed_as_of)
+    if fed_date is None:
+        raise ValueError("Fed Intelligence does not contain a valid 'as_of_date'.")
+    if not economic_as_of:
+        return fed_date
+    economic_date = parse_date(economic_as_of)
+    if economic_date is None or economic_date > (today or date.today()):
+        raise ValueError('Invalid/future verified Economic context date')
+    return max(fed_date, economic_date)
+
+
 def build_macro_context():
 
     print("=" * 70)
@@ -474,9 +502,11 @@ def build_macro_context():
 
     fed = load_fed()
 
-    context_date = parse_date(
-        fed.get("as_of_date")
-    )
+    economic_as_of = os.environ.get("MACRO_CONTEXT_AS_OF_DATE")
+    status_file = Path("economic_ingestion_status_v1.json")
+    if not economic_as_of and status_file.exists():
+        economic_as_of = verified_economic_context_date(json.loads(status_file.read_text()))
+    context_date = resolve_context_date(fed.get("as_of_date"), economic_as_of)
 
     if context_date is None:
         raise ValueError(
