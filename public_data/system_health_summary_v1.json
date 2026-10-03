@@ -1,11 +1,11 @@
 {
-  "as_of": "2026-10-03T19:25:16.572888+00:00",
-  "attention": 3,
+  "as_of": "2026-10-03T20:43:15.977300+00:00",
+  "attention": 2,
   "failed": 0,
-  "healthy": 23,
+  "healthy": 24,
   "layer_count": 26,
   "lkg_available": 26,
-  "overall_health": "DEGRADED",
+  "overall_health": "HEALTHY",
   "research_only": true,
   "stale": 0
 }

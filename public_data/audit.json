@@ -1,8 +1,14 @@
 {
   "provider": "official",
-  "as_of_date": "2026-10-03",
+  "credentials_configured": {
+    "BLS_API_KEY": true,
+    "CENSUS_API_KEY": true,
+    "FRED_API_KEY": true
+  },
+  "mode": "merge",
   "retrieved_at": "2026-10-03T20:26:20.522126+00:00",
-  "indicators": [
+  "passed": true,
+  "reports": [
     {
       "indicator": "NFP",
       "agency": "BLS",
@@ -15,16 +21,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "PAYEMS",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 29000.0,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "PAYEMS"
     },
     {
       "indicator": "UNEMPLOYMENT_RATE",
@@ -38,16 +39,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "UNRATE",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 4.2,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "UNRATE"
     },
     {
       "indicator": "AVERAGE_HOURLY_EARNINGS",
@@ -61,16 +57,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "CES0500000003",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 0.1,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "CES0500000003"
     },
     {
       "indicator": "CPI",
@@ -84,16 +75,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "CPIAUCSL",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-11",
-      "before_merge_canonical_value": 0.4,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "CPIAUCSL"
     },
     {
       "indicator": "CORE_CPI",
@@ -107,16 +93,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "CPILFESL",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-11",
-      "before_merge_canonical_value": 0.3,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "CPILFESL"
     },
     {
       "indicator": "PPI_FINAL_DEMAND",
@@ -130,16 +111,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "PPIFIS",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-10",
-      "before_merge_canonical_value": 0.4,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "PPIFIS"
     },
     {
       "indicator": "CORE_PPI",
@@ -153,16 +129,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
-      "metadata_series": "PPIFES",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-10",
-      "before_merge_canonical_value": 0.2,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": "PPIFES"
     },
     {
       "indicator": "GDP",
@@ -176,16 +147,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "BEA",
       "metadata_verification": null,
       "metadata_source_url": null,
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "Q2 2026",
-      "before_merge_canonical_release_date": "2026-09-30",
-      "before_merge_canonical_value": 2.2,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "PCE_PRICE_INDEX",
@@ -199,16 +165,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "BEA",
       "metadata_verification": null,
       "metadata_source_url": null,
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-30",
-      "before_merge_canonical_value": 0.3,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "CORE_PCE",
@@ -222,16 +183,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "BEA",
       "metadata_verification": null,
       "metadata_source_url": null,
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-30",
-      "before_merge_canonical_value": 0.2,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "RETAIL_SALES",
@@ -245,16 +201,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "Census",
       "metadata_verification": null,
       "metadata_source_url": "https://www.census.gov/retail/marts/www/marts_current.pdf",
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-28",
-      "before_merge_canonical_value": 1.1,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "INITIAL_JOBLESS_CLAIMS",
@@ -268,16 +219,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "DOL",
       "metadata_verification": null,
       "metadata_source_url": null,
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "Week ending September 26, 2026",
-      "before_merge_canonical_release_date": "2026-10-01",
-      "before_merge_canonical_value": 197000.0,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",
@@ -291,16 +237,11 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "ISM",
       "metadata_verification": null,
       "metadata_source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/",
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-01",
-      "before_merge_canonical_value": 54.5,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     },
     {
       "indicator": "ISM_SERVICES_PMI",
@@ -314,17 +255,97 @@
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "reason": "Official period, release and value match canonical",
       "metadata_provider": "ISM",
       "metadata_verification": null,
       "metadata_source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/",
-      "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-03",
-      "before_merge_canonical_value": 55.4,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "metadata_series": null
     }
   ],
-  "source_verification": "VERIFIED"
+  "mapping": {
+    "NFP": {
+      "agency": "BLS",
+      "series": "CES0000000001",
+      "units": "jobs, monthly SA change",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/CES0000000001"
+    },
+    "UNEMPLOYMENT_RATE": {
+      "agency": "BLS",
+      "series": "LNS14000000",
+      "units": "percent SA",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000"
+    },
+    "AVERAGE_HOURLY_EARNINGS": {
+      "agency": "BLS",
+      "series": "CES0500000003",
+      "units": "percent monthly SA change, all employees total private",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/CES0500000003"
+    },
+    "CPI": {
+      "agency": "BLS",
+      "series": "CUSR0000SA0",
+      "units": "percent monthly SA change, all urban consumers all items",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0"
+    },
+    "CORE_CPI": {
+      "agency": "BLS",
+      "series": "CUSR0000SA0L1E",
+      "units": "percent monthly SA change, all items less food and energy",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/CUSR0000SA0L1E"
+    },
+    "PPI_FINAL_DEMAND": {
+      "agency": "BLS",
+      "series": "WPSFD4",
+      "units": "percent monthly SA change, final demand",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/WPSFD4"
+    },
+    "CORE_PPI": {
+      "agency": "BLS",
+      "series": "WPSFD49104",
+      "units": "percent monthly SA change, final demand less foods and energy",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/WPSFD49104"
+    },
+    "GDP": {
+      "agency": "BEA",
+      "series": "NIPA T10101 A191RL / real GDP annualized quarterly growth",
+      "units": "percent SA annual rate",
+      "url": "https://www.bea.gov/news/current-releases"
+    },
+    "PCE_PRICE_INDEX": {
+      "agency": "BEA",
+      "series": "Personal Income and Outlays / PCE monthly price change",
+      "units": "percent monthly change",
+      "url": "https://www.bea.gov/news/current-releases"
+    },
+    "CORE_PCE": {
+      "agency": "BEA",
+      "series": "Personal Income and Outlays / PCE excluding food and energy monthly price change",
+      "units": "percent monthly change",
+      "url": "https://www.bea.gov/news/current-releases"
+    },
+    "RETAIL_SALES": {
+      "agency": "Census",
+      "series": "MARTS advance monthly sales, category 44X72, SM, seasonally_adj yes",
+      "units": "percent monthly SA nominal change",
+      "url": "https://api.census.gov/data/timeseries/eits/marts"
+    },
+    "INITIAL_JOBLESS_CLAIMS": {
+      "agency": "DOL",
+      "series": "UI weekly initial claims SA",
+      "units": "claims",
+      "url": "https://www.dol.gov/ui/data.pdf"
+    },
+    "ISM_MANUFACTURING_PMI": {
+      "agency": "ISM",
+      "series": "Manufacturing headline PMI composite",
+      "units": "diffusion index",
+      "url": "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/"
+    },
+    "ISM_SERVICES_PMI": {
+      "agency": "ISM",
+      "series": "Services headline PMI composite",
+      "units": "diffusion index",
+      "url": "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-pmi-reports/"
+    }
+  }
 }

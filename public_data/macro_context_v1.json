@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-02",
+    "as_of_date": "2026-10-03",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,27 +328,27 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-10-01",
-    "age_days": 2,
-    "composite_stress_score": -0.4007655696696865,
+    "source_date": "2026-10-02",
+    "age_days": 1,
+    "composite_stress_score": -0.5857492623486816,
     "research_regime": "LOW_RESEARCH_STRESS",
-    "vix": 16.39,
-    "treasury_2y": 4.88,
-    "treasury_10y": 5.29,
-    "yield_10y_2y_spread": 0.4100000000000001,
+    "vix": 15.31,
+    "treasury_2y": 4.78,
+    "treasury_10y": 5.24,
+    "yield_10y_2y_spread": 0.4599999999999999,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-10-01",
-    "age_days": 2,
-    "latest_published_at": "2026-10-01T14:00:00+00:00",
-    "latest_title": "Construction Spending",
-    "latest_source": "U.S. Census Bureau",
-    "latest_topic": "growth",
-    "events_available": 98,
+    "source_date": "2026-10-02",
+    "age_days": 1,
+    "latest_published_at": "2026-10-02T20:45:00+00:00",
+    "latest_title": "Federal Reserve Board announces approval of application by Fleur Capital Corporation",
+    "latest_source": "Federal Reserve",
+    "latest_topic": "fed",
+    "events_available": 99,
     "topic_counts": {
       "growth": 64,
-      "fed": 31,
+      "fed": 32,
       "labor": 2,
       "inflation": 1
     },
@@ -356,8 +356,8 @@
   },
   "temporal_alignment": {
     "economic_age_days": 0,
-    "financial_stress_age_days": 2,
-    "event_news_age_days": 2,
+    "financial_stress_age_days": 1,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
