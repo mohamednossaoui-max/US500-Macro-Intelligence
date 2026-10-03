@@ -12,6 +12,9 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from economic_indicator_details_v1 import card_details
+from economic_observation_order_v1 import latest as latest_economic_observation
+
 from ui_v3 import apply_ui_v3, dynamic_card, section as ui_section, alert_item, rank_item
 
 APP_VERSION = "V6.3"
@@ -789,8 +792,7 @@ def economic() -> None:
         subset = surprise_df[surprise_df["indicator"].astype(str).eq(indicator)].copy()
         if subset.empty:
             return None
-        subset["_date"] = pd.to_datetime(subset.get("release_date"), errors="coerce")
-        return subset.sort_values("_date").iloc[-1]
+        return latest_economic_observation(subset,indicator)
 
     def _release_interpretation(indicator: str, shock: Any) -> str:
         if not isinstance(shock, (int, float)) or pd.isna(shock) or abs(float(shock)) < 1e-12:
@@ -907,7 +909,10 @@ def economic() -> None:
                 context += f" · {zclass}"
             if indicator == "RETAIL_SALES" and str(release.get("price_adjusted")).lower() in {"false", "0", "no"}:
                 context += " · nominal / not price-adjusted"
-            lines.append(f"<div class='econ-indicator'><b>{label}</b><div class='econ-reading'>{' · '.join(parts)}</div><div class='econ-context'>{context}</div></div>")
+            previous_text,reading,annual_missing=card_details(release)
+            detail_html=f"<div class='econ-context'>{previous_text}</div><div class='econ-context'>{reading}</div>"
+            if annual_missing:detail_html+=f"<div class='econ-context'>{annual_missing}</div>"
+            lines.append(f"<div class='econ-indicator'><b>{label}</b><div class='econ-reading'>{' · '.join(parts)}</div>{detail_html}<div class='econ-context'>{context}</div></div>")
         if not lines:
             lines = ["<div class='econ-context'>No published evidence.</div>"]
         with col:

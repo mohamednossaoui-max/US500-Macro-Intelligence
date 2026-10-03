@@ -16,6 +16,7 @@ import pandas as pd
 import requests
 from economic_official_sources_v1 import Client, MAPPINGS, MetadataError, collect, http_error_diagnostic
 from point_in_time import validate_temporal_order
+from economic_indicator_details_v1 import DETAIL_FIELDS, detail_changed
 
 EVENTS='economic_historical_events_v1.csv'
 QUALITY='economic_historical_quality_v1.csv'
@@ -78,29 +79,38 @@ def merge(canonical,quality,rows):
         # Only latest official period may initialize a missing historical period.
         if same is None and r.get('latest_official_period') and period_key(r['reference_period'])!=period_key(r['latest_official_period']):
             continue
+        metadata_only=False
         if same is not None:
             samevalue=math.isclose(float(same.actual),float(r['actual']),rel_tol=0,abs_tol=1e-8)
             if samevalue:
                 # A repeated estimate with unchanged value but new release still
                 # carries a new vintage for the latest official reference period.
                 if str(same.release_date)==r['release_date'] or (r.get('latest_official_period') and period_key(r['reference_period'])!=period_key(r['latest_official_period'])):
-                    continue
+                    if period_key(r['reference_period'])!=period_key(r.get('latest_official_period',r['reference_period'])) or not detail_changed(same,r):
+                        continue
+                    metadata_only=True
+                    for field in DETAIL_FIELDS:
+                        if r.get(field) is None and pd.notna(same.get(field)):
+                            r[field]=same.get(field)
             elif pd.Timestamp(r['release_date'])<pd.Timestamp(same.release_date):
                 raise RuntimeError('Refusing revision rollback')
             r['revision']=float(r['actual'])-float(same.actual)
             r['original_release_date']=same.get('original_release_date') if pd.notna(same.get('original_release_date')) else same.release_date
-            r['publication_status']='REVISED'
-            r['ingestion_event_type']='REVISION'
+            r['publication_status']='METADATA_ENRICHED' if metadata_only else 'REVISED'
+            r['ingestion_event_type']='METADATA_ENRICHMENT' if metadata_only else 'REVISION'
         else:
             r['ingestion_event_type']='NEW_RELEASE'
         # Conservative availability: API current vintage was observed today,
         # not necessarily on the earlier announced release date.
         r['source_snapshot_history']=bool(r.get('latest_official_period') and period_key(r['reference_period'])!=period_key(r['latest_official_period']))
+        r['metadata_only']=metadata_only
         r['available_as_of']=pd.Timestamp(r['retrieved_at']).strftime('%Y-%m-%d')
         r['vintage_date']=r['release_date']
         r['observation_date']=r['release_date']
         ident={k:r.get(k) for k in ('indicator','reference_period','release_date','actual','source_series')}
         ident['reference_period']=period_key(ident['reference_period'])
+        if metadata_only:
+            ident['details']={k:r.get(k) for k in DETAIL_FIELDS}
         if same is not None:
             ident['supersedes']=str(same.get('event_id',''))+'|'+str(same.actual)+'|'+str(same.release_date)
         r['event_id']='official-'+hashlib.sha256(json.dumps(ident,sort_keys=True).encode()).hexdigest()[:24]

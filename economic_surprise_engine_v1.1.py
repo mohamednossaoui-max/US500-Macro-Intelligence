@@ -126,7 +126,7 @@ def classify_release_type(row: pd.Series) -> str:
 def finalize_gdp_release_types(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["release_type"] = "NEW_PERIOD_RELEASE"
-    df["regime_eligible"] = ~df.get("source_snapshot_history", pd.Series(False, index=df.index)).fillna(False).astype(bool)
+    df["regime_eligible"] = ~(df.get("source_snapshot_history", pd.Series(False, index=df.index)).fillna(False).astype(bool) | df.get("metadata_only", pd.Series(False, index=df.index)).fillna(False).astype(bool))
     if "reference_period" not in df.columns:
         return df
 
@@ -209,7 +209,7 @@ def calculate_prior_observation_change(
     prior_release = pd.Series(pd.NaT, index=work.index, dtype="datetime64[ns]")
 
     # Shift is safe because rows are chronological within each indicator.
-    active = work.loc[~work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool)]
+    active = work.loc[~(work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool) | work.get("metadata_only", pd.Series(False, index=work.index)).fillna(False).astype(bool))]
     grouped = active.groupby("indicator", sort=False)
     prior_actual.loc[active.index] = grouped["_actual_num"].shift(1)
     prior_release.loc[active.index] = grouped["_release_dt"].shift(1)
@@ -247,7 +247,7 @@ def calculate_prior_zscore(
     z = pd.Series(np.nan, index=work.index, dtype="float64")
     prior_count = pd.Series(0, index=work.index, dtype="int64")
 
-    active = work.loc[~work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool)]
+    active = work.loc[~(work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool) | work.get("metadata_only", pd.Series(False, index=work.index)).fillna(False).astype(bool))]
     for indicator, idx in active.groupby("indicator", sort=False).groups.items():
         sub = work.loc[idx].sort_values(
             ["_release_dt", "_row_order"],
@@ -401,7 +401,7 @@ def main() -> None:
 
     for indicator, idx in df.groupby("indicator", sort=False).groups.items():
         sub = df.loc[idx]
-        sub = sub.loc[~sub.get("source_snapshot_history", pd.Series(False,index=sub.index)).fillna(False).astype(bool)].sort_values(
+        sub = sub.loc[~(sub.get("source_snapshot_history", pd.Series(False,index=sub.index)).fillna(False).astype(bool) | sub.get("metadata_only", pd.Series(False,index=sub.index)).fillna(False).astype(bool))].sort_values(
             ["_release_dt", "_row_order"],
             kind="mergesort",
         )

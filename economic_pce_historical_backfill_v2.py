@@ -89,6 +89,9 @@ def parse_bea_release(html: str, url: str) -> list[dict]:
     if pce is None or core_pce is None:
         raise ValueError("ambiguous sub-0.1 change; fail closed")
 
+    annual=re.search(r"From the same month one year ago, the PCE price index(?: for [A-Za-z]+)? (increased|decreased) (\d+(?:\.\d+)?) percent\s*\. Excluding food and energy, the PCE price index (increased|decreased) (\d+(?:\.\d+)?) percent from one year ago",text,re.I)
+    annual_values=(_number(annual.group(1),annual.group(2)),_number(annual.group(3),annual.group(4))) if annual else (None,None)
+    annual_meta=dict(yoy_method='BEA published change from same month one year ago',yoy_source_url=url,yoy_verification_status='VERIFIED' if annual else 'METADATA_UNVERIFIED')
     common = dict(
         agency="BEA", release_date=release_date, release_time=release_time,
         reference_period=f"{ref_month} {ref_year}", previous=None, revision=None,
@@ -96,10 +99,26 @@ def parse_bea_release(html: str, url: str) -> list[dict]:
         source="U.S. Bureau of Economic Analysis — Personal Income and Outlays",
         source_url=url, notes="Original BEA Personal Income and Outlays release; monthly change as published.",
     )
-    return [
-        dict(indicator="PCE_PRICE_INDEX", actual=pce, mom=pce, **common),
-        dict(indicator="CORE_PCE", actual=core_pce, mom=core_pce, **common),
+    result=[
+        dict(indicator="PCE_PRICE_INDEX", actual=pce, mom=pce, yoy=annual_values[0], **annual_meta, **common),
+        dict(indicator="CORE_PCE", actual=core_pce, mom=core_pce, yoy=annual_values[1], **annual_meta, **common),
     ]
+    ref=pd.Period(f"{ref_month} {ref_year}",freq='M')
+    for table in BeautifulSoup(html,'html.parser').find_all('table'):
+        if 'Percent change from preceding month' not in table.get_text(' ',strip=True):continue
+        header=False
+        for tr in table.find_all('tr'):
+            cells=[c.get_text(' ',strip=True) for c in tr.find_all(['td','th'])]
+            if len(cells)!=3:continue
+            if cells[1:]==[(ref-1).strftime('%B'),ref.strftime('%B')]:header=True;continue
+            if not header:continue
+            target={'PCE price index':result[0],'PCE price index excluding food and energy':result[1]}.get(cells[0])
+            if target is None:continue
+            try:prior,current=map(float,cells[1:])
+            except ValueError:continue
+            if not pd.notna(prior) or current!=target['actual']:continue
+            target['previous']=prior
+    return result
 
 
 def fetch_release(year: int, month: int, session: requests.Session) -> list[dict]:

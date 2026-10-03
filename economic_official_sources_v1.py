@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
+from economic_indicator_details_v1 import ANNUAL_BLS, annual_bls, percent_change
 
 BLS = {
     'NFP': ('CES0000000001', 'empsit', 'difference_thousands', 'jobs, monthly SA change'),
@@ -73,10 +74,24 @@ class Client:
 
     def bls_payload(self, series):
         """One official API request for the seven series reduces rate-limit use."""
+        if series in ANNUAL_BLS.values():
+            if not hasattr(self,'_bls_annual_batch'):
+                year=pd.Timestamp.now(tz='UTC').year
+                request={'seriesid':list(ANNUAL_BLS.values()),'startyear':str(year-1),'endyear':str(year)}
+                if os.environ.get('BLS_API_KEY'):request['registrationkey']=os.environ['BLS_API_KEY']
+                response=self.session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/',json=request,timeout=30)
+                response.raise_for_status();payload=response.json()
+                if payload.get('status')!='REQUEST_SUCCEEDED':raise MetadataError('BLS annual batch failed')
+                self.directory.mkdir(parents=True,exist_ok=True)
+                (self.directory/'bls-official-annual-batch.json').write_text(json.dumps(payload,sort_keys=True))
+                self._bls_annual_batch={x['seriesID']:x for x in payload['Results']['series']}
+            if series not in self._bls_annual_batch:raise MetadataError('BLS annual batch omitted required series')
+            return {'status':'REQUEST_SUCCEEDED','Results':{'series':[self._bls_annual_batch[series]]}}
         if getattr(self, '_bls_failure', None):
             raise RuntimeError(self._bls_failure)
         if not hasattr(self, '_bls_batch'):
-            request = {'seriesid': [v[0] for v in BLS.values()]}
+            year=pd.Timestamp.now(tz='UTC').year
+            request = {'seriesid': [v[0] for v in BLS.values()],'startyear':str(year-1),'endyear':str(year)}
             if os.environ.get('BLS_API_KEY'):
                 request['registrationkey'] = os.environ['BLS_API_KEY']
             response = self.session.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', json=request, timeout=30)
@@ -295,8 +310,25 @@ def collect_bls(client, indicator):
     # Capture current source values, including revisions, without backdating.
     for p,value,footnotes in values:
         out.append(observation(indicator,p,value,rd,rt,url,publication_status='PRELIMINARY' if any(f.get('code')=='P' for f in footnotes) else 'CURRENT_VINTAGE', release_time_verification='VERIFIED' if rt else 'METADATA_UNVERIFIED', original_release_date=None, value_source_url=MAPPINGS[indicator]['url'], latest_official_period=period, **(metadata_extra or {})))
-    if len(out)>1:
-        out[-1]['previous']=out[-2]['actual']
+    for index,row in enumerate(out):
+        if method=='percent':row['mom']=row['actual']
+        if index and pd.Period(row['reference_period'],freq='M')-1==pd.Period(out[index-1]['reference_period'],freq='M'):
+            row['previous']=out[index-1]['actual']
+    if indicator in ANNUAL_BLS or indicator=='AVERAGE_HOURLY_EARNINGS':
+        annual_series=ANNUAL_BLS.get(indicator,series)
+        latest_row=out[-1]
+        latest_row.update(yoy_source_series=annual_series,yoy_source_url='https://api.bls.gov/publicAPI/v2/timeseries/data/'+annual_series,
+                          yoy_method='12-month index change NSA' if indicator in ANNUAL_BLS else '12-month hourly earnings change SA')
+        try:
+            annual_data=records[0]['data'] if annual_series==series else client.bls_payload(annual_series)['Results']['series'][0]
+            if annual_series!=series:
+                if annual_data['seriesID']!=annual_series:raise ValueError('Annual series mismatch')
+                annual_data=annual_data['data']
+            latest_row['yoy']=annual_bls(annual_data,period)
+            latest_row['yoy_verification_status']='VERIFIED'
+        except (ValueError,KeyError,TypeError,AttributeError,requests.RequestException,RuntimeError) as exc:
+            latest_row['yoy']=None
+            latest_row['yoy_verification_status']='SOURCE_ERROR' if isinstance(exc,requests.RequestException) else 'METADATA_UNVERIFIED'
     return out
 
 
@@ -324,7 +356,7 @@ def collect_bea(client,indicator):
         except ValueError as exc:
             raise MetadataError(str(exc)) from exc
         row=next(r for r in rows if r['indicator']==indicator)
-        return [observation(indicator,row['reference_period'],row['actual'],row['release_date'],row['release_time'],url)]
+        return [observation(indicator,row['reference_period'],row['actual'],row['release_date'],row['release_time'],url,**{k:row[k] for k in ('previous','mom','yoy','yoy_method','yoy_verification_status','yoy_source_url') if k in row})]
     text=flat(html)
     rd,rt=release_timestamp(text)
     m=re.search(r'Real gross domestic product\s*\(GDP\)\s*(increased|decreased)\s*(?:at an annual rate of\s*)?(\d+(?:\.\d+)?)\s*percent\s*(?:at an annual rate\s*)?in the\s*(first|second|third|fourth)\s*quarter of\s*(\d{4})',text,re.I)
@@ -448,8 +480,12 @@ def collect_retail(client):
     ref=pd.Period(period,freq='M')
     if max(values)!=ref or ref-1 not in values:
         raise MetadataError('Census release/API reference period mismatch')
-    actual=round((values[ref]/values[ref-1]-1)*100,1)
-    return [observation('RETAIL_SALES',period,actual,rd,rt,base,metadata_source_url=url,publication_status='REVISED' if notice else 'ADVANCE')]
+    actual=percent_change(values[ref],values[ref-1])
+    details=dict(mom=actual,level=values[ref],price_adjusted=False,yoy_method='12-month nominal sales change SA',yoy_source_url=base,yoy_verification_status='METADATA_UNVERIFIED')
+    if ref-2 in values:details['previous']=percent_change(values[ref-1],values[ref-2])
+    if ref-12 in values:
+        details.update(yoy=percent_change(values[ref],values[ref-12]),yoy_verification_status='VERIFIED')
+    return [observation('RETAIL_SALES',period,actual,rd,rt,base,metadata_source_url=url,publication_status='REVISED' if notice else 'ADVANCE',**details)]
 
 
 def ism_latest_release(client, kind):
