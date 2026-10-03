@@ -27,7 +27,7 @@ def detect_due(reg, now=None, repo=ROOT):
             if ts: stamps.append(ts)
         last=max(stamps) if stamps else None
         age=(now-last).total_seconds()/86400 if last else None
-        is_due=(last is None) or age>=cadence
+        is_due=(n.get('frequency')=='release_driven' or n['id'] in {'economic','event_news'}) or (last is None) or age>=cadence
         detail.append({'id':n['id'],'frequency':n.get('frequency'),'cadence_days':cadence,'last_change':last.isoformat() if last else None,'age_days':round(age,2) if age is not None else None,'due':is_due})
         if is_due: due.append(n['id'])
     plan=affected(reg['nodes'],due) if due else []
