@@ -1,8 +1,8 @@
 {
   "decision_intelligence_version": "DIV2.0",
-  "context_date": "2026-10-02",
+  "context_date": "2026-10-03",
   "decision_state": "SUPPORTIVE",
-  "current_environment": "Economic regime is MIXED: inflation +1.06, labor +0.03, and growth -0.26. Fed stance is MODERATELY HAWKISH; financial stress is LOW_RESEARCH_STRESS; sentiment is NEUTRAL; technical regime is NEUTRAL. Published Decision Engine state remains SUPPORTIVE.",
+  "current_environment": "Economic regime is MIXED: inflation +0.54, labor -0.03, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is LOW_RESEARCH_STRESS; sentiment is NEUTRAL; technical regime is NEUTRAL. Published Decision Engine state remains SUPPORTIVE.",
   "what_changed": {
     "status": "UNAVAILABLE",
     "reason": "No prior canonical USV1.0 snapshot is published; change is not inferred from non-canonical history."
@@ -17,76 +17,76 @@
   },
   "historical_analogs": {
     "count": 8,
-    "closest_date": "2025-03-03",
-    "closest_similarity_pct": 62.5276,
+    "closest_date": "2025-09-26",
+    "closest_similarity_pct": 63.8415,
     "closest_coverage_pct": 88.89,
-    "summary": "Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-03-03 with 62.53% similarity and 88.89% comparable CORE coverage.",
-    "key_differences": "economic_regime: hist=STAGFLATIONARY, current=MIXED | economic_labor: hist=0.0009333847342749, current=0.0265094293115017 | sentiment: hist=23.707773707773708, current=42.979242979242976"
+    "summary": "Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-09-26 with 63.84% similarity and 88.89% comparable CORE coverage.",
+    "key_differences": "technical: hist=STRONG_BULLISH, current=NEUTRAL | economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | sentiment: hist=64.8046398046398, current=42.979242979242976"
   },
   "historical_market_reaction": {
-    "summary": "Across the locked analog set, historical median US500 return was +4.49% at 60 trading days (75.0% positive) and +8.75% at 120 trading days (87.5% positive). Outcomes were dispersed: 60D range -14.49% to +14.85%. These are conditional historical outcomes, not expected returns or forecasts.",
+    "summary": "Across the locked analog set, historical median US500 return was +4.49% at 60 trading days (75.0% positive) and +8.17% at 120 trading days (87.5% positive). Outcomes were dispersed: 60D range -4.57% to +18.89%. These are conditional historical outcomes, not expected returns or forecasts.",
     "horizons": {
       "5d": {
         "available_analogs": 8,
         "total_analogs": 8,
-        "mean_return_pct": -0.006128,
-        "median_return_pct": -0.42283,
+        "mean_return_pct": -0.823506,
+        "median_return_pct": -0.899469,
         "positive_hit_rate_pct": 37.5,
         "min_return_pct": -4.020024,
-        "max_return_pct": 4.466683,
-        "return_std_pct": 2.762324,
-        "median_max_drawdown_pct": -0.870536,
-        "median_realized_volatility_pct": 16.023844
+        "max_return_pct": 1.085086,
+        "return_std_pct": 1.670159,
+        "median_max_drawdown_pct": -2.217647,
+        "median_realized_volatility_pct": 14.04158
       },
       "20d": {
         "available_analogs": 8,
         "total_analogs": 8,
-        "mean_return_pct": 1.743287,
-        "median_return_pct": 1.78304,
-        "positive_hit_rate_pct": 62.5,
+        "mean_return_pct": 1.593631,
+        "median_return_pct": 1.472058,
+        "positive_hit_rate_pct": 75.0,
         "min_return_pct": -4.06635,
-        "max_return_pct": 5.93968,
-        "return_std_pct": 3.392829,
+        "max_return_pct": 7.438433,
+        "return_std_pct": 3.258714,
         "median_max_drawdown_pct": -2.639105,
         "median_realized_volatility_pct": 13.543083
       },
       "60d": {
         "available_analogs": 8,
         "total_analogs": 8,
-        "mean_return_pct": 3.148402,
+        "mean_return_pct": 4.828181,
         "median_return_pct": 4.486089,
         "positive_hit_rate_pct": 75.0,
-        "min_return_pct": -14.488832,
-        "max_return_pct": 14.851974,
-        "return_std_pct": 8.951704,
-        "median_max_drawdown_pct": -6.388532,
+        "min_return_pct": -4.568807,
+        "max_return_pct": 18.89143,
+        "return_std_pct": 7.363379,
+        "median_max_drawdown_pct": -4.846675,
         "median_realized_volatility_pct": 14.172923
       },
       "120d": {
         "available_analogs": 8,
         "total_analogs": 8,
-        "mean_return_pct": 10.532726,
-        "median_return_pct": 8.746175,
+        "mean_return_pct": 9.862034,
+        "median_return_pct": 8.167782,
         "positive_hit_rate_pct": 87.5,
         "min_return_pct": -2.065419,
-        "max_return_pct": 22.388506,
-        "return_std_pct": 8.072397,
-        "median_max_drawdown_pct": -7.216117,
-        "median_realized_volatility_pct": 13.429761
+        "max_return_pct": 27.47317,
+        "return_std_pct": 8.625087,
+        "median_max_drawdown_pct": -5.93767,
+        "median_realized_volatility_pct": 12.587933
       }
     },
     "selection_locked": true,
     "outcomes_used_in_selection": false
   },
-  "important_differences": "economic_regime: hist=STAGFLATIONARY, current=MIXED | economic_labor: hist=0.0009333847342749, current=0.0265094293115017 | sentiment: hist=23.707773707773708, current=42.979242979242976",
+  "important_differences": "technical: hist=STRONG_BULLISH, current=NEUTRAL | economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | sentiment: hist=64.8046398046398, current=42.979242979242976",
   "risks_and_limitations": [
-    "Closest analog similarity is 62.53%, not a close match.",
+    "Closest analog similarity is 63.84%, not a close match.",
     "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
     "Overall evidence PIT status is PIT_LIMITED; CORE PIT remains True.",
     "CONTEXTUAL evidence does not alter the Decision Engine state.",
     "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
   ],
-  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (62.53%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
+  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (63.84%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
   "research_only": true,
   "forecast_generated": false,
   "trading_signal_generated": false,
