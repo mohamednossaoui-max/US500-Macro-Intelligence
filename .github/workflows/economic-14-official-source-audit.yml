@@ -2,13 +2,22 @@ name: Economic 14 — Official Source Audit
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner (self-hosted requires an installed online runner)"
+        type: choice
+        options:
+          - ubuntu-latest
+          - self-hosted
+        default: ubuntu-latest
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
       CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
