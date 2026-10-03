@@ -29,7 +29,7 @@ def compare(row,canonical):
     i=row['indicator'];old=latest(canonical,i)
     report=dict(indicator=i,agency=MAPPINGS[i]['agency'],official_latest_reference_period=row.get('reference_period'),official_release_date=row.get('release_date'),official_value=row.get('actual'),
                 canonical_latest_reference_period=None if old is None else old.reference_period,canonical_release_date=None if old is None else old.release_date,canonical_value=None if old is None else float(old.actual),
-                status='METADATA_UNVERIFIED',revision_detected=False,source_verification=row.get('verification_status'),reason=row.get('reason',''))
+                status='METADATA_UNVERIFIED',revision_detected=False,source_verification=row.get('verification_status'),reason=row.get('reason',''),metadata_provider=row.get('metadata_provider',MAPPINGS[i]['agency']),metadata_verification=row.get('metadata_verification'),metadata_source_url=row.get('metadata_source_url'),metadata_series=row.get('metadata_series'))
     if row.get('verification_status')!='VERIFIED':
         report['status']=row.get('verification_status','METADATA_UNVERIFIED');return report
     try:
@@ -140,7 +140,7 @@ def run(root,staging,mode='audit',collector=collect,now=None):
             reports.append(compare(row,canonical))
     pd.DataFrame(rows).to_csv(staging/'observations.csv',index=False)
     pd.DataFrame(reports).to_csv(staging/'comparison.csv',index=False)
-    result=dict(provider='official',credentials_configured={'BLS_API_KEY':bool(os.environ.get('BLS_API_KEY')),'CENSUS_API_KEY':bool(os.environ.get('CENSUS_API_KEY'))},mode=mode,retrieved_at=now.isoformat(),passed=all(r['status'] in ACCEPT for r in reports),reports=reports,mapping=MAPPINGS)
+    result=dict(provider='official',credentials_configured={'BLS_API_KEY':bool(os.environ.get('BLS_API_KEY')),'CENSUS_API_KEY':bool(os.environ.get('CENSUS_API_KEY')),'FRED_API_KEY':bool(os.environ.get('FRED_API_KEY'))},mode=mode,retrieved_at=now.isoformat(),passed=all(r['status'] in ACCEPT for r in reports),reports=reports,mapping=MAPPINGS)
     (staging/'audit.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
     if mode=='merge':
         validate_batch(rows,reports)

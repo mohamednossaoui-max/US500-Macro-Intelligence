@@ -55,7 +55,7 @@ def http_error_diagnostic(exc):
     parsed = urlparse(url)
     endpoint = (parsed.scheme + '://' + (parsed.hostname or '') + parsed.path
                 if parsed.scheme in ('https', 'http') and parsed.hostname else 'unknown endpoint')
-    for name in ('BLS_API_KEY', 'CENSUS_API_KEY', 'BEA_API_KEY'):
+    for name in ('BLS_API_KEY', 'CENSUS_API_KEY', 'BEA_API_KEY', 'FRED_API_KEY'):
         secret = os.environ.get(name, '').strip()
         if secret:
             endpoint = endpoint.replace(secret, '[REDACTED]')
@@ -110,7 +110,7 @@ class Client:
 
     def get(self, url, **kwargs):
         # API keys are never included in evidence filenames or logs.
-        key = url + str({k:v for k,v in kwargs.get('params',{}).items() if k not in ('key','registrationkey','UserID')})
+        key = url + str({k:v for k,v in kwargs.get('params',{}).items() if k not in ('key','registrationkey','UserID','api_key')})
         if key in self.cache:
             return self.cache[key]
         r = self.session.get(url, timeout=30, **kwargs)
@@ -279,7 +279,16 @@ def collect_bls(client, indicator):
     try:
         period,rd,rt,url,metadata_extra = bls_release_context(client,group)
     except (MetadataError, ET.ParseError) as exc:
-        return [observation(indicator, values[-1][0],values[-1][1],None,None,MAPPINGS[indicator]['url'],verification_status='METADATA_UNVERIFIED',reason=str(exc))]
+        from economic_bls_fred_metadata_v1 import corroborate
+        failure = str(exc)
+        try:
+            period,rd,rt,url,metadata_extra = corroborate(client,indicator,records[0]['data'],failure)
+        except requests.HTTPError as alternate:
+            failure += '; FRED alternate: ' + http_error_diagnostic(alternate)
+            return [observation(indicator,values[-1][0],values[-1][1],None,None,MAPPINGS[indicator]['url'],verification_status='METADATA_UNVERIFIED',reason=failure)]
+        except (MetadataError, ValueError, KeyError, TypeError, requests.RequestException) as alternate:
+            failure += '; FRED alternate: ' + (str(alternate) if isinstance(alternate,MetadataError) else type(alternate).__name__)
+            return [observation(indicator,values[-1][0],values[-1][1],None,None,MAPPINGS[indicator]['url'],verification_status='METADATA_UNVERIFIED',reason=failure)]
     if period != values[-1][0]:
         raise MetadataError('BLS API latest period differs from official release feed (publication lag)')
     out=[]
