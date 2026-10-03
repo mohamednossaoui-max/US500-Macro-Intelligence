@@ -152,9 +152,26 @@ def run(root,staging,mode='audit',collector=collect,now=None):
             data=(staging/name).read_bytes();tmp=root/(name+'.tmp');tmp.write_bytes(data);os.replace(tmp,root/name)
         result['added']=added
         assert_current(events,reports)
-        status=dict(provider='official',as_of_date=now.date().isoformat(),retrieved_at=now.isoformat(),indicators=[dict(r,status='CURRENT') for r in reports],source_verification='VERIFIED')
+        status=dict(provider='official',as_of_date=now.date().isoformat(),retrieved_at=now.isoformat(),indicators=merged_status_reports(events,reports),source_verification='VERIFIED')
         (root/'economic_ingestion_status_v1.json').write_text(json.dumps(status,indent=2)+'\n')
     return result
+
+
+def merged_status_reports(events,reports):
+    """Describe verified post-merge state while retaining audit comparisons."""
+    assert_current(events,reports)
+    updated=[]
+    for report in reports:
+        current=latest(events,report['indicator'],report['official_latest_reference_period'])
+        item=dict(report)
+        for field in ('canonical_latest_reference_period','canonical_release_date','canonical_value'):
+            item['before_merge_'+field]=report.get(field)
+        item.update(ingestion_status=report['status'],ingestion_reason=report.get('reason',''),
+                    canonical_latest_reference_period=current.reference_period,
+                    canonical_release_date=str(current.release_date),canonical_value=float(current.actual),
+                    status='CURRENT',reason='Official period, release and value match merged canonical')
+        updated.append(item)
+    return updated
 
 
 def assert_current(events,reports):
