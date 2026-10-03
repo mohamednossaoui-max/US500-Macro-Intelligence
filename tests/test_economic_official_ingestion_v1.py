@@ -110,6 +110,18 @@ def verified_fixture(c,i):
 
 def test_all_14_staging_merge_and_downstream_e2e(tmp_path):
     shutil.copytree(ROOT/'public_data',tmp_path/'public_data')
+    # Fixture reference/release times must not depend on today's production vintages.
+    baseline=[]
+    for index,period in enumerate(pd.period_range('2025-01','2026-08',freq='M')):
+        release=((period+1).to_timestamp()+pd.Timedelta(days=3)).strftime('%Y-%m-%d')
+        for indicator in MAPPINGS:
+            if indicator=='GDP':continue
+            ref='Week ending '+period.end_time.strftime('%B %d, %Y') if indicator=='INITIAL_JOBLESS_CLAIMS' else period.strftime('%B %Y')
+            baseline.append(row(indicator,10+index*index if indicator=='NFP' else 1.0+(index%5)*.1,period=ref,release=release))
+    for period in pd.period_range('2024Q4','2026Q2',freq='Q'):
+        baseline.append(row('GDP',1.0,period=f'Q{period.quarter} {period.year}',release=(period.end_time+pd.Timedelta(days=25)).strftime('%Y-%m-%d')))
+    pd.DataFrame(baseline).to_csv(tmp_path/'public_data'/EVENTS,index=False)
+    quality().to_csv(tmp_path/'public_data'/QUALITY,index=False)
     out=run(tmp_path,tmp_path/'stage',mode='merge',collector=verified_fixture,now=NOW)
     assert out['passed'] and len(out['reports'])==14
     original=pd.read_csv(tmp_path/'public_data'/EVENTS)
@@ -122,7 +134,7 @@ def test_all_14_staging_merge_and_downstream_e2e(tmp_path):
         assert (sub.actual==report['official_value']).any()
     regime=pd.read_csv(tmp_path/'economic_regime_events_v1.csv')
     assert regime.release_date.max()=='2026-10-02'
-    for name in [EVENTS,QUALITY,'economic_surprise_engine_v1.csv','economic_surprise_summary_v1.csv','economic_regime_events_v1.csv','economic_regime_summary_v1.csv']:
+    for name in [EVENTS,QUALITY,'economic_ingestion_status_v1.json','economic_surprise_engine_v1.csv','economic_surprise_summary_v1.csv','economic_regime_events_v1.csv','economic_regime_summary_v1.csv']:
         shutil.copy2(tmp_path/name,tmp_path/'public_data'/name)
     # Exercise the actual Context and Decision scripts in an isolated project.
     import os
@@ -131,7 +143,7 @@ def test_all_14_staging_merge_and_downstream_e2e(tmp_path):
         shutil.copytree(ROOT/folder,tmp_path/folder,dirs_exist_ok=True)
     for src in (tmp_path/'public_data').iterdir():
         if src.suffix in {'.csv','.json'}:shutil.copy2(src,tmp_path/src.name)
-    env=dict(os.environ,MACRO_CONTEXT_FILE=str(tmp_path/'macro_context_v1.csv'),SENTIMENT_ENGINE_FILE=str(tmp_path/'sentiment_engine_research_v1.csv'),TECHNICAL_INTELLIGENCE_FILE=str(tmp_path/'technical_intelligence_research_v1.csv'))
+    env=dict(os.environ,MACRO_CONTEXT_AS_OF_DATE=NOW.date().isoformat(),MACRO_CONTEXT_FILE=str(tmp_path/'macro_context_v1.csv'),SENTIMENT_ENGINE_FILE=str(tmp_path/'sentiment_engine_research_v1.csv'),TECHNICAL_INTELLIGENCE_FILE=str(tmp_path/'technical_intelligence_research_v1.csv'))
     for script in ['macro_context_v1.py','research-context-v1.py']:
         subprocess.run([sys.executable,str(tmp_path/script)],cwd=tmp_path,env=env,check=True,capture_output=True)
     macro=pd.read_csv(tmp_path/'macro_context_v1.csv')
@@ -179,7 +191,10 @@ def test_source_snapshot_revision_does_not_replace_latest_period():
 def test_economic_due_even_after_file_rebuild(monkeypatch):
     import autonomy_due_detector_v1 as dd
     monkeypatch.setattr(dd,'_git_last_change',lambda *a,**k: NOW)
-    out=dd.detect_due(dd.load_registry(),NOW,ROOT)
+    registry=dd.load_registry()
+    # A stale registry cadence must not turn freshly rebuilt files into source proof.
+    next(node for node in registry['nodes'] if node['id']=='economic')['frequency']='daily'
+    out=dd.detect_due(registry,NOW,ROOT)
     assert 'economic' in out['due_roots']
 
 
