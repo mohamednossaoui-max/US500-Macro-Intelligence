@@ -70,6 +70,7 @@ def test_backfill_asof_requests_and_idempotency(tmp_path):
             assert params['realtime_start']==params['realtime_end']=='2020-04-01'
             assert params['observation_end']=='2020-04-01'
             if m.SERIES[sid][0]=='Monthly':return payload([('2020-03-01',110),('2020-02-01',100)])
+            if sid=='A191RL1Q225SBEA':return payload([('2020-01-01',1)])
             return payload([('2020-03-31',1)])
     events=pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']*2})
     a=m.backfill(events,Good(),tmp_path);b=m.backfill(events,Good(),tmp_path)
@@ -116,3 +117,31 @@ def test_stale_response_retained_but_not_accepted(tmp_path):
     r=m.backfill(pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']}),Stale(),tmp_path)
     assert r['stale']==10 and r['verified']==0
     assert len(list((tmp_path/'receipts').glob('*')))==10
+
+
+@pytest.mark.parametrize('asof,start,end,value,age',[
+    ('2022-01-18','2021-07-01','2021-09-30',2.3,110),
+    ('2024-07-24','2024-01-01','2024-03-31',1.4,115),
+    ('2025-11-17','2025-04-01','2025-06-30',3.8,140)])
+def test_gdp_age_is_measured_from_quarter_end(asof,start,end,value,age):
+    r=m.observation('A191RL1Q225SBEA',asof,payload([(start,value)],asof))
+    assert r['reference_period']==start and r['reference_period_end']==end
+    assert r['age_since_reference_period_end_days']==age
+    assert r['level']==value and r['release_date'] is None
+
+
+def test_genuinely_old_gdp_and_unfinished_quarter_still_fail():
+    for date in ('2019-01-01','2020-04-01'):
+        with pytest.raises(m.SourceError):m.observation('A191RL1Q225SBEA','2020-04-01',payload([(date,1)]))
+
+
+def test_partial_archive_policy_does_not_allow_stale_or_source_failure():
+    report={'rows':2,'first_provider_vintages':{'DFF':'2005-06-28'},'results':[
+        {'series':'UNRATE','decision_at':'2000-04-13','status':'ASOF_VERIFIED'},
+        {'series':'DFF','decision_at':'2000-04-13','as_of_date':'2000-04-12','status':'UNAVAILABLE_ARCHIVE'}]}
+    assert m.research_coverage(report)=='VERIFIED_AVAILABLE_ARCHIVE_PARTIAL_TOTAL'
+    for status in ('STALE','SOURCE_ERROR','METADATA_UNVERIFIED'):
+        report['results'][1]['status']=status
+        assert m.research_coverage(report)=='FAILED_SOURCE_VALIDATION'
+    report['results'][1]['status']='UNAVAILABLE_ARCHIVE';report['results'][1]['as_of_date']='2006-01-01'
+    assert m.research_coverage(report)=='FAILED_SOURCE_VALIDATION'
