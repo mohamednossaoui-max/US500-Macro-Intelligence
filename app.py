@@ -14,6 +14,7 @@ import streamlit as st
 
 from economic_indicator_details_v1 import card_details
 from economic_observation_order_v1 import latest as latest_economic_observation
+from ath_pullback_context_ui_v1 import render_ath_pullback_context
 
 from ui_v3 import apply_ui_v3, dynamic_card, section as ui_section, alert_item, rank_item
 
@@ -2033,6 +2034,10 @@ instead of inventing Historical Edge tables.
     )
 
 
+def ath_pullback_context():
+    render_ath_pullback_context(PUBLIC_DATA)
+
+
 PAGES = {
     "Executive Dashboard": executive,
     "Research Context": research_context,
@@ -2043,6 +2048,7 @@ PAGES = {
     "Liquidity": liquidity,
     "Sentiment": sentiment,
     "Technical Intelligence": technical,
+    "ATH Pullback Context": ath_pullback_context,
     "Market Breadth": breadth,
     "Cross-Asset": cross_asset,
     "Event / News": event_news,
