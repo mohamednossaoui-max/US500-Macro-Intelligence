@@ -1,0 +1,151 @@
+{
+  "version": "ATH_DEPTH_MODEL_RESEARCH_V1",
+  "mode": "READ_ONLY_EXPERIMENT",
+  "instrument": "^GSPC cash-index proxy; intraday records in available 2019+ history",
+  "model": "Fixed k=5 nearest neighbours; one prior count per class; training-only scaling",
+  "sampling": "First eligible record high, then more than three calendar months between anchors",
+  "source_pit_status": "PIT_LIMITED_HISTORICAL_RESEARCH_PROXIES",
+  "source_hashes": {
+    "technical_intelligence_research_v1.csv": "f1be8c09c9f2bbe779d16cab727de43ec79716085df94dcfafad0c6a9c23a229",
+    "financial_stress_research_v1.csv": "87a4621c3497a77d8e71b711bcc725d37100a25f6ceb69a998c05dad6b355441",
+    "sentiment_engine_research_v1.csv": "18311af5c9d96d5f98df03c793b0659d380f60ed1ff4e12643fdbdb56854a764",
+    "liquidity_intelligence_research_v1.csv": "4517aad75859d4b3730f197204319ceff79f7fd9c932f4d28bf79f663dbd1789"
+  },
+  "source_snapshot_count": 2,
+  "archive_snapshot_ids": [
+    "fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4",
+    "cd3c3b10f577e514ef66c7b719862194175170533bd2ca2669b19c6713c6a7ac"
+  ],
+  "snapshot_first_available_at": "2026-10-04T19:00:18.670929+00:00",
+  "analyses": [
+    {
+      "horizon": "1M",
+      "sample_count": 15,
+      "complete_unambiguous": 15,
+      "partial_feature_complete": 14,
+      "full_feature_complete": 0,
+      "price_only": {
+        "evaluations": 10,
+        "price_brier": 0.6296296296296298,
+        "context_brier": 0.6296296296296298,
+        "climatology_brier": 0.5531435257069238,
+        "incremental_brier_improvement": 0.0,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 7,
+          "LIMITED": 3,
+          "MEDIUM": 0,
+          "CRASH": 0
+        }
+      },
+      "partial_context_common_sample": {
+        "evaluations": 9,
+        "price_brier": 0.6529492455418382,
+        "context_brier": 0.5569272976680385,
+        "climatology_brier": 0.5458140521871653,
+        "incremental_brier_improvement": 0.09602194787379972,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 6,
+          "LIMITED": 3,
+          "MEDIUM": 0,
+          "CRASH": 0
+        }
+      },
+      "full_context_common_sample": {
+        "evaluations": 0,
+        "price_brier": null,
+        "context_brier": null,
+        "climatology_brier": null,
+        "incremental_brier_improvement": null,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 0,
+          "MEDIUM": 0,
+          "CRASH": 0
+        }
+      }
+    },
+    {
+      "horizon": "3M",
+      "sample_count": 15,
+      "complete_unambiguous": 14,
+      "partial_feature_complete": 14,
+      "full_feature_complete": 0,
+      "price_only": {
+        "evaluations": 9,
+        "price_brier": 0.7517146776406036,
+        "context_brier": 0.7517146776406036,
+        "climatology_brier": 0.6810519577363982,
+        "incremental_brier_improvement": 0.0,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 2,
+          "MEDIUM": 6,
+          "CRASH": 1
+        }
+      },
+      "partial_context_common_sample": {
+        "evaluations": 8,
+        "price_brier": 0.6975308641975309,
+        "context_brier": 0.6975308641975309,
+        "climatology_brier": 0.653332125528796,
+        "incremental_brier_improvement": 0.0,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 2,
+          "MEDIUM": 5,
+          "CRASH": 1
+        }
+      },
+      "full_context_common_sample": {
+        "evaluations": 0,
+        "price_brier": null,
+        "context_brier": null,
+        "climatology_brier": null,
+        "incremental_brier_improvement": null,
+        "test_class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 0,
+          "MEDIUM": 0,
+          "CRASH": 0
+        }
+      }
+    }
+  ],
+  "live_forecast": null,
+  "forecast_status": "NOT_VALIDATED",
+  "incremental_edge_status": "NOT_ESTABLISHED",
+  "gate_reasons": [
+    "Historical input vintages and exact publication times are not independently verified.",
+    "Independent crash cases and walk-forward evaluation sample are too small for high-confidence claims.",
+    "Partial-context experiment excludes historical Macro/Fed where no captured snapshot exists.",
+    "No separately calibrated prospective forecast or external validation has been performed."
+  ],
+  "until_recovery_model_status": "NOT_TRAINED_RETROSPECTIVE_EPISODE_SELECTION_IS_NOT_A_FORECAST_SAMPLE",
+  "price_features": [
+    "return20_pct",
+    "vol20_pct",
+    "above_sma200_pct"
+  ],
+  "partial_features": [
+    "return20_pct",
+    "vol20_pct",
+    "above_sma200_pct",
+    "stress",
+    "sentiment",
+    "net_liquidity"
+  ],
+  "full_features": [
+    "return20_pct",
+    "vol20_pct",
+    "above_sma200_pct",
+    "stress",
+    "sentiment",
+    "net_liquidity",
+    "inflation",
+    "labor",
+    "growth",
+    "fed"
+  ],
+  "research_only": true,
+  "execution": false
+}
