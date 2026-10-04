@@ -83,3 +83,8 @@ python -m pytest tests -q
 - `research_history/ath_context_v1/snapshots/fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4.json`: لقطة سياق مؤرخة، محفوظة مع بصمات تحقق.
 
 مرجع منهجي عن خطر الإفراط في ملاءمة الاختبارات التاريخية: [Bailey et al., The Probability of Backtest Overfitting](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf). لم تُستخدم نتيجة دراسة سابقة للاستراتيجية كدليل على هذا النموذج.
+
+
+## V3 — Edge research and historical vintages
+
+The expanded study uses cash-index closing records from 2000, separately from intraday ATH labels. The market-context candidate failed to beat climatology and price baselines; live forecasting remains disabled. Run the manual **ATH Official Vintage Context Backfill** workflow with the existing `FRED_API_KEY` secret to acquire provider as-of vintages. It writes only research artifacts, not public_data. See `ath_pullback_edge_v3.py` and `ath_official_vintage_backfill_v1.py`. Provider as-of dates are not agency release timestamps. Results remain exploratory because prior research inspected the same evaluation years.

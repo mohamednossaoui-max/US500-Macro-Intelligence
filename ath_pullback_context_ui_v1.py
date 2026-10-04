@@ -29,6 +29,7 @@ def render_ath_pullback_context(public_data=None):
         col.metric(name, 'التقدير غير متاح')
     st.write('حتى الاستعادة: يُقاس الهبوط من القمة المرجعية حتى العودة إليها. الشهر والثلاثة أشهر: يُقاس أكبر هبوط داخل المدة، بما يشمل الهبوط من قمة جديدة تتحقق خلالها.')
     render_model_research(root)
+    render_edge_research(root)
     with st.expander('السياق المتاح قبل تاريخ لقطة الأسعار', expanded=True):
         for item in result['context_inventory']:
             st.write(item['file'] + ' — ' + item['status'])
@@ -95,3 +96,26 @@ def render_model_research(public_data):
             st.download_button('تنزيل نتيجة اختبار النموذج',path.read_bytes(),'ath-depth-model-audit.json','application/json',key='ath_model_download')
         except (OSError,ValueError,KeyError,TypeError) as error:
             st.error('تعذر قراءة تدقيق النموذج: '+str(error))
+
+
+def render_edge_research(public_data):
+    path=Path(public_data).parent/'research_history'/'ath_edge_v3'/'edge_v3_audit.json'
+    if not path.exists():return
+    with st.expander('دراسة موسعة: عمق الهبوط بعد وصوله إلى 3%'):
+        try:
+            report=json.loads(path.read_text())
+            st.warning('لا توجد ميزة تنبؤ مؤكدة. هذه نتائج بحثية وليست احتمالات للسوق الحالي.')
+            st.caption('الدراسة تبدأ بعد هبوط إغلاق 3% إلى أقل من 5% من قمة إغلاق في التاريخ المتاح. لا تمثل توقعًا يوم ATH أو أسعار ES/US500.')
+            source=Path(public_data)/report['source_file']
+            if not source.exists() or hashlib.sha256(source.read_bytes()).hexdigest()!=report['source_sha256']:
+                st.info('المدخلات تغيرت؛ الدراسة المعروضة أرشيفية وتحتاج إعادة حساب.')
+            st.dataframe(pd.DataFrame([{'المدة':x['horizon'],'حالات الاختبار':x['evaluation_predictions'],
+                'حالات الانهيار':x['test_class_counts']['CRASH'],
+                'خطأ السياق':x['mean_scores']['market_brier'],
+                'خطأ الأسعار':x['mean_scores']['price_brier'],
+                'خطأ الاحتمالات التاريخية':x['mean_scores']['climatology_brier']} for x in report['analyses']]),
+                hide_index=True,use_container_width=True)
+            st.caption('الخطأ الأصغر أفضل. فترة الاختبار سبق الاطلاع عليها في دراسات أخرى؛ يلزم اختبار مستقبلي مستقل قبل إثبات edge.')
+            st.download_button('تنزيل تدقيق الدراسة الموسعة',path.read_bytes(),'ath-edge-v3-audit.json','application/json',key='ath_edge_download')
+        except (OSError,ValueError,KeyError,TypeError) as error:
+            st.error('تعذر قراءة الدراسة الموسعة: '+str(error))
