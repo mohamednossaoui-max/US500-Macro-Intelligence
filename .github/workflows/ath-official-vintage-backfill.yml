@@ -1,0 +1,39 @@
+name: ATH Official Vintage Context Backfill
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy requests pytest
+      - name: Verify research regressions
+        run: python -m pytest tests/test_ath_pullback_edge_v3.py tests/test_ath_official_vintage_backfill_v1.py -q
+      - name: Download official CBOE VIX into research staging
+        run: |
+          mkdir -p ath_edge_run/sources
+          python - <<'PY'
+          from pathlib import Path
+          import requests
+          r=requests.get('https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv', timeout=45)
+          r.raise_for_status()
+          Path('ath_edge_run/sources/VIX_History.csv').write_bytes(r.content)
+          PY
+      - name: Read-only depth research
+        run: python ath_pullback_edge_v3.py --official-vix ath_edge_run/sources/VIX_History.csv --output ath_edge_run/study
+      - name: Acquire historical provider vintages without publication
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python ath_official_vintage_backfill_v1.py --events ath_edge_run/study/edge_v3_events.csv --output ath_edge_run/vintages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-official-vintage-context-backfill
+          path: ath_edge_run/
+          if-no-files-found: warn
