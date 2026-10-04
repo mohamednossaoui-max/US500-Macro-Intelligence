@@ -30,6 +30,7 @@ def render_ath_pullback_context(public_data=None):
     st.write('حتى الاستعادة: يُقاس الهبوط من القمة المرجعية حتى العودة إليها. الشهر والثلاثة أشهر: يُقاس أكبر هبوط داخل المدة، بما يشمل الهبوط من قمة جديدة تتحقق خلالها.')
     render_model_research(root)
     render_edge_research(root)
+    render_macro_edge_research(root)
     with st.expander('السياق المتاح قبل تاريخ لقطة الأسعار', expanded=True):
         for item in result['context_inventory']:
             st.write(item['file'] + ' — ' + item['status'])
@@ -119,3 +120,22 @@ def render_edge_research(public_data):
             st.download_button('تنزيل تدقيق الدراسة الموسعة',path.read_bytes(),'ath-edge-v3-audit.json','application/json',key='ath_edge_download')
         except (OSError,ValueError,KeyError,TypeError) as error:
             st.error('تعذر قراءة الدراسة الموسعة: '+str(error))
+
+
+def render_macro_edge_research(public_data):
+    path=Path(public_data).parent/'research_history'/'ath_macro_edge_v4'/'macro_edge_v4_audit.json'
+    if not path.exists():return
+    with st.expander('اختبار السياق الاقتصادي التاريخي الموثق'):
+        try:
+            report=json.loads(path.read_text())
+            st.warning('النموذج الاقتصادي لم يثبت edge؛ لا توقع مباشر منشور.')
+            source=Path(public_data)/'cross_asset_research_v1.csv'
+            if not source.exists() or hashlib.sha256(source.read_bytes()).hexdigest()!=report['price_source_sha256']:
+                st.info('هذه نتائج أرشيفية؛ تغيرت مدخلات الأسعار وتحتاج إعادة حساب.')
+            st.caption('ميزات التوظيف والبطالة والتضخم والإنتاج الصناعي مستخرجة من receipts تعكس vintage سابقًا لكل قرار. لا تستخدم القيم الحالية للقمم القديمة.')
+            st.dataframe(pd.DataFrame([{'المدة':a['horizon'],'حالات الاختبار':a['evaluation_predictions'],
+                'خطأ السياق الاقتصادي':a['scores']['macro'],'خطأ الأسعار':a['scores']['price'],
+                'خطأ الاحتمالات التاريخية':a['scores']['climatology']} for a in report['analyses']]),
+                hide_index=True,use_container_width=True)
+            st.caption('الخطأ الأصغر أفضل. نتائج بحثية بعد هبوط 3%؛ ليست توقعًا يوم ATH أو معايرة مؤكدة.')
+        except (OSError,ValueError,KeyError,TypeError) as error:st.error('تعذر قراءة دراسة السياق: '+str(error))

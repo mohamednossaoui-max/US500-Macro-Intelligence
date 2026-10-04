@@ -22,13 +22,15 @@ SERIES={
  'PCEPILFE':('Monthly','Seasonally Adjusted','Index','BEA'),
  'A191RL1Q225SBEA':('Quarterly','Seasonally Adjusted Annual Rate','Percent Change from Preceding Period','BEA'),
  'INDPRO':('Monthly','Seasonally Adjusted','Index','Federal Reserve'),
- 'DFF':('Daily','Not Seasonally Adjusted','Percent','Federal Reserve'),
+ 'DFF':('Daily, 7-Day','Not Seasonally Adjusted','Percent','Federal Reserve'),
  'T10Y3M':('Daily','Not Seasonally Adjusted','Percent','Federal Reserve'),
  'NFCI':('Weekly, Ending Friday','Not Seasonally Adjusted','Index','Chicago Fed'),
  'ANFCI':('Weekly, Ending Friday','Not Seasonally Adjusted','Index','Chicago Fed')}
 API='https://api.stlouisfed.org/fred/'
 
-class SourceError(Exception):pass
+class SourceError(Exception):
+    def __init__(self,message,status='SOURCE_ERROR'):
+        super().__init__(message);self.status=status
 
 class Client:
     def __init__(self,key,session=None,pace=.6):
@@ -72,8 +74,8 @@ def observation(series,asof,payload):
     if not rows:raise SourceError('Historical vintage has no finite observations')
     if len({r[0] for r in rows})!=len(rows):raise SourceError('Duplicate reference periods')
     newest,value=rows[0]
-    max_age={'Daily':10,'Weekly, Ending Friday':28,'Monthly':120,'Quarterly':200}[SERIES[series][0]]
-    if (pd.Timestamp(asof)-newest).days>max_age:raise SourceError('Historical vintage is stale')
+    max_age={'Daily':10,'Daily, 7-Day':10,'Weekly, Ending Friday':28,'Monthly':120,'Quarterly':200}[SERIES[series][0]]
+    if (pd.Timestamp(asof)-newest).days>max_age:raise SourceError('Historical vintage is stale','STALE')
     result={'series':series,'agency':SERIES[series][3],'reference_period':newest.date().isoformat(),
             'as_of_date':asof,'level':value,'release_date':None,'release_time':None,
             'verification_status':'PROVIDER_ASOF_VERIFIED_AGENCY_RELEASE_TIME_UNVERIFIED'}
@@ -102,14 +104,41 @@ def immutable_receipt(root,series,asof,metadata,payload):
     return digest
 
 
-def backfill(events,client,output):
+def load_receipts(root):
+    records={}
+    for path in sorted((Path(root)/'receipts').glob('*.json')):
+        raw=path.read_bytes();sha=hashlib.sha256(raw).hexdigest()
+        if not path.stem.endswith('-'+sha):raise SourceError('Receipt checksum mismatch')
+        item=json.loads(raw);sid=item['series'];asof=item['as_of_date']
+        if sid not in SERIES or path.name!=f'{sid}-{asof}-{sha}.json':raise SourceError('Receipt identity mismatch')
+        verify_metadata(sid,{'seriess':[item['metadata']]})
+        if item.get('source')!=API+'series/observations':raise SourceError('Unexpected receipt source')
+        if item['response'].get('realtime_start')!=asof or item['response'].get('realtime_end')!=asof:
+            raise SourceError('Receipt vintage mismatch')
+        key=(sid,asof)
+        if key in records and records[key]['sha']!=sha:raise SourceError('Conflicting historical receipts; review revisions explicitly')
+        records[key]={'record':item,'sha':sha}
+    return records
+
+
+def backfill(events,client,output,cache=None):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
+    cached=load_receipts(cache) if cache else {}
     decisions=pd.to_datetime(events.decision_at,utc=True,errors='raise').drop_duplicates().sort_values()
     if decisions.empty:raise ValueError('No decision dates')
-    metadata={};errors={}
+    metadata={};errors={};bounds={};bounds_errors={}
     for series in SERIES:
-        try:metadata[series]=verify_metadata(series,client.get('series',{'series_id':series}))
-        except SourceError as exc:errors[series]=str(exc)
+        try:
+            metadata[series]=verify_metadata(series,client.get('series',{'series_id':series}))
+            dates=client.get('series/vintagedates',{'series_id':series,'realtime_start':'1776-07-04',
+                                                 'realtime_end':'9999-12-31','sort_order':'asc','limit':1})
+            first=dates.get('vintage_dates',[])
+            if len(first)!=1 or pd.isna(pd.to_datetime(first[0],errors='coerce')):
+                raise SourceError('Earliest provider vintage unavailable')
+            bounds[series]=first[0]
+        except SourceError as exc:
+            if series not in metadata:errors[series]=str(exc)
+            else:bounds_errors[series]=str(exc)
     results=[]
     for decision in decisions:
         if decision != decision.normalize():raise ValueError('Decision date must be conservative midnight UTC')
@@ -117,19 +146,32 @@ def backfill(events,client,output):
         for series in SERIES:
             row={'series':series,'decision_at':decision.isoformat(),'as_of_date':asof,'status':'SOURCE_ERROR'}
             try:
-                if series in errors:raise SourceError(errors[series])
-                payload=client.get('series/observations',{'series_id':series,'realtime_start':asof,'realtime_end':asof,
-                    'observation_end':asof,'sort_order':'desc','limit':90,'units':'lin','output_type':1})
-                derived=observation(series,asof,payload)
-                row.update(derived,status='ASOF_VERIFIED',receipt_sha256=immutable_receipt(output,series,asof,metadata[series],payload))
-            except SourceError as exc:row['reason']=str(exc)
+                saved=cached.get((series,asof))
+                if saved:
+                    payload=saved['record']['response'];meta=saved['record']['metadata']
+                    row['acquisition']='REVALIDATED_IMMUTABLE_CACHE'
+                else:
+                    if series in errors:raise SourceError(errors[series])
+                    if series in bounds_errors:raise SourceError(bounds_errors[series])
+                    if asof<bounds[series]:
+                        raise SourceError('Requested date precedes first provider vintage '+bounds[series], 'UNAVAILABLE_ARCHIVE')
+                    payload=client.get('series/observations',{'series_id':series,'realtime_start':asof,'realtime_end':asof,
+                        'observation_end':asof,'sort_order':'desc','limit':90,'units':'lin','output_type':1})
+                    meta=metadata[series];row['acquisition']='OFFICIAL_API'
+                # Save even a stale response for diagnosis, without accepting it as a predictor.
+                row['receipt_sha256']=immutable_receipt(output,series,asof,meta,payload)
+                row.update(observation(series,asof,payload),status='ASOF_VERIFIED')
+            except SourceError as exc:row.update(reason=str(exc),status=exc.status)
             results.append(row)
     report={'research_only':True,'live_forecast':None,'rows':len(results),
             'verified':sum(r['status']=='ASOF_VERIFIED' for r in results),
             'source_errors':sum(r['status']=='SOURCE_ERROR' for r in results),
+            'unavailable_archive':sum(r['status']=='UNAVAILABLE_ARCHIVE' for r in results),
+            'stale':sum(r['status']=='STALE' for r in results),
+            'first_provider_vintages':bounds,'archive_metadata_errors':bounds_errors,
             'limitations':['Provider as-of vintage is not an agency release timestamp.',
                 'No synthetic historical Fed stance, Decision scores or neutral missing-value fallback.',
-                'Authenticated live acquisition must run with FRED_API_KEY; fixtures do not prove endpoint availability.'],
+                'Partial research coverage does not permit live forecasting or CURRENT claims.'],
             'results':results}
     (output/'official_vintage_audit.json').write_text(json.dumps(report,indent=2,allow_nan=False))
     return report
@@ -137,12 +179,13 @@ def backfill(events,client,output):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--events',type=Path,required=True)
-    parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()
+    parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--cache',type=Path);args=parser.parse_args()
     if 'public_data' in args.output.resolve().parts:parser.error('Output must be outside public_data')
     try:client=Client(os.environ.get('FRED_API_KEY'))
     except SourceError as exc:parser.exit(2,str(exc)+'\n')
-    report=backfill(pd.read_csv(args.events),client,args.output)
+    report=backfill(pd.read_csv(args.events),client,args.output,args.cache)
     print(json.dumps({k:v for k,v in report.items() if k!='results'},indent=2))
-    return 1 if report['source_errors'] else 0
+    return 1 if report['verified']!=report['rows'] else 0
 
 if __name__=='__main__':raise SystemExit(main())
