@@ -30,7 +30,7 @@ jobs:
       - name: Acquire historical provider vintages without publication
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python ath_official_vintage_backfill_v1.py --events ath_edge_run/study/edge_v3_events.csv --output ath_edge_run/vintages --cache research_history/ath_official_vintages_v1
+        run: python ath_official_vintage_backfill_v1.py --events ath_edge_run/study/edge_v3_events.csv --output ath_edge_run/vintages --cache research_history/ath_official_vintages_v1 --coverage-policy available-archive
       - name: Receipt-backed macro comparison on available research coverage
         if: always()
         run: |
