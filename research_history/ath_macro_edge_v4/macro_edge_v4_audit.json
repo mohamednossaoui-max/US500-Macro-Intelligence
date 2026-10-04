@@ -40,7 +40,7 @@
     "interval_family_comparisons": 9,
     "live_forecast": "DISABLED"
   },
-  "validated_receipts": 319,
+  "validated_receipts": 360,
   "study_source_sha256": "e0000c7a4d62521430bd8bc72d3eae1cc5f44c053752de59913071f7704dfab2",
   "price_source_sha256": "ca1ea97831f4b0404008b430557d6123a501055076189b29e65a3fec07486ccb",
   "analyses": [
@@ -152,7 +152,7 @@
   "research_only": true,
   "limitations": [
     "This predicts conditional risk after 3% closing drawdown, not at the ATH.",
-    "No historical DFF/Fed stance substituted into the candidate; new DFF acquisition still required.",
+    "DFF and GDP receipts are audited but are not predictors in the frozen V4 candidate.",
     "The inspected years are exploratory; future independent validation and calibration are required.",
     "The price series is the cash index, not ES or broker US500.",
     "Small independent episode and crash counts limit conclusions."

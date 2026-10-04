@@ -1,10 +1,12 @@
 {
-  "full_suite_command": "python -m pytest -q",
-  "exit_code": 0,
-  "successful_test_markers": 449,
+  "suite": "python -m pytest -q",
+  "passed": 454,
+  "warnings": 6,
+  "seconds": 37.42,
   "publication_matches": 106,
   "mismatch": 0,
   "missing": 0,
   "errors": 0,
-  "repeat_model_output_identical": true
+  "mode": "ARCHIVED_RESPONSE_REPLAY_NOT_NEW_NETWORK_FETCH",
+  "revalidated_receipts": 360
 }
