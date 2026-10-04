@@ -1,0 +1,23 @@
+name: ATH Pullback Depth Context Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy pytest
+      - run: python -m pytest tests/test_ath_pullback_context_v1.py tests/test_ath_context_archive_v1.py tests/test_ath_depth_model_research_v1.py -q -k 'not ui'
+      - name: Read-only published-data depth study
+        run: python ath_pullback_context_v1.py --output ath_pullback_research
+      - name: Walk-forward model comparison without publication
+        run: python ath_depth_model_research_v1.py --output ath_pullback_research
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ath-pullback-depth-context-audit
+          path: ath_pullback_research/

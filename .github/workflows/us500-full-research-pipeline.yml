@@ -597,7 +597,11 @@ jobs:
             echo "Run ID: ${RUN_ID}"
             echo "------------------------------------------------------------"
 
-            if gh run download "${RUN_ID}" \
+            EXTRA_ARGS=()
+            if [ "${LABEL}" = "Economic Intelligence" ]; then
+              EXTRA_ARGS=(--name economic-intelligence-v2-3-refresh)
+            fi
+            if gh run download "${RUN_ID}" "${EXTRA_ARGS[@]}" \
               --repo "${GH_REPO}" \
               --dir "${TARGET}"; then
 
@@ -605,7 +609,8 @@ jobs:
 
             else
 
-              echo "WARNING: No downloadable artifacts found for ${LABEL}"
+              echo "ERROR: Required artifacts missing for ${LABEL}"
+              exit 1
 
             fi
 
@@ -662,7 +667,7 @@ jobs:
                 # Publication manifests are owned by the dedicated
                 # publication workflow and are never copied from artifacts.
                 case "${BASENAME}" in
-                  *manifest*.json)
+                  *manifest*.json|audit.json|fed_ingestion_audit.json|comparison.csv|observations.csv)
                     continue
                     ;;
                 esac
@@ -744,6 +749,13 @@ jobs:
           set -euo pipefail
           python -m pip install -r requirements.txt
           python -m pip install pytest
+          # Rebuild contexts from the exact validated Economic artifacts installed above.
+          cp public_data/*.csv .
+          cp public_data/*.json .
+          python macro_context_v1.py
+          cp macro_context_v1.csv macro_context_v1.json public_data/
+          MACRO_CONTEXT_FILE="$PWD/macro_context_v1.csv" SENTIMENT_ENGINE_FILE="$PWD/sentiment_engine_research_v1.csv" TECHNICAL_INTELLIGENCE_FILE="$PWD/technical_intelligence_research_v1.csv" python research-context-v1.py
+          cp research_context_v1.csv research_context_summary_v1.csv research_context_extremes_v1.csv public_data/
           python research_evidence_contract_v1.py
           python research_context_quality_integration_v1.py
           rm -rf decision_engine_output
@@ -766,6 +778,18 @@ jobs:
       # ============================================================
       # 25. PUBLICATION MANIFEST OWNERSHIP
       # ============================================================
+
+      - name: Preserve ATH Context Vintage and Run Depth Research
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'pandas>=2,<4' numpy
+          # Capture only after publication verification. Never backdate the
+          # capture to context_date and never replace an earlier vintage.
+          python ath_context_archive_v1.py --archive research_history/ath_context_v1
+          python ath_depth_model_research_v1.py --archive research_history/ath_context_v1 --output master_runs/ath_depth
+          cp master_runs/ath_depth/model_research_audit.json research_history/ath_depth_model_audit_v1.json
 
       - name: Publication Manifest Ownership
         if: success()
@@ -876,6 +900,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add public_data
+          # Persist the captured context across runner lifetimes, using the
+          # existing publication commit. No source/decision calculations change.
+          git add research_history/ath_context_v1 research_history/ath_depth_model_audit_v1.json
 
           echo ""
           echo "Staged changes:"
