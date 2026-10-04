@@ -14,7 +14,7 @@ jobs:
           python-version: '3.11'
       - run: pip install 'pandas>=2,<4' numpy requests pytest
       - name: Verify research regressions
-        run: python -m pytest tests/test_ath_pullback_edge_v3.py tests/test_ath_official_vintage_backfill_v1.py -q
+        run: python -m pytest tests/test_ath_pullback_edge_v3.py tests/test_ath_official_vintage_backfill_v1.py tests/test_ath_macro_edge_research_v4.py -q
       - name: Download official CBOE VIX into research staging
         run: |
           mkdir -p ath_edge_run/sources
@@ -30,7 +30,13 @@ jobs:
       - name: Acquire historical provider vintages without publication
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python ath_official_vintage_backfill_v1.py --events ath_edge_run/study/edge_v3_events.csv --output ath_edge_run/vintages
+        run: python ath_official_vintage_backfill_v1.py --events ath_edge_run/study/edge_v3_events.csv --output ath_edge_run/vintages --cache research_history/ath_official_vintages_v1
+      - name: Receipt-backed macro comparison on available research coverage
+        if: always()
+        run: |
+          if [ -f ath_edge_run/vintages/official_vintage_audit.json ]; then
+            python ath_macro_edge_research_v4.py --study ath_edge_run/study --cache ath_edge_run/vintages --output ath_edge_run/macro_study
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
