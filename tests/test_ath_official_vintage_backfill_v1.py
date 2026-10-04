@@ -66,6 +66,7 @@ def test_backfill_asof_requests_and_idempotency(tmp_path):
             if endpoint=='series':
                 freq,sa,units,_=m.SERIES[sid]
                 return {'seriess':[{'id':sid,'frequency':freq,'seasonal_adjustment':sa,'units':units}]}
+            if endpoint=='series/vintagedates':return {'vintage_dates':['1990-01-01']}
             assert params['realtime_start']==params['realtime_end']=='2020-04-01'
             assert params['observation_end']=='2020-04-01'
             if m.SERIES[sid][0]=='Monthly':return payload([('2020-03-01',110),('2020-02-01',100)])
@@ -73,3 +74,45 @@ def test_backfill_asof_requests_and_idempotency(tmp_path):
     events=pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']*2})
     a=m.backfill(events,Good(),tmp_path);b=m.backfill(events,Good(),tmp_path)
     assert a==b and a['verified']==10 and len(list((tmp_path/'receipts').glob('*')))==10
+
+
+def test_dff_requires_official_seven_day_semantics():
+    row={'id':'DFF','frequency':'Daily, 7-Day','seasonal_adjustment':'Not Seasonally Adjusted','units':'Percent'}
+    assert m.verify_metadata('DFF',{'seriess':[row]})['frequency']=='Daily, 7-Day'
+    assert m.observation('DFF','2020-04-01',payload([('2020-03-31',1)]))['level']==1
+    with pytest.raises(m.SourceError):m.verify_metadata('DFF',{'seriess':[{**row,'frequency':'Daily'}]})
+
+
+def test_before_archive_is_not_http_error_or_current(tmp_path):
+    class NoEarly:
+        def get(self,endpoint,params):
+            sid=params['series_id']
+            if endpoint=='series':
+                freq,sa,units,_=m.SERIES[sid]
+                return {'seriess':[{'id':sid,'frequency':freq,'seasonal_adjustment':sa,'units':units}]}
+            if endpoint=='series/vintagedates':return {'vintage_dates':['2021-01-01']}
+            raise AssertionError('Must not request unsupported vintage')
+    r=m.backfill(pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']}),NoEarly(),tmp_path)
+    assert r['unavailable_archive']==10 and r['source_errors']==0 and r['verified']==0
+    assert all(x['status']=='UNAVAILABLE_ARCHIVE' for x in r['results'])
+
+
+def test_receipt_tampering_and_conflict_fail_closed(tmp_path):
+    m.immutable_receipt(tmp_path,'UNRATE','2020-04-01',{'id':'UNRATE','frequency':'Monthly','seasonal_adjustment':'Seasonally Adjusted','units':'Percent'},payload([('2020-03-01',4)]))
+    assert len(m.load_receipts(tmp_path))==1
+    path=next((tmp_path/'receipts').glob('*'));path.write_text(path.read_text()+' ')
+    with pytest.raises(m.SourceError):m.load_receipts(tmp_path)
+
+
+def test_stale_response_retained_but_not_accepted(tmp_path):
+    class Stale:
+        def get(self,endpoint,params):
+            sid=params['series_id']
+            if endpoint=='series':
+                freq,sa,units,_=m.SERIES[sid]
+                return {'seriess':[{'id':sid,'frequency':freq,'seasonal_adjustment':sa,'units':units}]}
+            if endpoint=='series/vintagedates':return {'vintage_dates':['1990-01-01']}
+            return payload([('1990-01-01',1)])
+    r=m.backfill(pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']}),Stale(),tmp_path)
+    assert r['stale']==10 and r['verified']==0
+    assert len(list((tmp_path/'receipts').glob('*')))==10
