@@ -1,0 +1,10 @@
+{
+  "full_suite_command": "python -m pytest -q",
+  "exit_code": 0,
+  "successful_test_markers": 449,
+  "publication_matches": 106,
+  "mismatch": 0,
+  "missing": 0,
+  "errors": 0,
+  "repeat_model_output_identical": true
+}

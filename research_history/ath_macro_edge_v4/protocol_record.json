@@ -1,0 +1,45 @@
+{
+  "recorded_at": "2026-10-04T20:31:56.588280+00:00",
+  "protocol_sha256": "ed6e30dd89eec03d63bd799451b8d5713e627b5bf92f24d5239e0acc33bb1b4d",
+  "protocol": {
+    "version": "ATH_MACRO_EDGE_V4",
+    "ridge_penalty": 10.0,
+    "minimum_training_episodes": 12,
+    "evaluation_start": "2019-01-01",
+    "macro_features": {
+      "nfp_change_jobs": [
+        "PAYEMS",
+        "monthly_change_jobs"
+      ],
+      "unemployment_pct": [
+        "UNRATE",
+        "level"
+      ],
+      "cpi_yoy_sa_pct": [
+        "CPIAUCSL",
+        "yoy_sa_index_pct"
+      ],
+      "core_pce_yoy_sa_pct": [
+        "PCEPILFE",
+        "yoy_sa_index_pct"
+      ],
+      "industrial_production_mom_pct": [
+        "INDPRO",
+        "mom_pct"
+      ]
+    },
+    "hypothesis": "Employment, inflation and industrial production as known at the decision date add depth information after an observed 3%-<5% closing drawdown.",
+    "models": [
+      "MACRO_RIDGE",
+      "PRICE_RIDGE",
+      "MARKET_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "status": "EXPLORATORY_REUSED_CALENDAR_PERIODS_NOT_CONFIRMATORY",
+    "minimum_evaluation_episodes": 30,
+    "minimum_evaluation_crashes": 3,
+    "interval_family_comparisons": 9,
+    "live_forecast": "DISABLED"
+  },
+  "status": "LOCAL_EXPLORATORY_SPECIFICATION_RECORDED_BEFORE_V4_EVALUATION_NOT_INDEPENDENT_PREREGISTRATION"
+}

@@ -1,0 +1,3662 @@
+{
+  "version": "ATH_MACRO_EDGE_V4",
+  "protocol": {
+    "version": "ATH_MACRO_EDGE_V4",
+    "ridge_penalty": 10.0,
+    "minimum_training_episodes": 12,
+    "evaluation_start": "2019-01-01",
+    "macro_features": {
+      "nfp_change_jobs": [
+        "PAYEMS",
+        "monthly_change_jobs"
+      ],
+      "unemployment_pct": [
+        "UNRATE",
+        "level"
+      ],
+      "cpi_yoy_sa_pct": [
+        "CPIAUCSL",
+        "yoy_sa_index_pct"
+      ],
+      "core_pce_yoy_sa_pct": [
+        "PCEPILFE",
+        "yoy_sa_index_pct"
+      ],
+      "industrial_production_mom_pct": [
+        "INDPRO",
+        "mom_pct"
+      ]
+    },
+    "hypothesis": "Employment, inflation and industrial production as known at the decision date add depth information after an observed 3%-<5% closing drawdown.",
+    "models": [
+      "MACRO_RIDGE",
+      "PRICE_RIDGE",
+      "MARKET_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "status": "EXPLORATORY_REUSED_CALENDAR_PERIODS_NOT_CONFIRMATORY",
+    "minimum_evaluation_episodes": 30,
+    "minimum_evaluation_crashes": 3,
+    "interval_family_comparisons": 9,
+    "live_forecast": "DISABLED"
+  },
+  "validated_receipts": 319,
+  "study_source_sha256": "e0000c7a4d62521430bd8bc72d3eae1cc5f44c053752de59913071f7704dfab2",
+  "price_source_sha256": "ca1ea97831f4b0404008b430557d6123a501055076189b29e65a3fec07486ccb",
+  "analyses": [
+    {
+      "horizon": "1M",
+      "eligible_episodes": 35,
+      "complete_macro_feature_rows": 34,
+      "evaluation_predictions": 16,
+      "evaluation_crashes": 0,
+      "scores": {
+        "macro": 0.6984872328000344,
+        "price": 0.5908110556118356,
+        "market": 0.763444968711805,
+        "climatology": 0.5275635218448174
+      },
+      "improvements": {
+        "price": {
+          "mean": -0.10767617718819869,
+          "lower": -0.43654876071617077,
+          "upper": 0.23123856138725626,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "market": {
+          "mean": 0.06495773591177079,
+          "lower": -0.28691493515762506,
+          "upper": 0.44064375914600673,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "climatology": {
+          "mean": -0.17092371095521694,
+          "lower": -0.5421892581646182,
+          "upper": 0.18258123245383598,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        }
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE"
+    },
+    {
+      "horizon": "3M",
+      "eligible_episodes": 26,
+      "complete_macro_feature_rows": 25,
+      "evaluation_predictions": 12,
+      "evaluation_crashes": 1,
+      "scores": {
+        "macro": 0.6824988426278189,
+        "price": 0.5793424709961584,
+        "market": 0.7248869580514993,
+        "climatology": 0.5124494531856982
+      },
+      "improvements": {
+        "price": {
+          "mean": -0.10315637163166047,
+          "lower": -0.2573468860711184,
+          "upper": 0.07290155851193392,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "market": {
+          "mean": 0.04238811542368039,
+          "lower": -0.1866506844325276,
+          "upper": 0.18554179193788012,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "climatology": {
+          "mean": -0.17004938944212067,
+          "lower": -0.5276047166863369,
+          "upper": 0.11045244585368764,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        }
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE"
+    },
+    {
+      "horizon": "UNTIL_RECOVERY",
+      "eligible_episodes": 39,
+      "complete_macro_feature_rows": 38,
+      "evaluation_predictions": 19,
+      "evaluation_crashes": 2,
+      "scores": {
+        "macro": 0.8009151561680957,
+        "price": 0.6762042016672251,
+        "market": 0.8017617515828217,
+        "climatology": 0.6181341904299498
+      },
+      "improvements": {
+        "price": {
+          "mean": -0.12471095450087057,
+          "lower": -0.4397071971121087,
+          "upper": 0.1323904247445945,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "market": {
+          "mean": 0.0008465954147261566,
+          "lower": -0.3649613173398902,
+          "upper": 0.30474855233108233,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        },
+        "climatology": {
+          "mean": -0.18278096573814587,
+          "lower": -0.526929372944868,
+          "upper": 0.09465439890596984,
+          "method": "Exploratory block percentile bootstrap, alpha=0.05/9; no guaranteed coverage"
+        }
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE"
+    }
+  ],
+  "live_forecast": null,
+  "high_confidence_claim_allowed": false,
+  "research_only": true,
+  "limitations": [
+    "This predicts conditional risk after 3% closing drawdown, not at the ATH.",
+    "No historical DFF/Fed stance substituted into the candidate; new DFF acquisition still required.",
+    "The inspected years are exploratory; future independent validation and calibration are required.",
+    "The price series is the cash index, not ES or broker US500.",
+    "Small independent episode and crash counts limit conclusions."
+  ],
+  "feature_coverage": [
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2000-04-12",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c6ef3a4d0cb8e6bb8ebb3e4f",
+      "decision_at": "2000-04-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2000-04-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fdadd92e4314d860141d0fed",
+      "decision_at": "2007-06-08T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-06-07",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e30d57ac57796ef656deecfc",
+      "decision_at": "2007-07-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-07-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "b336de7cd22b7c9ef4678d55",
+      "decision_at": "2007-10-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-19",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "4e46e70036679cf60e2313fd",
+      "decision_at": "2013-04-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-04-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "5771722bf6a0d26b4aab4048",
+      "decision_at": "2013-06-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-06-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "ddea457cb21069ead679d301",
+      "decision_at": "2013-08-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-08-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0d25d30872cf717f96471ef3",
+      "decision_at": "2013-10-09T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-10-08",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0b80f7153bf9c31ae073abf2",
+      "decision_at": "2014-01-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-01-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "a2832c3da971c220b477ba24",
+      "decision_at": "2014-04-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-04-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "56c39857fc69e0d7576c7d73",
+      "decision_at": "2014-08-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-08-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "64706d2ffe93348a84215c63",
+      "decision_at": "2014-10-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-10-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "53375ae43a67a173aa80cbe8",
+      "decision_at": "2014-12-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "70e00c882621d0b950bca62d",
+      "decision_at": "2015-01-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-01-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "70e00c882621d0b950bca62d",
+      "decision_at": "2015-01-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-01-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "70e00c882621d0b950bca62d",
+      "decision_at": "2015-01-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-01-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "70e00c882621d0b950bca62d",
+      "decision_at": "2015-01-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-01-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "70e00c882621d0b950bca62d",
+      "decision_at": "2015-01-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-01-05",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "9db368b159b52a4765487a68",
+      "decision_at": "2015-03-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-03-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1b469d30068cbda73bd2394c",
+      "decision_at": "2015-06-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-06-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "e6c1b04e54bca02a20d9e27f",
+      "decision_at": "2016-11-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "45603b6d45f93c1b047d204e",
+      "decision_at": "2018-02-03T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-02-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d7241d0c4ebc604bea498f9b",
+      "decision_at": "2018-10-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-10-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "0a0a0429e9bd817251094c2c",
+      "decision_at": "2019-05-14T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-05-13",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d4871f5b3e20d4d0a3fe81f0",
+      "decision_at": "2019-08-03T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-08-02",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f4bf3f779aa472b28992758e",
+      "decision_at": "2020-02-01T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-01-31",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1c3ce1c99ba47e1c3924a0e0",
+      "decision_at": "2020-02-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-02-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1c3ce1c99ba47e1c3924a0e0",
+      "decision_at": "2020-02-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-02-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1c3ce1c99ba47e1c3924a0e0",
+      "decision_at": "2020-02-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-02-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1c3ce1c99ba47e1c3924a0e0",
+      "decision_at": "2020-02-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-02-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1c3ce1c99ba47e1c3924a0e0",
+      "decision_at": "2020-02-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-02-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "046c025ac8e1090efba653d7",
+      "decision_at": "2020-09-04T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-09-03",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "66f9087e7cdf83d0a8b0aaba",
+      "decision_at": "2021-01-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-01-29",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "44301ef42e8bf1b282621964",
+      "decision_at": "2021-02-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-02-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "44301ef42e8bf1b282621964",
+      "decision_at": "2021-02-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-02-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "44301ef42e8bf1b282621964",
+      "decision_at": "2021-02-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-02-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "44301ef42e8bf1b282621964",
+      "decision_at": "2021-02-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-02-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "44301ef42e8bf1b282621964",
+      "decision_at": "2021-02-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-02-26",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "bc57ec7319b53100ed8287bf",
+      "decision_at": "2021-05-13T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-05-12",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8a513749a13484be4eee581a",
+      "decision_at": "2021-09-21T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-09-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "89dd49e0fabfabf05a972ad9",
+      "decision_at": "2021-12-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-12-01",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fab68ab76303e4ce901b27d6",
+      "decision_at": "2021-12-21T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-12-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fab68ab76303e4ce901b27d6",
+      "decision_at": "2021-12-21T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-12-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fab68ab76303e4ce901b27d6",
+      "decision_at": "2021-12-21T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-12-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fab68ab76303e4ce901b27d6",
+      "decision_at": "2021-12-21T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-12-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "fab68ab76303e4ce901b27d6",
+      "decision_at": "2021-12-21T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-12-20",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "72b37f1cedcc60a6d6e1492d",
+      "decision_at": "2022-01-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2022-01-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "f60c7b2bf9b4d3db67eb12ec",
+      "decision_at": "2024-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-04-15",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "8556ec34f603711313e442d9",
+      "decision_at": "2024-07-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-07-24",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "84825ee580603e81ef24440d",
+      "decision_at": "2024-12-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-12-18",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d28e948eb82473c31e070d5f",
+      "decision_at": "2025-02-26T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-02-25",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "c0880c39bf6ffc2ac7cfe112",
+      "decision_at": "2025-11-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-11-17",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "1889257964f271b4a34a5407",
+      "decision_at": "2026-03-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-03-06",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "d3b3785eebc31df710ed3347",
+      "decision_at": "2026-06-11T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-06-10",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    },
+    {
+      "episode_id": "17f463d364ce6f4f41d66723",
+      "decision_at": "2026-09-17T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-09-16",
+      "status": "ASOF_VERIFIED"
+    }
+  ]
+}

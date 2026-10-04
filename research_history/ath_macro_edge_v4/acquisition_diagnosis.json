@@ -1,0 +1,14 @@
+{
+  "uploaded_artifact_sha256": "1472eba34da94c0a117166935eda31adf9b4f29bf933753008cb47af8e6c015c",
+  "verified_receipts": 319,
+  "dff_frequency_mapping_failures": 39,
+  "http_400_before_archival_coverage": 29,
+  "gdp_reference_age_gate_rejections": 3,
+  "new_dff_values_acquired_locally": 0,
+  "live_forecast": null,
+  "notes": [
+    "The DFF code fix was verified against official metadata and regression fixtures, not authenticated live reacquisition.",
+    "HTTP 400 chronology matches ALFRED series archival metadata; runtime code now queries series/vintagedates instead of hardcoded first dates.",
+    "Rejected GDP responses were not saved by the first collector; actual reference periods cannot be independently examined from this artifact. The patched collector saves such responses without accepting stale features."
+  ]
+}
