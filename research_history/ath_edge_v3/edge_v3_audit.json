@@ -1,0 +1,152 @@
+{
+  "version": "ATH_EDGE_V3",
+  "protocol": {
+    "version": "ATH_EDGE_V3",
+    "trigger_min_pct": 3,
+    "trigger_max_exclusive_pct": 5,
+    "warmup_sessions": 63,
+    "ridge_penalty": 10.0,
+    "minimum_training_episodes": 12,
+    "development_end": "2018-12-31",
+    "evaluation_start": "2019-01-01",
+    "bootstrap_draws": 2000,
+    "bootstrap_block_episodes": 3,
+    "bootstrap_seed": 20261004,
+    "minimum_evaluation_episodes_for_candidate": 30,
+    "minimum_evaluation_crashes_for_candidate": 3,
+    "family_comparisons": 6,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_CONTEXT_RIDGE"
+    ],
+    "hypothesis": "Market volatility and relative risk-asset behaviour add information about depth after an observed 3% closing drawdown.",
+    "human_research_status": "EXPLORATORY: 2019-2026 calendar periods were also examined in earlier studies; not a pristine external holdout.",
+    "live_forecast_policy": "DISABLED_PENDING_INDEPENDENT_DATA_VERIFICATION_CALIBRATION_AND_PROSPECTIVE_VALIDATION"
+  },
+  "source_file": "cross_asset_research_v1.csv",
+  "source_sha256": "ca1ea97831f4b0404008b430557d6123a501055076189b29e65a3fec07486ccb",
+  "history_start": "2000-01-03",
+  "history_end": "2026-10-02",
+  "official_vix": {
+    "source_url": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
+    "sha256": "6edc3e3928c4b164b9e4ed1ec874e0ed53c7d52997557adebb7d6b7451db565a",
+    "matched_sessions": 6728,
+    "vendor_differences_above_0_02": 11,
+    "maximum_absolute_difference": 2.610000839233397,
+    "verification": "OFFICIAL_CURRENT_HISTORY_NOT_CERTIFIED_HISTORICAL_VINTAGES"
+  },
+  "closing_sessions": 6728,
+  "instrument": "^GSPC CASH_INDEX_CLOSE_PROXY",
+  "source_pit_status": "PIT_LIMITED_VENDOR_HISTORY_WITH_PLUS_ONE_DAY_PROXY",
+  "analyses": [
+    {
+      "horizon": "1M",
+      "eligible_episodes": 35,
+      "completed_episodes": 34,
+      "development_predictions": 6,
+      "evaluation_predictions": 16,
+      "test_class_counts": {
+        "LIMITED": 5,
+        "MEDIUM": 11,
+        "CRASH": 0
+      },
+      "mean_scores": {
+        "price_brier": 0.5645373201085726,
+        "market_brier": 0.7218942140349629,
+        "climatology_brier": 0.5123048085982806
+      },
+      "improvement_vs_price": {
+        "mean": -0.1573568939263902,
+        "lower": -0.3845407791954887,
+        "upper": 0.04191971892786842,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "improvement_vs_climatology": {
+        "mean": -0.2095894054366822,
+        "lower": -0.49494301730394413,
+        "upper": 0.02261742349046693,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE",
+      "live_probabilities": null,
+      "high_confidence_claim_allowed": false
+    },
+    {
+      "horizon": "3M",
+      "eligible_episodes": 26,
+      "completed_episodes": 25,
+      "development_predictions": 0,
+      "evaluation_predictions": 13,
+      "test_class_counts": {
+        "LIMITED": 3,
+        "MEDIUM": 9,
+        "CRASH": 1
+      },
+      "mean_scores": {
+        "price_brier": 0.53266961714791,
+        "market_brier": 0.613084513417246,
+        "climatology_brier": 0.48637420602312226
+      },
+      "improvement_vs_price": {
+        "mean": -0.08041489626933598,
+        "lower": -0.19987074022584125,
+        "upper": 0.028166966283534413,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "improvement_vs_climatology": {
+        "mean": -0.12671030739412378,
+        "lower": -0.34577481538711907,
+        "upper": 0.04238624489403211,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE",
+      "live_probabilities": null,
+      "high_confidence_claim_allowed": false
+    },
+    {
+      "horizon": "UNTIL_RECOVERY",
+      "eligible_episodes": 39,
+      "completed_episodes": 38,
+      "development_predictions": 7,
+      "evaluation_predictions": 19,
+      "test_class_counts": {
+        "LIMITED": 8,
+        "MEDIUM": 9,
+        "CRASH": 2
+      },
+      "mean_scores": {
+        "price_brier": 0.6550317160844467,
+        "market_brier": 0.8060882874510602,
+        "climatology_brier": 0.6176565626623658
+      },
+      "improvement_vs_price": {
+        "mean": -0.1510565713666134,
+        "lower": -0.29463244931914273,
+        "upper": -0.04637029583220179,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "improvement_vs_climatology": {
+        "mean": -0.18843172478869447,
+        "lower": -0.4615999382945319,
+        "upper": -0.004457534512431028,
+        "method": "Exploratory moving-block percentile bootstrap, adjusted alpha=0.05/6; coverage is not guaranteed"
+      },
+      "candidate_status": "NO_CONFIRMED_EDGE",
+      "live_probabilities": null,
+      "high_confidence_claim_allowed": false
+    }
+  ],
+  "live_forecast": null,
+  "forecast_status": "NOT_VALIDATED",
+  "scope": "Risk AFTER observed 3%-<5% close drawdown; not risk at the ATH and not trading rules.",
+  "limitations": [
+    "Closing-record highs are not intraday ATHs or ES/broker-US500 highs.",
+    "Historical source vintages/session publication times are not independently certified.",
+    "Macro/Fed/Decision are not backcast into historical predictors.",
+    "The 2019-2026 periods are reused exploratory research, not untouched confirmatory data.",
+    "Calendar completeness and individual vendor unit consistency have not been independently verified.",
+    "Bootstrap intervals are diagnostic; rare crises and small samples limit inference."
+  ],
+  "research_only": true,
+  "execution": false
+}

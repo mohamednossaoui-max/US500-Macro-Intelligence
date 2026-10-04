@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-10-04T19:54:03.082634+00:00",
+  "protocol_sha256": "29fec10ea9a88e33631a2de83fc2d7518f0fbc93b453583a49227b8cf7e4f8dc",
+  "protocol": {
+    "version": "ATH_EDGE_V3",
+    "trigger_min_pct": 3,
+    "trigger_max_exclusive_pct": 5,
+    "warmup_sessions": 63,
+    "ridge_penalty": 10.0,
+    "minimum_training_episodes": 12,
+    "development_end": "2018-12-31",
+    "evaluation_start": "2019-01-01",
+    "bootstrap_draws": 2000,
+    "bootstrap_block_episodes": 3,
+    "bootstrap_seed": 20261004,
+    "minimum_evaluation_episodes_for_candidate": 30,
+    "minimum_evaluation_crashes_for_candidate": 3,
+    "family_comparisons": 6,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_CONTEXT_RIDGE"
+    ],
+    "hypothesis": "Market volatility and relative risk-asset behaviour add information about depth after an observed 3% closing drawdown.",
+    "human_research_status": "EXPLORATORY: 2019-2026 calendar periods were also examined in earlier studies; not a pristine external holdout.",
+    "live_forecast_policy": "DISABLED_PENDING_INDEPENDENT_DATA_VERIFICATION_CALIBRATION_AND_PROSPECTIVE_VALIDATION"
+  },
+  "status": "EXPLORATORY_POST_RUN_RECORD_NOT_FORMAL_PRE_REGISTRATION",
+  "confirmation_requirement": "Any changed predictor/parameter specification is a new trial; do not reuse this inspected evaluation period as pristine holdout."
+}

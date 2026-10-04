@@ -1,0 +1,22 @@
+........................................................................ [ 16%]
+........................................................................ [ 32%]
+........................................................................ [ 48%]
+........................................................................ [ 65%]
+........................................................................ [ 81%]
+........................................................................ [ 97%]
+..........                                                               [100%]
+=============================== warnings summary ===============================
+tests/test_economic_indicator_details.py::test_metadata_enrichment_preserves_pit_and_is_idempotent
+tests/test_economic_official_ingestion_v1.py::test_revision_preserves_prior_vintage_and_pit
+tests/test_economic_official_ingestion_v1.py::test_source_snapshot_revision_does_not_replace_latest_period
+tests/test_economic_official_ingestion_v1.py::test_source_snapshot_revision_does_not_replace_latest_period
+tests/test_economic_official_ingestion_v1.py::test_revision_reversion_is_recorded_and_duplicate_safe
+  /workspace/scratch/0c2ce463fb87/free-sources/US500-Macro-Intelligence-main/economic_official_ingestion_v1.py:119: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+    events=pd.concat([events,pd.DataFrame([r])],ignore_index=True,sort=False)
+
+tests/test_economic_official_ingestion_v1.py::test_prior_period_revisions_are_not_independent_zscore_samples
+  /workspace/scratch/0c2ce463fb87/free-sources/US500-Macro-Intelligence-main/economic_surprise_engine_v1.1.py:250: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+    active = work.loc[~(work.get("source_snapshot_history", pd.Series(False, index=work.index)).fillna(False).astype(bool) | work.get("metadata_only", pd.Series(False, index=work.index)).fillna(False).astype(bool))]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+442 passed, 6 warnings in 26.86s
