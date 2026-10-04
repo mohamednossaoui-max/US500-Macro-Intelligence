@@ -103,7 +103,7 @@ def run(study,cache):
             'price_source_sha256':audit['source_sha256'],'analyses':analyses,
             'live_forecast':None,'high_confidence_claim_allowed':False,'research_only':True,
             'limitations':['This predicts conditional risk after 3% closing drawdown, not at the ATH.',
-                'No historical DFF/Fed stance substituted into the candidate; new DFF acquisition still required.',
+                'DFF and GDP receipts are audited but are not predictors in the frozen V4 candidate.',
                 'The inspected years are exploratory; future independent validation and calibration are required.',
                 'The price series is the cash index, not ES or broker US500.',
                 'Small independent episode and crash counts limit conclusions.'],
