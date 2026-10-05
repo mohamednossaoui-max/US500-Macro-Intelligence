@@ -131,15 +131,18 @@ def parse_dates(
     return result.dt.normalize()
 
 
-def get_as_of_date() -> pd.Timestamp | None:
+def get_as_of_date() -> pd.Timestamp:
 
     value = os.getenv(
         "RESEARCH_CONTEXT_AS_OF_DATE",
         "",
     ).strip()
 
+    # Technical observations may only become available on the following day.
+    # Their future availability dates must not become today's context date.
+    today = pd.Timestamp.now(tz="UTC").tz_localize(None).normalize()
     if not value:
-        return None
+        return today
 
     parsed = pd.to_datetime(
         value,
@@ -153,7 +156,13 @@ def get_as_of_date() -> pd.Timestamp | None:
             "Expected YYYY-MM-DD."
         )
 
-    return pd.Timestamp(parsed).normalize()
+    cutoff = pd.Timestamp(parsed)
+    if cutoff.tzinfo is not None:
+        cutoff = cutoff.tz_convert("UTC").tz_localize(None)
+    cutoff = cutoff.normalize()
+    if cutoff > today:
+        fail("RESEARCH_CONTEXT_AS_OF_DATE cannot be in the future.")
+    return cutoff
 
 
 def ensure_unique_columns(
