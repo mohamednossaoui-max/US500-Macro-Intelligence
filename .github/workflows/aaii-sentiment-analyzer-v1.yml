@@ -52,20 +52,13 @@ jobs:
         run: |
           set -e
 
-          ARTIFACT_ID=$(gh api \
+          gh api --paginate --slurp \
+            -H "Accept: application/vnd.github+json" \
             "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq '
-              [
-                .artifacts[]
-                | select(
-                    .name == "aaii-historical-v1"
-                    and .expired == false
-                  )
-              ]
-              | sort_by(.created_at)
-              | reverse
-              | .[0].id
-            ')
+            > artifact-pages.json
+
+          ARTIFACT_ID="$(python scripts/actions_artifact_inventory_v1.py \
+            --pages artifact-pages.json --name aaii-historical-v1)"
 
           if [ -z "$ARTIFACT_ID" ] || [ "$ARTIFACT_ID" = "null" ]; then
             echo "ERROR: Could not find aaii-historical-v1 artifact."

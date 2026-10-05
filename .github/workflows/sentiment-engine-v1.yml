@@ -108,10 +108,13 @@ jobs:
           echo "DISCOVERING GITHUB ACTIONS ARTIFACTS"
           echo "============================================================"
 
-          gh api \
+          gh api --paginate --slurp \
             -H "Accept: application/vnd.github+json" \
             "/repos/${REPO}/actions/artifacts?per_page=100" \
-            > artifacts.json
+            > artifact-pages.json
+
+          python scripts/actions_artifact_inventory_v1.py \
+            --pages artifact-pages.json --output artifacts.json
 
           python - <<'PY'
           import json
