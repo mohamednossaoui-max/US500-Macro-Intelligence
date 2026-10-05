@@ -28,6 +28,7 @@ def render_ath_pullback_context(public_data=None):
     for col, name in zip(st.columns(3), ['حتى استعادة القمة', 'خلال شهر', 'خلال ثلاثة أشهر']):
         col.metric(name, 'التقدير غير متاح')
     st.write('حتى الاستعادة: يُقاس الهبوط من القمة المرجعية حتى العودة إليها. الشهر والثلاثة أشهر: يُقاس أكبر هبوط داخل المدة، بما يشمل الهبوط من قمة جديدة تتحقق خلالها.')
+    render_record_research(root)
     render_model_research(root)
     render_edge_research(root)
     render_macro_edge_research(root)
@@ -139,3 +140,25 @@ def render_macro_edge_research(public_data):
                 hide_index=True,use_container_width=True)
             st.caption('الخطأ الأصغر أفضل. نتائج بحثية بعد هبوط 3%؛ ليست توقعًا يوم ATH أو معايرة مؤكدة.')
         except (OSError,ValueError,KeyError,TypeError) as error:st.error('تعذر قراءة دراسة السياق: '+str(error))
+
+
+def render_record_research(public_data):
+    path=Path(public_data).parent/'research_history'/'ath_record_high_v6'/'record_high_v6_audit.json'
+    if not path.exists():return
+    with st.expander('الاختبار من يوم القمة — قبل حدوث التراجع',expanded=True):
+        try:
+            report=json.loads(path.read_text())
+            st.caption('هذا الاختبار يختار قمم إغلاق بالتاريخ، ويحتفظ أيضًا بحالات استمرار الصعود. المؤشر النقدي وتاريخ القمم المتاح لا يثبتان ATH داخل الجلسة أو أسعار ES/US500.')
+            st.warning('لا توجد احتمالات حية معتمدة. السياق الاقتصادي يجب أن يعود إلى تاريخ القمة نفسه.')
+            source=Path(public_data)/'cross_asset_research_v1.csv'
+            if not source.exists() or hashlib.sha256(source.read_bytes()).hexdigest()!=report['source_sha256']:
+                st.info('نتائج أرشيفية؛ تغيرت المدخلات وتحتاج إعادة حساب.')
+            for column,item in zip(st.columns(3),report['analyses']):
+                score=item['price_and_market_common_sample']
+                column.metric(item['horizon'],str(score['evaluations'])+' اختبارات')
+                column.caption('السياق الكامل: '+str(item['full_context_common_sample']['evaluations'])+' اختبارات')
+            if all(x['full_context_feature_rows']==0 for x in report['analyses']):
+                st.info('الأرشيف الحالي جمع vintages عند بدء هبوط 3%؛ لا يغطي تواريخ هذه القمم. شغّل ATH Record High Context Audit لجلبها.')
+            st.caption('حتى الاستعادة يعني العودة إلى القمة المرجعية المختارة، وقد يحدث ذلك في الجلسة التالية. لا تستبعد هذه الحالات لتضخيم عدد البولباكس. نتائج الشهر والثلاثة أشهر تقيس الهبوط من قمم متحركة داخل المدة.')
+            st.download_button('تنزيل تدقيق الاختبار من القمة',path.read_bytes(),'ath-record-high-v6-audit.json','application/json',key='ath_record_v6_download')
+        except (OSError,ValueError,KeyError,TypeError) as error:st.error('تعذر قراءة اختبار القمم: '+str(error))
