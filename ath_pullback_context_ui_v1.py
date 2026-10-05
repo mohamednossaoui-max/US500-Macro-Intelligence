@@ -157,6 +157,15 @@ def render_record_research(public_data):
                 score=item['price_and_market_common_sample']
                 column.metric(item['horizon'],str(score['evaluations'])+' اختبارات')
                 column.caption('السياق الكامل: '+str(item['full_context_common_sample']['evaluations'])+' اختبارات')
+            comparisons=[]
+            for item in report['analyses']:
+                sample=item['full_context_common_sample'];scores=sample['scores']
+                if sample['evaluations']:
+                    comparisons.append({'المدة':item['horizon'],'الحالات':sample['evaluations'],
+                        'السياق الكامل':scores.get('full_context'),'المرجع التاريخي':scores.get('climatology')})
+            if comparisons:
+                st.caption('Brier: الأقل أفضل؛ مقارنة على نفس الحالات. النتائج استكشافية ولا تثبت edge.')
+                st.dataframe(comparisons,hide_index=True,use_container_width=True)
             if all(x['full_context_feature_rows']==0 for x in report['analyses']):
                 st.info('الأرشيف الحالي جمع vintages عند بدء هبوط 3%؛ لا يغطي تواريخ هذه القمم. شغّل ATH Record High Context Audit لجلبها.')
             st.caption('حتى الاستعادة يعني العودة إلى القمة المرجعية المختارة، وقد يحدث ذلك في الجلسة التالية. لا تستبعد هذه الحالات لتضخيم عدد البولباكس. نتائج الشهر والثلاثة أشهر تقيس الهبوط من قمم متحركة داخل المدة.')

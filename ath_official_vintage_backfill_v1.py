@@ -76,6 +76,11 @@ def observation(series,asof,payload):
     newest,value=rows[0]
     max_age={'Daily':10,'Daily, 7-Day':10,'Weekly, Ending Friday':28,'Monthly':120,'Quarterly':200}[SERIES[series][0]]
     reference_end=newest
+    if SERIES[series][0]=='Monthly':
+        month=newest.to_period('M')
+        if newest!=month.start_time:raise SourceError('Monthly reference date is not a month start')
+        reference_end=month.end_time.normalize()
+        if reference_end>pd.Timestamp(asof):raise SourceError('Unfinished month in completed monthly history')
     if SERIES[series][0]=='Quarterly':
         quarter=newest.to_period('Q')
         if newest!=quarter.start_time:raise SourceError('Quarterly reference date is not a quarter start')
@@ -88,16 +93,20 @@ def observation(series,asof,payload):
             'reference_period_end':reference_end.date().isoformat(),'age_since_reference_period_end_days':age,
             'verification_status':'PROVIDER_ASOF_VERIFIED_AGENCY_RELEASE_TIME_UNVERIFIED'}
     if series=='PAYEMS' or series in ('CPIAUCSL','PCEPILFE','INDPRO'):
-        if len(rows)<2 or newest.to_period('M')-rows[1][0].to_period('M')!=pd.offsets.MonthEnd(1):
-            raise SourceError('Consecutive monthly levels unavailable')
-        previous=rows[1][1]
-        if series=='PAYEMS':result['monthly_change_jobs']=(value-previous)*1000
+        adjacent=len(rows)>=2 and newest.to_period('M')-rows[1][0].to_period('M')==pd.offsets.MonthEnd(1)
+        if series=='PAYEMS':
+            if not adjacent:raise SourceError('Consecutive monthly levels unavailable')
+            result['monthly_change_jobs']=(value-rows[1][1])*1000
         else:
-            if previous<=0 or value<=0:raise SourceError('Nonpositive index')
-            result['mom_pct']=100*(value/previous-1)
-        # Only derive YoY from exactly 12 months earlier, same as-of vintage.
-        old=next((v for d,v in rows if d.to_period('M')==newest.to_period('M')-12),None)
-        if series!='PAYEMS':result['yoy_sa_index_pct']=None if old is None or old<=0 else 100*(value/old-1)
+            if value<=0 or (adjacent and rows[1][1]<=0):raise SourceError('Nonpositive index')
+            # A missing month blocks MoM, not independently verifiable level/YoY.
+            # Never bridge a gap or carry forward an observation ourselves.
+            result['mom_pct']=100*(value/rows[1][1]-1) if adjacent else None
+            old=next((v for d,v in rows if d.to_period('M')==newest.to_period('M')-12),None)
+            result['yoy_sa_index_pct']=None if old is None or old<=0 else 100*(value/old-1)
+            result['derived_field_statuses']={
+                'mom_pct':'ASOF_VERIFIED' if adjacent else 'UNAVAILABLE_CONSECUTIVE_MONTH',
+                'yoy_sa_index_pct':'ASOF_VERIFIED' if old is not None and old>0 else 'UNAVAILABLE_YEAR_REFERENCE'}
     return result
 
 
@@ -176,6 +185,7 @@ def backfill(events,client,output,cache=None):
             'source_errors':sum(r['status']=='SOURCE_ERROR' for r in results),
             'unavailable_archive':sum(r['status']=='UNAVAILABLE_ARCHIVE' for r in results),
             'stale':sum(r['status']=='STALE' for r in results),
+            'unavailable_derived_fields':sum(v!='ASOF_VERIFIED' for r in results for v in r.get('derived_field_statuses',{}).values()),
             'first_provider_vintages':bounds,'archive_metadata_errors':bounds_errors,
             'limitations':['Provider as-of vintage is not an agency release timestamp.',
                 'No synthetic historical Fed stance, Decision scores or neutral missing-value fallback.',
