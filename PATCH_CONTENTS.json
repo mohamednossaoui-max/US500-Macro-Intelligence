@@ -1,30 +1,42 @@
 [
   {
-    "path": "economic_official_sources_v1.py",
-    "sha256": "551baf279942ed8b872bfab683abafa928a82e026631189c05aa701d3332acdf"
+    "path": ".github/workflows/aaii-sentiment-analyzer-v1.yml",
+    "sha256": "171b05b85569114de915fa8b0c24c75349bf0f8f453799b8dc2946b26e82572d"
   },
   {
-    "path": "research_history/ism_services_parser_fix/evidence/e2e-result.json",
-    "sha256": "aaaa2a9c64faa2b0107065d6883fcdacfb6ec74585e72709d39177a6eefce02f"
+    "path": ".github/workflows/cot-positioning-analyzer-v1.yml",
+    "sha256": "d50c69a2990cf8484aec07c56358f6b1e2ef72550a9b06b7ccd4bd1f1d4dfca6"
   },
   {
-    "path": "research_history/ism_services_parser_fix/evidence/full-tests.log",
-    "sha256": "acce54f54344fa3f45dbed022387ec47db91d5114c871243ffcb87af620cfe2f"
+    "path": ".github/workflows/sentiment-engine-v1.yml",
+    "sha256": "dabb721907a4645e64b863a646a61b7701155160a3678118984cb3f1f934bde7"
   },
   {
-    "path": "research_history/ism_services_parser_fix/evidence/integrity-tests.log",
-    "sha256": "82b57a32cf2a6790a70040cb9eb52b4e2571a7b283c95c69a982acd880870d84"
+    "path": ".github/workflows/vix-sentiment-analyzer-v1.yml",
+    "sha256": "47c70aedb324d7b88024d8bcdf4006e0261985e982bdd0ede6234937725346de"
   },
   {
-    "path": "research_history/ism_services_parser_fix/evidence/publication.log",
+    "path": "research_history/sentiment_artifact_pagination_fix/evidence/full-tests.log",
+    "sha256": "ab2a9ec6979b79bb6b6293a7b3854b30de5e15f30e7d898d7ec334dc5ce5709a"
+  },
+  {
+    "path": "research_history/sentiment_artifact_pagination_fix/evidence/integrity-tests.log",
+    "sha256": "f76dd8c0d124530873de7bfce5826885cb1fcde06b9e5688c0c762bcee2db6dd"
+  },
+  {
+    "path": "research_history/sentiment_artifact_pagination_fix/evidence/publication.log",
     "sha256": "a57779fb84a06f60246ba513c4ac0390b8dd959fc33433302dea49e9269a8dc8"
   },
   {
-    "path": "research_history/ism_services_parser_fix/evidence/targeted-tests.log",
-    "sha256": "1e80dea33272377b7b04a6eca4e7ea491f1964235d87df57e2fa00a3d7ea2544"
+    "path": "research_history/sentiment_artifact_pagination_fix/evidence/workflow-validation.json",
+    "sha256": "0d00440edec935a34f93fc594c6632a816d4b32482ff5261261991283271769c"
   },
   {
-    "path": "tests/test_ism_issuer_distribution.py",
-    "sha256": "ac047a3b2b64ac138dc6a501f6c99cb614971b87ff010c3c378be3e676fa5695"
+    "path": "scripts/actions_artifact_inventory_v1.py",
+    "sha256": "b5acf8536ca12e79b586ee55329f85033361c6c82a7ce8b5bc9eb355532aacb8"
+  },
+  {
+    "path": "tests/test_actions_artifact_inventory_v1.py",
+    "sha256": "c239bed2c767fb2519f54eb849fadd39111c65b789cc0e7701069004d2d81046"
   }
 ]
