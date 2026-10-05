@@ -523,12 +523,21 @@ def collect_ism(client,indicator):
         links=sorted({urljoin(discovery_url,a['href']) for a in home.find_all('a',href=True) if a.get_text(' ',strip=True) in labels and '/ism-pmi-reports/pmi/' in a['href']})
     if len(links)!=1 or urlparse(links[0]).hostname!='www.ismworld.org':
         raise MetadataError('ISM current report discovery ambiguous')
-    url=links[0];html=client.get(url).text;text=flat(html)
+    url=links[0];html=client.get(url).text
+    # SEO titles can retain a prior report year while visible content updates.
+    # Only the report content supplies reference-period/value evidence.
+    report=BeautifulSoup(html,'html.parser')
+    for tag in report.find_all(['head','title','script','style']):tag.decompose()
+    text=flat(str(report))
     sector='Services' if kind=='services' else 'Manufacturing'
-    m=re.search(MONTH+r'\s+(\d{4})\s+(?:ISM[^A-Za-z]*\s+)?'+sector+r'\s+(?:ISM[^A-Za-z]*\s+)?PMI',text,re.I)
-    if not m:
-        raise MetadataError('ISM report year/month missing')
-    period=f'{m.group(1).title()} {m.group(2)}'
+    # Breadcrumbs may also retain last year's period: use the report heading.
+    headings=report.find_all('h1')
+    reference_text=' '.join(h.get_text(' ',strip=True) for h in headings) if headings else text
+    matches=list(re.finditer(MONTH+r'\s+(\d{4})\s+(?:ISM[^A-Za-z]*\s+)?'+sector+r'\s+(?:ISM[^A-Za-z]*\s+)?PMI',reference_text,re.I))
+    periods={f'{m.group(1).title()} {m.group(2)}' for m in matches}
+    if len(periods)!=1:
+        raise MetadataError('ISM report year/month missing or ambiguous')
+    period=periods.pop()
     val=re.search(r'(?:The\s+)?'+sector+r'\s+PMI[^\d]{0,100}?(\d{2}\.\d)\s*percent',text,re.I)
     if not val:
         raise MetadataError('ISM headline composite PMI not identified')
@@ -545,8 +554,9 @@ def collect_ism(client,indicator):
 
 def collect_ism_distributed_release(client, indicator, direct_failure):
     """Read ISM's publicly issued press release on its named distributor profile."""
-    if indicator != 'ISM_MANUFACTURING_PMI':
-        raise MetadataError('Distribution alternate is only verified for manufacturing')
+    sectors={'ISM_MANUFACTURING_PMI':('Manufacturing','pmi'),'ISM_SERVICES_PMI':('Services','services')}
+    if indicator not in sectors:raise MetadataError('Unsupported ISM distributed indicator')
+    sector,kind=sectors[indicator]
     profile = 'https://www.prnewswire.com/news/institute-for-supply-management/'
     soup = BeautifulSoup(client.get(profile).text, 'html.parser')
     heading = soup.find('h1')
@@ -555,12 +565,12 @@ def collect_ism_distributed_release(client, indicator, direct_failure):
     candidates = []
     for a in soup.find_all('a',href=True):
         label = a.get_text(' ',strip=True)
-        ref = re.search(MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+Manufacturing PMI',label,re.I)
+        ref = re.search(MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+'+sector+r' PMI',label,re.I)
         url = urljoin(profile,a['href'])
-        if ref and urlparse(url).hostname=='www.prnewswire.com' and urlparse(url).path.startswith('/news-releases/manufacturing-pmi-at-'):
+        if ref and urlparse(url).hostname=='www.prnewswire.com' and urlparse(url).path.startswith('/news-releases/'+sector.lower()+'-pmi-at-'):
             candidates.append((pd.Period(f'{ref.group(1)} {ref.group(2)}',freq='M'),url))
     if not candidates:
-        raise MetadataError('ISM distributor has no manufacturing release')
+        raise MetadataError('ISM distributor has no '+sector.lower()+' release')
     latest = max(p for p,u in candidates)
     urls = {u for p,u in candidates if p==latest}
     if len(urls)!=1:
@@ -573,7 +583,7 @@ def collect_ism_distributed_release(client, indicator, direct_failure):
         raise MetadataError('Distributed release issuer is not verified ISM')
     headline = article.find('h1')
     title = headline.get_text(' ',strip=True) if headline else ''
-    value = re.search(r'^Manufacturing PMI[^\d]{0,20}at\s+(\d+(?:\.\d+)?)%;\s*'+MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+Manufacturing PMI',title,re.I)
+    value = re.search(r'^'+sector+r' PMI[^\d]{0,20}at\s+(\d+(?:\.\d+)?)%;\s*'+MONTH+r'\s+(\d{4})\s+ISM[^A-Za-z]*\s+'+sector+r' PMI',title,re.I)
     if not value or pd.Period(f'{value.group(2)} {value.group(3)}',freq='M')!=latest:
         raise MetadataError('ISM distributed headline/reference period mismatch')
     schema = []
@@ -586,12 +596,12 @@ def collect_ism_distributed_release(client, indicator, direct_failure):
     if pd.isna(stamp) or stamp.tzinfo is None:
         raise MetadataError('ISM distributed published timestamp unavailable')
     stamp = stamp.tz_convert('America/New_York')
-    released,calendar_url = ism_latest_release(client,'pmi')
+    released,calendar_url = ism_latest_release(client,kind)
     expected = released.tz_localize('America/New_York')+pd.Timedelta(hours=10)
     if stamp!=expected or latest!=pd.Period(released,freq='M')-1:
         raise MetadataError('ISM distributed release differs from latest official dated calendar')
     body = flat(str(article))
-    actual = re.search(r'The Manufacturing PMI[^\d]{0,25}registered\s+(\d+(?:\.\d+)?)\s+percent',body,re.I)
+    actual = re.search(r'The '+sector+r' PMI[^\d]{0,25}registered\s+(\d+(?:\.\d+)?)\s+percent',body,re.I)
     if not actual or float(actual.group(1))!=float(value.group(1)):
         raise MetadataError('ISM distributed headline/body value mismatch')
     return [observation(indicator,latest.strftime('%B %Y'),float(value.group(1)),stamp.strftime('%Y-%m-%d'),'10:00 ET',url,
@@ -609,7 +619,7 @@ def collect(client,indicator):
     try:
         return collect_ism(client,indicator)
     except (requests.HTTPError,RuntimeError,MetadataError) as exc:
-        if indicator!='ISM_MANUFACTURING_PMI':
+        if indicator not in ('ISM_MANUFACTURING_PMI','ISM_SERVICES_PMI'):
             raise
         reason=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else str(exc)
         return collect_ism_distributed_release(client,indicator,reason)

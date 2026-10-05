@@ -1,42 +1,30 @@
 [
   {
-    "path": ".github/workflows/ath-credit-edge-audit.yml",
-    "sha256": "88aabeb45c2fe6234d0e61623877ad37c00b5b5716117860278fbac8bfcc7b2e"
+    "path": "economic_official_sources_v1.py",
+    "sha256": "551baf279942ed8b872bfab683abafa928a82e026631189c05aa701d3332acdf"
   },
   {
-    "path": "ath_credit_edge_research_v8.py",
-    "sha256": "7c75d354eb5ef1dce74f7bcbddbf4a8ecfc1d98c09d005ae8c79b885d0ecd928"
+    "path": "research_history/ism_services_parser_fix/evidence/e2e-result.json",
+    "sha256": "aaaa2a9c64faa2b0107065d6883fcdacfb6ec74585e72709d39177a6eefce02f"
   },
   {
-    "path": "research_history/ath_credit_v8/credit_edge_v8_audit.json",
-    "sha256": "ab2f67e72964f24bbdbc8ca83835c1731c23cf73e25eb751d2a989c67282bb90"
+    "path": "research_history/ism_services_parser_fix/evidence/full-tests.log",
+    "sha256": "acce54f54344fa3f45dbed022387ec47db91d5114c871243ffcb87af620cfe2f"
   },
   {
-    "path": "research_history/ath_credit_v8/credit_v8_protocol.json",
-    "sha256": "4f836066717d1a269938a9f3798376d5b060f7fc3158ea0a9559427b8409f5b5"
-  },
-  {
-    "path": "research_history/ath_credit_v8/evidence/full-tests.log",
-    "sha256": "16c8b8b98ed49e9e55dbe2ee33644f2005bd28e8e08b5dffeb26a465f428b861"
-  },
-  {
-    "path": "research_history/ath_credit_v8/evidence/integrity-tests.log",
+    "path": "research_history/ism_services_parser_fix/evidence/integrity-tests.log",
     "sha256": "82b57a32cf2a6790a70040cb9eb52b4e2571a7b283c95c69a982acd880870d84"
   },
   {
-    "path": "research_history/ath_credit_v8/evidence/local-study.log",
-    "sha256": "f49e4d0766c413558d54b59f7876950c707dd7f5e912f59f96538d65aa40628b"
-  },
-  {
-    "path": "research_history/ath_credit_v8/evidence/publication.log",
+    "path": "research_history/ism_services_parser_fix/evidence/publication.log",
     "sha256": "a57779fb84a06f60246ba513c4ac0390b8dd959fc33433302dea49e9269a8dc8"
   },
   {
-    "path": "research_history/ath_credit_v8/evidence/targeted-tests.log",
-    "sha256": "70e9110199c8ec728381dd4c91ae7e47e9050a1319e122bb67232ce9f41f77e3"
+    "path": "research_history/ism_services_parser_fix/evidence/targeted-tests.log",
+    "sha256": "1e80dea33272377b7b04a6eca4e7ea491f1964235d87df57e2fa00a3d7ea2544"
   },
   {
-    "path": "tests/test_ath_credit_edge_research_v8.py",
-    "sha256": "4daaa05223b7dc955d0398b02be594d89dc072b565dee28a4bc4ede95c26598d"
+    "path": "tests/test_ism_issuer_distribution.py",
+    "sha256": "ac047a3b2b64ac138dc6a501f6c99cb614971b87ff010c3c378be3e676fa5695"
   }
 ]
