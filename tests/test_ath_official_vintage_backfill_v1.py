@@ -145,3 +145,27 @@ def test_partial_archive_policy_does_not_allow_stale_or_source_failure():
         assert m.research_coverage(report)=='FAILED_SOURCE_VALIDATION'
     report['results'][1]['status']='UNAVAILABLE_ARCHIVE';report['results'][1]['as_of_date']='2006-01-01'
     assert m.research_coverage(report)=='FAILED_SOURCE_VALIDATION'
+
+
+def test_missing_index_month_preserves_exact_year_but_never_bridges_mom():
+    r=m.observation('CPIAUCSL','2026-01-06',payload([
+        ('2025-11-01',325.031),('2025-10-01','.'),('2025-09-01',324.368),
+        ('2024-11-01',315)],'2026-01-06'))
+    assert r['mom_pct'] is None
+    assert r['yoy_sa_index_pct']==pytest.approx(100*(325.031/315-1))
+    assert r['derived_field_statuses']['mom_pct']=='UNAVAILABLE_CONSECUTIVE_MONTH'
+    assert r['release_date'] is None
+
+
+def test_missing_exact_year_does_not_use_nearest_month():
+    r=m.observation('INDPRO','2020-04-01',payload([('2020-02-01',110),('2020-01-01',100),('2019-01-01',90)]))
+    assert r['yoy_sa_index_pct'] is None
+    assert r['derived_field_statuses']['yoy_sa_index_pct']=='UNAVAILABLE_YEAR_REFERENCE'
+
+
+def test_monthly_reference_age_uses_completed_period_end():
+    r=m.observation('PCEPILFE','2026-01-06',payload([('2025-09-01',126.955),('2025-08-01',126.707)],'2026-01-06'))
+    assert r['reference_period_end']=='2025-09-30'
+    assert r['age_since_reference_period_end_days']==98
+    for date in ('2025-08-01','2026-01-01','2025-09-15'):
+        with pytest.raises(m.SourceError):m.observation('UNRATE','2026-01-06',payload([(date,4)],'2026-01-06'))
