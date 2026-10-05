@@ -5,4 +5,4 @@ Sentiment Engine,sentiment,MIXED,Unified sentiment regime is NEUTRAL.,NEUTRAL,EL
 Technical Intelligence,technical,MIXED,Technical research regime is NEUTRAL.,NEUTRAL,ELIGIBLE,CORE,True,FROM_RESEARCH_CONTEXT
 Event / News,event_news,CONTEXTUAL,99 official items; 47 high-relevance; 5 duplicates flagged.,FULL,ELIGIBLE,CONTEXTUAL,False,PIT_SAFE_BY_PUBLICATION_TIME
 Corporate Earnings,earnings,CONTEXTUAL,1203 historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.,2026-08-26,DEGRADED,CONTEXTUAL,False,PIT_LIMITED
-Fed Intelligence (current),fed,CONTEXTUAL,Independent Fed artifact as of 2026-10-04; LATEST_MINUTES_LAG_LATEST_FOMC. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.,56.2,DEGRADED,CONTEXTUAL,False,PIT_SAFE
+Fed Intelligence (current),fed,CONTEXTUAL,Independent Fed artifact as of 2026-10-05; LATEST_MINUTES_LAG_LATEST_FOMC. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.,56.2,DEGRADED,CONTEXTUAL,False,PIT_SAFE

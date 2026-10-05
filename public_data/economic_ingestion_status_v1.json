@@ -1,7 +1,7 @@
 {
   "provider": "official",
-  "as_of_date": "2026-10-04",
-  "retrieved_at": "2026-10-04T11:06:08.647638+00:00",
+  "as_of_date": "2026-10-05",
+  "retrieved_at": "2026-10-05T23:09:59.271845+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -305,12 +305,12 @@
     {
       "indicator": "ISM_SERVICES_PMI",
       "agency": "ISM",
-      "official_latest_reference_period": "August 2026",
-      "official_release_date": "2026-09-03",
-      "official_value": 55.4,
-      "canonical_latest_reference_period": "August 2026",
-      "canonical_release_date": "2026-09-03",
-      "canonical_value": 55.4,
+      "official_latest_reference_period": "September 2026",
+      "official_release_date": "2026-10-05",
+      "official_value": 54.9,
+      "canonical_latest_reference_period": "September 2026",
+      "canonical_release_date": "2026-10-05",
+      "canonical_value": 54.9,
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
@@ -322,8 +322,8 @@
       "before_merge_canonical_latest_reference_period": "August 2026",
       "before_merge_canonical_release_date": "2026-09-03",
       "before_merge_canonical_value": 55.4,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "ingestion_status": "NEW_RELEASE",
+      "ingestion_reason": "New official release/vintage requires canonical merge"
     }
   ],
   "source_verification": "VERIFIED"

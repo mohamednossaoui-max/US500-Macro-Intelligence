@@ -1,11 +1,11 @@
 {
   "state_vector_version": "USV1.0",
-  "context_date": "2026-10-04",
+  "context_date": "2026-10-05",
   "feature_count": 13,
   "core_feature_count": 9,
   "contextual_feature_count": 4,
   "eligible_feature_count": 9,
-  "fingerprint_sha256": "d9a0b7d11ec5376cd3b1db7809be96fa45c94b5b1f450ff4f5013e3c29f6d7fc",
+  "fingerprint_sha256": "e89b866e53b0857ac4c8643640c9d41b7512eb3e5af1064680c8c4950e2c1cca",
   "missing_to_neutral": false,
   "double_counting_policy": "Direct canonical layer features only; Macro composite and legacy Fed duplicate are excluded.",
   "research_only": true,

@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-10-04T11:09:18.740062+00:00",
+  "generated_at": "2026-10-05T23:14:24.955737+00:00",
   "rows": 99,
   "source_counts": {
     "OFFICIAL_RSS": 99
@@ -156,6 +156,15 @@
         "description": "Minutes of the Federal Open Market Committee, March 17–18, 2026",
         "published_at": "2026-04-08T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260408a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
+        "description": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
+        "published_at": "2026-10-05T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261005a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -327,15 +336,6 @@
         "description": "Federal Reserve Board announces approval of application by National Westminster Bank Plc",
         "published_at": "2026-08-20T20:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260820a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Federal Reserve Board issues enforcement action with SouthPoint Bancshares, Inc. and announces termination of enforcement action with Deutsche Bank AG, DB USA Corporation, and Deutsche Bank AG New York Branch",
-        "description": "Federal Reserve Board issues enforcement action with SouthPoint Bancshares, Inc. and announces termination of enforcement action with Deutsche Bank AG, DB USA Corporation, and Deutsche Bank AG New York Branch",
-        "published_at": "2026-08-20T15:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20260820b.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
