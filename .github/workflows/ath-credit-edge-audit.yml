@@ -1,0 +1,45 @@
+name: ATH Credit Edge Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy requests pytest
+      - name: Test vintage safety and common-sample comparison
+        run: python -m pytest tests/test_ath_credit_edge_research_v8.py tests/test_ath_record_high_research_v6.py -q
+      - name: Record fixed credit hypothesis before acquisition
+        run: python ath_credit_edge_research_v8.py --mode protocol --output ath_credit_run/protocol
+      - name: Download official VIX into research staging
+        run: |
+          mkdir -p ath_credit_run/sources
+          python - <<'PY'
+          from pathlib import Path
+          import requests
+          r=requests.get('https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv',timeout=45)
+          r.raise_for_status()
+          Path('ath_credit_run/sources/VIX_History.csv').write_bytes(r.content)
+          PY
+      - name: Select frozen V6 cohort from current input
+        run: python ath_record_high_research_v6.py --official-vix ath_credit_run/sources/VIX_History.csv --output ath_credit_run/cohort
+      - name: Acquire Baa spread vintages at the actual record-high dates
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python ath_credit_edge_research_v8.py --mode acquire --events ath_credit_run/cohort/record_high_v6_events.csv --output ath_credit_run/vintages
+      - name: Compare credit with identical baseline cases
+        if: success()
+        run: python ath_credit_edge_research_v8.py --mode study --events ath_credit_run/cohort/record_high_v6_events.csv --cache ath_credit_run/vintages --output ath_credit_run/study
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-credit-edge-audit
+          path: ath_credit_run/
+          retention-days: 7
+          if-no-files-found: warn
