@@ -749,6 +749,12 @@ jobs:
           set -euo pipefail
           python -m pip install -r requirements.txt
           python -m pip install pytest
+          # Generate root-level intermediates outside the tracked checkout.
+          CHECKOUT_ROOT="$(pwd -P)"
+          BUILD_WORKSPACE=$(mktemp -d "${RUNNER_TEMP}/us500-integrated.XXXXXX")
+          trap 'cd "$CHECKOUT_ROOT"; rm -rf "$BUILD_WORKSPACE"' EXIT
+          python scripts/integrated_build_workspace_v1.py prepare --root "$CHECKOUT_ROOT" --destination "$BUILD_WORKSPACE"
+          cd "$BUILD_WORKSPACE"
           # Rebuild contexts from the exact validated Economic artifacts installed above.
           cp public_data/*.csv .
           cp public_data/*.json .
@@ -774,6 +780,9 @@ jobs:
           python -m pytest -q
           python scripts/rebuild_publication_manifest.py --public-data public_data --source autonomous-intelligence-pipeline-v1
           python scripts/verify_publication_integrity.py --public-data public_data
+          # Only validated publications return to the checkout. Root inputs,
+          # tests and generated datasets remain in the disposable workspace.
+          python scripts/integrated_build_workspace_v1.py install --root "$CHECKOUT_ROOT" --candidate "$BUILD_WORKSPACE/public_data"
 
       # ============================================================
       # 25. PUBLICATION MANIFEST OWNERSHIP
