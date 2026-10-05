@@ -1,0 +1,5344 @@
+{
+  "version": "ATH_RECORD_HIGH_V6",
+  "protocol": {
+    "version": "ATH_RECORD_HIGH_V6",
+    "warmup_sessions": 252,
+    "cohort_spacing_calendar_months": 3,
+    "class_thresholds_pct": [
+      3,
+      5,
+      20
+    ],
+    "minimum_training_events": 12,
+    "ridge_penalty": 10.0,
+    "evaluation_start": "2019-01-01",
+    "minimum_evaluation_events": 30,
+    "minimum_evaluation_crashes": 3,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_RIDGE",
+      "FULL_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "hypothesis": "Context known at a closing record high adds information about subsequent depth beyond price history and climatology.",
+    "selection": "First strict available-history record close after a 252-session warmup and the previous selected decision plus 3 calendar months plus one day. Selection uses past/current data only.",
+    "horizons": {
+      "1M": "Maximum drawdown from a rolling closing peak over one calendar month after decision availability.",
+      "3M": "Same over three calendar months.",
+      "UNTIL_RECOVERY": "Original anchor loss until the first subsequent close >= anchor. If the next close sets/recovers the record, label is zero. No future requirement to drop 3%."
+    },
+    "status": "EXPLORATORY: prior studies inspected these calendar years; not a pristine holdout.",
+    "live_forecast": "DISABLED_PENDING_INDEPENDENT_VERIFICATION_AND_CALIBRATION"
+  },
+  "source_sha256": "ca1ea97831f4b0404008b430557d6123a501055076189b29e65a3fec07486ccb",
+  "history_start": "2000-01-03",
+  "history_end": "2026-10-02",
+  "selected_records": 35,
+  "unique_decisions": 35,
+  "official_vix": {
+    "source_url": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
+    "sha256": "6edc3e3928c4b164b9e4ed1ec874e0ed53c7d52997557adebb7d6b7451db565a",
+    "matched_sessions": 6728,
+    "vendor_differences_above_0_02": 11,
+    "maximum_absolute_difference": 2.610000839233397,
+    "verification": "OFFICIAL_CURRENT_HISTORY_NOT_CERTIFIED_HISTORICAL_VINTAGES"
+  },
+  "validated_receipts": 360,
+  "analyses": [
+    {
+      "horizon": "1M",
+      "selected_records": 35,
+      "mature_records": 35,
+      "historical_class_counts": {
+        "NO_MEANINGFUL_PULLBACK": 26,
+        "LIMITED": 6,
+        "MEDIUM": 3
+      },
+      "full_context_feature_rows": 0,
+      "price_and_market_common_sample": {
+        "evaluations": 18,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 14,
+          "LIMITED": 1,
+          "MEDIUM": 3,
+          "CRASH": 0
+        },
+        "scores": {
+          "price": 0.5015937214109528,
+          "market": 0.5340450245306291,
+          "climatology": 0.43155957702958214
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      },
+      "full_context_common_sample": {
+        "evaluations": 0,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 0,
+          "MEDIUM": 0,
+          "CRASH": 0
+        },
+        "scores": {
+          "price": null,
+          "market": null,
+          "climatology": null
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      }
+    },
+    {
+      "horizon": "3M",
+      "selected_records": 35,
+      "mature_records": 34,
+      "historical_class_counts": {
+        "MEDIUM": 15,
+        "LIMITED": 9,
+        "NO_MEANINGFUL_PULLBACK": 9,
+        "CRASH": 1
+      },
+      "full_context_feature_rows": 0,
+      "price_and_market_common_sample": {
+        "evaluations": 17,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 3,
+          "LIMITED": 4,
+          "MEDIUM": 9,
+          "CRASH": 1
+        },
+        "scores": {
+          "price": 0.6212104656040178,
+          "market": 0.7342121348872184,
+          "climatology": 0.6899478090807835
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      },
+      "full_context_common_sample": {
+        "evaluations": 0,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 0,
+          "MEDIUM": 0,
+          "CRASH": 0
+        },
+        "scores": {
+          "price": null,
+          "market": null,
+          "climatology": null
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      }
+    },
+    {
+      "horizon": "UNTIL_RECOVERY",
+      "selected_records": 35,
+      "mature_records": 35,
+      "historical_class_counts": {
+        "NO_MEANINGFUL_PULLBACK": 34,
+        "MEDIUM": 1
+      },
+      "full_context_feature_rows": 0,
+      "price_and_market_common_sample": {
+        "evaluations": 18,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 17,
+          "LIMITED": 0,
+          "MEDIUM": 1,
+          "CRASH": 0
+        },
+        "scores": {
+          "price": 0.11922734484490968,
+          "market": 0.1116479041994879,
+          "climatology": 0.11543299338119802
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      },
+      "full_context_common_sample": {
+        "evaluations": 0,
+        "class_counts": {
+          "NO_MEANINGFUL_PULLBACK": 0,
+          "LIMITED": 0,
+          "MEDIUM": 0,
+          "CRASH": 0
+        },
+        "scores": {
+          "price": null,
+          "market": null,
+          "climatology": null
+        },
+        "status": "NO_CONFIRMED_EDGE",
+        "live_probabilities": null,
+        "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
+      }
+    }
+  ],
+  "context_coverage": [
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "nfp_change_jobs",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "unemployment_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "cpi_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "core_pce_yoy_sa_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "industrial_production_mom_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "effective_fed_rate_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-05-30",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2007-10-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-03-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2013-10-17",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-02-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "40905d3dc8331afebf808676",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-05-29",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-09-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2014-12-22",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "08b3da3469591c600688104d",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2015-04-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-07-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2016-11-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-02-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "624a7fe1a558b01034159d82",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-05-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "de438d74981d98168d164960",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-09-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2017-12-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2018-08-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-04-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-07-26",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2019-10-28",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-02-05",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-08-18",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2020-11-24",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-03-11",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d11a80f684263e89d6c890de",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-06-14",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2021-10-21",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-01-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-05-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2024-09-19",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-01-23",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "0d35411022a919ba00807677",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-06-27",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "76240b869944979d9a11920b",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2025-10-01",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-01-06",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "10beecb66605cd0f06078330",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-04-15",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "feature": "gdp_saar_pct",
+      "as_of_date": "2026-08-04",
+      "status": "UNAVAILABLE_RECEIPT"
+    }
+  ],
+  "scope": "At an available-history closing record, not after an observed 3% pullback.",
+  "research_only": true,
+  "live_forecast": null,
+  "execution": false,
+  "limitations": [
+    "The cash-index available-history closing record is not an independently verified intraday ATH or an ES/broker US500 price.",
+    "Closing-price availability is conservatively proxied by the next day, not verified publication timestamps.",
+    "Many consecutive new records are omitted by a fixed three-calendar-month sampling rule.",
+    "Existing receipts at 3% trigger dates cannot be reused as if they were known at earlier record-high dates.",
+    "Until-recovery includes immediate new highs with zero depth; excluding them would select future pullbacks.",
+    "Calendar years were inspected in prior studies; this is exploratory, not fresh confirmatory validation.",
+    "No high-confidence or calibrated probability claim is permitted."
+  ]
+}

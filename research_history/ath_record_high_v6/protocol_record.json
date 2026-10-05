@@ -1,0 +1,35 @@
+{
+  "recorded_at": "2026-10-04T21:30:07.405290+00:00",
+  "protocol_sha256": "756790f380dfeb15d569efadfe36dcd579c5a53a1e35d453c6c9d996e39cc9ee",
+  "protocol": {
+    "version": "ATH_RECORD_HIGH_V6",
+    "warmup_sessions": 252,
+    "cohort_spacing_calendar_months": 3,
+    "class_thresholds_pct": [
+      3,
+      5,
+      20
+    ],
+    "minimum_training_events": 12,
+    "ridge_penalty": 10.0,
+    "evaluation_start": "2019-01-01",
+    "minimum_evaluation_events": 30,
+    "minimum_evaluation_crashes": 3,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_RIDGE",
+      "FULL_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "hypothesis": "Context known at a closing record high adds information about subsequent depth beyond price history and climatology.",
+    "selection": "First strict available-history record close after a 252-session warmup and the previous selected decision plus 3 calendar months plus one day. Selection uses past/current data only.",
+    "horizons": {
+      "1M": "Maximum drawdown from a rolling closing peak over one calendar month after decision availability.",
+      "3M": "Same over three calendar months.",
+      "UNTIL_RECOVERY": "Original anchor loss until the first subsequent close >= anchor. If the next close sets/recovers the record, label is zero. No future requirement to drop 3%."
+    },
+    "status": "EXPLORATORY: prior studies inspected these calendar years; not a pristine holdout.",
+    "live_forecast": "DISABLED_PENDING_INDEPENDENT_VERIFICATION_AND_CALIBRATION"
+  },
+  "status": "LOCAL_EXPLORATORY_SPECIFICATION_NOT_INDEPENDENT_PREREGISTRATION"
+}
