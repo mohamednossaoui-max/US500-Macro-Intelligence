@@ -1,0 +1,762 @@
+{
+  "analyses": [
+    {
+      "brier": {
+        "climatology": null,
+        "credit_only": null,
+        "market": null,
+        "market_plus_credit": null,
+        "price": null,
+        "price_plus_credit": null
+      },
+      "class_counts": {
+        "CRASH": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "NO_MEANINGFUL_PULLBACK": 0
+      },
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "horizon": "1M",
+      "live_probabilities": null,
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT"
+    },
+    {
+      "brier": {
+        "climatology": null,
+        "credit_only": null,
+        "market": null,
+        "market_plus_credit": null,
+        "price": null,
+        "price_plus_credit": null
+      },
+      "class_counts": {
+        "CRASH": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "NO_MEANINGFUL_PULLBACK": 0
+      },
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "horizon": "3M",
+      "live_probabilities": null,
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT"
+    },
+    {
+      "brier": {
+        "climatology": null,
+        "credit_only": null,
+        "market": null,
+        "market_plus_credit": null,
+        "price": null,
+        "price_plus_credit": null
+      },
+      "class_counts": {
+        "CRASH": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "NO_MEANINGFUL_PULLBACK": 0
+      },
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "horizon": "UNTIL_RECOVERY",
+      "live_probabilities": null,
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT"
+    }
+  ],
+  "base_protocol": {
+    "class_thresholds_pct": [
+      3,
+      5,
+      20
+    ],
+    "cohort_spacing_calendar_months": 3,
+    "evaluation_start": "2019-01-01",
+    "horizons": {
+      "1M": "Maximum drawdown from a rolling closing peak over one calendar month after decision availability.",
+      "3M": "Same over three calendar months.",
+      "UNTIL_RECOVERY": "Original anchor loss until the first subsequent close >= anchor. If the next close sets/recovers the record, label is zero. No future requirement to drop 3%."
+    },
+    "hypothesis": "Context known at a closing record high adds information about subsequent depth beyond price history and climatology.",
+    "live_forecast": "DISABLED_PENDING_INDEPENDENT_VERIFICATION_AND_CALIBRATION",
+    "minimum_evaluation_crashes": 3,
+    "minimum_evaluation_events": 30,
+    "minimum_training_events": 12,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_RIDGE",
+      "FULL_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "ridge_penalty": 10.0,
+    "selection": "First strict available-history record close after a 252-session warmup and the previous selected decision plus 3 calendar months plus one day. Selection uses past/current data only.",
+    "status": "EXPLORATORY: prior studies inspected these calendar years; not a pristine holdout.",
+    "version": "ATH_RECORD_HIGH_V6",
+    "warmup_sessions": 252
+  },
+  "coverage": [
+    {
+      "as_of_date": "2007-05-30",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2007-05-30",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2007-05-30",
+      "decision_at": "2007-05-31T00:00:00+00:00",
+      "episode_id": "6e967b106bb9ad58b4741d2e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2007-10-05",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2007-10-05",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2007-10-05",
+      "decision_at": "2007-10-06T00:00:00+00:00",
+      "episode_id": "cf9a66bf3d0fb9785a32dddd",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-03-28",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-03-28",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-03-28",
+      "decision_at": "2013-03-29T00:00:00+00:00",
+      "episode_id": "a9ac459b4b09d1b4937ccfd1",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-07-11",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-07-11",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-07-11",
+      "decision_at": "2013-07-12T00:00:00+00:00",
+      "episode_id": "f5bae1fddd966de4680a0898",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-10-17",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-10-17",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2013-10-17",
+      "decision_at": "2013-10-18T00:00:00+00:00",
+      "episode_id": "fb0950793a9e24b4a8031365",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-02-27",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-02-27",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-02-27",
+      "decision_at": "2014-02-28T00:00:00+00:00",
+      "episode_id": "82e2c565d22ffb1a089b4ac4",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-05-29",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "episode_id": "40905d3dc8331afebf808676",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-05-29",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "episode_id": "40905d3dc8331afebf808676",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-05-29",
+      "decision_at": "2014-05-30T00:00:00+00:00",
+      "episode_id": "40905d3dc8331afebf808676",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-09-05",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-09-05",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-09-05",
+      "decision_at": "2014-09-06T00:00:00+00:00",
+      "episode_id": "b0aa0871df14be042e9f816c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-12-22",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-12-22",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2014-12-22",
+      "decision_at": "2014-12-23T00:00:00+00:00",
+      "episode_id": "b08af542ebbe3f681bb0e877",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2015-04-24",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "episode_id": "08b3da3469591c600688104d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2015-04-24",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "episode_id": "08b3da3469591c600688104d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2015-04-24",
+      "decision_at": "2015-04-25T00:00:00+00:00",
+      "episode_id": "08b3da3469591c600688104d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-07-11",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-07-11",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-07-11",
+      "decision_at": "2016-07-12T00:00:00+00:00",
+      "episode_id": "0f655aa6bda32c65507959a3",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-11-21",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-11-21",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2016-11-21",
+      "decision_at": "2016-11-22T00:00:00+00:00",
+      "episode_id": "a5fa51c0a2c24784d3baa82d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-02-24",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-02-24",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-02-24",
+      "decision_at": "2017-02-25T00:00:00+00:00",
+      "episode_id": "983f8e0335843498d5fbdebe",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-05-26",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "episode_id": "624a7fe1a558b01034159d82",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-05-26",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "episode_id": "624a7fe1a558b01034159d82",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-05-26",
+      "decision_at": "2017-05-27T00:00:00+00:00",
+      "episode_id": "624a7fe1a558b01034159d82",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-09-11",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "episode_id": "de438d74981d98168d164960",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-09-11",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "episode_id": "de438d74981d98168d164960",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-09-11",
+      "decision_at": "2017-09-12T00:00:00+00:00",
+      "episode_id": "de438d74981d98168d164960",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-12-15",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-12-15",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2017-12-15",
+      "decision_at": "2017-12-16T00:00:00+00:00",
+      "episode_id": "678ab5f64eed7cd201c877ea",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2018-08-24",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2018-08-24",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2018-08-24",
+      "decision_at": "2018-08-25T00:00:00+00:00",
+      "episode_id": "9c8c8f3ba9743aff1e2d337e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-04-23",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-04-23",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-04-23",
+      "decision_at": "2019-04-24T00:00:00+00:00",
+      "episode_id": "11da9fecf6f533c84bfbfd92",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-07-26",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-07-26",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-07-26",
+      "decision_at": "2019-07-27T00:00:00+00:00",
+      "episode_id": "2457b325b4845e9ec27cac0c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-10-28",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-10-28",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2019-10-28",
+      "decision_at": "2019-10-29T00:00:00+00:00",
+      "episode_id": "c95c04fabf443e4cefba2d83",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-02-05",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-02-05",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-02-05",
+      "decision_at": "2020-02-06T00:00:00+00:00",
+      "episode_id": "dd4bd74da59c2610e0efa784",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-08-18",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-08-18",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-08-18",
+      "decision_at": "2020-08-19T00:00:00+00:00",
+      "episode_id": "814aa12b9eaf72564f7f61ef",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-11-24",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-11-24",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2020-11-24",
+      "decision_at": "2020-11-25T00:00:00+00:00",
+      "episode_id": "fa315aaf84b32d9405df0b1e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-03-11",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-03-11",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-03-11",
+      "decision_at": "2021-03-12T00:00:00+00:00",
+      "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-06-14",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "episode_id": "d11a80f684263e89d6c890de",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-06-14",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "episode_id": "d11a80f684263e89d6c890de",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-06-14",
+      "decision_at": "2021-06-15T00:00:00+00:00",
+      "episode_id": "d11a80f684263e89d6c890de",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-10-21",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-10-21",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2021-10-21",
+      "decision_at": "2021-10-22T00:00:00+00:00",
+      "episode_id": "00b96b6a970b840bf37a81bf",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-01-19",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-01-19",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-01-19",
+      "decision_at": "2024-01-20T00:00:00+00:00",
+      "episode_id": "5a2e0e1470a64083c7246287",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-05-15",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-05-15",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-05-15",
+      "decision_at": "2024-05-16T00:00:00+00:00",
+      "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-09-19",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-09-19",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2024-09-19",
+      "decision_at": "2024-09-20T00:00:00+00:00",
+      "episode_id": "3a144571570d4c3b3ca0049a",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-01-23",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-01-23",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-01-23",
+      "decision_at": "2025-01-24T00:00:00+00:00",
+      "episode_id": "6c7291cfd711fa08e6f55267",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-06-27",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "episode_id": "0d35411022a919ba00807677",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-06-27",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "episode_id": "0d35411022a919ba00807677",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-06-27",
+      "decision_at": "2025-06-28T00:00:00+00:00",
+      "episode_id": "0d35411022a919ba00807677",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-10-01",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "episode_id": "76240b869944979d9a11920b",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-10-01",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "episode_id": "76240b869944979d9a11920b",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2025-10-01",
+      "decision_at": "2025-10-02T00:00:00+00:00",
+      "episode_id": "76240b869944979d9a11920b",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-01-06",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-01-06",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-01-06",
+      "decision_at": "2026-01-07T00:00:00+00:00",
+      "episode_id": "565dde58a7e072c66e63b99c",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-04-15",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "episode_id": "10beecb66605cd0f06078330",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-04-15",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "episode_id": "10beecb66605cd0f06078330",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-04-15",
+      "decision_at": "2026-04-16T00:00:00+00:00",
+      "episode_id": "10beecb66605cd0f06078330",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-08-04",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-08-04",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "status": "UNAVAILABLE_RECEIPT"
+    },
+    {
+      "as_of_date": "2026-08-04",
+      "decision_at": "2026-08-05T00:00:00+00:00",
+      "episode_id": "81ff9b3fe3a580796b40cfc4",
+      "status": "UNAVAILABLE_RECEIPT"
+    }
+  ],
+  "input_events_sha256": "b43f6aabace25db13047667359d3cb460828c9443bd4299d311ad68742de8e3d",
+  "live_forecast": null,
+  "protocol": {
+    "cohort_and_labels": "Frozen V6 record-high cohort, labels, maturity, 3-calendar-month sampling",
+    "comparison": "PRICE, MARKET, CREDIT_ONLY, PRICE_PLUS_CREDIT, MARKET_PLUS_CREDIT, CLIMATOLOGY on identical complete cases",
+    "evaluation_start": "2019-01-01",
+    "features": [
+      "baa_spread_pct",
+      "baa_change_30_calendar_days_pp"
+    ],
+    "live_forecast": null,
+    "lookback_calendar_days": 30,
+    "maximum_baseline_age_days": 10,
+    "maximum_reference_age_days": 10,
+    "minimum_training_events": 12,
+    "primary_comparison": "MARKET_PLUS_CREDIT versus MARKET and CLIMATOLOGY; other comparisons exploratory",
+    "primary_horizon": "3M",
+    "research_only": true,
+    "ridge_penalty": 10.0,
+    "secondary_horizons": [
+      "1M",
+      "UNTIL_RECOVERY"
+    ],
+    "semantics": "Baa corporate yield minus 10-year Treasury yield, percent units; not EBP or duration-matched OAS.",
+    "series": "BAA10Y",
+    "source_url": "https://fred.stlouisfed.org/series/BAA10Y",
+    "status": "EXPLORATORY; prior years inspected. No pristine holdout or confirmed edge claim.",
+    "version": "ATH_CREDIT_V8"
+  },
+  "research_only": true,
+  "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT",
+  "study_code_sha256": "7c75d354eb5ef1dce74f7bcbddbf4a8ecfc1d98c09d005ae8c79b885d0ecd928",
+  "validated_receipts": 0
+}

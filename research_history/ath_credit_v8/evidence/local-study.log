@@ -1,0 +1,130 @@
+{
+  "protocol": {
+    "version": "ATH_CREDIT_V8",
+    "series": "BAA10Y",
+    "source_url": "https://fred.stlouisfed.org/series/BAA10Y",
+    "semantics": "Baa corporate yield minus 10-year Treasury yield, percent units; not EBP or duration-matched OAS.",
+    "features": [
+      "baa_spread_pct",
+      "baa_change_30_calendar_days_pp"
+    ],
+    "comparison": "PRICE, MARKET, CREDIT_ONLY, PRICE_PLUS_CREDIT, MARKET_PLUS_CREDIT, CLIMATOLOGY on identical complete cases",
+    "cohort_and_labels": "Frozen V6 record-high cohort, labels, maturity, 3-calendar-month sampling",
+    "lookback_calendar_days": 30,
+    "maximum_reference_age_days": 10,
+    "maximum_baseline_age_days": 10,
+    "minimum_training_events": 12,
+    "ridge_penalty": 10.0,
+    "evaluation_start": "2019-01-01",
+    "primary_comparison": "MARKET_PLUS_CREDIT versus MARKET and CLIMATOLOGY; other comparisons exploratory",
+    "primary_horizon": "3M",
+    "secondary_horizons": [
+      "1M",
+      "UNTIL_RECOVERY"
+    ],
+    "status": "EXPLORATORY; prior years inspected. No pristine holdout or confirmed edge claim.",
+    "live_forecast": null,
+    "research_only": true
+  },
+  "base_protocol": {
+    "version": "ATH_RECORD_HIGH_V6",
+    "warmup_sessions": 252,
+    "cohort_spacing_calendar_months": 3,
+    "class_thresholds_pct": [
+      3,
+      5,
+      20
+    ],
+    "minimum_training_events": 12,
+    "ridge_penalty": 10.0,
+    "evaluation_start": "2019-01-01",
+    "minimum_evaluation_events": 30,
+    "minimum_evaluation_crashes": 3,
+    "models": [
+      "PRICE_RIDGE",
+      "MARKET_RIDGE",
+      "FULL_CONTEXT_RIDGE",
+      "CLIMATOLOGY"
+    ],
+    "hypothesis": "Context known at a closing record high adds information about subsequent depth beyond price history and climatology.",
+    "selection": "First strict available-history record close after a 252-session warmup and the previous selected decision plus 3 calendar months plus one day. Selection uses past/current data only.",
+    "horizons": {
+      "1M": "Maximum drawdown from a rolling closing peak over one calendar month after decision availability.",
+      "3M": "Same over three calendar months.",
+      "UNTIL_RECOVERY": "Original anchor loss until the first subsequent close >= anchor. If the next close sets/recovers the record, label is zero. No future requirement to drop 3%."
+    },
+    "status": "EXPLORATORY: prior studies inspected these calendar years; not a pristine holdout.",
+    "live_forecast": "DISABLED_PENDING_INDEPENDENT_VERIFICATION_AND_CALIBRATION"
+  },
+  "study_code_sha256": "7c75d354eb5ef1dce74f7bcbddbf4a8ecfc1d98c09d005ae8c79b885d0ecd928",
+  "input_events_sha256": "b43f6aabace25db13047667359d3cb460828c9443bd4299d311ad68742de8e3d",
+  "validated_receipts": 0,
+  "analyses": [
+    {
+      "horizon": "1M",
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "class_counts": {
+        "NO_MEANINGFUL_PULLBACK": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "CRASH": 0
+      },
+      "brier": {
+        "price": null,
+        "market": null,
+        "credit_only": null,
+        "price_plus_credit": null,
+        "market_plus_credit": null,
+        "climatology": null
+      },
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT",
+      "live_probabilities": null
+    },
+    {
+      "horizon": "3M",
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "class_counts": {
+        "NO_MEANINGFUL_PULLBACK": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "CRASH": 0
+      },
+      "brier": {
+        "price": null,
+        "market": null,
+        "credit_only": null,
+        "price_plus_credit": null,
+        "market_plus_credit": null,
+        "climatology": null
+      },
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT",
+      "live_probabilities": null
+    },
+    {
+      "horizon": "UNTIL_RECOVERY",
+      "credit_complete_rows": 0,
+      "evaluations": 0,
+      "class_counts": {
+        "NO_MEANINGFUL_PULLBACK": 0,
+        "LIMITED": 0,
+        "MEDIUM": 0,
+        "CRASH": 0
+      },
+      "brier": {
+        "price": null,
+        "market": null,
+        "credit_only": null,
+        "price_plus_credit": null,
+        "market_plus_credit": null,
+        "climatology": null
+      },
+      "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT",
+      "live_probabilities": null
+    }
+  ],
+  "research_only": true,
+  "live_forecast": null,
+  "status": "BLOCKED_INSUFFICIENT_VERIFIED_CREDIT"
+}
