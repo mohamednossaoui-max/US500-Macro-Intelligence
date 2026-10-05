@@ -54,7 +54,7 @@
         "LIMITED": 6,
         "MEDIUM": 3
       },
-      "full_context_feature_rows": 27,
+      "full_context_feature_rows": 26,
       "price_and_market_common_sample": {
         "evaluations": 18,
         "class_counts": {
@@ -73,18 +73,18 @@
         "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
       },
       "full_context_common_sample": {
-        "evaluations": 15,
+        "evaluations": 14,
         "class_counts": {
-          "NO_MEANINGFUL_PULLBACK": 13,
+          "NO_MEANINGFUL_PULLBACK": 12,
           "LIMITED": 0,
           "MEDIUM": 2,
           "CRASH": 0
         },
         "scores": {
-          "price": 0.407084204267789,
-          "market": 0.4429442710987605,
-          "climatology": 0.29633599455904025,
-          "full_context": 0.3182758303885239
+          "price": 0.4318744174465419,
+          "market": 0.4739479636839038,
+          "climatology": 0.3103599941704003,
+          "full_context": 0.3409112494004426
         },
         "status": "NO_CONFIRMED_EDGE",
         "live_probabilities": null,
@@ -101,7 +101,7 @@
         "NO_MEANINGFUL_PULLBACK": 9,
         "CRASH": 1
       },
-      "full_context_feature_rows": 27,
+      "full_context_feature_rows": 26,
       "price_and_market_common_sample": {
         "evaluations": 17,
         "class_counts": {
@@ -120,18 +120,18 @@
         "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
       },
       "full_context_common_sample": {
-        "evaluations": 14,
+        "evaluations": 13,
         "class_counts": {
           "NO_MEANINGFUL_PULLBACK": 2,
           "LIMITED": 4,
-          "MEDIUM": 7,
+          "MEDIUM": 6,
           "CRASH": 1
         },
         "scores": {
-          "price": 0.7704034005362318,
-          "market": 0.8402176633281359,
-          "climatology": 0.7466861231993116,
-          "full_context": 0.8756642434654452
+          "price": 0.7742703497217046,
+          "market": 0.8489187009912121,
+          "climatology": 0.7622646627097629,
+          "full_context": 0.9016124299015443
         },
         "status": "NO_CONFIRMED_EDGE",
         "live_probabilities": null,
@@ -146,7 +146,7 @@
         "NO_MEANINGFUL_PULLBACK": 34,
         "MEDIUM": 1
       },
-      "full_context_feature_rows": 27,
+      "full_context_feature_rows": 26,
       "price_and_market_common_sample": {
         "evaluations": 18,
         "class_counts": {
@@ -165,18 +165,18 @@
         "note": "Descriptive exploratory comparison only; no calibrated live model or independent confirmation."
       },
       "full_context_common_sample": {
-        "evaluations": 15,
+        "evaluations": 14,
         "class_counts": {
-          "NO_MEANINGFUL_PULLBACK": 15,
+          "NO_MEANINGFUL_PULLBACK": 14,
           "LIMITED": 0,
           "MEDIUM": 0,
           "CRASH": 0
         },
         "scores": {
-          "price": 0.06038139951236945,
-          "market": 0.0390034138568176,
-          "climatology": 0.04650775676302878,
-          "full_context": 0.17417759332497731
+          "price": 0.06293154742364679,
+          "market": 0.04119387286464623,
+          "climatology": 0.048083707642927666,
+          "full_context": 0.1861342552223101
         },
         "status": "NO_CONFIRMED_EDGE",
         "live_probabilities": null,
@@ -3564,14 +3564,14 @@
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "cpi_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "SOURCE_ERROR"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "core_pce_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "STALE"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
@@ -3599,14 +3599,14 @@
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "cpi_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "SOURCE_ERROR"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "core_pce_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "STALE"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
@@ -3634,14 +3634,14 @@
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "cpi_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "SOURCE_ERROR"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
       "decision_at": "2026-01-07T00:00:00+00:00",
       "feature": "core_pce_yoy_sa_pct",
       "as_of_date": "2026-01-06",
-      "status": "ASOF_VERIFIED"
+      "status": "STALE"
     },
     {
       "episode_id": "565dde58a7e072c66e63b99c",
