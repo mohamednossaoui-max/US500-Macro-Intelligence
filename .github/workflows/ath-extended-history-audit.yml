@@ -1,0 +1,33 @@
+name: ATH Extended History and Calendar Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy pytest 'yfinance>=0.2,<2' 'pandas_market_calendars==5.5.0'
+      - name: Test source failures, calendar coverage and frozen protocol
+        run: python -m pytest -q tests/test_ath_extended_history_research_v10.py tests/test_ath_sequential_pullback_research_v9.py
+      - name: Audit current cash sessions against NYSE calendar
+        run: python ath_extended_history_research_v10.py --mode calendar --prices public_data/cross_asset_research_v1.csv --output ath_extended_run/current_calendar
+      - name: Acquire extended unadjusted cash-index closes into research staging
+        run: python ath_extended_history_research_v10.py --mode acquire --output ath_extended_run/acquisition
+      - name: Re-evaluate frozen V9 on validated extended history
+        run: python ath_extended_history_research_v10.py --mode study --cache ath_extended_run/acquisition --output ath_extended_run/study
+      - name: Verify publication remained unchanged
+        if: always()
+        run: python scripts/verify_publication_integrity.py --public-data public_data
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-extended-history-audit
+          path: ath_extended_run/
+          retention-days: 7
+          if-no-files-found: warn
