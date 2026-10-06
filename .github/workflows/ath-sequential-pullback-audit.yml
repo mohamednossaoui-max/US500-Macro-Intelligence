@@ -1,0 +1,28 @@
+name: ATH Sequential Pullback Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy pytest
+      - name: Test prospective selection and maturity gates
+        run: python -m pytest -q tests/test_ath_sequential_pullback_research_v9.py
+      - name: Compare conditional baseline and price context
+        run: python ath_sequential_pullback_research_v9.py --observed-session-only --output ath_sequential_run/study
+      - name: Verify publication remained unchanged
+        run: python scripts/verify_publication_integrity.py --public-data public_data
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-sequential-pullback-audit
+          path: ath_sequential_run/
+          retention-days: 7
+          if-no-files-found: warn
