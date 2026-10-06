@@ -77,6 +77,45 @@ def load_credit(root):
     return records
 
 
+def discontinued(asof, payload):
+    """Require provider metadata for this exact historical as-of, never today's title."""
+    metadata(payload)
+    row = payload['seriess'][0]
+    if (payload.get('realtime_start') != asof or payload.get('realtime_end') != asof
+            or row.get('realtime_start') != asof or row.get('realtime_end') != asof
+            or 'DISCONTINUED' not in str(row.get('title', '')).upper()):
+        raise SourceError('Historical discontinuation metadata not verified')
+    return True
+
+
+def lifecycle_receipt(output, asof, payload):
+    discontinued(asof, payload)
+    record = {'source':API+'series', 'series':SID, 'as_of_date':asof, 'response':payload}
+    raw = json.dumps(record,sort_keys=True,separators=(',', ':'),allow_nan=False).encode()
+    sha = hashlib.sha256(raw).hexdigest()
+    path = Path(output)/'lifecycle_receipts'/f'{SID}-{asof}-{sha}.json'
+    path.parent.mkdir(parents=True,exist_ok=True)
+    if path.exists() and path.read_bytes()!=raw:
+        raise SourceError('Lifecycle receipt changed')
+    if not path.exists():path.write_bytes(raw)
+    return sha
+
+
+def load_lifecycle(root):
+    result = {}
+    for path in sorted((Path(root)/'lifecycle_receipts').glob('*.json')):
+        raw=path.read_bytes();sha=hashlib.sha256(raw).hexdigest();r=json.loads(raw)
+        key=r['as_of_date']
+        if (r.get('source')!=API+'series' or r.get('series')!=SID
+                or path.name!=f'{SID}-{key}-{sha}.json'):
+            raise SourceError('Lifecycle receipt checksum/identity mismatch')
+        discontinued(key,r['response'])
+        if key in result and result[key]['sha']!=sha:
+            raise SourceError('Conflicting lifecycle receipts')
+        result[key]={'response':r['response'],'sha':sha}
+    return result
+
+
 def acquire(events,client,output,cache=None):
     cached=load_credit(cache) if cache else {};error=None;meta=None;first=None
     try:
@@ -85,6 +124,7 @@ def acquire(events,client,output,cache=None):
         if len(dates)!=1 or pd.isna(pd.to_datetime(dates[0],errors='coerce')):raise SourceError('Earliest credit provider vintage unavailable')
         first=dates[0]
     except SourceError as exc:error=str(exc)
+    lifecycle=load_lifecycle(cache) if cache else {}
     results=[]
     for decision in sorted(events.decision_at.drop_duplicates()):
         d=pd.Timestamp(decision)
@@ -103,10 +143,23 @@ def acquire(events,client,output,cache=None):
                 used_meta=meta;row['acquisition']='OFFICIAL_PROVIDER_API'
             row['receipt_sha256']=immutable_receipt(output,SID,asof,used_meta,payload)
             row.update(features(asof,payload),status='ASOF_VERIFIED')
-        except SourceError as exc:row.update(status=exc.status,reason=str(exc))
+        except SourceError as exc:
+            row.update(status=exc.status,reason=str(exc))
+            # Only a stale or empty successful observations response can trigger
+            # lifecycle verification. HTTP/identity/as-of errors remain errors.
+            if (exc.status=='STALE' or str(exc)=='No finite credit history'):
+                try:
+                    proof = lifecycle[asof]['response'] if asof in lifecycle else client.get(
+                        'series', {'series_id':SID,'realtime_start':asof,'realtime_end':asof})
+                    sha=lifecycle_receipt(output,asof,proof)
+                    row.update(status='UNAVAILABLE_PROVIDER_DISCONTINUED',
+                               reason='Provider marks this exact historical vintage discontinued; excluded from model sample',
+                               lifecycle_receipt_sha256=sha, lifecycle_source=API+'series')
+                except SourceError as proof_error:
+                    row['lifecycle_verification_error']=str(proof_error)
         results.append(row)
     passed=bool(results) and any(r['status']=='ASOF_VERIFIED' for r in results) and all(
-        r['status']=='ASOF_VERIFIED' or (r['status']=='UNAVAILABLE_ARCHIVE' and first and r['as_of_date']<first) for r in results)
+        r['status'] in ('ASOF_VERIFIED','UNAVAILABLE_PROVIDER_DISCONTINUED') or (r['status']=='UNAVAILABLE_ARCHIVE' and first and r['as_of_date']<first) for r in results)
     report={'rows':len(results),'verified':sum(r['status']=='ASOF_VERIFIED' for r in results),
             'first_provider_vintage':first,'metadata_error':error,'results':results,
             'status':'VERIFIED_AVAILABLE_ARCHIVE' if passed else 'FAILED_SOURCE_VALIDATION',
@@ -160,6 +213,11 @@ def summarize(predictions):
 
 def study(events,cache,output):
     records=load_credit(cache) if cache else {};frame,coverage=attach(events,records)
+    lifecycle=load_lifecycle(cache) if cache else {}
+    for row in coverage:
+        if row['status'] in ('STALE','SOURCE_ERROR') and row['as_of_date'] in lifecycle:
+            row['status']='UNAVAILABLE_PROVIDER_DISCONTINUED'
+            row['lifecycle_receipt_sha256']=lifecycle[row['as_of_date']]['sha']
     predictions=[];analyses=[]
     for horizon in ['1M','3M','UNTIL_RECOVERY']:
         subset=frame[frame.horizon.eq(horizon)];rows=evaluate(subset)
@@ -170,6 +228,11 @@ def study(events,cache,output):
             'input_events_sha256':hashlib.sha256(events.to_csv(index=False).encode()).hexdigest(),
             'validated_receipts':len(records),'analyses':analyses,'coverage':coverage,
             'research_only':True,'live_forecast':None,'status':'NO_CONFIRMED_EDGE' if predictions else 'BLOCKED_INSUFFICIENT_VERIFIED_CREDIT'}
+    acquisition_path=Path(cache)/'credit_acquisition_audit.json' if cache else None
+    if acquisition_path and acquisition_path.exists():
+        report['source_validation_status']=json.loads(acquisition_path.read_text()).get('status')
+        if report['source_validation_status']=='FAILED_SOURCE_VALIDATION':
+            report['status']='PARTIAL_RESEARCH_NO_CONFIRMED_EDGE'
     write_json(Path(output)/'credit_edge_v8_audit.json',report)
     write_json(Path(output)/'credit_edge_v8_predictions.json',predictions)
     Path(output).mkdir(parents=True,exist_ok=True);frame.to_csv(Path(output)/'credit_edge_v8_events.csv',index=False)
