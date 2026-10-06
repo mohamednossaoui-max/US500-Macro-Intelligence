@@ -1,0 +1,31 @@
+name: ATH EMA19 First Touch Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy pytest 'yfinance>=0.2,<2' 'pandas_market_calendars==5.5.0'
+      - name: Test first touch, EMA timing and intraday ambiguity
+        run: python -m pytest -q tests/test_ath_ema19_touch_research_v12.py
+      - name: Acquire calendar-validated daily OHLC
+        run: python ath_ema19_touch_research_v12.py --mode acquire --output ath_ema19_run/acquisition
+      - name: Compare EMA19 touch context and conditional baseline
+        run: python ath_ema19_touch_research_v12.py --mode study --cache ath_ema19_run/acquisition --output ath_ema19_run/study
+      - name: Verify publication remained unchanged
+        if: always()
+        run: python scripts/verify_publication_integrity.py --public-data public_data
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-ema19-touch-audit
+          path: ath_ema19_run/
+          retention-days: 7
+          if-no-files-found: warn
