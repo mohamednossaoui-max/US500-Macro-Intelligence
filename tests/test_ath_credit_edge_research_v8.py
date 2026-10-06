@@ -123,3 +123,54 @@ def test_archive_gap_is_proven_and_not_source_success(tmp_path):
     r=m.acquire(pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']}),Late(),tmp_path)
     assert r['results'][0]['status']=='UNAVAILABLE_ARCHIVE' and r['verified']==0
     assert r['status']=='FAILED_SOURCE_VALIDATION'
+
+
+def historical_meta(asof, title='Baa Spread (DISCONTINUED)'):
+    return {'realtime_start':asof,'realtime_end':asof,'seriess':[
+        {**meta(),'title':title,'realtime_start':asof,'realtime_end':asof}]}
+
+
+def test_provider_discontinuation_is_verified_and_excluded(tmp_path):
+    class Stopped(Client):
+        def get(self, endpoint, params):
+            if endpoint=='series' and 'realtime_start' in params:
+                return historical_meta(params['realtime_start'])
+            if endpoint=='series/observations':
+                return {'realtime_start':'2020-04-01','realtime_end':'2020-04-01','observations':[]}
+            return super().get(endpoint,params)
+    events=pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00']})
+    r=m.acquire(events,Stopped(),tmp_path)
+    assert r['verified']==0 and r['status']=='FAILED_SOURCE_VALIDATION'
+    assert r['results'][0]['status']=='UNAVAILABLE_PROVIDER_DISCONTINUED'
+    assert len(m.load_lifecycle(tmp_path))==1
+    out,coverage=m.attach(frame(),m.load_credit(tmp_path))
+    assert out[m.CREDIT].isna().all().all()
+
+
+def test_discontinued_gap_with_verified_cases_permits_available_archive_study(tmp_path):
+    class Mixed(Client):
+        def get(self,endpoint,params):
+            if endpoint=='series' and 'realtime_start' in params:
+                return historical_meta(params['realtime_start'])
+            if endpoint=='series/observations' and params['realtime_start']=='2020-04-02':
+                return {'realtime_start':'2020-04-02','realtime_end':'2020-04-02','observations':[]}
+            return super().get(endpoint,params)
+    events=pd.DataFrame({'decision_at':['2020-04-02T00:00:00+00:00','2020-04-03T00:00:00+00:00']})
+    r=m.acquire(events,Mixed(),tmp_path)
+    assert r['status']=='VERIFIED_AVAILABLE_ARCHIVE' and r['verified']==1
+    assert r['results'][1]['status']=='UNAVAILABLE_PROVIDER_DISCONTINUED'
+
+
+@pytest.mark.parametrize('change',['current_date','active_title','wrong_series'])
+def test_unproven_lifecycle_cannot_bypass_failure(change):
+    p=historical_meta('2020-04-01')
+    if change=='current_date':p['realtime_start']='2026-10-06'
+    if change=='active_title':p['seriess'][0]['title']='Baa Spread'
+    if change=='wrong_series':p['seriess'][0]['id']='OTHER'
+    with pytest.raises(m.SourceError):m.discontinued('2020-04-01',p)
+
+
+def test_lifecycle_tamper_rejected(tmp_path):
+    m.lifecycle_receipt(tmp_path,'2020-04-01',historical_meta('2020-04-01'))
+    p=next((tmp_path/'lifecycle_receipts').glob('*'));p.write_text(p.read_text()+' ')
+    with pytest.raises(m.SourceError):m.load_lifecycle(tmp_path)
