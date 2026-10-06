@@ -1,7 +1,7 @@
 {
   "provider": "official",
-  "as_of_date": "2026-10-05",
-  "retrieved_at": "2026-10-05T23:09:59.271845+00:00",
+  "as_of_date": "2026-10-06",
+  "retrieved_at": "2026-10-06T08:36:06.670887+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -319,11 +319,11 @@
       "metadata_verification": null,
       "metadata_source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/",
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-03",
-      "before_merge_canonical_value": 55.4,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "September 2026",
+      "before_merge_canonical_release_date": "2026-10-05",
+      "before_merge_canonical_value": 54.9,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     }
   ],
   "source_verification": "VERIFIED"

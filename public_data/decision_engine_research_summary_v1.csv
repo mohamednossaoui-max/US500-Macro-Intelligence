@@ -1,2 +1,2 @@
 as_of_date,state,confidence,evidence_count,supportive_count,contradictory_count,mixed_count,point_in_time_safe,core_point_in_time_safe,overall_evidence_quality,overall_evidence_coverage_pct,overall_evidence_freshness,overall_evidence_freshness_current_pct,overall_evidence_pit_status,overall_evidence_pit_safe_pct,research_only,decision_engine_enabled
-2026-10-05,SUPPORTIVE,1.0,4,1,0,3,True,True,MEDIUM,100.0,AGING,97.6,PIT_LIMITED,78.6,True,True
+2026-10-06,SUPPORTIVE,1.0,4,2,0,2,True,True,MEDIUM,100.0,AGING,97.6,PIT_LIMITED,78.6,True,True

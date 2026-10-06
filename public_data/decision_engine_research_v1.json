@@ -1,14 +1,14 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-10-05",
+  "as_of_date": "2026-10-06",
   "state": "SUPPORTIVE",
   "confidence": 1.0,
   "confidence_type": "evidence_coverage",
   "evidence_count": 4,
-  "supportive_count": 1,
+  "supportive_count": 2,
   "contradictory_count": 0,
-  "mixed_count": 3,
+  "mixed_count": 2,
   "missing": [],
   "point_in_time_safe": true,
   "core_point_in_time_safe": true,
@@ -53,9 +53,9 @@
     {
       "source": "Technical Intelligence",
       "category": "technical",
-      "stance": "MIXED",
-      "reason": "Technical research regime is NEUTRAL.",
-      "value": "NEUTRAL"
+      "stance": "SUPPORTIVE",
+      "reason": "Technical research regime is STRONG_BULLISH.",
+      "value": "STRONG_BULLISH"
     }
   ]
 }
