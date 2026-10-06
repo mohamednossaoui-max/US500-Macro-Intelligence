@@ -1,0 +1,2110 @@
+[
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "983f8e0335843498d5fbdebe",
+    "decision_at": "2017-02-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 12,
+    "latest_training_label_available_at": "2016-12-23T00:00:00+00:00",
+    "development": true,
+    "price_brier": 1.2241118323998808,
+    "price_probabilities": [
+      0.16016904332842863,
+      0.7148309566715714,
+      0.06250000000000004,
+      0.06250000000000004
+    ],
+    "market_brier": 1.2860029526767685,
+    "market_probabilities": [
+      0.14051256199461687,
+      0.7344874380053829,
+      0.06250000000000012,
+      0.06250000000000012
+    ],
+    "climatology_brier": 0.3984375,
+    "climatology_probabilities": [
+      0.5,
+      0.375,
+      0.0625,
+      0.0625
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "624a7fe1a558b01034159d82",
+    "decision_at": "2017-05-27T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 13,
+    "latest_training_label_available_at": "2017-03-26T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.06688357531086393,
+    "price_probabilities": [
+      0.7783226329591562,
+      0.10403030821731446,
+      0.05882352941176471,
+      0.05882352941176471
+    ],
+    "market_brier": 0.016780423813501474,
+    "market_probabilities": [
+      0.8939370037335013,
+      0.0008939370037335014,
+      0.052584529631382576,
+      0.052584529631382576
+    ],
+    "climatology_brier": 0.35294117647058826,
+    "climatology_probabilities": [
+      0.5294117647058824,
+      0.35294117647058826,
+      0.058823529411764705,
+      0.058823529411764705
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "de438d74981d98168d164960",
+    "decision_at": "2017-09-12T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 14,
+    "latest_training_label_available_at": "2017-06-28T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.03215943610730779,
+    "price_probabilities": [
+      0.8449111407341734,
+      0.04397774815471539,
+      0.05555555555555556,
+      0.05555555555555556
+    ],
+    "market_brier": 0.017282261369150346,
+    "market_probabilities": [
+      0.8923454494015324,
+      0.0009602487169338042,
+      0.05334715094076695,
+      0.05334715094076695
+    ],
+    "climatology_brier": 0.3148148148148148,
+    "climatology_probabilities": [
+      0.5555555555555556,
+      0.3333333333333333,
+      0.05555555555555555,
+      0.05555555555555555
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "678ab5f64eed7cd201c877ea",
+    "decision_at": "2017-12-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 15,
+    "latest_training_label_available_at": "2017-10-13T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.6353719596423671,
+    "price_probabilities": [
+      0.3886683104242217,
+      0.5060685316810415,
+      0.05263157894736844,
+      0.05263157894736844
+    ],
+    "market_brier": 0.5706396902508267,
+    "market_probabilities": [
+      0.41842638366060575,
+      0.47631045844465736,
+      0.052631578947368536,
+      0.052631578947368536
+    ],
+    "climatology_brier": 0.28254847645429354,
+    "climatology_probabilities": [
+      0.5789473684210527,
+      0.3157894736842105,
+      0.05263157894736842,
+      0.05263157894736842
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "9c8c8f3ba9743aff1e2d337e",
+    "decision_at": "2018-08-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 16,
+    "latest_training_label_available_at": "2018-01-17T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.18841031256361174,
+    "price_probabilities": [
+      0.6513276774091615,
+      0.24867232259083843,
+      0.05000000000000001,
+      0.05000000000000001
+    ],
+    "market_brier": 0.20561652639189462,
+    "market_probabilities": [
+      0.6372568734633048,
+      0.2627431265366951,
+      0.05000000000000001,
+      0.05000000000000001
+    ],
+    "climatology_brier": 0.255,
+    "climatology_probabilities": [
+      0.6,
+      0.3,
+      0.05,
+      0.05
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "11da9fecf6f533c84bfbfd92",
+    "decision_at": "2019-04-24T00:00:00+00:00",
+    "actual_class": "LIMITED",
+    "training_count": 17,
+    "latest_training_label_available_at": "2018-09-26T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.18840424839283043,
+    "price_probabilities": [
+      0.2518253993224927,
+      0.6529365054394121,
+      0.04761904761904762,
+      0.04761904761904762
+    ],
+    "market_brier": 0.3131370475328382,
+    "market_probabilities": [
+      0.34229552812047115,
+      0.5624663766414337,
+      0.04761904761904761,
+      0.04761904761904761
+    ],
+    "climatology_brier": 0.8979591836734695,
+    "climatology_probabilities": [
+      0.6190476190476191,
+      0.2857142857142857,
+      0.047619047619047616,
+      0.047619047619047616
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "2457b325b4845e9ec27cac0c",
+    "decision_at": "2019-07-27T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 18,
+    "latest_training_label_available_at": "2019-05-25T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.3323599950352394,
+    "price_probabilities": [
+      0.4001684647266732,
+      0.508922444364236,
+      0.04545454545454546,
+      0.04545454545454546
+    ],
+    "market_brier": 1.3387132719095522,
+    "market_probabilities": [
+      0.3762288186440811,
+      0.5328620904468281,
+      0.04545454545454547,
+      0.04545454545454547
+    ],
+    "climatology_brier": 1.3636363636363638,
+    "climatology_probabilities": [
+      0.5909090909090909,
+      0.3181818181818182,
+      0.045454545454545456,
+      0.045454545454545456
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "c95c04fabf443e4cefba2d83",
+    "decision_at": "2019-10-29T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 19,
+    "latest_training_label_available_at": "2019-08-28T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.18558285008964323,
+    "price_probabilities": [
+      0.6506867295919962,
+      0.23924595751968192,
+      0.06658905201875669,
+      0.04347826086956523
+    ],
+    "market_brier": 0.0970832603892998,
+    "market_probabilities": [
+      0.7381891439416169,
+      0.14667240249809332,
+      0.07166019269072454,
+      0.04347826086956522
+    ],
+    "climatology_brier": 0.2911153119092628,
+    "climatology_probabilities": [
+      0.5652173913043478,
+      0.30434782608695654,
+      0.08695652173913043,
+      0.043478260869565216
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "dd4bd74da59c2610e0efa784",
+    "decision_at": "2020-02-06T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 20,
+    "latest_training_label_available_at": "2019-11-30T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.1861956350541432,
+    "price_probabilities": [
+      0.43136266053811273,
+      0.429258348331336,
+      0.09771232446388456,
+      0.04166666666666667
+    ],
+    "market_brier": 1.236206481145345,
+    "market_probabilities": [
+      0.337431747472004,
+      0.5345890331966363,
+      0.08631255266469304,
+      0.04166666666666667
+    ],
+    "climatology_brier": 1.2673611111111112,
+    "climatology_probabilities": [
+      0.5833333333333334,
+      0.2916666666666667,
+      0.08333333333333333,
+      0.041666666666666664
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "814aa12b9eaf72564f7f61ef",
+    "decision_at": "2020-08-19T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 21,
+    "latest_training_label_available_at": "2020-03-07T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.9789624437388202,
+    "price_probabilities": [
+      0.0008891175905002938,
+      0.6807124159906679,
+      0.28283376279881994,
+      0.03556470362001175
+    ],
+    "market_brier": 1.321709642232188,
+    "market_probabilities": [
+      0.0007961330109519693,
+      0.7961330109519693,
+      0.17122553559900006,
+      0.0318453204380788
+    ],
+    "climatology_brier": 1.1680000000000001,
+    "climatology_probabilities": [
+      0.56,
+      0.28,
+      0.12,
+      0.04
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "fa315aaf84b32d9405df0b1e",
+    "decision_at": "2020-11-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 22,
+    "latest_training_label_available_at": "2020-09-20T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.4847121307753268,
+    "price_probabilities": [
+      0.0009044249843568515,
+      0.583059012271888,
+      0.38125098642233757,
+      0.03478557632141736
+    ],
+    "market_brier": 1.5262552001670784,
+    "market_probabilities": [
+      0.0009008348819355169,
+      0.6579701063319575,
+      0.30648156332704873,
+      0.034647495459058306
+    ],
+    "climatology_brier": 0.31065088757396453,
+    "climatology_probabilities": [
+      0.5384615384615384,
+      0.2692307692307692,
+      0.15384615384615385,
+      0.038461538461538464
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+    "decision_at": "2021-03-12T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 23,
+    "latest_training_label_available_at": "2020-12-26T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.05192465332794058,
+    "price_probabilities": [
+      0.8149461200772274,
+      0.022271201513422684,
+      0.12574564137231287,
+      0.037037037037037035
+    ],
+    "market_brier": 0.015067612857135287,
+    "market_probabilities": [
+      0.9008122817811693,
+      0.06330906451436735,
+      0.0009432557449079967,
+      0.034935397959555387
+    ],
+    "climatology_brier": 0.28806584362139914,
+    "climatology_probabilities": [
+      0.5555555555555556,
+      0.25925925925925924,
+      0.14814814814814814,
+      0.037037037037037035
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d11a80f684263e89d6c890de",
+    "decision_at": "2021-06-15T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 24,
+    "latest_training_label_available_at": "2021-04-13T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.25109103950417466,
+    "price_probabilities": [
+      0.5842646125397662,
+      0.23885519247919454,
+      0.1411659092667536,
+      0.03571428571428572
+    ],
+    "market_brier": 0.6014279947177584,
+    "market_probabilities": [
+      0.36282793277924696,
+      0.21921659168135108,
+      0.38224118982511635,
+      0.035714285714285705
+    ],
+    "climatology_brier": 0.2678571428571429,
+    "climatology_probabilities": [
+      0.5714285714285714,
+      0.25,
+      0.14285714285714285,
+      0.03571428571428571
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "00b96b6a970b840bf37a81bf",
+    "decision_at": "2021-10-22T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 25,
+    "latest_training_label_available_at": "2021-07-16T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.052583675670337365,
+    "price_probabilities": [
+      0.8091106469418542,
+      0.11511101000024392,
+      0.04129558443721227,
+      0.03448275862068966
+    ],
+    "market_brier": 0.0478654713502217,
+    "market_probabilities": [
+      0.8308011530059879,
+      0.134543803108695,
+      0.000976672762559959,
+      0.03367837112275721
+    ],
+    "climatology_brier": 0.2497027348394769,
+    "climatology_probabilities": [
+      0.5862068965517241,
+      0.2413793103448276,
+      0.13793103448275862,
+      0.034482758620689655
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "5a2e0e1470a64083c7246287",
+    "decision_at": "2024-01-20T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 26,
+    "latest_training_label_available_at": "2021-11-23T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.7235425704993292,
+    "price_probabilities": [
+      0.2977762371611222,
+      0.28150164597161703,
+      0.38738878353392747,
+      0.03333333333333333
+    ],
+    "market_brier": 0.9398251722047626,
+    "market_probabilities": [
+      0.19823633183184455,
+      0.40219420732527034,
+      0.36623612750955187,
+      0.033333333333333354
+    ],
+    "climatology_brier": 0.2333333333333334,
+    "climatology_probabilities": [
+      0.6,
+      0.23333333333333334,
+      0.13333333333333333,
+      0.03333333333333333
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+    "decision_at": "2024-05-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 27,
+    "latest_training_label_available_at": "2024-02-21T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.4088949098903489,
+    "price_probabilities": [
+      0.4883576140129466,
+      0.36453552697778197,
+      0.11484879449314243,
+      0.03225806451612903
+    ],
+    "market_brier": 0.2403809231792001,
+    "market_probabilities": [
+      0.5999134295403526,
+      0.2601447314511394,
+      0.10768377449237901,
+      0.03225806451612903
+    ],
+    "climatology_brier": 0.218522372528616,
+    "climatology_probabilities": [
+      0.6129032258064516,
+      0.22580645161290322,
+      0.12903225806451613,
+      0.03225806451612903
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "3a144571570d4c3b3ca0049a",
+    "decision_at": "2024-09-20T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 28,
+    "latest_training_label_available_at": "2024-06-17T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.080451047352125,
+    "price_probabilities": [
+      0.7600745915562863,
+      0.09604402618775161,
+      0.11263138225596203,
+      0.031249999999999997
+    ],
+    "market_brier": 0.05053240108099504,
+    "market_probabilities": [
+      0.8147629467848557,
+      0.03584096643069496,
+      0.11814608678444939,
+      0.03125
+    ],
+    "climatology_brier": 0.205078125,
+    "climatology_probabilities": [
+      0.625,
+      0.21875,
+      0.125,
+      0.03125
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "6c7291cfd711fa08e6f55267",
+    "decision_at": "2025-01-24T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 29,
+    "latest_training_label_available_at": "2024-10-21T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.08369168946287667,
+    "price_probabilities": [
+      0.7619465964888192,
+      0.15143506523097217,
+      0.05631530797717832,
+      0.030303030303030293
+    ],
+    "market_brier": 0.07247611346577193,
+    "market_probabilities": [
+      0.7848137506416006,
+      0.1563235927590798,
+      0.02855962629628922,
+      0.030303030303030293
+    ],
+    "climatology_brier": 0.19283746556473827,
+    "climatology_probabilities": [
+      0.6363636363636364,
+      0.21212121212121213,
+      0.12121212121212122,
+      0.030303030303030304
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "0d35411022a919ba00807677",
+    "decision_at": "2025-06-28T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 30,
+    "latest_training_label_available_at": "2025-02-25T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.3639034041272025,
+    "price_probabilities": [
+      0.03708807149267291,
+      0.4747404590422074,
+      0.4587597047592374,
+      0.029411764705882394
+    ],
+    "market_brier": 1.0881907071256063,
+    "market_probabilities": [
+      0.1418501444529862,
+      0.3531274376623197,
+      0.47561065317881174,
+      0.0294117647058824
+    ],
+    "climatology_brier": 0.18166089965397922,
+    "climatology_probabilities": [
+      0.6470588235294118,
+      0.20588235294117646,
+      0.11764705882352941,
+      0.029411764705882353
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "76240b869944979d9a11920b",
+    "decision_at": "2025-10-02T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 31,
+    "latest_training_label_available_at": "2025-07-29T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.41167377174625375,
+    "price_probabilities": [
+      0.4762247686928983,
+      0.33097920392344193,
+      0.16422459881223117,
+      0.028571428571428577
+    ],
+    "market_brier": 0.5720932490711327,
+    "market_probabilities": [
+      0.37354869779227784,
+      0.30620343642558173,
+      0.29167643721071185,
+      0.028571428571428564
+    ],
+    "climatology_brier": 0.17142857142857143,
+    "climatology_probabilities": [
+      0.6571428571428571,
+      0.2,
+      0.11428571428571428,
+      0.02857142857142857
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "565dde58a7e072c66e63b99c",
+    "decision_at": "2026-01-07T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 32,
+    "latest_training_label_available_at": "2025-11-03T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.05605247078759374,
+    "price_probabilities": [
+      0.8013217984386024,
+      0.10998957464780236,
+      0.06091084913581751,
+      0.027777777777777773
+    ],
+    "market_brier": 0.013866687135276208,
+    "market_probabilities": [
+      0.898228818222009,
+      0.037310420621097046,
+      0.03668298337911628,
+      0.02777777777777777
+    ],
+    "climatology_brier": 0.16203703703703706,
+    "climatology_probabilities": [
+      0.6666666666666666,
+      0.19444444444444445,
+      0.1111111111111111,
+      0.027777777777777776
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "10beecb66605cd0f06078330",
+    "decision_at": "2026-04-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 33,
+    "latest_training_label_available_at": "2026-02-08T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.08932860869112136,
+    "price_probabilities": [
+      0.7532853605233175,
+      0.1522626206659296,
+      0.0674249917837259,
+      0.027027027027027042
+    ],
+    "market_brier": 0.08259863319318596,
+    "market_probabilities": [
+      0.7647709260699894,
+      0.05479884492964632,
+      0.15340320197333723,
+      0.027027027027027032
+    ],
+    "climatology_brier": 0.1533966398831264,
+    "climatology_probabilities": [
+      0.6756756756756757,
+      0.1891891891891892,
+      0.10810810810810811,
+      0.02702702702702703
+    ]
+  },
+  {
+    "horizon": "1M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "81ff9b3fe3a580796b40cfc4",
+    "decision_at": "2026-08-05T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 34,
+    "latest_training_label_available_at": "2026-05-17T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.09933184125184387,
+    "price_probabilities": [
+      0.7367743179671773,
+      0.14383616175858713,
+      0.09307373080055133,
+      0.026315789473684213
+    ],
+    "market_brier": 0.055380572793976644,
+    "market_probabilities": [
+      0.8012015491834668,
+      0.07415634537263767,
+      0.09832631597021153,
+      0.026315789473684216
+    ],
+    "climatology_brier": 0.14542936288088643,
+    "climatology_probabilities": [
+      0.6842105263157895,
+      0.18421052631578946,
+      0.10526315789473684,
+      0.02631578947368421
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "983f8e0335843498d5fbdebe",
+    "decision_at": "2017-02-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 12,
+    "latest_training_label_available_at": "2017-02-23T00:00:00+00:00",
+    "development": true,
+    "price_brier": 1.429499951017635,
+    "price_probabilities": [
+      0.03563688813591487,
+      0.2400773963538319,
+      0.6617857155102532,
+      0.06250000000000004
+    ],
+    "market_brier": 1.325070980938138,
+    "market_probabilities": [
+      0.05849814171342627,
+      0.2839103633215739,
+      0.5950914949649998,
+      0.06250000000000014
+    ],
+    "climatology_brier": 0.8046875,
+    "climatology_probabilities": [
+      0.25,
+      0.375,
+      0.3125,
+      0.0625
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "624a7fe1a558b01034159d82",
+    "decision_at": "2017-05-27T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 13,
+    "latest_training_label_available_at": "2017-05-26T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.567253979428428,
+    "price_probabilities": [
+      0.41177351594844613,
+      0.46174161420277554,
+      0.06766134043701372,
+      0.05882352941176471
+    ],
+    "market_brier": 0.4929287620837273,
+    "market_probabilities": [
+      0.4773785010685556,
+      0.46543865724488703,
+      0.0009558587105914189,
+      0.056226982975965976
+    ],
+    "climatology_brier": 0.71280276816609,
+    "climatology_probabilities": [
+      0.29411764705882354,
+      0.35294117647058826,
+      0.29411764705882354,
+      0.058823529411764705
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "de438d74981d98168d164960",
+    "decision_at": "2017-09-12T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 14,
+    "latest_training_label_available_at": "2017-08-28T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.44939437020822637,
+    "price_probabilities": [
+      0.4841456884876653,
+      0.422847078252155,
+      0.0374516777046241,
+      0.05555555555555556
+    ],
+    "market_brier": 0.2655183593276488,
+    "market_probabilities": [
+      0.5685534887028472,
+      0.24104369893286628,
+      0.13484725680873103,
+      0.05555555555555562
+    ],
+    "climatology_brier": 0.6358024691358025,
+    "climatology_probabilities": [
+      0.3333333333333333,
+      0.3333333333333333,
+      0.2777777777777778,
+      0.05555555555555555
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "678ab5f64eed7cd201c877ea",
+    "decision_at": "2017-12-16T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 15,
+    "latest_training_label_available_at": "2017-12-13T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.3801667578480851,
+    "price_probabilities": [
+      0.2629706927081963,
+      0.20167118062029069,
+      0.48272654772414464,
+      0.052631578947368446
+    ],
+    "market_brier": 0.5530619767551689,
+    "market_probabilities": [
+      0.5054856616442598,
+      0.000721033538379735,
+      0.45584417121842696,
+      0.037949133598933496
+    ],
+    "climatology_brier": 0.7811634349030472,
+    "climatology_probabilities": [
+      0.3684210526315789,
+      0.3157894736842105,
+      0.2631578947368421,
+      0.05263157894736842
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "9c8c8f3ba9743aff1e2d337e",
+    "decision_at": "2018-08-25T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 16,
+    "latest_training_label_available_at": "2018-03-17T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.7523034851564984,
+    "price_probabilities": [
+      0.42865821961708606,
+      0.2358018038919386,
+      0.2855399764909753,
+      0.05000000000000001
+    ],
+    "market_brier": 0.8303379848115675,
+    "market_probabilities": [
+      0.4047025043037952,
+      0.3021186167319383,
+      0.24317887896426646,
+      0.05000000000000001
+    ],
+    "climatology_brier": 0.7049999999999998,
+    "climatology_probabilities": [
+      0.35,
+      0.3,
+      0.3,
+      0.05
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "11da9fecf6f533c84bfbfd92",
+    "decision_at": "2019-04-24T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 17,
+    "latest_training_label_available_at": "2018-11-26T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.04801569143663907,
+    "price_probabilities": [
+      0.009715682959117233,
+      0.11967360609087127,
+      0.8229916633309639,
+      0.04761904761904762
+    ],
+    "market_brier": 0.21537174411376062,
+    "market_probabilities": [
+      0.0008982886332722232,
+      0.30419023439712983,
+      0.6521358277661589,
+      0.042775649203439195
+    ],
+    "climatology_brier": 0.6394557823129253,
+    "climatology_probabilities": [
+      0.3333333333333333,
+      0.2857142857142857,
+      0.3333333333333333,
+      0.047619047619047616
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "2457b325b4845e9ec27cac0c",
+    "decision_at": "2019-07-27T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 18,
+    "latest_training_label_available_at": "2019-07-25T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.20807359722007954,
+    "price_probabilities": [
+      0.1842417069901647,
+      0.15504286170552903,
+      0.6152608858497609,
+      0.04545454545454547
+    ],
+    "market_brier": 0.22904774649326393,
+    "market_probabilities": [
+      0.05500019323700624,
+      0.28061325109848173,
+      0.6189320102099666,
+      0.04545454545454548
+    ],
+    "climatology_brier": 0.5826446280991736,
+    "climatology_probabilities": [
+      0.3181818181818182,
+      0.2727272727272727,
+      0.36363636363636365,
+      0.045454545454545456
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "c95c04fabf443e4cefba2d83",
+    "decision_at": "2019-10-29T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 19,
+    "latest_training_label_available_at": "2019-10-28T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.5025558720080928,
+    "price_probabilities": [
+      0.41603203355969137,
+      0.3526534873373621,
+      0.18783621823338137,
+      0.04347826086956523
+    ],
+    "market_brier": 0.4680490927264641,
+    "market_probabilities": [
+      0.45478826665906996,
+      0.39755460329787967,
+      0.10417886917348526,
+      0.04347826086956523
+    ],
+    "climatology_brier": 0.7069943289224953,
+    "climatology_probabilities": [
+      0.30434782608695654,
+      0.2608695652173913,
+      0.391304347826087,
+      0.043478260869565216
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "dd4bd74da59c2610e0efa784",
+    "decision_at": "2020-02-06T00:00:00+00:00",
+    "actual_class": "CRASH",
+    "training_count": 20,
+    "latest_training_label_available_at": "2020-01-30T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.2416924957510729,
+    "price_probabilities": [
+      0.2850999324693768,
+      0.2489065514758075,
+      0.424326849388149,
+      0.04166666666666667
+    ],
+    "market_brier": 1.3452703981782945,
+    "market_probabilities": [
+      0.1604773655460682,
+      0.6024317466119585,
+      0.19542422117530664,
+      0.04166666666666668
+    ],
+    "climatology_brier": 1.232638888888889,
+    "climatology_probabilities": [
+      0.3333333333333333,
+      0.25,
+      0.375,
+      0.041666666666666664
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "814aa12b9eaf72564f7f61ef",
+    "decision_at": "2020-08-19T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 21,
+    "latest_training_label_available_at": "2020-05-07T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.06843045124230777,
+    "price_probabilities": [
+      0.0009300374158278935,
+      0.017260292328904202,
+      0.8065597449661075,
+      0.17524992528916047
+    ],
+    "market_brier": 0.09746664812723671,
+    "market_probabilities": [
+      0.0008956909896321817,
+      0.036735757938051526,
+      0.7627715160881279,
+      0.19959703498418838
+    ],
+    "climatology_brier": 0.576,
+    "climatology_probabilities": [
+      0.32,
+      0.24,
+      0.36,
+      0.08
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "fa315aaf84b32d9405df0b1e",
+    "decision_at": "2020-11-25T00:00:00+00:00",
+    "actual_class": "LIMITED",
+    "training_count": 22,
+    "latest_training_label_available_at": "2020-11-20T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.8541069471600484,
+    "price_probabilities": [
+      0.0008734395466449725,
+      0.2802083910040433,
+      0.5564166394163254,
+      0.1625015300329863
+    ],
+    "market_brier": 1.9594897008499994,
+    "market_probabilities": [
+      0.0009803757082550114,
+      0.0009803757082550114,
+      0.9803757082550113,
+      0.01766354032847867
+    ],
+    "climatology_brier": 0.8402366863905325,
+    "climatology_probabilities": [
+      0.3076923076923077,
+      0.23076923076923078,
+      0.38461538461538464,
+      0.07692307692307693
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+    "decision_at": "2021-03-12T00:00:00+00:00",
+    "actual_class": "LIMITED",
+    "training_count": 23,
+    "latest_training_label_available_at": "2021-02-26T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.680877446233209,
+    "price_probabilities": [
+      0.5275582600167587,
+      0.37319677102112014,
+      0.0008748756637928124,
+      0.09837009329832867
+    ],
+    "market_brier": 0.9587364841842687,
+    "market_probabilities": [
+      0.677046196808362,
+      0.2932362843591167,
+      0.028794618957629938,
+      0.0009228998748915342
+    ],
+    "climatology_brier": 0.7791495198902606,
+    "climatology_probabilities": [
+      0.2962962962962963,
+      0.25925925925925924,
+      0.37037037037037035,
+      0.07407407407407407
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d11a80f684263e89d6c890de",
+    "decision_at": "2021-06-15T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 24,
+    "latest_training_label_available_at": "2021-06-13T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.5882741775558505,
+    "price_probabilities": [
+      0.37345279870023473,
+      0.1551331637483578,
+      0.4096766802176449,
+      0.0617373573337625
+    ],
+    "market_brier": 0.809220932039478,
+    "market_probabilities": [
+      0.23013809605074484,
+      0.29909722443475034,
+      0.325561992349556,
+      0.1452026871649488
+    ],
+    "climatology_brier": 0.7244897959183673,
+    "climatology_probabilities": [
+      0.2857142857142857,
+      0.2857142857142857,
+      0.35714285714285715,
+      0.07142857142857142
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "00b96b6a970b840bf37a81bf",
+    "decision_at": "2021-10-22T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 25,
+    "latest_training_label_available_at": "2021-09-16T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.2553266147911213,
+    "price_probabilities": [
+      0.45146711184291427,
+      0.41709536806648373,
+      0.06555122566324939,
+      0.06588629442735265
+    ],
+    "market_brier": 1.027053908679442,
+    "market_probabilities": [
+      0.3857201887453676,
+      0.44048476809483295,
+      0.1728083413321768,
+      0.0009867018276228509
+    ],
+    "climatology_brier": 0.6064209274673008,
+    "climatology_probabilities": [
+      0.3103448275862069,
+      0.27586206896551724,
+      0.3448275862068966,
+      0.06896551724137931
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "5a2e0e1470a64083c7246287",
+    "decision_at": "2024-01-20T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 26,
+    "latest_training_label_available_at": "2022-01-23T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.32685125270955195,
+    "price_probabilities": [
+      0.22666754414512905,
+      0.1490597465266685,
+      0.5099205620353998,
+      0.11435214729280276
+    ],
+    "market_brier": 0.3131711516013848,
+    "market_probabilities": [
+      0.2586829776406697,
+      0.07071654353513758,
+      0.5295213839664009,
+      0.14107909485779188
+    ],
+    "climatology_brier": 0.5666666666666667,
+    "climatology_probabilities": [
+      0.3,
+      0.26666666666666666,
+      0.36666666666666664,
+      0.06666666666666667
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+    "decision_at": "2024-05-16T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 27,
+    "latest_training_label_available_at": "2024-04-21T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.3934119427772629,
+    "price_probabilities": [
+      0.12467546233169696,
+      0.3316681613465579,
+      0.485699326297259,
+      0.057957050024486235
+    ],
+    "market_brier": 0.5036640253187398,
+    "market_probabilities": [
+      0.2731516125737467,
+      0.26889626779552417,
+      0.4050632114083204,
+      0.05288890822240857
+    ],
+    "climatology_brier": 0.5306971904266389,
+    "climatology_probabilities": [
+      0.2903225806451613,
+      0.25806451612903225,
+      0.3870967741935484,
+      0.06451612903225806
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "3a144571570d4c3b3ca0049a",
+    "decision_at": "2024-09-20T00:00:00+00:00",
+    "actual_class": "LIMITED",
+    "training_count": 28,
+    "latest_training_label_available_at": "2024-08-17T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.5762892049698778,
+    "price_probabilities": [
+      0.3752835009934134,
+      0.3693298478327676,
+      0.17816850373654813,
+      0.07721814743727086
+    ],
+    "market_brier": 0.526970512810537,
+    "market_probabilities": [
+      0.3745945509501251,
+      0.3998179043924357,
+      0.13499756895044202,
+      0.09058997570699723
+    ],
+    "climatology_brier": 0.810546875,
+    "climatology_probabilities": [
+      0.28125,
+      0.25,
+      0.40625,
+      0.0625
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "6c7291cfd711fa08e6f55267",
+    "decision_at": "2025-01-24T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 29,
+    "latest_training_label_available_at": "2024-12-21T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.8616325789595288,
+    "price_probabilities": [
+      0.3148299811628888,
+      0.4003263676609123,
+      0.22617120418049802,
+      0.05867244699570099
+    ],
+    "market_brier": 0.7644384477389758,
+    "market_probabilities": [
+      0.26558912081679265,
+      0.42328366743881973,
+      0.2830995510140433,
+      0.028027660730344395
+    ],
+    "climatology_brier": 0.519742883379247,
+    "climatology_probabilities": [
+      0.2727272727272727,
+      0.2727272727272727,
+      0.3939393939393939,
+      0.06060606060606061
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "0d35411022a919ba00807677",
+    "decision_at": "2025-06-28T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 30,
+    "latest_training_label_available_at": "2025-04-25T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.7514100107480324,
+    "price_probabilities": [
+      0.0008618411150105088,
+      0.04699669110179916,
+      0.8618411150105089,
+      0.09030035277268149
+    ],
+    "market_brier": 1.8316422801558896,
+    "market_probabilities": [
+      0.0009477838360326159,
+      0.0009477838360326159,
+      0.9085823263654157,
+      0.08952210596251921
+    ],
+    "climatology_brier": 0.7837370242214534,
+    "climatology_probabilities": [
+      0.2647058823529412,
+      0.2647058823529412,
+      0.4117647058823529,
+      0.058823529411764705
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "76240b869944979d9a11920b",
+    "decision_at": "2025-10-02T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 31,
+    "latest_training_label_available_at": "2025-09-29T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.18112265862144936,
+    "price_probabilities": [
+      0.24443080227466896,
+      0.05025586783278768,
+      0.6584525551807032,
+      0.04686077471184011
+    ],
+    "market_brier": 0.42587319934231593,
+    "market_probabilities": [
+      0.24078396519528528,
+      0.18067573647649407,
+      0.4382442102157219,
+      0.14029608811249875
+    ],
+    "climatology_brier": 0.5110204081632653,
+    "climatology_probabilities": [
+      0.2857142857142857,
+      0.2571428571428571,
+      0.4,
+      0.05714285714285714
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "565dde58a7e072c66e63b99c",
+    "decision_at": "2026-01-07T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 32,
+    "latest_training_label_available_at": "2026-01-03T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.771830338391858,
+    "price_probabilities": [
+      0.4459623189185626,
+      0.22738579803685935,
+      0.27956507584936074,
+      0.04708680719521732
+    ],
+    "market_brier": 0.6744449524887763,
+    "market_probabilities": [
+      0.3829014045721556,
+      0.2812479923984584,
+      0.330150359512575,
+      0.0057002435168110885
+    ],
+    "climatology_brier": 0.4830246913580246,
+    "climatology_probabilities": [
+      0.2777777777777778,
+      0.25,
+      0.4166666666666667,
+      0.05555555555555555
+    ]
+  },
+  {
+    "horizon": "3M",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "10beecb66605cd0f06078330",
+    "decision_at": "2026-04-16T00:00:00+00:00",
+    "actual_class": "LIMITED",
+    "training_count": 33,
+    "latest_training_label_available_at": "2026-04-08T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.25067663469232004,
+    "price_probabilities": [
+      0.1430748891297648,
+      0.5749212210123931,
+      0.21082724657436258,
+      0.07117664328347956
+    ],
+    "market_brier": 0.3316950682338851,
+    "market_probabilities": [
+      0.3340442296906587,
+      0.5437177498785868,
+      0.013975812142989041,
+      0.10826220828776552
+    ],
+    "climatology_brier": 0.835646457268079,
+    "climatology_probabilities": [
+      0.2702702702702703,
+      0.24324324324324326,
+      0.43243243243243246,
+      0.05405405405405406
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "983f8e0335843498d5fbdebe",
+    "decision_at": "2017-02-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 12,
+    "latest_training_label_available_at": "2016-11-23T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.04687500000000002,
+    "price_probabilities": [
+      0.8125,
+      0.06250000000000006,
+      0.06250000000000006,
+      0.06250000000000006
+    ],
+    "market_brier": 0.04687500000000017,
+    "market_probabilities": [
+      0.8124999999999997,
+      0.06250000000000012,
+      0.06250000000000012,
+      0.06250000000000012
+    ],
+    "climatology_brier": 0.046875,
+    "climatology_probabilities": [
+      0.8125,
+      0.0625,
+      0.0625,
+      0.0625
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "624a7fe1a558b01034159d82",
+    "decision_at": "2017-05-27T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 13,
+    "latest_training_label_available_at": "2017-02-28T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.041522491349480974,
+    "price_probabilities": [
+      0.8235294117647058,
+      0.05882352941176471,
+      0.05882352941176471,
+      0.05882352941176471
+    ],
+    "market_brier": 0.041522491349481154,
+    "market_probabilities": [
+      0.8235294117647055,
+      0.05882352941176488,
+      0.05882352941176488,
+      0.05882352941176488
+    ],
+    "climatology_brier": 0.041522491349480974,
+    "climatology_probabilities": [
+      0.8235294117647058,
+      0.058823529411764705,
+      0.058823529411764705,
+      0.058823529411764705
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "de438d74981d98168d164960",
+    "decision_at": "2017-09-12T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 14,
+    "latest_training_label_available_at": "2017-06-02T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.03703703703703703,
+    "price_probabilities": [
+      0.8333333333333334,
+      0.05555555555555556,
+      0.05555555555555556,
+      0.05555555555555556
+    ],
+    "market_brier": 0.037037037037037084,
+    "market_probabilities": [
+      0.8333333333333333,
+      0.05555555555555562,
+      0.05555555555555562,
+      0.05555555555555562
+    ],
+    "climatology_brier": 0.03703703703703702,
+    "climatology_probabilities": [
+      0.8333333333333334,
+      0.05555555555555555,
+      0.05555555555555555,
+      0.05555555555555555
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "678ab5f64eed7cd201c877ea",
+    "decision_at": "2017-12-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 15,
+    "latest_training_label_available_at": "2017-09-13T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.033240997229916955,
+    "price_probabilities": [
+      0.8421052631578946,
+      0.05263157894736844,
+      0.05263157894736844,
+      0.05263157894736844
+    ],
+    "market_brier": 0.03324099722991698,
+    "market_probabilities": [
+      0.8421052631578946,
+      0.052631578947368536,
+      0.052631578947368536,
+      0.052631578947368536
+    ],
+    "climatology_brier": 0.03324099722991691,
+    "climatology_probabilities": [
+      0.8421052631578947,
+      0.05263157894736842,
+      0.05263157894736842,
+      0.05263157894736842
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "9c8c8f3ba9743aff1e2d337e",
+    "decision_at": "2018-08-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 16,
+    "latest_training_label_available_at": "2017-12-19T00:00:00+00:00",
+    "development": true,
+    "price_brier": 0.030000000000000013,
+    "price_probabilities": [
+      0.85,
+      0.05000000000000001,
+      0.05000000000000001,
+      0.05000000000000001
+    ],
+    "market_brier": 0.030000000000000013,
+    "market_probabilities": [
+      0.85,
+      0.05000000000000001,
+      0.05000000000000001,
+      0.05000000000000001
+    ],
+    "climatology_brier": 0.030000000000000013,
+    "climatology_probabilities": [
+      0.85,
+      0.05,
+      0.05,
+      0.05
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "11da9fecf6f533c84bfbfd92",
+    "decision_at": "2019-04-24T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 17,
+    "latest_training_label_available_at": "2018-08-28T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.027210884353741513,
+    "price_probabilities": [
+      0.8571428571428571,
+      0.04761904761904762,
+      0.04761904761904762,
+      0.04761904761904762
+    ],
+    "market_brier": 0.02721088435374145,
+    "market_probabilities": [
+      0.8571428571428573,
+      0.04761904761904762,
+      0.04761904761904762,
+      0.04761904761904762
+    ],
+    "climatology_brier": 0.027210884353741506,
+    "climatology_probabilities": [
+      0.8571428571428571,
+      0.047619047619047616,
+      0.047619047619047616,
+      0.047619047619047616
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "2457b325b4845e9ec27cac0c",
+    "decision_at": "2019-07-27T00:00:00+00:00",
+    "actual_class": "MEDIUM",
+    "training_count": 18,
+    "latest_training_label_available_at": "2019-04-27T00:00:00+00:00",
+    "development": false,
+    "price_brier": 1.661157024793389,
+    "price_probabilities": [
+      0.8636363636363638,
+      0.04545454545454547,
+      0.04545454545454547,
+      0.04545454545454547
+    ],
+    "market_brier": 1.6611570247933884,
+    "market_probabilities": [
+      0.8636363636363636,
+      0.04545454545454547,
+      0.04545454545454547,
+      0.04545454545454547
+    ],
+    "climatology_brier": 1.6611570247933884,
+    "climatology_probabilities": [
+      0.8636363636363636,
+      0.045454545454545456,
+      0.045454545454545456,
+      0.045454545454545456
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "c95c04fabf443e4cefba2d83",
+    "decision_at": "2019-10-29T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 18,
+    "latest_training_label_available_at": "2019-04-27T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.024793388429752032,
+    "price_probabilities": [
+      0.8636363636363638,
+      0.04545454545454547,
+      0.04545454545454547,
+      0.04545454545454547
+    ],
+    "market_brier": 0.024793388429752126,
+    "market_probabilities": [
+      0.8636363636363634,
+      0.04545454545454547,
+      0.04545454545454547,
+      0.04545454545454547
+    ],
+    "climatology_brier": 0.024793388429752063,
+    "climatology_probabilities": [
+      0.8636363636363636,
+      0.045454545454545456,
+      0.045454545454545456,
+      0.045454545454545456
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "dd4bd74da59c2610e0efa784",
+    "decision_at": "2020-02-06T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 20,
+    "latest_training_label_available_at": "2019-10-31T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.045797450781584974,
+    "price_probabilities": [
+      0.8189543422027822,
+      0.04166666666666668,
+      0.09771232446388457,
+      0.04166666666666668
+    ],
+    "market_brier": 0.03970180560577298,
+    "market_probabilities": [
+      0.8303541140019737,
+      0.04166666666666667,
+      0.08631255266469304,
+      0.04166666666666667
+    ],
+    "climatology_brier": 0.038194444444444434,
+    "climatology_probabilities": [
+      0.8333333333333334,
+      0.041666666666666664,
+      0.08333333333333333,
+      0.041666666666666664
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "814aa12b9eaf72564f7f61ef",
+    "decision_at": "2020-08-19T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 21,
+    "latest_training_label_available_at": "2020-02-07T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.09432548271159559,
+    "price_probabilities": [
+      0.7503270609835456,
+      0.04,
+      0.16967293901645436,
+      0.04
+    ],
+    "market_brier": 0.01683437975290312,
+    "market_probabilities": [
+      0.8877698824834712,
+      0.040000000000000036,
+      0.032230117516528725,
+      0.040000000000000036
+    ],
+    "climatology_brier": 0.03520000000000001,
+    "climatology_probabilities": [
+      0.84,
+      0.04,
+      0.08,
+      0.04
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "fa315aaf84b32d9405df0b1e",
+    "decision_at": "2020-11-25T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 22,
+    "latest_training_label_available_at": "2020-08-22T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.01982503403074258,
+    "price_probabilities": [
+      0.8781481915202245,
+      0.03846153846153846,
+      0.04492873155669861,
+      0.03846153846153846
+    ],
+    "market_brier": 0.008051336617903401,
+    "market_probabilities": [
+      0.9264270653692783,
+      0.036314380370543915,
+      0.0009441738896341428,
+      0.036314380370543915
+    ],
+    "climatology_brier": 0.03254437869822486,
+    "climatology_probabilities": [
+      0.8461538461538461,
+      0.038461538461538464,
+      0.07692307692307693,
+      0.038461538461538464
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "4f42aaa9aa75d1a8c0631d0e",
+    "decision_at": "2021-03-12T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 23,
+    "latest_training_label_available_at": "2020-11-28T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.013543927124709308,
+    "price_probabilities": [
+      0.8994926601640244,
+      0.037037037037037035,
+      0.026433265761901525,
+      0.037037037037037035
+    ],
+    "market_brier": 0.007251007890201143,
+    "market_probabilities": [
+      0.9301684638440075,
+      0.034450683846074304,
+      0.0009301684638440076,
+      0.034450683846074304
+    ],
+    "climatology_brier": 0.030178326474622767,
+    "climatology_probabilities": [
+      0.8518518518518519,
+      0.037037037037037035,
+      0.07407407407407407,
+      0.037037037037037035
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d11a80f684263e89d6c890de",
+    "decision_at": "2021-06-15T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 24,
+    "latest_training_label_available_at": "2021-03-13T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.03583475829762627,
+    "price_probabilities": [
+      0.8403245964275332,
+      0.03571428571428572,
+      0.08824683214389546,
+      0.03571428571428572
+    ],
+    "market_brier": 0.04789564021489171,
+    "market_probabilities": [
+      0.818009264714081,
+      0.035714285714285705,
+      0.11056216385734764,
+      0.035714285714285705
+    ],
+    "climatology_brier": 0.028061224489795932,
+    "climatology_probabilities": [
+      0.8571428571428571,
+      0.03571428571428571,
+      0.07142857142857142,
+      0.03571428571428571
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "00b96b6a970b840bf37a81bf",
+    "decision_at": "2021-10-22T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 25,
+    "latest_training_label_available_at": "2021-06-25T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.015113658655940996,
+    "price_probabilities": [
+      0.893554000458789,
+      0.03448275862068966,
+      0.03748048229983176,
+      0.03448275862068966
+    ],
+    "market_brier": 0.018515263782626416,
+    "market_probabilities": [
+      0.8825744260959616,
+      0.03448275862068966,
+      0.04846005666265917,
+      0.03448275862068966
+    ],
+    "climatology_brier": 0.02615933412604044,
+    "climatology_probabilities": [
+      0.8620689655172413,
+      0.034482758620689655,
+      0.06896551724137931,
+      0.034482758620689655
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "5a2e0e1470a64083c7246287",
+    "decision_at": "2024-01-20T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 26,
+    "latest_training_label_available_at": "2021-10-26T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.04257718198724417,
+    "price_probabilities": [
+      0.8285856441784193,
+      0.033333333333333326,
+      0.10474768915491386,
+      0.033333333333333326
+    ],
+    "market_brier": 0.05855836043161199,
+    "market_probabilities": [
+      0.802176673069537,
+      0.033333333333333354,
+      0.13115666026379644,
+      0.033333333333333354
+    ],
+    "climatology_brier": 0.02444444444444444,
+    "climatology_probabilities": [
+      0.8666666666666667,
+      0.03333333333333333,
+      0.06666666666666667,
+      0.03333333333333333
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "d698798c1c6e9f1b6ecb7d9d",
+    "decision_at": "2024-05-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 27,
+    "latest_training_label_available_at": "2024-01-23T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.02368210755176134,
+    "price_probabilities": [
+      0.8689497884112054,
+      0.032258064516129024,
+      0.06653408255653653,
+      0.032258064516129024
+    ],
+    "market_brier": 0.014799385659704541,
+    "market_probabilities": [
+      0.8948137010530363,
+      0.032258064516129024,
+      0.040670169914705706,
+      0.032258064516129024
+    ],
+    "climatology_brier": 0.022892819979188343,
+    "climatology_probabilities": [
+      0.8709677419354839,
+      0.03225806451612903,
+      0.06451612903225806,
+      0.03225806451612903
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "3a144571570d4c3b3ca0049a",
+    "decision_at": "2024-09-20T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 28,
+    "latest_training_label_available_at": "2024-05-22T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.013798002716582337,
+    "price_probabilities": [
+      0.8984230751540268,
+      0.031249999999999997,
+      0.039076924845973235,
+      0.031249999999999997
+    ],
+    "market_brier": 0.005809905726672539,
+    "market_probabilities": [
+      0.9374429430545046,
+      0.03078595322120843,
+      0.00098515050307867,
+      0.03078595322120843
+    ],
+    "climatology_brier": 0.021484375,
+    "climatology_probabilities": [
+      0.875,
+      0.03125,
+      0.0625,
+      0.03125
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "6c7291cfd711fa08e6f55267",
+    "decision_at": "2025-01-24T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 29,
+    "latest_training_label_available_at": "2024-09-24T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.012939846900448894,
+    "price_probabilities": [
+      0.9016280622639008,
+      0.030303030303030293,
+      0.037765877130038594,
+      0.030303030303030293
+    ],
+    "market_brier": 0.012789321987418828,
+    "market_probabilities": [
+      0.9021831659038441,
+      0.030303030303030297,
+      0.03721077349009542,
+      0.030303030303030297
+    ],
+    "climatology_brier": 0.020202020202020204,
+    "climatology_probabilities": [
+      0.8787878787878788,
+      0.030303030303030304,
+      0.06060606060606061,
+      0.030303030303030304
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "0d35411022a919ba00807677",
+    "decision_at": "2025-06-28T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 30,
+    "latest_training_label_available_at": "2025-02-19T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.0499363820575065,
+    "price_probabilities": [
+      0.8181477970156711,
+      0.029411764705882394,
+      0.1230286735725642,
+      0.029411764705882394
+    ],
+    "market_brier": 0.03993707965557365,
+    "market_probabilities": [
+      0.8355384814196346,
+      0.0294117647058824,
+      0.10563798916860069,
+      0.0294117647058824
+    ],
+    "climatology_brier": 0.019031141868512114,
+    "climatology_probabilities": [
+      0.8823529411764706,
+      0.029411764705882353,
+      0.058823529411764705,
+      0.029411764705882353
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "76240b869944979d9a11920b",
+    "decision_at": "2025-10-02T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 31,
+    "latest_training_label_available_at": "2025-07-01T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.03152678567457427,
+    "price_probabilities": [
+      0.852555783221755,
+      0.02857142857142858,
+      0.09030135963538792,
+      0.02857142857142858
+    ],
+    "market_brier": 0.012411992293705945,
+    "market_probabilities": [
+      0.9038020745088841,
+      0.028571428571428564,
+      0.03905506834825875,
+      0.028571428571428564
+    ],
+    "climatology_brier": 0.017959183673469395,
+    "climatology_probabilities": [
+      0.8857142857142857,
+      0.02857142857142857,
+      0.05714285714285714,
+      0.02857142857142857
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "565dde58a7e072c66e63b99c",
+    "decision_at": "2026-01-07T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 32,
+    "latest_training_label_available_at": "2025-10-03T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.016801259433537878,
+    "price_probabilities": [
+      0.8894126826737757,
+      0.027777777777777776,
+      0.05503176177066877,
+      0.027777777777777776
+    ],
+    "market_brier": 0.005665301930625222,
+    "market_probabilities": [
+      0.9363134337607689,
+      0.02777777777777777,
+      0.008131010683675458,
+      0.02777777777777777
+    ],
+    "climatology_brier": 0.016975308641975318,
+    "climatology_probabilities": [
+      0.8888888888888888,
+      0.027777777777777776,
+      0.05555555555555555,
+      0.027777777777777776
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "10beecb66605cd0f06078330",
+    "decision_at": "2026-04-16T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 33,
+    "latest_training_label_available_at": "2026-01-10T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.006089875386701401,
+    "price_probabilities": [
+      0.9331732579801316,
+      0.02702702702702704,
+      0.012772687965814336,
+      0.02702702702702704
+    ],
+    "market_brier": 0.004297554098321188,
+    "market_probabilities": [
+      0.9461559038396955,
+      0.02643303689754756,
+      0.0009780223652092596,
+      0.02643303689754756
+    ],
+    "climatology_brier": 0.016070124178232288,
+    "climatology_probabilities": [
+      0.8918918918918919,
+      0.02702702702702703,
+      0.05405405405405406,
+      0.02702702702702703
+    ]
+  },
+  {
+    "horizon": "UNTIL_RECOVERY",
+    "comparison": "PRICE_MARKET",
+    "episode_id": "81ff9b3fe3a580796b40cfc4",
+    "decision_at": "2026-08-05T00:00:00+00:00",
+    "actual_class": "NO_MEANINGFUL_PULLBACK",
+    "training_count": 34,
+    "latest_training_label_available_at": "2026-04-17T00:00:00+00:00",
+    "development": false,
+    "price_brier": 0.01113915632093508,
+    "price_probabilities": [
+      0.9089962162057234,
+      0.026315789473684216,
+      0.03837220484690831,
+      0.026315789473684216
+    ],
+    "market_brier": 0.003982642365967366,
+    "market_probabilities": [
+      0.9481582376261015,
+      0.02543756740623089,
+      0.0009666275614367738,
+      0.02543756740623089
+    ],
+    "climatology_brier": 0.01523545706371191,
+    "climatology_probabilities": [
+      0.8947368421052632,
+      0.02631578947368421,
+      0.05263157894736842,
+      0.02631578947368421
+    ]
+  }
+]
