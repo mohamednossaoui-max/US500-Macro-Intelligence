@@ -748,7 +748,9 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install -r requirements.txt
-          python -m pip install pytest
+          # The full test suite imports ATH exchange-calendar research modules.
+          # Match the calendar version used by the dedicated ATH audits.
+          python -m pip install pytest 'pandas_market_calendars==5.5.0'
           # Generate root-level intermediates outside the tracked checkout.
           CHECKOUT_ROOT="$(pwd -P)"
           BUILD_WORKSPACE=$(mktemp -d "${RUNNER_TEMP}/us500-integrated.XXXXXX")
