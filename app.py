@@ -1200,6 +1200,7 @@ def fed() -> None:
     comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
     st.subheader("Communication — Current vs Previous")
 
+    from fed_communication_ui_v1 import communication_dates
     comparison_rows = []
 
     for key, label in (
@@ -1272,7 +1273,7 @@ def fed() -> None:
             f"<div class='comm-shift-head'><b>{label}</b><span class='shift-badge {shift_class}'>{shift_icon} {signal}</span></div>"
             f"<div class='comm-shift-flow'><span><small>PREVIOUS</small>{fmt(previous_tone)}</span>"
             f"<strong>→</strong><span><small>CURRENT</small>{fmt(current_tone)}</span></div>"
-            f"<div class='comm-shift-date'>{fmt(previous_date)} → {fmt(current_date)}</div>"
+            f"<div class='comm-shift-date'>{communication_dates(key, item)}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )

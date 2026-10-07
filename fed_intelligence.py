@@ -149,6 +149,33 @@ def date_from_href(href: str) -> Optional[date]:
         return None
 
 
+def minutes_publication_date(anchor, meeting_date):
+    """Read an explicit release date adjacent to this official calendar link.
+
+    Never infer release from the meeting date, download time or Last Update.
+    Refuse containers that include minutes for more than one meeting.
+    """
+    node = anchor.parent
+    for _ in range(4):
+        if node is None:
+            break
+        dates = {date_from_href(a.get("href", ""))
+                 for a in node.find_all("a", href=True)
+                 if "fomcminutes" in a.get("href", "").lower()}
+        if dates != {meeting_date}:
+            break
+        matches = re.findall(r"Released\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})",
+                             node.get_text(" ", strip=True), re.I)
+        if len(set(matches)) == 1:
+            try:
+                published = datetime.strptime(matches[0], "%B %d, %Y").date()
+                return published.isoformat() if published >= meeting_date else None
+            except ValueError:
+                return None
+        node = node.parent
+    return None
+
+
 def discover_links() -> Dict[str, Dict[date, str]]:
     """
     Discover official FOMC documents from the Fed calendar.
@@ -157,6 +184,7 @@ def discover_links() -> Dict[str, Dict[date, str]]:
     result = {
         "statement": {},
         "minutes": {},
+        "minutes_publication_dates": {},
         "press": {},
         "sep": {}
     }
@@ -195,6 +223,9 @@ def discover_links() -> Dict[str, Dict[date, str]]:
             or "minutes" in label
         ):
             result["minutes"][d] = url
+            published = minutes_publication_date(a, d)
+            if published:
+                result["minutes_publication_dates"][d] = published
 
         # Press conference
         elif (
@@ -1888,6 +1919,7 @@ def build_fed_intelligence() -> Dict:
         # lag the latest FOMC meeting. Keep this explicit for UI/PIT consumers.
         "minutes_meeting_date": minutes_meeting_date.isoformat() if minutes_meeting_date else None,
         "minutes_is_latest_meeting": bool(minutes_meeting_date and minutes_meeting_date == meeting),
+        "minutes_publication_date": links.get("minutes_publication_dates", {}).get(minutes_meeting_date) if minutes_text else None,
 
         "chair_press": analyze(
             f"{chair} Press Conference",
@@ -1935,6 +1967,9 @@ def build_fed_intelligence() -> Dict:
             },
             "minutes": {
                 "current_date": minutes_meeting_date.isoformat() if minutes_text and minutes_meeting_date else None,
+                "current_publication_date": links.get("minutes_publication_dates", {}).get(minutes_meeting_date) if minutes_text else None,
+                "previous_publication_date": links.get("minutes_publication_dates", {}).get(previous_minutes_date) if previous_minutes_text else None,
+                "publication_date_source": CALENDAR,
                 "previous_date": previous_minutes_date.isoformat() if previous_minutes_date else None,
                 "previous": analyze("Previous FOMC Minutes", previous_minutes_text),
                 "comparison": compare_document_analysis(analyze("FOMC Minutes", minutes_text), analyze("Previous FOMC Minutes", previous_minutes_text)),
