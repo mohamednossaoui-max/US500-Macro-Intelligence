@@ -136,3 +136,47 @@ def test_ath_interface_labels_are_english():
         assert not any(any('\u0600'<=c<='\u06ff' for c in text) for text in literals)
     assert set(CAUSE_LABELS)==set(m.RULES)
     assert all(not any('\u0600'<=c<='\u06ff' for c in text) for text in CAUSE_LABELS.values())
+
+
+def test_page_renders_without_calendar_or_research_imports():
+    import subprocess,sys
+    root=Path(__file__).resolve().parents[1]
+    script='''
+import importlib.abc,sys
+class NoResearch(importlib.abc.MetaPathFinder):
+    def find_spec(self,fullname,path=None,target=None):
+        if fullname in {'pandas_market_calendars','ath_ema19_touch_research_v12','ath_extended_history_research_v10'}:
+            raise ModuleNotFoundError('Forbidden UI dependency: '+fullname)
+sys.meta_path.insert(0,NoResearch())
+from streamlit.testing.v1 import AppTest
+app=AppTest.from_string('from ath_pullback_context_ui_v1 import render_ath_pullback_context\\nrender_ath_pullback_context()').run(timeout=30)
+assert not app.exception and not app.error
+assert any('Drawdown-depth probability' in x.value for x in app.markdown)
+'''
+    r=subprocess.run([sys.executable,'-c',script],cwd=root,capture_output=True,text=True,timeout=45)
+    assert r.returncode==0,r.stdout+r.stderr
+
+
+def price_frame():
+    return pd.DataFrame({'observation_date':['2024-01-01','2024-01-02'],
+        'availability_date':['2024-01-02','2024-01-03'],
+        'Open':[99,99],'High':[100,100],'Low':[98,97],'Close':[99,98],
+        'symbol':['^GSPC','ES']})
+
+
+@pytest.mark.parametrize('problem',['date','duplicate','availability','nan','nonpositive','range'])
+def test_published_price_validation_remains_strict(problem):
+    f=price_frame()
+    if problem=='date':f.loc[1,'observation_date']='bad'
+    elif problem=='duplicate':f.loc[1,'observation_date']='2024-01-01'
+    elif problem=='availability':f.loc[1,'availability_date']='2024-01-02'
+    elif problem=='nan':f.loc[1,'Close']=float('nan')
+    elif problem=='nonpositive':f.loc[1,'Low']=0
+    elif problem=='range':f.loc[1,'High']=90
+    with pytest.raises(ValueError):m.price_context(f,m.utc('2024-01-04'))
+
+
+def test_future_price_and_instrument_are_excluded():
+    r=m.price_context(price_frame(),m.utc('2024-01-02'))
+    assert r['last_session']=='2024-01-01' and r['instrument']=='^GSPC'
+    assert r['drawdown_at_close_pct']==pytest.approx(1.)

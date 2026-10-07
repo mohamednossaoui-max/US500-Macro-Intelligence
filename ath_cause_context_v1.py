@@ -105,11 +105,23 @@ def news_candidates(news,cutoff):
 
 
 def price_context(frame,cutoff):
-    from ath_ema19_touch_research_v12 import history
-    d=history(frame);d=d[d.available<=cutoff].reset_index(drop=True)
+    # Published-price validation must not import research/acquisition dependencies.
+    required={'observation_date','availability_date','Open','High','Low','Close'}
+    if not required<=set(frame):raise ValueError('Explicit daily OHLC and availability required.')
+    d=frame.copy()
+    d['date']=pd.to_datetime(d.observation_date,utc=True,errors='coerce').dt.normalize()
+    d['available']=pd.to_datetime(d.availability_date,utc=True,errors='coerce')
+    if d.date.isna().any() or d.date.duplicated().any() or d.available.isna().any():raise ValueError('Invalid/duplicate dates.')
+    if (d.available!=d.date+pd.Timedelta(days=1)).any():raise ValueError('Invalid availability proxy.')
+    for name in ('Open','High','Low','Close'):
+        d[name]=pd.to_numeric(d[name],errors='coerce')
+        if not np.isfinite(d[name]).all() or (d[name]<=0).any():raise ValueError('Missing/nonpositive OHLC; no price fabrication.')
+    if (d.High<d[['Open','Close','Low']].max(axis=1)).any() or (d.Low>d[['Open','Close','High']].min(axis=1)).any():
+        raise ValueError('Inconsistent OHLC ranges.')
+    d=d.sort_values('date');d=d[d.available<=cutoff].reset_index(drop=True)
     if d.empty:raise ValueError('No price observation available at cutoff.')
     last=d.iloc[-1];peak=float(d.High.max());past=d.Close
-    return {'instrument':str(frame.symbol.iloc[-1]) if 'symbol' in frame else 'UNVERIFIED_INSTRUMENT',
+    return {'instrument':str(last.symbol) if 'symbol' in d else 'UNVERIFIED_INSTRUMENT',
             'last_session':last.observation_date,'available_at':last.available.isoformat(),
             'price_status':'STALE' if cutoff-last.available>pd.Timedelta(days=3) else 'AVAILABLE_SESSION_PROXY',
             'reference_peak':peak,'peak_scope':'HIGHEST_HIGH_IN_AVAILABLE_FILE_NOT_CERTIFIED_LIFETIME_ATH',
