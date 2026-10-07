@@ -32,8 +32,8 @@ def test_card_text_contrast():
         assert contrast>=4.5
 
 
-def test_all_research_and_debug_panels_start_closed():
-    app=AppTest.from_string('from ath_pullback_context_ui_v1 import render_ath_pullback_context\nrender_ath_pullback_context()').run(timeout=30)
+def test_all_research_and_debug_panels_start_closed(ath_ui_publication):
+    app=AppTest.from_string('from ath_pullback_context_ui_v1 import render_ath_pullback_context\nrender_ath_pullback_context('+repr(str(ath_ui_publication))+')').run(timeout=30)
     assert not app.exception and not app.error
     assert app.expander and all(not x.proto.expanded for x in app.expander)
     assert any(x.label=='Research archive and model comparisons' for x in app.expander)
@@ -42,10 +42,10 @@ def test_all_research_and_debug_panels_start_closed():
     assert any('Observed drawdown' in x.value for x in app.markdown)
 
 
-def test_saved_archive_mismatch_is_visible_in_details(tmp_path,monkeypatch):
+def test_saved_archive_mismatch_is_visible_in_details(tmp_path,monkeypatch,ath_ui_publication):
     import ath_cause_context_ui_v1 as ui
     from ath_cause_context_v1 import assess
-    report=assess(ROOT/'public_data')
+    report=assess(ath_ui_publication)
     monkeypatch.setattr(ui,'assess',lambda root:report)
     monkeypatch.setattr(ui,'load',lambda archive:[{'snapshot_id':'old','payload':{'source_sha256':{}}},{'snapshot_id':'new','payload':{}}])
     archive=tmp_path/'research_history/ath_cause_v1';archive.mkdir(parents=True)

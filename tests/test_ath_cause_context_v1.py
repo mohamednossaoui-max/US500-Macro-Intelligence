@@ -117,9 +117,9 @@ def test_future_record_rejected_even_with_valid_checksum(tmp_path,monkeypatch):
     with pytest.raises(ValueError,match='future'):m.load(tmp_path)
 
 
-def test_real_cause_ui_smoke():
+def test_real_cause_ui_smoke(ath_ui_publication):
     from streamlit.testing.v1 import AppTest
-    root=Path(__file__).resolve().parents[1]/'public_data'
+    root=ath_ui_publication
     app=AppTest.from_string('from ath_cause_context_ui_v1 import render_cause_context\nrender_cause_context('+repr(str(root))+')').run(timeout=30)
     assert not app.exception and not app.error
     assert any('not validated' in x.value for x in app.markdown)
@@ -138,7 +138,7 @@ def test_ath_interface_labels_are_english():
     assert all(not any('\u0600'<=c<='\u06ff' for c in text) for text in CAUSE_LABELS.values())
 
 
-def test_page_renders_without_calendar_or_research_imports():
+def test_page_renders_without_calendar_or_research_imports(ath_ui_publication):
     import subprocess,sys
     root=Path(__file__).resolve().parents[1]
     script='''
@@ -149,11 +149,11 @@ class NoResearch(importlib.abc.MetaPathFinder):
             raise ModuleNotFoundError('Forbidden UI dependency: '+fullname)
 sys.meta_path.insert(0,NoResearch())
 from streamlit.testing.v1 import AppTest
-app=AppTest.from_string('from ath_pullback_context_ui_v1 import render_ath_pullback_context\\nrender_ath_pullback_context()').run(timeout=30)
+app=AppTest.from_string('from ath_pullback_context_ui_v1 import render_ath_pullback_context\\nrender_ath_pullback_context('+repr(sys.argv[1])+')').run(timeout=30)
 assert not app.exception and not app.error
 assert any('Drawdown-depth probability' in x.value for x in app.markdown)
 '''
-    r=subprocess.run([sys.executable,'-c',script],cwd=root,capture_output=True,text=True,timeout=45)
+    r=subprocess.run([sys.executable,'-c',script,str(ath_ui_publication)],cwd=root,capture_output=True,text=True,timeout=45)
     assert r.returncode==0,r.stdout+r.stderr
 
 
@@ -180,3 +180,21 @@ def test_future_price_and_instrument_are_excluded():
     r=m.price_context(price_frame(),m.utc('2024-01-02'))
     assert r['last_session']=='2024-01-01' and r['instrument']=='^GSPC'
     assert r['drawdown_at_close_pct']==pytest.approx(1.)
+
+
+def test_ui_fixture_keeps_integrity_gate_strict(ath_ui_publication, tmp_path):
+    import shutil
+    from streamlit.testing.v1 import AppTest
+    root = tmp_path / 'public_data'
+    shutil.copytree(ath_ui_publication, root)
+    target = root / 'unified_state_vector_v1.csv'
+    target.write_bytes(target.read_bytes() + b'\n')
+    with pytest.raises(ValueError, match='Publication'):
+        m.assess(root)
+    app = AppTest.from_string(
+        'from ath_cause_context_ui_v1 import render_cause_context\n'
+        'render_cause_context(' + repr(str(root)) + ')'
+    ).run(timeout=30)
+    assert not app.exception
+    assert any('Risk evidence unavailable' in x.value for x in app.markdown)
+    assert not any('not validated' in x.value for x in app.markdown)
