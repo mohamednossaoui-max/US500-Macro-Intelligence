@@ -1,0 +1,35 @@
+name: ATH Cause and Drawdown Depth Audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'pandas>=2,<4' numpy pytest streamlit requests 'yfinance>=0.2,<2' 'pandas_market_calendars==5.5.0'
+      - name: Test causal evidence and temporal gates
+        run: python -m pytest -q tests/test_ath_cause_context_v1.py tests/test_ath_cause_depth_research_v1.py
+      - name: Verify canonical publication
+        run: python scripts/verify_publication_integrity.py --public-data public_data
+      - name: Acquire calendar-validated cash prices
+        run: python ath_ema19_touch_research_v12.py --mode acquire --output ath_cause_run/acquisition
+      - name: Capture genuine current evidence and compare depth models
+        run: python ath_cause_depth_research_v1.py --cache ath_cause_run/acquisition --archive research_history/ath_cause_v1 --output ath_cause_run/study
+      - name: Verify public data unchanged
+        if: always()
+        run: python scripts/verify_publication_integrity.py --public-data public_data
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ath-cause-and-depth-audit
+          path: |
+            ath_cause_run/
+            research_history/ath_cause_v1/
+          retention-days: 14
+          if-no-files-found: warn
