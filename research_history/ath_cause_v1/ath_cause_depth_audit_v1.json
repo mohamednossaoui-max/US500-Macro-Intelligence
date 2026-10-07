@@ -1,0 +1,614 @@
+{
+  "protocol": {
+    "version": "ATH_CAUSE_DEPTH_V1",
+    "research_only": true,
+    "live_forecast": null,
+    "stage_pct": 3,
+    "targets_pct": [
+      5,
+      10,
+      20,
+      30
+    ],
+    "horizon_sessions": 63,
+    "warmup_sessions": 252,
+    "minimum_training_cases": 30,
+    "ridge_penalty": 10.0,
+    "evaluation_start": "2019-01-01",
+    "origin": "First close >=3% below available-history High record per cycle; known next calendar day.",
+    "target": "Future Low reaches frozen-peak target before High recovery or 63 sessions.",
+    "historical_features": [
+      "return20",
+      "vol20",
+      "days_from_peak",
+      "economic_inflation",
+      "economic_labor",
+      "economic_growth",
+      "fed_stance",
+      "financial_stress"
+    ],
+    "historical_scope": "Context-confirmation subset, not a trained headline causal model.",
+    "capture": "Genuine capture availability only; no backdating source/observation dates.",
+    "promotion": "No live probabilities without independent prospective validation and adequate calibration."
+  },
+  "code_sha256": "7bf335199bb8b6ab5a0f5a49e152ec65eeae901da83b615747a78ad4b63b441b",
+  "source_sha256": "4f35f4fd1fe6e4f7a0d43b4860bf38773a8afa0c4c855c92256db2cbd5959dec",
+  "snapshot_count": 1,
+  "capture": {
+    "status": "UNCHANGED",
+    "snapshot_id": "b1687df47e35711b403a07029361afe9184773b64e8352988096dd2899d76404",
+    "snapshot_count": 1
+  },
+  "event_rows": 512,
+  "events_with_full_context": 0,
+  "price_only_comparison": [
+    {
+      "target_pct": 5,
+      "evaluations": 17,
+      "hits": 12,
+      "baseline_brier": 0.2155791389238895,
+      "model_brier": 0.20785004345538072,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 5,
+          "mean_probability": 0.5447824083146673,
+          "observed_rate": 0.6
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 12,
+          "mean_probability": 0.6667938739295668,
+          "observed_rate": 0.75
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "EXPLORATORY_NOT_VALIDATED",
+      "live_probability": null
+    },
+    {
+      "target_pct": 10,
+      "evaluations": 20,
+      "hits": 4,
+      "baseline_brier": 0.16136630537974045,
+      "model_brier": 0.16402935485959158,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 12,
+          "mean_probability": 0.16784201557305925,
+          "observed_rate": 0.16666666666666666
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 8,
+          "mean_probability": 0.23350966492482478,
+          "observed_rate": 0.25
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "EXPLORATORY_NOT_VALIDATED",
+      "live_probability": null
+    },
+    {
+      "target_pct": 20,
+      "evaluations": 20,
+      "hits": 2,
+      "baseline_brier": 0.09326132091077899,
+      "model_brier": 0.09130547585044127,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 20,
+          "mean_probability": 0.05450901125428156,
+          "observed_rate": 0.1
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "EXPLORATORY_NOT_VALIDATED",
+      "live_probability": null
+    },
+    {
+      "target_pct": 30,
+      "evaluations": 20,
+      "hits": 1,
+      "baseline_brier": 0.048777870377072444,
+      "model_brier": 0.049333250108487124,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 20,
+          "mean_probability": 0.02401113011437655,
+          "observed_rate": 0.05
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "EXPLORATORY_NOT_VALIDATED",
+      "live_probability": null
+    }
+  ],
+  "common_sample_price_comparison": [
+    {
+      "target_pct": 5,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 10,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 20,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 30,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    }
+  ],
+  "context_comparison": [
+    {
+      "target_pct": 5,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 10,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 20,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    },
+    {
+      "target_pct": 30,
+      "evaluations": 0,
+      "hits": 0,
+      "baseline_brier": null,
+      "model_brier": null,
+      "calibration": [
+        {
+          "lower": 0,
+          "upper": 0.2,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.4,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.6,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.8,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 1.0001,
+          "count": 0,
+          "mean_probability": null,
+          "observed_rate": null
+        }
+      ],
+      "status": "INSUFFICIENT_HISTORICAL_CONTEXT",
+      "live_probability": null
+    }
+  ],
+  "live_forecast": null,
+  "status": "INSUFFICIENT_HISTORICAL_CAUSE_VINTAGES",
+  "limitations": [
+    "Current programme context/news cannot fill historical vintages.",
+    "Same previously examined cash-price history; no pristine holdout.",
+    "Headlines produce candidates, not trained causal probabilities.",
+    "Full context model covers five numerical confirmation channels, not all eight headline causes.",
+    "First closing 3% landmark differs from real-time intraday touch.",
+    "Unknown target/recovery ordering and already-reached targets are excluded.",
+    "A genuine forward archive is required; preserve workflow artifact snapshots between runs.",
+    "Partial coverage or better retrospective Brier alone cannot release live probabilities."
+  ]
+}
