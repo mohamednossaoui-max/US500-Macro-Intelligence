@@ -21,50 +21,50 @@
     "5d": {
       "available_analogs": 9,
       "total_analogs": 9,
-      "mean_return_pct": -1.182447,
-      "median_return_pct": -0.312136,
-      "positive_hit_rate_pct": 44.4444,
-      "min_return_pct": -11.544324,
+      "mean_return_pct": -0.719873,
+      "median_return_pct": 0.322559,
+      "positive_hit_rate_pct": 55.5556,
+      "min_return_pct": -9.08198,
       "max_return_pct": 1.470956,
-      "return_std_pct": 4.057955,
+      "return_std_pct": 3.260608,
       "median_max_drawdown_pct": -0.883815,
       "median_realized_volatility_pct": 9.398306
     },
     "20d": {
       "available_analogs": 9,
       "total_analogs": 9,
-      "mean_return_pct": 0.681382,
+      "mean_return_pct": 0.729137,
       "median_return_pct": 1.338559,
       "positive_hit_rate_pct": 55.5556,
       "min_return_pct": -6.827594,
       "max_return_pct": 5.487904,
-      "return_std_pct": 3.591742,
-      "median_max_drawdown_pct": -2.582183,
+      "return_std_pct": 3.587817,
+      "median_max_drawdown_pct": -2.37505,
       "median_realized_volatility_pct": 13.545671
     },
     "60d": {
       "available_analogs": 9,
       "total_analogs": 9,
-      "mean_return_pct": 3.764212,
+      "mean_return_pct": 2.701976,
       "median_return_pct": 5.438153,
       "positive_hit_rate_pct": 66.6667,
-      "min_return_pct": -6.954543,
+      "min_return_pct": -14.463735,
       "max_return_pct": 13.681309,
-      "return_std_pct": 6.970661,
+      "return_std_pct": 8.922114,
       "median_max_drawdown_pct": -5.110085,
-      "median_realized_volatility_pct": 12.899886
+      "median_realized_volatility_pct": 12.356547
     },
     "120d": {
       "available_analogs": 9,
       "total_analogs": 9,
-      "mean_return_pct": 8.728964,
+      "mean_return_pct": 9.693351,
       "median_return_pct": 7.452457,
-      "positive_hit_rate_pct": 88.8889,
-      "min_return_pct": -2.065419,
+      "positive_hit_rate_pct": 100.0,
+      "min_return_pct": 3.518418,
       "max_return_pct": 19.543761,
-      "return_std_pct": 6.854017,
-      "median_max_drawdown_pct": -6.765255,
-      "median_realized_volatility_pct": 12.506949
+      "return_std_pct": 6.015743,
+      "median_max_drawdown_pct": -5.110085,
+      "median_realized_volatility_pct": 11.746574
     }
   }
 }

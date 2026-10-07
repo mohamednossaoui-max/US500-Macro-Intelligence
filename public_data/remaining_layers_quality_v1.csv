@@ -1,5 +1,5 @@
 layer,available,row_count,pit_status,freshness_status,quality_status,quality_gate,quality_reason,decision_role,research_only,forecast,trading_signal,note
-EVENT_NEWS,True,99,PIT_SAFE,CURRENT,MEDIUM,ELIGIBLE,,CONTEXTUAL,True,False,False,publication-time chronology and context-date freshness audited; historical events remain research history
+EVENT_NEWS,True,97,PIT_SAFE,CURRENT,MEDIUM,ELIGIBLE,,CONTEXTUAL,True,False,False,publication-time chronology and context-date freshness audited; historical events remain research history
 EARNINGS,True,1203,PIT_LIMITED,CURRENT,MEDIUM,DEGRADED,PIT_LIMITED,CONTEXTUAL,True,False,False,event facts and post-event reaction-horizon availability are separated; reactions are never contemporaneous decision evidence
 DECISION_ENGINE,True,1,PIT_SAFE,CURRENT,MEDIUM,ELIGIBLE,,OUTPUT,True,False,False,state semantics preserved; quality is metadata only
 HISTORICAL_EVENT_STUDY,True,1916,PIT_LIMITED,CURRENT,MEDIUM,DEGRADED,PIT_LIMITED,CONTEXTUAL,True,False,False,historical association; not forecast or causal evidence

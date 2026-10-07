@@ -1,14 +1,14 @@
 {
   "module": "Event / News Intelligence",
   "version": "2.1",
-  "generated_at": "2026-10-06T08:39:08.303090+00:00",
-  "rows": 99,
+  "generated_at": "2026-10-07T22:35:49.065674+00:00",
+  "rows": 97,
   "source_counts": {
-    "OFFICIAL_RSS": 99
+    "OFFICIAL_RSS": 97
   },
   "topic_counts": {
-    "growth": 64,
-    "fed": 32,
+    "growth": 63,
+    "fed": 31,
     "labor": 2,
     "inflation": 1
   },
@@ -23,13 +23,13 @@
   "structured_evidence": true,
   "event_class_counts": {
     "OTHER_OFFICIAL": 41,
-    "MACRO_RELEASE": 32,
+    "MACRO_RELEASE": 31,
     "POLICY_EVENT": 15,
-    "ADMINISTRATIVE": 11
+    "ADMINISTRATIVE": 10
   },
   "research_relevance_counts": {
-    "MEDIUM": 52,
-    "HIGH": 47
+    "MEDIUM": 51,
+    "HIGH": 46
   },
   "duplicate_rows": 5,
   "decision_role": "CONTEXTUAL",
