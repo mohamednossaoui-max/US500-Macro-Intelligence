@@ -20,16 +20,16 @@
     "name": "FOMC Minutes",
     "available": true,
     "tone": "HAWKISH",
-    "tone_score": 11,
-    "inflation_mentions": 73,
-    "labor_mentions": 34,
-    "growth_mentions": 27,
-    "financial_mentions": 22,
-    "text_length": 48113
+    "tone_score": 13,
+    "inflation_mentions": 77,
+    "labor_mentions": 33,
+    "growth_mentions": 32,
+    "financial_mentions": 17,
+    "text_length": 44413
   },
-  "minutes_source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
-  "minutes_meeting_date": "2026-07-29",
-  "minutes_is_latest_meeting": false,
+  "minutes_source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+  "minutes_meeting_date": "2026-09-16",
+  "minutes_is_latest_meeting": true,
   "chair_press": {
     "name": "Kevin Warsh Press Conference",
     "available": true,
@@ -39,7 +39,7 @@
     "labor_mentions": 1,
     "growth_mentions": 0,
     "financial_mentions": 9,
-    "text_length": 9271
+    "text_length": 9332
   },
   "chair_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "chair_pdf": null,
@@ -52,7 +52,7 @@
     "labor_mentions": 1,
     "growth_mentions": 0,
     "financial_mentions": 9,
-    "text_length": 9271
+    "text_length": 9332
   },
   "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "powell_pdf": null,
@@ -63,10 +63,10 @@
     },
     "minutes": {
       "available": true,
-      "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
-      "meeting_date": "2026-07-29",
+      "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "meeting_date": "2026-09-16",
       "latest_fomc_date": "2026-09-16",
-      "lagged": true
+      "lagged": false
     },
     "chair_press": {
       "available": true,
@@ -101,28 +101,28 @@
       }
     },
     "minutes": {
-      "current_date": "2026-07-29",
-      "previous_date": "2026-06-17",
+      "current_date": "2026-09-16",
+      "previous_date": "2026-07-29",
       "previous": {
         "name": "Previous FOMC Minutes",
         "available": true,
-        "tone": "MODERATELY HAWKISH",
-        "tone_score": 6,
-        "inflation_mentions": 80,
-        "labor_mentions": 36,
-        "growth_mentions": 26,
-        "financial_mentions": 16,
-        "text_length": 44695
+        "tone": "HAWKISH",
+        "tone_score": 11,
+        "inflation_mentions": 73,
+        "labor_mentions": 34,
+        "growth_mentions": 27,
+        "financial_mentions": 22,
+        "text_length": 48113
       },
       "comparison": {
         "available": true,
-        "classification": "MORE HAWKISH",
-        "tone_score_change": 5,
+        "classification": "BROADLY UNCHANGED",
+        "tone_score_change": 2,
         "mention_changes": {
-          "inflation_mentions": -7,
-          "labor_mentions": -2,
-          "growth_mentions": 1,
-          "financial_mentions": 6
+          "inflation_mentions": 4,
+          "labor_mentions": -1,
+          "growth_mentions": 5,
+          "financial_mentions": -5
         }
       }
     },
@@ -217,13 +217,13 @@
     },
     "document_score_eligibility": {
       "statement": true,
-      "minutes": false,
+      "minutes": true,
       "chair": true
     },
     "document_weights": {
-      "statement": 0.583333,
-      "minutes": 0.0,
-      "chair": 0.416667
+      "statement": 0.35,
+      "minutes": 0.4,
+      "chair": 0.25
     },
     "statement": {
       "inflation": {
@@ -264,25 +264,25 @@
     },
     "minutes": {
       "inflation": {
-        "score": 4,
+        "score": 5,
         "classification": "HAWKISH",
-        "hawkish_hits": 4,
+        "hawkish_hits": 5,
         "dovish_hits": 0,
-        "score_100": 70
+        "score_100": 75
       },
       "labor": {
-        "score": 4,
-        "classification": "HAWKISH",
-        "hawkish_hits": 4,
+        "score": 2,
+        "classification": "MODERATELY HAWKISH",
+        "hawkish_hits": 2,
         "dovish_hits": 0,
-        "score_100": 70
+        "score_100": 60
       },
       "growth": {
-        "score": -1,
-        "classification": "MODERATELY DOVISH",
+        "score": 0,
+        "classification": "NEUTRAL",
         "hawkish_hits": 0,
-        "dovish_hits": 1,
-        "score_100": 45
+        "dovish_hits": 0,
+        "score_100": 50
       },
       "financial": {
         "score": 0,
@@ -294,8 +294,8 @@
       "policy": {
         "score": 2,
         "classification": "MODERATELY HAWKISH",
-        "hawkish_hits": 3,
-        "dovish_hits": 1,
+        "hawkish_hits": 2,
+        "dovish_hits": 0,
         "score_100": 60
       }
     },
@@ -338,8 +338,8 @@
     },
     "combined": {
       "inflation": {
-        "score_100": 52.9,
-        "classification": "NEUTRAL",
+        "score_100": 61.8,
+        "classification": "MODERATELY HAWKISH",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -348,11 +348,11 @@
           "score_100": 55
         },
         "minutes": {
-          "score": 4,
+          "score": 5,
           "classification": "HAWKISH",
-          "hawkish_hits": 4,
+          "hawkish_hits": 5,
           "dovish_hits": 0,
-          "score_100": 70
+          "score_100": 75
         },
         "chair": {
           "score": 0,
@@ -363,8 +363,8 @@
         }
       },
       "labor": {
-        "score_100": 52.9,
-        "classification": "NEUTRAL",
+        "score_100": 55.8,
+        "classification": "MODERATELY HAWKISH",
         "statement": {
           "score": 1,
           "classification": "MODERATELY HAWKISH",
@@ -373,11 +373,11 @@
           "score_100": 55
         },
         "minutes": {
-          "score": 4,
-          "classification": "HAWKISH",
-          "hawkish_hits": 4,
+          "score": 2,
+          "classification": "MODERATELY HAWKISH",
+          "hawkish_hits": 2,
           "dovish_hits": 0,
-          "score_100": 70
+          "score_100": 60
         },
         "chair": {
           "score": 0,
@@ -398,11 +398,11 @@
           "score_100": 50
         },
         "minutes": {
-          "score": -1,
-          "classification": "MODERATELY DOVISH",
+          "score": 0,
+          "classification": "NEUTRAL",
           "hawkish_hits": 0,
-          "dovish_hits": 1,
-          "score_100": 45
+          "dovish_hits": 0,
+          "score_100": 50
         },
         "chair": {
           "score": 0,
@@ -438,7 +438,7 @@
         }
       },
       "policy": {
-        "score_100": 50.0,
+        "score_100": 54.0,
         "classification": "NEUTRAL",
         "statement": {
           "score": 0,
@@ -450,8 +450,8 @@
         "minutes": {
           "score": 2,
           "classification": "MODERATELY HAWKISH",
-          "hawkish_hits": 3,
-          "dovish_hits": 1,
+          "hawkish_hits": 2,
+          "dovish_hits": 0,
           "score_100": 60
         },
         "chair": {
@@ -464,24 +464,24 @@
       }
     },
     "fed_score": {
-      "score": 56.2,
-      "base_score": 51.2,
+      "score": 60.2,
+      "base_score": 55.2,
       "sep_adjustment": 5.0,
       "classification": "MODERATELY HAWKISH"
     },
     "reasons": [
-      "- Inflation: None (+0.72)",
-      "- Labor: None (+0.43)",
+      "- Inflation: None (+2.95)",
+      "- Labor: None (+0.87)",
       "- Growth: None (+0.00)",
       "- Financial: None (+0.00)",
-      "- Policy: None (+0.00)",
+      "- Policy: None (+1.40)",
       "- SEP: HAWKISH SHIFT"
     ],
     "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
   },
   "fed_score": {
-    "score": 56.2,
-    "base_score": 51.2,
+    "score": 60.2,
+    "base_score": 55.2,
     "sep_adjustment": 5.0,
     "classification": "MODERATELY HAWKISH"
   },
@@ -559,9 +559,9 @@
     "method": "Heuristic analytical score based on directional language in the official National Summary. Not a probability."
   },
   "quality": {
-    "quality_gate": "DEGRADED",
-    "quality_status": "MEDIUM",
-    "quality_reason": "LATEST_MINUTES_LAG_LATEST_FOMC",
+    "quality_gate": "ELIGIBLE",
+    "quality_status": "HIGH",
+    "quality_reason": null,
     "pit_status": "PIT_SAFE",
     "freshness_status": "CURRENT",
     "research_only": true,
