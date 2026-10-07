@@ -30,6 +30,7 @@
   "minutes_source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
   "minutes_meeting_date": "2026-09-16",
   "minutes_is_latest_meeting": true,
+  "minutes_publication_date": "2026-10-07",
   "chair_press": {
     "name": "Kevin Warsh Press Conference",
     "available": true,
@@ -102,6 +103,9 @@
     },
     "minutes": {
       "current_date": "2026-09-16",
+      "current_publication_date": "2026-10-07",
+      "previous_publication_date": "2026-08-19",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
       "previous_date": "2026-07-29",
       "previous": {
         "name": "Previous FOMC Minutes",
