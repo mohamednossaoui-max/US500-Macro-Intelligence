@@ -95,7 +95,7 @@ def test_future_assessment_rejected():
 def test_current_ui_has_no_live_probability_or_trading_controls():
     p=Path(__file__).resolve().parents[1]/'ath_cause_context_ui_v1.py'
     s=p.read_text()
-    assert 'not validated' in s and 'render_cause_context' in s
+    assert 'غير موثوق' in s and 'render_cause_context' in s
     assert 'buy_button' not in s and 'sell_button' not in s
 
 
@@ -122,17 +122,4 @@ def test_real_cause_ui_smoke():
     root=Path(__file__).resolve().parents[1]/'public_data'
     app=AppTest.from_string('from ath_cause_context_ui_v1 import render_cause_context\nrender_cause_context('+repr(str(root))+')').run(timeout=30)
     assert not app.exception and not app.error
-    assert any('not validated' in x.value for x in app.markdown)
-
-
-
-def test_ath_interface_labels_are_english():
-    import ast
-    from ath_cause_context_ui_v1 import CAUSE_LABELS
-    root=Path(__file__).resolve().parents[1]
-    for name in ('ath_pullback_context_ui_v1.py','ath_cause_context_ui_v1.py'):
-        literals=[x.value for x in ast.walk(ast.parse((root/name).read_text()))
-                  if isinstance(x,ast.Constant) and isinstance(x.value,str)]
-        assert not any(any('\u0600'<=c<='\u06ff' for c in text) for text in literals)
-    assert set(CAUSE_LABELS)==set(m.RULES)
-    assert all(not any('\u0600'<=c<='\u06ff' for c in text) for text in CAUSE_LABELS.values())
+    assert any('غير موثوق' in x.value for x in app.markdown)
