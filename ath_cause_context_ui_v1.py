@@ -2,7 +2,8 @@
 import json
 from pathlib import Path
 import streamlit as st
-from ath_cause_context_v1 import assess
+from ath_cause_context_v1 import assess, load
+from ath_ui_components_v1 import cards, notice
 
 
 CAUSE_LABELS={
@@ -18,34 +19,55 @@ CAUSE_LABELS={
 
 
 def render_cause_context(root):
-    st.subheader('What may be putting pressure on the market?')
     try:
         r=assess(root)
-    except (OSError,ValueError,KeyError,TypeError) as e:
-        st.error('Unable to verify risk evidence: '+str(e));return
+    except (OSError,ValueError,KeyError,TypeError) as error:
+        notice('Risk evidence unavailable','Source validation did not pass. No risk assessment or probability is shown.',True)
+        with st.expander('Risk diagnostic details'):st.code(str(error))
+        return
     active=[x for x in r['causes'] if x['status']!='UNVERIFIED']
-    st.caption('News identifies risk candidates; data may corroborate them or remain insufficient. This does not prove the cause or magnitude of a decline.')
-    if not active:st.info('No supported case in the eligible evidence; this does not prove that risks are absent.')
-    for c in active:
-        st.write('**'+CAUSE_LABELS[c['cause']]+'** — '+c['status'])
-        for x in c['news_evidence'][:3]:st.markdown('['+x['title'].replace('[','').replace(']','')+']('+x['url']+')')
-        if c['context_evidence']:
-            st.caption('Numerical support: '+' · '.join(f"{x['feature']}={x['value']:.3f}" for x in c['context_evidence']))
-        st.caption('Evidence strength: '+c['impact_evidence']+' · Causal attribution is unproven.')
+    status_names={'CONTEXT_RISK_FLAG':'Context signal','NEWS_CANDIDATE':'News candidate',
+                  'CORROBORATED_RISK_CANDIDATE':'Corroborated candidate'}
+    st.subheader('Risk drivers')
+    if active:
+        cards([('Potential pressure',CAUSE_LABELS[x['cause']],
+                status_names.get(x['status'],'Unverified')+' · Does not establish the cause of a decline') for x in active])
+    else:
+        notice('No supported risk driver','Eligible evidence does not identify a supported case. This does not mean risks are absent.')
     p=r['observed_market_response']
-    if p['price_status']=='STALE':st.warning('Price snapshot is stale; last session '+p['last_session']+'. No live-price reading is available.')
-    st.caption('Observed response: '+p['response']+' · Last session '+p['last_session']+' · Insufficient verified evidence on the breadth and persistence of the impact.')
-    st.write('**Drawdown-depth probability: not validated — withheld**')
-    st.caption('Research targets: −5%, −10%, −20%, −30% after the first close at −3% from the file peak, within 63 sessions and before peak recovery. A news label is not converted into a probability.')
-    path=Path(root).parent/'research_history/ath_cause_v1/ath_cause_depth_audit_v1.json'
-    if path.exists():
-        try:
-            a=json.loads(path.read_text());st.caption('Archive test: '+a['status']+' · Snapshots '+str(a['snapshot_count'])+' · Full-context rows '+str(a['events_with_full_context']))
-        except (ValueError,KeyError,OSError) as e:st.warning('Unable to read test results: '+str(e))
-    with st.expander('Unverified cases and evidence limitations'):
-        for c in r['causes']:
-            if c['status']=='UNVERIFIED':st.write(CAUSE_LABELS[c['cause']]+' — Unverified does not mean absent.')
-        st.json({'excluded_features':r['excluded_features'],'excluded_news_count':len(r['excluded_news']),
-                 'limitations':r['limitations']})
-    st.download_button('Download current risk evidence',json.dumps(r,ensure_ascii=False,indent=2),
-                       'ath-cause-current.json','application/json',key='ath_cause_current_download')
+    if p['price_status']=='STALE':
+        notice('Stale price snapshot','Latest published session: '+p['last_session']+'. Refresh the price source before interpreting current conditions.',True)
+    response='No net decline over the last 20 sessions' if p['response']=='NO_20_SESSION_DECLINE_CONFIRMED' else 'Net decline over the last 20 sessions'
+    st.caption(response+' · Price session: '+p['last_session']+'. This observation does not establish the effect of any news event.')
+    notice('Drawdown-depth probability: not validated — withheld',
+           'There is not enough eligible historical context to publish a reliable probability. One-month, three-month and peak-recovery forecasts remain unavailable.',True)
+    st.caption('Research targets: −5%, −10%, −20%, −30% after the first closing decline of 3%, within 63 sessions and before peak recovery.')
+    with st.expander('Risk evidence and research readiness',expanded=False):
+        for c in active:
+            st.write('**'+CAUSE_LABELS[c['cause']]+'** — '+status_names[c['status']])
+            for x in c['news_evidence'][:3]:st.markdown('['+x['title'].replace('[','').replace(']','')+']('+x['url']+')')
+            feature_names={'economic_inflation':'Inflation surprise score','economic_labor':'Labor surprise score',
+                           'economic_growth':'Growth surprise score','fed_stance':'Fed stance score','financial_stress':'Financial stress score'}
+            for x in c['context_evidence']:
+                st.write(feature_names.get(x['feature'],x['feature'])+f": {x['value']:.3f} · "+x['state'].replace('_',' ').title())
+                st.caption('Available: '+x['available_at']+' · '+x['source'])
+        unknown=[CAUSE_LABELS[x['cause']] for x in r['causes'] if x['status']=='UNVERIFIED']
+        st.write('**Not verified:** '+', '.join(unknown) if unknown else 'All cases have candidate evidence; causal attribution remains unproven.')
+        st.caption('A missing case is not evidence of its absence. Headline candidates and score thresholds are not calibrated probabilities.')
+        archive=Path(root).parent/'research_history/ath_cause_v1'
+        path=archive/'ath_cause_depth_audit_v1.json'
+        if path.exists():
+            try:
+                a=json.loads(path.read_text());receipts=load(archive)
+                capture_id=a.get('capture',{}).get('snapshot_id')
+                tested=next((x for x in receipts if x['snapshot_id']==capture_id),None)
+                outdated=(a['snapshot_count']!=len(receipts) or tested is None or tested['payload']['source_sha256']!=r['source_sha256'])
+                st.write(f"Saved research result: {a['events_with_full_context']} event rows with full context; {a['snapshot_count']} snapshots used in that test.")
+                st.write(f"Verified archive now contains {len(receipts)} snapshots.")
+                if outdated:st.info('The saved test uses older inputs or archive coverage. Rerun the audit and update its saved display summary. These counts are not a current assessment.')
+                st.caption('Research status: insufficient historical context' if a['status']=='INSUFFICIENT_HISTORICAL_CAUSE_VINTAGES' else 'Research status: no independently validated edge')
+            except (ValueError,KeyError,OSError,TypeError) as error:st.warning('Saved research summary could not be verified: '+str(error))
+        st.write(f"Excluded news records: {len(r['excluded_news'])}. Existing news feeds do not provide complete global coverage.")
+        for item in r['limitations']:st.caption(item)
+        st.download_button('Download current risk evidence',json.dumps(r,ensure_ascii=False,indent=2),
+                           'ath-cause-current.json','application/json',key='ath_cause_current_download')
