@@ -6,7 +6,7 @@
   "sampling": "First eligible record high, then more than three calendar months between anchors",
   "source_pit_status": "PIT_LIMITED_HISTORICAL_RESEARCH_PROXIES",
   "source_hashes": {
-    "technical_intelligence_research_v1.csv": "468631291898114a01d30f3129ad07c9596254b7b1b42547f0407210cc025828",
+    "technical_intelligence_research_v1.csv": "2d87b8013a7d49ac59cf26330bf67a53b60d3bc3acc5dcfca7f09c3b2db44fc0",
     "financial_stress_research_v1.csv": "984d1b5d2dc7598c4567ad594a80f05e2a820a777a8de23e71db680287ae5509",
     "sentiment_engine_research_v1.csv": "84c4a543029f94729ef03bf1a0c9462b18e722bdccf53abfce3e3bf0d77b4177",
     "liquidity_intelligence_research_v1.csv": "4517aad75859d4b3730f197204319ceff79f7fd9c932f4d28bf79f663dbd1789"
