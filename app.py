@@ -2068,7 +2068,8 @@ PAGES = {
 with st.sidebar:
     st.markdown("## US500 Research Terminal")
     st.caption(APP_VERSION)
-    selected = st.radio("Navigation", list(PAGES.keys()), index=0)
+    from sidebar_navigation_v1 import render_navigation
+    selected = render_navigation(list(PAGES.keys()))
     st.divider()
     st.caption("Token-free")
     st.caption("local public_data → GitHub Raw → NOT PUBLISHED")
