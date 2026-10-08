@@ -439,6 +439,10 @@ def classify_regime(
         "transition",
         "uncertain",
         "moderate_stress",
+        # Producer uses ELEVATED for 0 <= composite < 1, below HIGH.
+        # Keep this intermediate evidence visible without labeling it low
+        # stress (supportive) or high stress (contradictory).
+        "elevated_research_stress",
     }
 
     if normalized in supportive:
