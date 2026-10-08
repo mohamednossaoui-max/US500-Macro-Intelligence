@@ -26,6 +26,8 @@ def apply_ui_v3() -> None:
 .stButton>button,.stDownloadButton>button{border-radius:10px;border:1px solid #245077;background:#0c2134;color:#eaf5ff}.stButton>button:hover,.stDownloadButton>button:hover{border-color:var(--blue);color:white}
 @media(max-width:700px){.v3-title{font-size:1.5rem}.card,.v3-card{min-height:78px;padding:11px 12px!important}}
 </style>''', unsafe_allow_html=True)
+    from ui_theme_v1 import apply_theme
+    apply_theme()
 
 
 def _s(v: Any) -> str:

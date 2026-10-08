@@ -478,7 +478,8 @@ def chart(df: Optional[pd.DataFrame], preferred: list[str]) -> None:
         return
 
     st.caption(f"Series: {selected}")
-    st.line_chart(plot.set_index("Date"))
+    from ui_theme_v1 import render_line_chart
+    render_line_chart(plot, selected)
 
 
 def module_page(
