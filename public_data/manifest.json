@@ -69,32 +69,32 @@
       "sha256": "f1345098ca2b322d400ca6f99d9e11cde0966e1e7ff186a835b4a6035717c8e1"
     },
     "decision_engine_evidence_registry_v2.csv": {
-      "bytes": 1035,
-      "sha256": "4a62f1df63aead87dbc00bb30dd53ef83cccbb48d6b02a2f0c4c51478d16a6a0"
+      "bytes": 1194,
+      "sha256": "cdbc234bbd74ec18c30c22211991be0829fb66fbb6a16334fbf27cb6a13a70ec"
     },
     "decision_engine_research_evidence_v1.csv": {
-      "bytes": 279,
-      "sha256": "24ec2853530499783ba21a5f5cbfd6a98ac99e10deda54dfe1a7f4e3ddcaca96"
+      "bytes": 397,
+      "sha256": "84c4ee299b42929097cf32e508551503b9c07a8a64d74fffa4cf68caa94e4913"
     },
     "decision_engine_research_summary_v1.csv": {
-      "bytes": 448,
-      "sha256": "ad7b58bce4906cef3c438e4b42c968f860b00730adbd16ac9b139acf9f82c7c2"
+      "bytes": 447,
+      "sha256": "33777203f9edc1fc46975fa596e0b9aa58e91828f97d2cd92674cf5f8b485436"
     },
     "decision_engine_research_v1.csv": {
-      "bytes": 684,
-      "sha256": "1cc39664281bc3fa5df44f0bda632a9e95927a43647d60a9f942e1457fa288bf"
+      "bytes": 683,
+      "sha256": "fc43f0c4b077b2c5a41ff415d19541ca87f985a27a51e8667572936b1492b67d"
     },
     "decision_engine_research_v1.json": {
-      "bytes": 1483,
-      "sha256": "1000afed5d268b5c45d4fa6ea70d3121e347027ecf681bd86fccf2e9357ebb4f"
+      "bytes": 1708,
+      "sha256": "29d2d961076a87c7a0f97c68959db97500301843e0b711c75b11346bebc72283"
     },
     "decision_intelligence_summary_v2.csv": {
       "bytes": 696,
-      "sha256": "eb2fd6ff14ff9ba21f5df0827d87c64f9e53b38c488b95c63c89c22e62d0eb64"
+      "sha256": "935ab21120c3f99ce5bf74a4d45308f37983a5df6327c9dd985cd718a83d5184"
     },
     "decision_intelligence_v2.json": {
       "bytes": 4939,
-      "sha256": "9ef5e32d783e22a281e26d4fae119ef056d4fc614fea917d07dd35c7a04facc9"
+      "sha256": "f4dce01ef5a311d869a946a732c930c803bbcb3a19b6d4416f70aa53d2bc457c"
     },
     "earnings_market_reaction_summary_v3.csv": {
       "bytes": 1084,
@@ -106,7 +106,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "890b80a25cfac216fde79e59bfdf75f9da1eee0f4c92edee20a36d22025fd97f"
+      "sha256": "0cfa1872e3cec5a990883ccd1a445d4c48646605d0458c0eb1813093d88bf694"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -126,7 +126,7 @@
     },
     "economic_ingestion_status_v1.json": {
       "bytes": 14350,
-      "sha256": "05d1f59e50a52033ab8b9094c3ddf46cea91717df080c2accbbb0a64c281ad19"
+      "sha256": "a9563d8a0043b3b242ad1fc2e0cd01b82b6d90e2e674305a241ad91ca9081265"
     },
     "economic_regime_events_v1.csv": {
       "bytes": 103501,
@@ -146,15 +146,15 @@
     },
     "event_news_research_summary_v2.json": {
       "bytes": 1004,
-      "sha256": "2e88ee38db74fe9eb848873eb55796b4507dcb3e8676fd9e7db45aae55d2a2ee"
+      "sha256": "d3b258506c81a994c060fa91516ef1e5b42b97a82f5404ca11c012c9f95accaf"
     },
     "event_news_research_v2.csv": {
-      "bytes": 45656,
-      "sha256": "641223f5810f939018382d73123c71ff5b1b09b278077cdd2f45d57d718ffd1f"
+      "bytes": 45647,
+      "sha256": "7d81b6d32e5f4d9d0a7e873ac7e35fe0403ed8bbb403c9e68d4dc15fffcaa9ac"
     },
     "event_news_validation_v2.json": {
       "bytes": 76006,
-      "sha256": "0a76c690ec40f63b8574fe845a732153b4e394e0f0be762d5162ea6a961bed8d"
+      "sha256": "f18da7c31f8cca444f3c21db960fc2712fd6e1bbac13fade6151cf195662dc45"
     },
     "fed_intelligence_output_v1.json": {
       "bytes": 15261,
@@ -182,7 +182,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "62a0f5e4590abbba753022f2b89905c00444736ebc882375f0721f6b89d44f51"
+      "sha256": "9f7d7b72f1bde77a218a191575d1faa8e64fe47a4a1b230b89687ebb565d27a1"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1776101,
@@ -202,7 +202,7 @@
     },
     "historical_analog_summary_v1.json": {
       "bytes": 680,
-      "sha256": "b35cbbbb1edaba8fe61f05c1f50a37ba4449b964c5718026dded580f0db3de9f"
+      "sha256": "3906951b697731f0ed9fef33d08dfc93413dbae265aa8ecc08bc3ad958f2839f"
     },
     "historical_analog_top_v1.csv": {
       "bytes": 2547,
@@ -266,11 +266,11 @@
     },
     "macro_context_v1.csv": {
       "bytes": 915,
-      "sha256": "a0adb3cf8e89835cfad801d85a9ff5e14117f0c744e54d515fbe914799d77d16"
+      "sha256": "8c9a1ead914dbf7e0f105402e1baf77ac9169bd75c696f95f63333b11c00e03b"
     },
     "macro_context_v1.json": {
       "bytes": 9831,
-      "sha256": "3329e5e97a4ec8626998bd37c690e21f1867a0e0001ccdcbdbc7b163f4d77efd"
+      "sha256": "1973213418e86e6e7c3c8f3d958ecabb8b0564d23ef099d56528e182e4f37c11"
     },
     "market_breadth_analysis_summary_v1.json": {
       "bytes": 2196,
@@ -337,28 +337,28 @@
       "sha256": "5b08c239152b21f5e779e32db758ef06a619545446d12cec81d313ec4c3464b5"
     },
     "research_context_extremes_v1.csv": {
-      "bytes": 2723906,
-      "sha256": "2fee252b56118cc18000289ba33769b8868aebeca80c409b8df768a0043673b2"
+      "bytes": 2725090,
+      "sha256": "b90e1fc093daa01ebbb7cea5b0e4781909a0a78203147f33ab0dc63682b7689c"
     },
     "research_context_summary_v1.csv": {
-      "bytes": 5167,
-      "sha256": "77a6093723b69f8ba0977130fd67a6a0f8e154b2354d62e27704387cd572ed3f"
+      "bytes": 5181,
+      "sha256": "fcf470d7e6c22e46d6c24503508ae67d9594a53453e4c3d306f1cf662faa1bf1"
     },
     "research_context_v1.csv": {
-      "bytes": 7844365,
-      "sha256": "e2d159c1638c516d119e6d754a7e924e87faf77d94fab34780a649b091315a2b"
+      "bytes": 7845549,
+      "sha256": "04aa6bad52912127b99791e1c070dccf0891a8bb8b61d881d8bc449b6ae91867"
     },
     "research_evidence_contract_v1.csv": {
-      "bytes": 14354,
-      "sha256": "38707048d91a418eebed4d27629d99d897319600bceb3aae0525e9b956a07252"
+      "bytes": 14345,
+      "sha256": "834cd7aa32fe8d9e71bb4b9c49754eede690367996c9719ea62c180804abe750"
     },
     "research_evidence_quality_summary_v1.json": {
       "bytes": 411,
-      "sha256": "045c2e6dd9a43789fb1f2b82438ef94579ebac41ff1ab1c5873f5c82022ab685"
+      "sha256": "c72593fbd90a16164dc89d63801cba6da6fb1a3653b2f54c9318c6ed79ff876f"
     },
     "research_evidence_quality_v1.csv": {
       "bytes": 3567,
-      "sha256": "6660508b350a66508f349a73109574d0844e68f8e5dab67a8401150a2ea86fe9"
+      "sha256": "a3d0eeb1aa7f6383ddc53f961dc8a9d1c615ab444211ebedf7d17040fb743cdf"
     },
     "research_evidence_validation_v1.json": {
       "bytes": 532,
@@ -378,11 +378,11 @@
     },
     "system_health_layers_v1.json": {
       "bytes": 12908,
-      "sha256": "d3632889dca922e3a92dda59dce179c90e71cf239922ae9f092ca6fdce993e0d"
+      "sha256": "bbad9fb69384ab333f8d8607b05eb081f1a7243682f9d03622476205788699c4"
     },
     "system_health_summary_v1.json": {
       "bytes": 214,
-      "sha256": "6fb327fc0b03a2967d4d9cad9f6c83d4e87de1177ed962e36e212d4d9191a72e"
+      "sha256": "c2ea675795ceffa06440706ce8094e16be1ac6d6a18416440ba35ebb3cd9bc94"
     },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 673947,
@@ -398,11 +398,11 @@
     },
     "unified_state_vector_summary_v1.json": {
       "bytes": 559,
-      "sha256": "59bead115abd6cab77c3273824c60ab55a1f16259b0023522a3f4162e459e63e"
+      "sha256": "ef7e3c6584f81ecb6f145f9d93174ee269ea294ba516afa16b1a7d80803d3be7"
     },
     "unified_state_vector_v1.csv": {
       "bytes": 2629,
-      "sha256": "176780a67c7ed70624d0144d15466c171a652e6e8f2ff585e2c9346861dc75b0"
+      "sha256": "f06670dc4762e54bbc9a29f151a5f4628b7693c274ed1983a767a1e517473e65"
     },
     "vix_historical_collection_summary_v1.csv": {
       "bytes": 389,

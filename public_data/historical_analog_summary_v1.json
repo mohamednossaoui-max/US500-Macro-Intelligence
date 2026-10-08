@@ -1,7 +1,7 @@
 {
   "analog_engine_version": "HAE1.0",
   "state_vector_version": "USV1.0",
-  "context_date": "2026-10-07",
+  "context_date": "2026-10-08",
   "candidate_count": 56,
   "selected_analog_count": 9,
   "minimum_comparable_features": 7,

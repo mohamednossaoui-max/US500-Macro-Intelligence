@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-07",
+  "context_date": "2026-10-08",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-10-05",
-    "age_days": 2,
+    "age_days": 3,
     "economic_regime": "MIXED",
     "inflation_score": 0.5394965511237497,
     "labor_score": -0.025407330640432,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-07",
+    "as_of_date": "2026-10-08",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -329,7 +329,7 @@
   },
   "financial_stress": {
     "source_date": "2026-10-07",
-    "age_days": 0,
+    "age_days": 1,
     "composite_stress_score": 0.0205748359334967,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
     "vix": 15.01,
@@ -340,7 +340,7 @@
   },
   "event_news": {
     "source_date": "2026-10-07",
-    "age_days": 0,
+    "age_days": 1,
     "latest_published_at": "2026-10-07T18:00:00+00:00",
     "latest_title": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
     "latest_source": "Federal Reserve",
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 2,
-    "financial_stress_age_days": 0,
-    "event_news_age_days": 0,
+    "economic_age_days": 3,
+    "financial_stress_age_days": 1,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

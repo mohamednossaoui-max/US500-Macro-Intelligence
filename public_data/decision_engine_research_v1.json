@@ -1,14 +1,14 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-10-07",
+  "as_of_date": "2026-10-08",
   "state": "SUPPORTIVE",
-  "confidence": 0.75,
+  "confidence": 1.0,
   "confidence_type": "evidence_coverage",
-  "evidence_count": 3,
+  "evidence_count": 4,
   "supportive_count": 1,
   "contradictory_count": 0,
-  "mixed_count": 2,
+  "mixed_count": 3,
   "missing": [],
   "point_in_time_safe": true,
   "core_point_in_time_safe": true,
@@ -35,6 +35,13 @@
       "stance": "MIXED",
       "reason": "Economic regime is MIXED.",
       "value": "MIXED"
+    },
+    {
+      "source": "Financial Stress",
+      "category": "financial_stress",
+      "stance": "MIXED",
+      "reason": "Financial stress regime is ELEVATED_RESEARCH_STRESS.",
+      "value": "ELEVATED_RESEARCH_STRESS"
     },
     {
       "source": "Sentiment Engine",
