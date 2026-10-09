@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-10-08T12:04:20.587892+00:00",
-  "rows": 97,
+  "generated_at": "2026-10-09T11:39:17.450870+00:00",
+  "rows": 98,
   "source_counts": {
-    "OFFICIAL_RSS": 97
+    "OFFICIAL_RSS": 98
   },
   "topic_counts": {
     "growth": 63,
-    "fed": 31,
+    "fed": 32,
     "labor": 2,
     "inflation": 1
   },
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "ParseError('syntax error: line 1, column 0')",
+    "error": "HTTP 429",
     "query_requests": 1,
     "fallback_required": true
   },
@@ -156,6 +156,15 @@
         "description": "Minutes of the Board’s discount rate meetings on February 9 and March 18, 2026",
         "published_at": "2026-04-14T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260414a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+        "description": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+        "published_at": "2026-10-08T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261008a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -327,15 +336,6 @@
         "description": "Federal Reserve Board issues enforcement action with former employee of Banco Popular de Puerto Rico",
         "published_at": "2026-08-27T15:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20260827a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Minutes of the Board's discount rate meetings on July 20 and July 29, 2026",
-        "description": "Minutes of the Board&#39;s discount rate meetings on July 20 and July 29, 2026",
-        "published_at": "2026-08-25T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260825a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -773,6 +773,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Monthly Wholesale Trade: Sales and Inventories",
+        "description": "August 2026 sales of merchant wholesalers were $817.5 billion, up 1.8 percent (+/- 0.2 percent) from last month. End-of-month inventories were $964.2 billion, up 0.5 percent (+/- 0.2 percent) from last month.<p><br>August 2026: +0.5 % Change in Inventories<br>July 2026 (r): +1.4 % Change in Inventories<br></p>",
+        "published_at": "2026-10-08T14:00:00+00:00",
+        "url": "https://www.census.gov/wholesale/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "U.S. International Trade in Goods and Services",
         "description": "The nation's international trade deficit in goods and services increased to $105.6 billion in August from $92.8 billion in July (revised), as imports increased more than exports.<p><br>August 2026: 13.7° % Change<br>July 2026 (r): 30.4° % Change<br></p>",
         "published_at": "2026-10-06T12:30:00+00:00",
@@ -881,15 +890,6 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Monthly Wholesale Trade: Sales and Inventories",
-        "description": "July 2026 sales of merchant wholesalers were $801.3 billion, up 0.8 percent (+/- 0.4 percent) from last month. End-of-month inventories were $958.9 billion, up 1.3 percent (+/- 0.2 percent) from last month.<p><br>July 2026: +1.3 % Change in Inventories<br>June 2026 (r): +0.4 % Change in Inventories<br></p>",
-        "published_at": "2026-09-10T14:00:00+00:00",
-        "url": "https://www.census.gov/wholesale/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
         "title": "Quarterly Services Survey",
         "description": "U.S. selected services total revenue for the second quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,418.7 billion, an increase of 3.0 percent (+/- 0.4 percent) from the first quarter of 2026 and up 7.6 percent (+/- 0.6 percent) from the second quarter of 2025. The first quarter of 2026 to second quarter of 2026 percentage change was revised from the advance estimate of 3.1 percent (+/- 0.4 percent).<p><br>2nd Qtr 2026: +3.0 % Change<br>1st Qtr 2026 (r): +1.1 % Change<br></p>",
         "published_at": "2026-09-09T14:00:00+00:00",
@@ -973,12 +973,12 @@
     {
       "check": "minimum_dataset_rows",
       "pass": true,
-      "detail": "rows=97"
+      "detail": "rows=98"
     },
     {
       "check": "unique_event_ids",
       "pass": true,
-      "detail": "unique_ids=97"
+      "detail": "unique_ids=98"
     },
     {
       "check": "timestamps",

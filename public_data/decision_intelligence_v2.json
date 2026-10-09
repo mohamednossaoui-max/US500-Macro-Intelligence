@@ -1,8 +1,8 @@
 {
   "decision_intelligence_version": "DIV2.0",
-  "context_date": "2026-10-08",
+  "context_date": "2026-10-09",
   "decision_state": "SUPPORTIVE",
-  "current_environment": "Economic regime is MIXED: inflation +0.54, labor -0.03, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is ELEVATED_RESEARCH_STRESS; sentiment is NEUTRAL; technical regime is STRONG_BULLISH. Published Decision Engine state remains SUPPORTIVE.",
+  "current_environment": "Economic regime is MIXED: inflation +0.54, labor -0.02, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is LOW_RESEARCH_STRESS; sentiment is NEUTRAL; technical regime is STRONG_BULLISH. Published Decision Engine state remains SUPPORTIVE.",
   "what_changed": {
     "status": "UNAVAILABLE",
     "reason": "No prior canonical USV1.0 snapshot is published; change is not inferred from non-canonical history."
@@ -18,10 +18,10 @@
   "historical_analogs": {
     "count": 9,
     "closest_date": "2025-09-11",
-    "closest_similarity_pct": 76.8931,
+    "closest_similarity_pct": 76.6578,
     "closest_coverage_pct": 88.89,
-    "summary": "Stage 10 selected 9 independent analog regimes without using outcomes. Closest is 2025-09-11 with 76.89% similarity and 88.89% comparable CORE coverage.",
-    "key_differences": "economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | economic_inflation: hist=-0.0184961401602939, current=0.5394965511237497 | economic_labor: hist=-0.0317686710477259, current=-0.025407330640432"
+    "summary": "Stage 10 selected 9 independent analog regimes without using outcomes. Closest is 2025-09-11 with 76.66% similarity and 88.89% comparable CORE coverage.",
+    "key_differences": "economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | economic_inflation: hist=-0.0184961401602939, current=0.5394965511237497 | economic_labor: hist=-0.0317686710477259, current=-0.0246016158557906"
   },
   "historical_market_reaction": {
     "summary": "Across the locked analog set, historical median US500 return was +5.44% at 60 trading days (66.7% positive) and +7.45% at 120 trading days (100.0% positive). Outcomes were dispersed: 60D range -14.46% to +13.68%. These are conditional historical outcomes, not expected returns or forecasts.",
@@ -78,15 +78,15 @@
     "selection_locked": true,
     "outcomes_used_in_selection": false
   },
-  "important_differences": "economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | economic_inflation: hist=-0.0184961401602939, current=0.5394965511237497 | economic_labor: hist=-0.0317686710477259, current=-0.025407330640432",
+  "important_differences": "economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | economic_inflation: hist=-0.0184961401602939, current=0.5394965511237497 | economic_labor: hist=-0.0317686710477259, current=-0.0246016158557906",
   "risks_and_limitations": [
-    "Closest analog similarity is 76.89%, not a close match.",
+    "Closest analog similarity is 76.66%, not a close match.",
     "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
     "Overall evidence PIT status is PIT_LIMITED; CORE PIT remains True.",
     "CONTEXTUAL evidence does not alter the Decision Engine state.",
     "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
   ],
-  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (76.89%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
+  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (76.66%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
   "research_only": true,
   "forecast_generated": false,
   "trading_signal_generated": false,

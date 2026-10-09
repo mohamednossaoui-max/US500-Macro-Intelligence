@@ -1,11 +1,11 @@
 {
-  "as_of_date": "2026-10-08",
+  "as_of_date": "2026-10-09",
   "evidence_total": 42,
   "available": 42,
   "eligible": 33,
   "pit_safe_pct": 78.57,
   "current_pct": 97.62,
-  "high_quality_pct": 26.19,
+  "high_quality_pct": 23.81,
   "modules": {
     "CROSS_ASSET": 8,
     "ECONOMIC": 14,

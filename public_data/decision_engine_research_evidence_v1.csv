@@ -1,5 +1,5 @@
 source,category,stance,reason,value
 Macro Context,economic,MIXED,Economic regime is MIXED.,MIXED
-Financial Stress,financial_stress,MIXED,Financial stress regime is ELEVATED_RESEARCH_STRESS.,ELEVATED_RESEARCH_STRESS
+Financial Stress,financial_stress,SUPPORTIVE,Financial stress regime is LOW_RESEARCH_STRESS.,LOW_RESEARCH_STRESS
 Sentiment Engine,sentiment,MIXED,Unified sentiment regime is NEUTRAL.,NEUTRAL
 Technical Intelligence,technical,SUPPORTIVE,Technical research regime is STRONG_BULLISH.,STRONG_BULLISH

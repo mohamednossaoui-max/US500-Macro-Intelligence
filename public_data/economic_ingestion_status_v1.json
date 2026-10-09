@@ -1,7 +1,7 @@
 {
   "provider": "official",
-  "as_of_date": "2026-10-08",
-  "retrieved_at": "2026-10-08T12:00:57.587820+00:00",
+  "as_of_date": "2026-10-09",
+  "retrieved_at": "2026-10-09T11:34:32.379177+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -259,14 +259,14 @@
     {
       "indicator": "INITIAL_JOBLESS_CLAIMS",
       "agency": "DOL",
-      "official_latest_reference_period": "Week ending September 26, 2026",
-      "official_release_date": "2026-10-01",
+      "official_latest_reference_period": "Week ending October 03, 2026",
+      "official_release_date": "2026-10-08",
       "official_value": 197000.0,
-      "canonical_latest_reference_period": "Week ending September 26, 2026",
-      "canonical_release_date": "2026-10-01",
+      "canonical_latest_reference_period": "Week ending October 03, 2026",
+      "canonical_release_date": "2026-10-08",
       "canonical_value": 197000.0,
       "status": "CURRENT",
-      "revision_detected": false,
+      "revision_detected": true,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "DOL",
@@ -276,8 +276,8 @@
       "before_merge_canonical_latest_reference_period": "Week ending September 26, 2026",
       "before_merge_canonical_release_date": "2026-10-01",
       "before_merge_canonical_value": 197000.0,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "ingestion_status": "NEW_RELEASE",
+      "ingestion_reason": "New official release/vintage requires canonical merge"
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",
