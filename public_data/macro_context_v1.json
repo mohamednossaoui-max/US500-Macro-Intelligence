@@ -339,10 +339,10 @@
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-10-08",
-    "age_days": 1,
-    "latest_published_at": "2026-10-08T20:30:00+00:00",
-    "latest_title": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+    "source_date": "2026-10-09",
+    "age_days": 0,
+    "latest_published_at": "2026-10-09T14:00:00+00:00",
+    "latest_title": "Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
     "latest_source": "Federal Reserve",
     "latest_topic": "fed",
     "events_available": 98,
@@ -357,7 +357,7 @@
   "temporal_alignment": {
     "economic_age_days": 0,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 1,
+    "event_news_age_days": 0,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
