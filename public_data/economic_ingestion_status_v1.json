@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-10-09",
-  "retrieved_at": "2026-10-09T11:34:32.379177+00:00",
+  "retrieved_at": "2026-10-09T11:53:10.902962+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -266,18 +266,18 @@
       "canonical_release_date": "2026-10-08",
       "canonical_value": 197000.0,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "DOL",
       "metadata_verification": null,
       "metadata_source_url": null,
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "Week ending September 26, 2026",
-      "before_merge_canonical_release_date": "2026-10-01",
+      "before_merge_canonical_latest_reference_period": "Week ending October 03, 2026",
+      "before_merge_canonical_release_date": "2026-10-08",
       "before_merge_canonical_value": 197000.0,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",

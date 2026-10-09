@@ -106,7 +106,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "85bd6a29f585f3e85810903fb37b9aa7f2bb4f99fd4ac69939b0b7bd38ba86fa"
+      "sha256": "368791804470ea7c5aea594d764b112cc7f6f1e40c49a078f51d5dc1e66d2336"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 911,
@@ -125,8 +125,8 @@
       "sha256": "c04ab2609fec829b289f665da5bef7be4d8e938069b97d3867ac3875c4699071"
     },
     "economic_ingestion_status_v1.json": {
-      "bytes": 14352,
-      "sha256": "45ae9626273562d76d4bdb56fa5a95e4b4940dbc2a1a53986b1d8db65a36ceed"
+      "bytes": 14344,
+      "sha256": "55133af8612058a3fbf9321da839d444eae1078b0f2e5e3442ab5229665dc4d5"
     },
     "economic_regime_events_v1.csv": {
       "bytes": 104216,
@@ -146,15 +146,15 @@
     },
     "event_news_research_summary_v2.json": {
       "bytes": 1004,
-      "sha256": "46f52f9829b2a71960ba7c4fc39c6c1bfa762cbb5cacdcd65e301cd55dfe5825"
+      "sha256": "f33333ebec87ce1dd1378057027ffea1df434c64200633379164370ed927cfd2"
     },
     "event_news_research_v2.csv": {
       "bytes": 46297,
       "sha256": "fc22b98922818d3072e5749383d266f6ed1c7b738dff8d7238641a399a559490"
     },
     "event_news_validation_v2.json": {
-      "bytes": 76277,
-      "sha256": "6e0da8e9c5180a4e06010174a76b1ba7df26b410bc62a6c42e789e6403c5e6b6"
+      "bytes": 76313,
+      "sha256": "37ac2158e85a76762c68aa120543dc1d636b1231a96bb3b30812834f42b831d7"
     },
     "fed_intelligence_output_v1.json": {
       "bytes": 15261,
@@ -182,7 +182,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "939d2341f9929b1ddd823fb51b710f753f6529dfb72cd9e1759a684b8eb1e427"
+      "sha256": "42fbdd34895857ed74cdf85ea34aec59b4b8835982cda0ac34e430af8154b749"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1777272,
@@ -377,12 +377,12 @@
       "sha256": "ad651879f92eb019496ae00d0cc106fc66cbab900e41f6bf2f90e6a0a1dfd134"
     },
     "system_health_layers_v1.json": {
-      "bytes": 12901,
-      "sha256": "fc14a44c1fac172f0d5e7de8d0581373b3cb93f7ea6e6e04ecfdbf4a7bf82f44"
+      "bytes": 12909,
+      "sha256": "b4c8ff04ca1118aaaadaef8909ce3256f015a565c67af1fa68af5227ad3dcfb4"
     },
     "system_health_summary_v1.json": {
       "bytes": 214,
-      "sha256": "7354a23f429525a96aab09bca60aa08c81229529503a3ed11c1b3598399eeabd"
+      "sha256": "28ca4820e9322b9ae06cec0b198f9bed98e2e3ba25d3fde31164073ac26bc2f6"
     },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 674737,
