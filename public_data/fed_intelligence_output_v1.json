@@ -1,8 +1,8 @@
 {
   "available": true,
-  "as_of_date": "2026-10-08",
+  "as_of_date": "2026-10-09",
   "latest_fomc": "2026-09-16",
-  "current_date": "2026-10-08",
+  "current_date": "2026-10-09",
   "fed_chair": "Kevin Warsh",
   "statement": {
     "name": "FOMC Statement",
@@ -571,7 +571,7 @@
     "research_only": true,
     "forecast": false,
     "trading_signal": false,
-    "as_of_date": "2026-10-08",
+    "as_of_date": "2026-10-09",
     "communication_documents_available": 3,
     "sep_available": true,
     "beige_book_available": true,
