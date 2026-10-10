@@ -1,7 +1,7 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-10-09",
+  "as_of_date": "2026-10-10",
   "state": "SUPPORTIVE",
   "confidence": 1.0,
   "confidence_type": "evidence_coverage",
@@ -15,7 +15,7 @@
   "overall_evidence_quality": "MEDIUM",
   "overall_evidence_coverage_pct": 100.0,
   "overall_evidence_freshness": "AGING",
-  "overall_evidence_freshness_current_pct": 97.6,
+  "overall_evidence_freshness_current_pct": 95.2,
   "overall_evidence_pit_status": "PIT_LIMITED",
   "overall_evidence_pit_safe_pct": 78.6,
   "research_only": true,

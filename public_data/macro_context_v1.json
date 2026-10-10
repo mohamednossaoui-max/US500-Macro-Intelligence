@@ -1,12 +1,12 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-09",
+  "context_date": "2026-10-10",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
-    "source_date": "2026-10-09",
+    "source_date": "2026-10-10",
     "age_days": 0,
     "economic_regime": "MIXED",
     "inflation_score": 0.5394965511237497,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-09",
+    "as_of_date": "2026-10-10",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -329,7 +329,7 @@
   },
   "financial_stress": {
     "source_date": "2026-10-08",
-    "age_days": 1,
+    "age_days": 2,
     "composite_stress_score": -0.0249290022454353,
     "research_regime": "LOW_RESEARCH_STRESS",
     "vix": 15.41,
@@ -340,7 +340,7 @@
   },
   "event_news": {
     "source_date": "2026-10-09",
-    "age_days": 0,
+    "age_days": 1,
     "latest_published_at": "2026-10-09T14:00:00+00:00",
     "latest_title": "Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
     "latest_source": "Federal Reserve",
@@ -356,8 +356,8 @@
   },
   "temporal_alignment": {
     "economic_age_days": 0,
-    "financial_stress_age_days": 1,
-    "event_news_age_days": 0,
+    "financial_stress_age_days": 2,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
