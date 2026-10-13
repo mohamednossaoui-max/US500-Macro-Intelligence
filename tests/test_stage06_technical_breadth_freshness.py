@@ -31,10 +31,19 @@ def test_technical_uses_research_context_for_freshness_clock():
 
 
 def test_technical_stale_data_is_not_decision_eligible(tmp_path):
-    pd.DataFrame([{'context_date':'2026-10-20'}]).to_csv(tmp_path/'research_context_summary_v1.csv', index=False)
     src = pd.read_csv(PUBLIC/'technical_intelligence_research_v1.csv')
+    latest_available = pd.to_datetime(src['availability_date'], errors='coerce').max()
+    assert pd.notna(latest_available)
+    # DAILY evidence becomes STALE after 7 calendar days. Keep this scenario
+    # stale even when the published Technical dataset is refreshed.
+    context_date = (latest_available.normalize() + pd.Timedelta(days=8)).date().isoformat()
+    pd.DataFrame([{'context_date': context_date}]).to_csv(
+        tmp_path/'research_context_summary_v1.csv', index=False
+    )
     src.to_csv(tmp_path/'technical_intelligence_research_v1.csv', index=False)
     rows = _one('TECHNICAL', technical_adapter.build(tmp_path))
+    assert len(rows) == 3
+    assert {r['age_days'] for r in rows} == {8}
     assert all(r['freshness_status'] == 'STALE' for r in rows)
     assert not any(r['decision_engine_eligible'] for r in rows)
     assert {r['exclusion_reason'] for r in rows} == {'STALE_EVIDENCE'}
