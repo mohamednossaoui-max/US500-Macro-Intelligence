@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import io
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from fed_beige_evidence_v1 import (
+    load_reports, metadata as beige_metadata, comparison as beige_comparison,
+    snapshot_quality, parse_date, official,
+)
 
 try:
     from pypdf import PdfReader
@@ -174,6 +178,20 @@ def minutes_publication_date(anchor, meeting_date):
                 return None
         node = node.parent
     return None
+
+
+def explicit_publication_date(text: str) -> Optional[str]:
+    """Meeting/title dates and Last Update are not publication evidence."""
+    match = re.search(
+        r"(?:For release\b.{0,120}?|(?:Published|Released):?\s+)"
+        r"([A-Za-z]+\s+\d{1,2},\s+\d{4})", text or "", re.I,
+    )
+    if not match:
+        return None
+    try:
+        return datetime.strptime(match[1], "%B %d, %Y").date().isoformat()
+    except ValueError:
+        return None
 
 
 def discover_links() -> Dict[str, Dict[date, str]]:
@@ -358,6 +376,7 @@ def press_page_data(url: str) -> Dict:
 
         if (
             href.lower().endswith(".pdf")
+            and official(href)
             and (
                 "transcript" in label
                 or "press conference" in label
@@ -366,11 +385,8 @@ def press_page_data(url: str) -> Dict:
             pdf = href
             break
 
-    text = (
-        pdf_text(pdf)
-        if pdf
-        else clean_html(r.text)
-    )
+    # A video/landing page is not a transcript and must never become neutral evidence.
+    text = pdf_text(pdf) if pdf else ""
 
     return {
         "page_url": url,
@@ -1174,198 +1190,10 @@ def build_deep_fed_analysis(
 # PHASE 2C — BEIGE BOOK
 # ============================================================
 
-def discover_beige_book(
-    as_of: Optional[date] = None
-) -> Dict:
-
-    """
-    Discover the latest official Beige Book.
-
-    The Fed archive uses issue-month URLs such as:
-    beigebook202608-summary.htm
-
-    The August 2026 issue was published on
-    September 2, 2026.
-    """
-
-    as_of = as_of or date.today()
-
-    result = {
-        "available": False,
-        "issue_date": None,
-        "publication_date": None,
-        "title": None,
-        "url": None,
-        "text": ""
-    }
-
-    r = get(BEIGE_BOOK)
-
-    if r is None:
-        return result
-
-    soup = BeautifulSoup(
-        r.text,
-        "html.parser"
-    )
-
-    candidates = []
-
-    for a in soup.find_all("a", href=True):
-
-        href = a.get("href", "")
-        label = a.get_text(
-            " ",
-            strip=True
-        )
-
-        full_url = absolute(href)
-
-        m = re.search(
-            r"beigebook(20\d{4})",
-            href.lower()
-        )
-
-        if not m:
-            continue
-
-        issue = m.group(1)
-
-        try:
-            issue_year = int(issue[:4])
-            issue_month = int(issue[4:6])
-
-            issue_date = date(
-                issue_year,
-                issue_month,
-                1
-            )
-
-        except Exception:
-            continue
-
-        # Never select an issue that is clearly in the future.
-        if issue_date > date(
-            as_of.year,
-            as_of.month,
-            1
-        ):
-            continue
-
-        candidates.append({
-            "issue_date": issue_date,
-            "url": full_url,
-            "label": label,
-            "href": href
-        })
-
-    if not candidates:
-        return result
-
-    latest_issue = max(
-        x["issue_date"]
-        for x in candidates
-    )
-
-    same_issue = [
-        x for x in candidates
-        if x["issue_date"] == latest_issue
-    ]
-
-    # Prefer National Summary.
-    national = None
-
-    for item in same_issue:
-
-        text = (
-            item["label"]
-            + " "
-            + item["href"]
-        ).lower()
-
-        if "summary" in text or "national" in text:
-            national = item
-            break
-
-    # If the archive did not expose a summary link,
-    # use the predictable official summary URL.
-    if national is None:
-
-        predictable = (
-            f"{FED}/monetarypolicy/"
-            f"beigebook{latest_issue.year}"
-            f"{latest_issue.month:02d}-summary.htm"
-        )
-
-        response = get(predictable)
-
-        if response is not None:
-
-            national = {
-                "issue_date": latest_issue,
-                "url": predictable,
-                "label": "National Summary",
-                "href": predictable
-            }
-
-    if national is None:
-        return result
-
-    text = fetch_document(
-        national["url"]
-    )
-
-    if not text:
-        return result
-
-    # The publication date can be extracted from
-    # the official page when available.
-    publication_date = None
-
-    date_patterns = [
-        r"Last Update:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
-        r"Published:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})"
-    ]
-
-    for pattern in date_patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.I
-        )
-
-        if match:
-
-            try:
-
-                publication_date = datetime.strptime(
-                    match.group(1),
-                    "%B %d, %Y"
-                ).date()
-
-                break
-
-            except Exception:
-                pass
-
-    result.update({
-        "available": True,
-        "issue_date": latest_issue.isoformat(),
-        "publication_date": (
-            publication_date.isoformat()
-            if publication_date
-            else None
-        ),
-        "title": (
-            f"Beige Book - "
-            f"{latest_issue.strftime('%B %Y')}"
-        ),
-        "url": national["url"],
-        "text": text
-    })
-
-    return result
+def discover_beige_book(as_of: Optional[date] = None) -> Dict:
+    """Compatibility entry point; release date comes from the official index."""
+    current, _ = load_reports(get, as_of or date.today())
+    return current
 
 
 # ============================================================
@@ -1435,7 +1263,11 @@ BEIGE_DIMENSIONS = {
             "input costs increased",
             "higher energy prices",
             "higher fuel prices",
-            "tariff-related impacts"
+            "tariff-related impacts",
+            "pace of price increases picked up",
+            "price growth as robust",
+            "elevated diesel prices",
+            "higher oil prices"
         ]
     },
 
@@ -1516,7 +1348,7 @@ def beige_dimension_signal(
 
         return {
             "score": 0,
-            "score_100": 50.0,
+            "score_100": None,
             "classification": "UNAVAILABLE",
             "positive_hits": 0,
             "negative_hits": 0
@@ -1526,15 +1358,12 @@ def beige_dimension_signal(
 
     cfg = BEIGE_DIMENSIONS[dimension]
 
-    positive_hits = sum(
-        low.count(term)
-        for term in cfg["positive"]
-    )
+    def hits(terms):
+        pattern = "|".join(re.escape(t) for t in sorted(terms, key=len, reverse=True))
+        return len(re.findall(r"\b(?:" + pattern + r")\b", low))
 
-    negative_hits = sum(
-        low.count(term)
-        for term in cfg["negative"]
-    )
+    positive_hits = hits(cfg["positive"])
+    negative_hits = hits(cfg["negative"])
 
     raw = positive_hits - negative_hits
 
@@ -1548,7 +1377,11 @@ def beige_dimension_signal(
         1
     )
 
-    if raw >= 4:
+    if positive_hits + negative_hits == 0:
+        classification = "UNRECOGNIZED"
+        score_100 = None
+
+    elif raw >= 4:
         classification = "POSITIVE"
 
     elif raw >= 1:
@@ -1618,8 +1451,13 @@ def build_beige_analysis(
 
     weighted = 0
     total_weight = 0
+    recognized_dimensions = 0
 
     for dimension, weight in weights.items():
+
+        if dimensions[dimension]["score_100"] is None:
+            continue
+        recognized_dimensions += 1
 
         weighted += (
             dimensions[dimension]["score_100"]
@@ -1628,28 +1466,32 @@ def build_beige_analysis(
 
         total_weight += weight
 
+    # Do not manufacture a neutral aggregate out of mostly unrecognized wording.
     score = (
         weighted / total_weight
-        if total_weight
-        else 50.0
+        if total_weight >= 50 and recognized_dimensions >= 3
+        else None
     )
 
     # The score is an analytical balance,
     # NOT a probability and NOT a trading signal.
-    if score >= 65:
-        overall = "MODERATELY HAWKISH / STRONG ACTIVITY"
+    if score is None:
+        overall = "INSUFFICIENT KEYWORD COVERAGE"
+
+    elif score >= 65:
+        overall = "POSITIVE KEYWORD BALANCE"
 
     elif score >= 56:
-        overall = "SLIGHTLY HAWKISH"
+        overall = "SLIGHTLY POSITIVE KEYWORD BALANCE"
 
     elif score >= 45:
-        overall = "NEUTRAL"
+        overall = "MIXED KEYWORD BALANCE"
 
     elif score >= 35:
-        overall = "SLIGHTLY DOVISH"
+        overall = "SLIGHTLY NEGATIVE KEYWORD BALANCE"
 
     else:
-        overall = "MODERATELY DOVISH"
+        overall = "NEGATIVE KEYWORD BALANCE"
 
     reasons = []
 
@@ -1658,19 +1500,22 @@ def build_beige_analysis(
         reasons.append(
             f"- {dimension.replace('_', ' ').capitalize()}: "
             f"{data['classification']} "
-            f"({data['score_100']:.1f}/100)"
+            + (f"({data['score_100']:.1f}/100)" if data['score_100'] is not None else "(not scored)")
         )
 
     return {
         "available": True,
-        "score": round(score, 1),
+        "score": round(score, 1) if score is not None else None,
+        "recognized_weight_percent": total_weight,
+        "recognized_dimensions": recognized_dimensions,
         "tone": overall,
         "dimensions": dimensions,
         "reasons": reasons,
         "method": (
-            "Heuristic analytical score based on "
+            "Heuristic keyword balance (not a policy stance) based on "
             "directional language in the official "
-            "National Summary. Not a probability."
+            "National Summary. Unrecognized dimensions are excluded; an aggregate requires "
+            "at least 3 dimensions and 50% of preset weight. Not a probability."
         )
     }
 
@@ -1683,7 +1528,9 @@ def latest_document_date(links: Dict[str, Dict[date, str]], kind: str, as_of: da
     the minutes are published in the current snapshot; keeping the meeting date
     separate prevents them from being mislabeled as minutes for a newer meeting.
     """
-    dates = [d for d in links.get(kind, {}) if d <= as_of]
+    publications = links.get("minutes_publication_dates", {}) if kind == "minutes" else {}
+    dates = [d for d in links.get(kind, {}) if d <= as_of and
+             (not publications.get(d) or (parse_date(publications[d]) and parse_date(publications[d]) <= as_of))]
     return max(dates) if dates else None
 
 
@@ -1731,9 +1578,13 @@ def fed_quality_contract(data: Dict, as_of: date) -> Dict:
         gate, quality, reason = "DEGRADED", "MEDIUM", "LATEST_MINUTES_LAG_LATEST_FOMC"
     else:
         gate, quality, reason = "ELIGIBLE", "HIGH", None
+    temporal = snapshot_quality(data, as_of)
+    if reason is None and (temporal["freshness_status"] != "CURRENT" or temporal["pit_status"] != "DATE_CHECKED"
+                           or not data.get("beige_comparison", {}).get("available")):
+        gate, quality, reason = "DEGRADED", "MEDIUM", "EVIDENCE_DATES_OR_COMPARISON_UNVERIFIED"
     return {
         "quality_gate": gate, "quality_status": quality, "quality_reason": reason,
-        "pit_status": "PIT_SAFE", "freshness_status": "CURRENT",
+        **temporal,
         "research_only": True, "forecast": False, "trading_signal": False,
         "as_of_date": as_of.isoformat(), "communication_documents_available": available_docs,
         "sep_available": sep_ok, "beige_book_available": beige_ok,
@@ -1877,18 +1728,18 @@ def build_fed_intelligence() -> Dict:
     # PHASE 2C
     # --------------------------------------------------------
 
-    beige = discover_beige_book(
-        as_of=today
-    )
+    beige, previous_beige = load_reports(get, today)
 
     beige_analysis = build_beige_analysis(
         beige.get("text", "")
     )
 
+    previous_beige_analysis = build_beige_analysis(previous_beige.get("text", ""))
     result = {
 
         "available": True,
-
+        "schema_version": "fed-evidence-2",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "as_of_date": today.isoformat(),
 
         "latest_fomc": meeting.isoformat(),
@@ -2018,18 +1869,32 @@ def build_fed_intelligence() -> Dict:
         # PHASE 2C
         # ----------------------------------------------------
 
-        "beige_book": {
-            "available": beige["available"],
-            "issue_date": beige["issue_date"],
-            "publication_date": beige[
-                "publication_date"
-            ],
-            "title": beige["title"],
-            "url": beige["url"]
-        },
-
-        "beige_analysis": beige_analysis
+        "beige_book": beige_metadata(beige),
+        "beige_analysis": beige_analysis,
+        "beige_comparison": beige_comparison(beige, previous_beige, beige_analysis, previous_beige_analysis),
     }
+    # Current-snapshot discovery verifies latest identifiers. Dates are recorded
+    # separately, and future/missing dates are not silently labeled PIT-safe.
+    def event_record(available, event, published, source):
+        return {"available": available, "meeting_date": event,
+                "publication_date": published, "publication_date_source": source,
+                "latest_publication_date": published, "catalog_verified": True}
+    result["evidence_dates"] = {
+        "statement": event_record(bool(statement_text), meeting.isoformat(), explicit_publication_date(statement_text), statement_url),
+        "minutes": event_record(bool(minutes_text), result["minutes_meeting_date"], result["minutes_publication_date"], CALENDAR),
+        "chair_press": event_record(bool(press.get("text")), meeting.isoformat(), None, press.get("pdf_url")),
+        "sep": event_record(bool(current_sep.get("available")), result["latest_sep_date"], None, current_sep.get("url")),
+        "beige_book": beige_metadata(beige),
+    }
+    if current_sep.get("available"):
+        sep_publication = explicit_publication_date(fetch_document(current_sep.get("url", "")))
+        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication)
+    # A transcript's meeting date is not evidence of its publication date.
+    # Require an explicit publication/release label; otherwise retain UNKNOWN.
+    if press.get("text"):
+        published = explicit_publication_date(press["text"])
+        result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published)
+
     result["quality"] = fed_quality_contract(result, today)
     return result
 
@@ -2183,7 +2048,7 @@ def fed_summary(
 
         lines.append(
             f"Issue: "
-            f"{beige.get('issue_date')}"
+            f"{beige.get('issue_month')}"
         )
 
         lines.append(

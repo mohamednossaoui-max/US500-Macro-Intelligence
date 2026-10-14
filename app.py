@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from fed_snapshot_ui_v1 import load_snapshot, display_quality, issue_month
 from economic_indicator_details_v1 import card_details
 from economic_observation_order_v1 import latest as latest_economic_observation
 from ath_pullback_context_ui_v1 import render_ath_pullback_context
@@ -297,6 +298,11 @@ def load_json(filename: str) -> tuple[Optional[Any], str]:
 
 def load_named(name: str) -> tuple[Any, str]:
     filename = DATASETS[name]
+    if name == "Fed Intelligence":
+        return load_snapshot(
+            PUBLIC_DATA / filename, f"{RAW_BASE}/{filename}",
+            lambda url: requests.get(url, headers=HEADERS, timeout=15),
+        )
     if filename.endswith(".json"):
         return load_json(filename)
     return load_csv(filename)
@@ -992,6 +998,8 @@ def economic() -> None:
 
 def fed() -> None:
     st.header("Fed Intelligence")
+    if st.button("Reload Fed snapshot", key="reload_fed_snapshot"):
+        st.rerun()
     obj, src = load_named("Fed Intelligence")
 
     if not isinstance(obj, dict) or not obj.get("available", False):
@@ -1057,7 +1065,7 @@ def fed() -> None:
     changes.sort(reverse=True, key=lambda x: x[0])
 
     # PATCH 4.1 — compact decision brief; presentation only.
-    quality = obj.get("quality") if isinstance(obj.get("quality"), dict) else {}
+    quality = display_quality(obj)
     biggest = changes[0] if changes else None
     biggest_text = "No comparable SEP move"
     if biggest:
@@ -1331,11 +1339,54 @@ def fed() -> None:
     else:
         beige_cols = st.columns(4)
         for col, (label, value) in zip(beige_cols, [
-            ("Issue", beige.get("issue_date")), ("Published", beige.get("publication_date")),
-            ("Tone", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
+            ("Issue month", issue_month(beige)), ("Published", beige.get("publication_date")),
+            ("Keyword balance", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
         ]):
             with col:
                 card(label, value)
+        st.caption(f"Information collected through: {fmt(beige.get('information_cutoff_date'))}. "
+                   f"Retrieved: {fmt(beige.get('retrieved_at'))}.")
+        st.caption("Context Score is a keyword balance, not the Fed's policy stance. "
+                   "Zero matches mean the wording was not recognized; they do not prove neutral conditions.")
+        if beige_analysis.get("score") is None:
+            st.info("Context Score is withheld because keyword coverage is insufficient. "
+                    "Use the reported evidence and comparison below.")
+        st.caption(f"Recognized keyword weight: {fmt(beige_analysis.get('recognized_weight_percent'))}%. "
+                   "This measures parser coverage, not economic confidence.")
+        comp = obj.get("beige_comparison") or {}
+        if comp.get("available"):
+            prior = comp.get("previous") or {}
+            st.markdown("**Beige Book — What changed?**")
+            st.caption(f"Published: {fmt(prior.get('publication_date'))} → {fmt(beige.get('publication_date'))}. "
+                       f"Information cutoffs: {fmt(prior.get('information_cutoff_date'))} → "
+                       f"{fmt(beige.get('information_cutoff_date'))}.")
+            labels_beige = {
+                "districts_with_accelerating_prices": "Districts with faster price increases",
+                "districts_with_robust_prices": "Districts with robust price growth",
+                "districts_with_growth": "Districts reporting economic growth",
+                "employment_modest": "Districts with modest employment gains",
+                "employment_slight": "Districts with slight employment gains",
+                "employment_unchanged": "Districts with unchanged employment",
+            }
+            for key, label in labels_beige.items():
+                change = (comp.get("changes") or {}).get(key)
+                if change:
+                    st.write(f"**{label}:** {change['previous']} → {change['current']} "
+                             f"({change['change']:+d})")
+            with st.expander("Official reported evidence — previous and current"):
+                for key, label in [("consumer_spending_evidence", "Consumer spending"),
+                                   ("credit_evidence", "Credit and financial conditions"),
+                                   ("price_evidence", "Price pressures")]:
+                    st.markdown(f"**{label}**")
+                    for side in ("previous", "current"):
+                        evidence = (comp.get(f"{side}_facts") or {}).get(key, [])
+                        st.write(f"{side.title()}: " + (" ".join(evidence) if evidence else
+                                 "No supported sentence extracted; no conclusion of unchanged conditions."))
+                if prior.get("url"):
+                    st.markdown(f"[Previous official Beige Book]({prior['url']})")
+            st.caption(comp.get("interpretation", ""))
+        else:
+            st.warning("Previous/current Beige Book comparison is unavailable. No unchanged conclusion is inferred.")
         dimensions = beige_analysis.get("dimensions")
         if isinstance(dimensions, dict) and dimensions:
             with st.expander("Beige Book dimension detail"):
@@ -1350,6 +1401,7 @@ def fed() -> None:
             st.markdown(f"[Official Beige Book source]({beige.get('url')})")
         st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
 
+    st.caption(f"Snapshot generated: {fmt(obj.get('generated_at'))} · {src}")
     st.subheader("Fed Evidence Quality")
     qcols = st.columns(4)
     for col, (label, value) in zip(qcols, [
@@ -1360,6 +1412,9 @@ def fed() -> None:
     ]):
         with col:
             card(label, value)
+    st.caption(quality.get("pit_scope", ""))
+    with st.expander("Document freshness checks"):
+        st.json(quality.get("document_checks", {}))
     if quality.get("quality_reason"):
         st.caption(f"Quality note: {quality.get('quality_reason')}. Quality metadata does not alter the Fed analytical score.")
 

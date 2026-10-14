@@ -177,7 +177,7 @@ def test_fed_quality_contract_marks_published_prior_meeting_minutes_as_lagged():
     q = fed.fed_quality_contract(data, fed.date(2026, 9, 27))
     assert q["quality_gate"] == "DEGRADED"
     assert q["quality_reason"] == "LATEST_MINUTES_LAG_LATEST_FOMC"
-    assert q["pit_status"] == "PIT_SAFE"
+    assert q["pit_status"] == "UNKNOWN"  # Lag status alone does not verify publication dates.
 
 
 def test_fed_ui_labels_lagged_minutes_without_relabeling_them_current():

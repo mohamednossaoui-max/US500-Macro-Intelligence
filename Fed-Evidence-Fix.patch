@@ -1,0 +1,1193 @@
+diff --git a/.github/workflows/test-fed.yml b/.github/workflows/test-fed.yml
+index 9fe6ed3..602cb60 100644
+--- a/.github/workflows/test-fed.yml
++++ b/.github/workflows/test-fed.yml
+@@ -39,7 +39,7 @@ jobs:
+       # ------------------------------------------------------
+       - name: Run PR-05 Fed Intelligence tests
+         run: |
+-          python -m pytest -q tests/test_fed_intelligence.py
++          python -m pytest -q tests/test_fed_intelligence.py tests/test_fed_communication_dates_v1.py tests/test_fed_beige_evidence_v1.py tests/test_publication_integrity.py tests/test_point_in_time_integrity.py
+ 
+       # ------------------------------------------------------
+       # Run existing Fed Intelligence engine
+diff --git a/app.py b/app.py
+index 112839f..19f2e91 100644
+--- a/app.py
++++ b/app.py
+@@ -12,6 +12,7 @@ import pandas as pd
+ import requests
+ import streamlit as st
+ 
++from fed_snapshot_ui_v1 import load_snapshot, display_quality, issue_month
+ from economic_indicator_details_v1 import card_details
+ from economic_observation_order_v1 import latest as latest_economic_observation
+ from ath_pullback_context_ui_v1 import render_ath_pullback_context
+@@ -297,6 +298,11 @@ def load_json(filename: str) -> tuple[Optional[Any], str]:
+ 
+ def load_named(name: str) -> tuple[Any, str]:
+     filename = DATASETS[name]
++    if name == "Fed Intelligence":
++        return load_snapshot(
++            PUBLIC_DATA / filename, f"{RAW_BASE}/{filename}",
++            lambda url: requests.get(url, headers=HEADERS, timeout=15),
++        )
+     if filename.endswith(".json"):
+         return load_json(filename)
+     return load_csv(filename)
+@@ -992,6 +998,8 @@ def economic() -> None:
+ 
+ def fed() -> None:
+     st.header("Fed Intelligence")
++    if st.button("Reload Fed snapshot", key="reload_fed_snapshot"):
++        st.rerun()
+     obj, src = load_named("Fed Intelligence")
+ 
+     if not isinstance(obj, dict) or not obj.get("available", False):
+@@ -1057,7 +1065,7 @@ def fed() -> None:
+     changes.sort(reverse=True, key=lambda x: x[0])
+ 
+     # PATCH 4.1 — compact decision brief; presentation only.
+-    quality = obj.get("quality") if isinstance(obj.get("quality"), dict) else {}
++    quality = display_quality(obj)
+     biggest = changes[0] if changes else None
+     biggest_text = "No comparable SEP move"
+     if biggest:
+@@ -1331,11 +1339,54 @@ def fed() -> None:
+     else:
+         beige_cols = st.columns(4)
+         for col, (label, value) in zip(beige_cols, [
+-            ("Issue", beige.get("issue_date")), ("Published", beige.get("publication_date")),
+-            ("Tone", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
++            ("Issue month", issue_month(beige)), ("Published", beige.get("publication_date")),
++            ("Keyword balance", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
+         ]):
+             with col:
+                 card(label, value)
++        st.caption(f"Information collected through: {fmt(beige.get('information_cutoff_date'))}. "
++                   f"Retrieved: {fmt(beige.get('retrieved_at'))}.")
++        st.caption("Context Score is a keyword balance, not the Fed's policy stance. "
++                   "Zero matches mean the wording was not recognized; they do not prove neutral conditions.")
++        if beige_analysis.get("score") is None:
++            st.info("Context Score is withheld because keyword coverage is insufficient. "
++                    "Use the reported evidence and comparison below.")
++        st.caption(f"Recognized keyword weight: {fmt(beige_analysis.get('recognized_weight_percent'))}%. "
++                   "This measures parser coverage, not economic confidence.")
++        comp = obj.get("beige_comparison") or {}
++        if comp.get("available"):
++            prior = comp.get("previous") or {}
++            st.markdown("**Beige Book — What changed?**")
++            st.caption(f"Published: {fmt(prior.get('publication_date'))} → {fmt(beige.get('publication_date'))}. "
++                       f"Information cutoffs: {fmt(prior.get('information_cutoff_date'))} → "
++                       f"{fmt(beige.get('information_cutoff_date'))}.")
++            labels_beige = {
++                "districts_with_accelerating_prices": "Districts with faster price increases",
++                "districts_with_robust_prices": "Districts with robust price growth",
++                "districts_with_growth": "Districts reporting economic growth",
++                "employment_modest": "Districts with modest employment gains",
++                "employment_slight": "Districts with slight employment gains",
++                "employment_unchanged": "Districts with unchanged employment",
++            }
++            for key, label in labels_beige.items():
++                change = (comp.get("changes") or {}).get(key)
++                if change:
++                    st.write(f"**{label}:** {change['previous']} → {change['current']} "
++                             f"({change['change']:+d})")
++            with st.expander("Official reported evidence — previous and current"):
++                for key, label in [("consumer_spending_evidence", "Consumer spending"),
++                                   ("credit_evidence", "Credit and financial conditions"),
++                                   ("price_evidence", "Price pressures")]:
++                    st.markdown(f"**{label}**")
++                    for side in ("previous", "current"):
++                        evidence = (comp.get(f"{side}_facts") or {}).get(key, [])
++                        st.write(f"{side.title()}: " + (" ".join(evidence) if evidence else
++                                 "No supported sentence extracted; no conclusion of unchanged conditions."))
++                if prior.get("url"):
++                    st.markdown(f"[Previous official Beige Book]({prior['url']})")
++            st.caption(comp.get("interpretation", ""))
++        else:
++            st.warning("Previous/current Beige Book comparison is unavailable. No unchanged conclusion is inferred.")
+         dimensions = beige_analysis.get("dimensions")
+         if isinstance(dimensions, dict) and dimensions:
+             with st.expander("Beige Book dimension detail"):
+@@ -1350,6 +1401,7 @@ def fed() -> None:
+             st.markdown(f"[Official Beige Book source]({beige.get('url')})")
+         st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
+ 
++    st.caption(f"Snapshot generated: {fmt(obj.get('generated_at'))} · {src}")
+     st.subheader("Fed Evidence Quality")
+     qcols = st.columns(4)
+     for col, (label, value) in zip(qcols, [
+@@ -1360,6 +1412,9 @@ def fed() -> None:
+     ]):
+         with col:
+             card(label, value)
++    st.caption(quality.get("pit_scope", ""))
++    with st.expander("Document freshness checks"):
++        st.json(quality.get("document_checks", {}))
+     if quality.get("quality_reason"):
+         st.caption(f"Quality note: {quality.get('quality_reason')}. Quality metadata does not alter the Fed analytical score.")
+ 
+diff --git a/fed_beige_evidence_v1.py b/fed_beige_evidence_v1.py
+new file mode 100644
+index 0000000..d57be2b
+--- /dev/null
++++ b/fed_beige_evidence_v1.py
+@@ -0,0 +1,225 @@
++"""Source-grounded Beige Book evidence; no inferred dates or policy probabilities."""
++from __future__ import annotations
++
++import hashlib
++import re
++from datetime import date, datetime, timezone
++from urllib.parse import urljoin, urlparse
++
++from bs4 import BeautifulSoup
++
++INDEX = "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm"
++SECTIONS = {"Overall Economic Activity": "activity", "Labor Markets": "labor", "Prices": "prices"}
++NUMBERS = {word: i for i, word in enumerate(
++    "zero one two three four five six seven eight nine ten eleven twelve".split())}
++N = r"(?:\d{1,2}|zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
++
++
++def parse_date(value):
++    try:
++        return date.fromisoformat(str(value))
++    except (ValueError, TypeError):
++        return None
++
++
++def official(url):
++    return urlparse(str(url or "")).hostname == "www.federalreserve.gov"
++
++
++def _english_date(value):
++    try:
++        return datetime.strptime(value, "%B %d, %Y").date().isoformat()
++    except ValueError:
++        return None
++
++
++def release_catalog(html):
++    """Only explicit release labels beside links; URL month is an identifier."""
++    soup = BeautifulSoup(html, "html.parser")
++    records = {}
++    for a in soup.find_all("a", href=True):
++        href = a["href"]
++        match = re.search(r"beigebook(20\d{4})(?:-summary)?\.(?:htm|pdf)", href, re.I)
++        if not match:
++            continue
++        issue = match[1]
++        heading = a.find_previous(["h2", "h3", "h4", "th"])
++        year_match = re.search(r"\b(20\d{2})\b", heading.get_text() if heading else "")
++        # No fallback to the URL year: December issues can be released in January.
++        if not year_match:
++            continue
++        node = a.parent
++        published = None
++        for _ in range(3):
++            if node is None:
++                break
++            issues = {m[1] for x in node.find_all("a", href=True)
++                      if (m := re.search(r"beigebook(20\d{4})", x["href"]))}
++            if issues != {issue}:
++                break
++            label = re.search(r"([A-Za-z]+\s+\d{1,2})\s*:", node.get_text(" ", strip=True))
++            if label:
++                published = _english_date(f"{label[1]}, {year_match[1]}")
++                break
++            node = node.parent
++        if not published:
++            continue
++        url = urljoin(INDEX, href)
++        if not official(url):
++            continue
++        records[issue] = {"issue_month": f"{issue[:4]}-{issue[4:]}",
++                          "issue_date": None, "publication_date": published,
++                          "publication_date_source": INDEX,
++                          "url": f"https://www.federalreserve.gov/monetarypolicy/beigebook{issue}-summary.htm"}
++    return sorted(records.values(), key=lambda x: x["publication_date"], reverse=True)
++
++
++def national_sections(html):
++    """Stop before district highlights. Never score navigation/footer text."""
++    soup = BeautifulSoup(html, "html.parser")
++    heading = next((h for h in soup.find_all(["h2", "h3"])
++                    if h.get_text(" ", strip=True) == "National Summary"), None)
++    sections, current = {}, None
++    if heading:
++        for node in heading.find_all_next(["h2", "h3", "h4", "p"]):
++            if node.name in ("h2", "h3"):
++                break
++            if node.name == "h4":
++                current = SECTIONS.get(node.get_text(" ", strip=True))
++                if not current:
++                    break
++            elif current:
++                if node.get("id") == "f2" or node.get_text(strip=True).startswith("Note: This report"):
++                    break
++                sections.setdefault(current, []).append(node.get_text(" ", strip=True))
++    cutoff = re.search(r"information collected on or before\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})",
++                       soup.get_text(" ", strip=True), re.I)
++    return {k: " ".join(v) for k, v in sections.items()}, _english_date(cutoff[1]) if cutoff else None
++
++
++def _number(value):
++    return int(value) if value.isdigit() else NUMBERS[value.lower()]
++
++
++def _match_count(pattern, text):
++    matches = re.findall(pattern, text, re.I)
++    values = {_number(m) for m in matches}
++    return values.pop() if len(values) == 1 else None
++
++
++def report_facts(sections):
++    """Conservative supported forms; unknown wording is null, never neutral/zero."""
++    activity, labor, prices = (sections.get(k, "") for k in ("activity", "labor", "prices"))
++    growth = _match_count(rf"\b({N}) of the twelve.*?Districts reported growth", activity)
++    if growth is None:
++        counts = [_match_count(pattern, activity) for pattern in (
++            rf"\b({N}) of the twelve.*?Districts reported moderate growth",
++            rf"\b({N}) Districts reported modest growth",
++            rf"while ({N}) reported slight growth")]
++        growth = sum(counts) if all(x is not None for x in counts) else None
++    robust = _match_count(rf"\b({N}) Districts characterized overall price growth as robust", prices)
++    if robust is None:
++        robust = _match_count(rf"\band ({N}) robust increases", prices)
++    faster = _match_count(rf"\b({N}) Districts reported that the pace of price increases picked up", prices)
++    if faster is None:
++        faster = _match_count(rf"pace of price increases.*?increased in ({N})\b", prices)
++    modest = _match_count(rf"\b({N}) Districts (?:described modest increases|showing modest gains)", labor)
++    slight = _match_count(rf"\b({N}) (?:reported slight increases|reporting slight gains)", labor)
++    flat = _match_count(rf"\b({N}) (?:reported no significant change|Districts experiencing no change)", labor)
++    def sentences(text, terms):
++        return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text)
++                if any(t in s.lower() for t in terms)]
++    return {"districts_with_growth": growth, "districts_with_robust_prices": robust,
++            "districts_with_accelerating_prices": faster,
++            "employment_modest": modest, "employment_slight": slight, "employment_unchanged": flat,
++            "consumer_spending_evidence": sentences(activity, ["consumer spending"]),
++            "credit_evidence": sentences(activity, ["financial conditions", "loan", "credit", "lending"]),
++            "price_evidence": sentences(prices, ["oil", "diesel", "fuel", "margin", "expect"])}
++
++
++def load_reports(get, as_of):
++    """Use the latest eligible release, even if its content fails to download."""
++    index = get(INDEX)
++    catalog = release_catalog(index.text) if index is not None else []
++    eligible = [x for x in catalog if parse_date(x["publication_date"]) <= as_of]
++    def load(record):
++        result = {"issue_date": None, "issue_month": None, "publication_date": None,
++                  "url": None, "title": None, **(record or {}), "available": False, "text": "", "sections": {},
++                  "information_cutoff_date": None, "retrieved_at": None,
++                  "catalog_verified": bool(catalog), "latest_publication_date": eligible[0]["publication_date"] if eligible else None}
++        if not record:
++            return result
++        response = get(record["url"])
++        if response is None:
++            return result
++        sections, cutoff = national_sections(response.text)
++        # Failed extraction is missing evidence, never whole-page fallback.
++        text = " ".join(sections.values())
++        temporal_ok = not cutoff or parse_date(cutoff) <= parse_date(record["publication_date"])
++        result.update(available=all(sections.get(k) for k in SECTIONS.values()) and temporal_ok,
++                      sections=sections, text=text if temporal_ok else "",
++                      information_cutoff_date=cutoff,
++                      retrieved_at=datetime.now(timezone.utc).isoformat(),
++                      content_sha256=hashlib.sha256(text.encode()).hexdigest(),
++                      title=f"Beige Book — {record['issue_month']}")
++        if result["available"]:
++            result["facts"] = report_facts(sections)
++        return result
++    return load(eligible[0] if eligible else None), load(eligible[1] if len(eligible) > 1 else None)
++
++
++def metadata(report):
++    return {k: v for k, v in report.items() if k not in ("text", "sections", "facts")}
++
++
++def comparison(current, previous, current_analysis, previous_analysis):
++    out = {"available": bool(current.get("available") and previous.get("available")),
++           "current": metadata(current), "previous": metadata(previous),
++           "current_facts": current.get("facts", {}), "previous_facts": previous.get("facts", {}),
++           "changes": {}, "dimension_changes": {},
++           "interpretation": "Comparison of reported evidence; no inference of a policy decision."}
++    if not out["available"]:
++        out["reason"] = "CURRENT_OR_PREVIOUS_REPORT_UNAVAILABLE"
++        return out
++    for k, value in current.get("facts", {}).items():
++        old = previous.get("facts", {}).get(k)
++        if isinstance(value, int) and isinstance(old, int):
++            out["changes"][k] = {"previous": old, "current": value, "change": value - old}
++    for k, value in current_analysis.get("dimensions", {}).items():
++        old = previous_analysis.get("dimensions", {}).get(k, {}).get("score_100")
++        new = value.get("score_100")
++        if isinstance(old, (int, float)) and isinstance(new, (int, float)):
++            out["dimension_changes"][k] = {"previous": old, "current": new, "change": round(new-old, 1)}
++    return out
++
++
++def snapshot_quality(data, as_of):
++    """Date-level checks, not a guarantee about archived intraday vintages."""
++    checks = {}
++    for key, record in data.get("evidence_dates", {}).items():
++        pub = parse_date(record.get("publication_date"))
++        event = parse_date(record.get("information_cutoff_date") if key == "beige_book" else record.get("meeting_date"))
++        expected = parse_date(record.get("latest_publication_date"))
++        if not record.get("available"):
++            status = "MISSING"
++        elif pub is None or event is None or not official(record.get("publication_date_source")):
++            status = "UNKNOWN"
++        elif pub > as_of or (event and event > pub):
++            status = "INVALID_DATES"
++        elif expected is None or not record.get("catalog_verified"):
++            status = "UNKNOWN"
++        elif pub < expected:
++            status = "STALE"
++        else:
++            status = "CURRENT"
++        checks[key] = status
++    required = {"statement", "minutes", "chair_press", "sep", "beige_book"}
++    complete = set(checks) == required
++    states = list(checks.values())
++    snapshot_date = parse_date(data.get("as_of_date"))
++    pit = "INVALID_DATES" if "INVALID_DATES" in states or (snapshot_date and snapshot_date > as_of) else (
++        "DATE_CHECKED" if complete and all(x in ("CURRENT", "STALE") for x in states) else "UNKNOWN")
++    freshness = "STALE" if "STALE" in states or (parse_date(data.get("as_of_date")) and parse_date(data["as_of_date"]) < as_of) else (
++        "CURRENT" if complete and all(x == "CURRENT" for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
++    return {"pit_status": pit, "freshness_status": freshness, "document_checks": checks,
++            "pit_scope": "Publication-date ordering only; no intraday or archived-vintage guarantee."}
+diff --git a/fed_intelligence.py b/fed_intelligence.py
+index c763d0b..54c8d4c 100644
+--- a/fed_intelligence.py
++++ b/fed_intelligence.py
+@@ -11,12 +11,16 @@ from __future__ import annotations
+ 
+ import io
+ import re
+-from datetime import date, datetime
++from datetime import date, datetime, timezone
+ from typing import Dict, Optional
+ 
+ import pandas as pd
+ import requests
+ from bs4 import BeautifulSoup
++from fed_beige_evidence_v1 import (
++    load_reports, metadata as beige_metadata, comparison as beige_comparison,
++    snapshot_quality, parse_date, official,
++)
+ 
+ try:
+     from pypdf import PdfReader
+@@ -176,6 +180,20 @@ def minutes_publication_date(anchor, meeting_date):
+     return None
+ 
+ 
++def explicit_publication_date(text: str) -> Optional[str]:
++    """Meeting/title dates and Last Update are not publication evidence."""
++    match = re.search(
++        r"(?:For release\b.{0,120}?|(?:Published|Released):?\s+)"
++        r"([A-Za-z]+\s+\d{1,2},\s+\d{4})", text or "", re.I,
++    )
++    if not match:
++        return None
++    try:
++        return datetime.strptime(match[1], "%B %d, %Y").date().isoformat()
++    except ValueError:
++        return None
++
++
+ def discover_links() -> Dict[str, Dict[date, str]]:
+     """
+     Discover official FOMC documents from the Fed calendar.
+@@ -358,6 +376,7 @@ def press_page_data(url: str) -> Dict:
+ 
+         if (
+             href.lower().endswith(".pdf")
++            and official(href)
+             and (
+                 "transcript" in label
+                 or "press conference" in label
+@@ -366,11 +385,8 @@ def press_page_data(url: str) -> Dict:
+             pdf = href
+             break
+ 
+-    text = (
+-        pdf_text(pdf)
+-        if pdf
+-        else clean_html(r.text)
+-    )
++    # A video/landing page is not a transcript and must never become neutral evidence.
++    text = pdf_text(pdf) if pdf else ""
+ 
+     return {
+         "page_url": url,
+@@ -1174,198 +1190,10 @@ def build_deep_fed_analysis(
+ # PHASE 2C — BEIGE BOOK
+ # ============================================================
+ 
+-def discover_beige_book(
+-    as_of: Optional[date] = None
+-) -> Dict:
+-
+-    """
+-    Discover the latest official Beige Book.
+-
+-    The Fed archive uses issue-month URLs such as:
+-    beigebook202608-summary.htm
+-
+-    The August 2026 issue was published on
+-    September 2, 2026.
+-    """
+-
+-    as_of = as_of or date.today()
+-
+-    result = {
+-        "available": False,
+-        "issue_date": None,
+-        "publication_date": None,
+-        "title": None,
+-        "url": None,
+-        "text": ""
+-    }
+-
+-    r = get(BEIGE_BOOK)
+-
+-    if r is None:
+-        return result
+-
+-    soup = BeautifulSoup(
+-        r.text,
+-        "html.parser"
+-    )
+-
+-    candidates = []
+-
+-    for a in soup.find_all("a", href=True):
+-
+-        href = a.get("href", "")
+-        label = a.get_text(
+-            " ",
+-            strip=True
+-        )
+-
+-        full_url = absolute(href)
+-
+-        m = re.search(
+-            r"beigebook(20\d{4})",
+-            href.lower()
+-        )
+-
+-        if not m:
+-            continue
+-
+-        issue = m.group(1)
+-
+-        try:
+-            issue_year = int(issue[:4])
+-            issue_month = int(issue[4:6])
+-
+-            issue_date = date(
+-                issue_year,
+-                issue_month,
+-                1
+-            )
+-
+-        except Exception:
+-            continue
+-
+-        # Never select an issue that is clearly in the future.
+-        if issue_date > date(
+-            as_of.year,
+-            as_of.month,
+-            1
+-        ):
+-            continue
+-
+-        candidates.append({
+-            "issue_date": issue_date,
+-            "url": full_url,
+-            "label": label,
+-            "href": href
+-        })
+-
+-    if not candidates:
+-        return result
+-
+-    latest_issue = max(
+-        x["issue_date"]
+-        for x in candidates
+-    )
+-
+-    same_issue = [
+-        x for x in candidates
+-        if x["issue_date"] == latest_issue
+-    ]
+-
+-    # Prefer National Summary.
+-    national = None
+-
+-    for item in same_issue:
+-
+-        text = (
+-            item["label"]
+-            + " "
+-            + item["href"]
+-        ).lower()
+-
+-        if "summary" in text or "national" in text:
+-            national = item
+-            break
+-
+-    # If the archive did not expose a summary link,
+-    # use the predictable official summary URL.
+-    if national is None:
+-
+-        predictable = (
+-            f"{FED}/monetarypolicy/"
+-            f"beigebook{latest_issue.year}"
+-            f"{latest_issue.month:02d}-summary.htm"
+-        )
+-
+-        response = get(predictable)
+-
+-        if response is not None:
+-
+-            national = {
+-                "issue_date": latest_issue,
+-                "url": predictable,
+-                "label": "National Summary",
+-                "href": predictable
+-            }
+-
+-    if national is None:
+-        return result
+-
+-    text = fetch_document(
+-        national["url"]
+-    )
+-
+-    if not text:
+-        return result
+-
+-    # The publication date can be extracted from
+-    # the official page when available.
+-    publication_date = None
+-
+-    date_patterns = [
+-        r"Last Update:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
+-        r"Published:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})"
+-    ]
+-
+-    for pattern in date_patterns:
+-
+-        match = re.search(
+-            pattern,
+-            text,
+-            re.I
+-        )
+-
+-        if match:
+-
+-            try:
+-
+-                publication_date = datetime.strptime(
+-                    match.group(1),
+-                    "%B %d, %Y"
+-                ).date()
+-
+-                break
+-
+-            except Exception:
+-                pass
+-
+-    result.update({
+-        "available": True,
+-        "issue_date": latest_issue.isoformat(),
+-        "publication_date": (
+-            publication_date.isoformat()
+-            if publication_date
+-            else None
+-        ),
+-        "title": (
+-            f"Beige Book - "
+-            f"{latest_issue.strftime('%B %Y')}"
+-        ),
+-        "url": national["url"],
+-        "text": text
+-    })
+-
+-    return result
++def discover_beige_book(as_of: Optional[date] = None) -> Dict:
++    """Compatibility entry point; release date comes from the official index."""
++    current, _ = load_reports(get, as_of or date.today())
++    return current
+ 
+ 
+ # ============================================================
+@@ -1435,7 +1263,11 @@ BEIGE_DIMENSIONS = {
+             "input costs increased",
+             "higher energy prices",
+             "higher fuel prices",
+-            "tariff-related impacts"
++            "tariff-related impacts",
++            "pace of price increases picked up",
++            "price growth as robust",
++            "elevated diesel prices",
++            "higher oil prices"
+         ]
+     },
+ 
+@@ -1516,7 +1348,7 @@ def beige_dimension_signal(
+ 
+         return {
+             "score": 0,
+-            "score_100": 50.0,
++            "score_100": None,
+             "classification": "UNAVAILABLE",
+             "positive_hits": 0,
+             "negative_hits": 0
+@@ -1526,15 +1358,12 @@ def beige_dimension_signal(
+ 
+     cfg = BEIGE_DIMENSIONS[dimension]
+ 
+-    positive_hits = sum(
+-        low.count(term)
+-        for term in cfg["positive"]
+-    )
++    def hits(terms):
++        pattern = "|".join(re.escape(t) for t in sorted(terms, key=len, reverse=True))
++        return len(re.findall(r"\b(?:" + pattern + r")\b", low))
+ 
+-    negative_hits = sum(
+-        low.count(term)
+-        for term in cfg["negative"]
+-    )
++    positive_hits = hits(cfg["positive"])
++    negative_hits = hits(cfg["negative"])
+ 
+     raw = positive_hits - negative_hits
+ 
+@@ -1548,7 +1377,11 @@ def beige_dimension_signal(
+         1
+     )
+ 
+-    if raw >= 4:
++    if positive_hits + negative_hits == 0:
++        classification = "UNRECOGNIZED"
++        score_100 = None
++
++    elif raw >= 4:
+         classification = "POSITIVE"
+ 
+     elif raw >= 1:
+@@ -1618,9 +1451,14 @@ def build_beige_analysis(
+ 
+     weighted = 0
+     total_weight = 0
++    recognized_dimensions = 0
+ 
+     for dimension, weight in weights.items():
+ 
++        if dimensions[dimension]["score_100"] is None:
++            continue
++        recognized_dimensions += 1
++
+         weighted += (
+             dimensions[dimension]["score_100"]
+             * weight
+@@ -1628,28 +1466,32 @@ def build_beige_analysis(
+ 
+         total_weight += weight
+ 
++    # Do not manufacture a neutral aggregate out of mostly unrecognized wording.
+     score = (
+         weighted / total_weight
+-        if total_weight
+-        else 50.0
++        if total_weight >= 50 and recognized_dimensions >= 3
++        else None
+     )
+ 
+     # The score is an analytical balance,
+     # NOT a probability and NOT a trading signal.
+-    if score >= 65:
+-        overall = "MODERATELY HAWKISH / STRONG ACTIVITY"
++    if score is None:
++        overall = "INSUFFICIENT KEYWORD COVERAGE"
++
++    elif score >= 65:
++        overall = "POSITIVE KEYWORD BALANCE"
+ 
+     elif score >= 56:
+-        overall = "SLIGHTLY HAWKISH"
++        overall = "SLIGHTLY POSITIVE KEYWORD BALANCE"
+ 
+     elif score >= 45:
+-        overall = "NEUTRAL"
++        overall = "MIXED KEYWORD BALANCE"
+ 
+     elif score >= 35:
+-        overall = "SLIGHTLY DOVISH"
++        overall = "SLIGHTLY NEGATIVE KEYWORD BALANCE"
+ 
+     else:
+-        overall = "MODERATELY DOVISH"
++        overall = "NEGATIVE KEYWORD BALANCE"
+ 
+     reasons = []
+ 
+@@ -1658,19 +1500,22 @@ def build_beige_analysis(
+         reasons.append(
+             f"- {dimension.replace('_', ' ').capitalize()}: "
+             f"{data['classification']} "
+-            f"({data['score_100']:.1f}/100)"
++            + (f"({data['score_100']:.1f}/100)" if data['score_100'] is not None else "(not scored)")
+         )
+ 
+     return {
+         "available": True,
+-        "score": round(score, 1),
++        "score": round(score, 1) if score is not None else None,
++        "recognized_weight_percent": total_weight,
++        "recognized_dimensions": recognized_dimensions,
+         "tone": overall,
+         "dimensions": dimensions,
+         "reasons": reasons,
+         "method": (
+-            "Heuristic analytical score based on "
++            "Heuristic keyword balance (not a policy stance) based on "
+             "directional language in the official "
+-            "National Summary. Not a probability."
++            "National Summary. Unrecognized dimensions are excluded; an aggregate requires "
++            "at least 3 dimensions and 50% of preset weight. Not a probability."
+         )
+     }
+ 
+@@ -1683,7 +1528,9 @@ def latest_document_date(links: Dict[str, Dict[date, str]], kind: str, as_of: da
+     the minutes are published in the current snapshot; keeping the meeting date
+     separate prevents them from being mislabeled as minutes for a newer meeting.
+     """
+-    dates = [d for d in links.get(kind, {}) if d <= as_of]
++    publications = links.get("minutes_publication_dates", {}) if kind == "minutes" else {}
++    dates = [d for d in links.get(kind, {}) if d <= as_of and
++             (not publications.get(d) or (parse_date(publications[d]) and parse_date(publications[d]) <= as_of))]
+     return max(dates) if dates else None
+ 
+ 
+@@ -1731,9 +1578,13 @@ def fed_quality_contract(data: Dict, as_of: date) -> Dict:
+         gate, quality, reason = "DEGRADED", "MEDIUM", "LATEST_MINUTES_LAG_LATEST_FOMC"
+     else:
+         gate, quality, reason = "ELIGIBLE", "HIGH", None
++    temporal = snapshot_quality(data, as_of)
++    if reason is None and (temporal["freshness_status"] != "CURRENT" or temporal["pit_status"] != "DATE_CHECKED"
++                           or not data.get("beige_comparison", {}).get("available")):
++        gate, quality, reason = "DEGRADED", "MEDIUM", "EVIDENCE_DATES_OR_COMPARISON_UNVERIFIED"
+     return {
+         "quality_gate": gate, "quality_status": quality, "quality_reason": reason,
+-        "pit_status": "PIT_SAFE", "freshness_status": "CURRENT",
++        **temporal,
+         "research_only": True, "forecast": False, "trading_signal": False,
+         "as_of_date": as_of.isoformat(), "communication_documents_available": available_docs,
+         "sep_available": sep_ok, "beige_book_available": beige_ok,
+@@ -1877,18 +1728,18 @@ def build_fed_intelligence() -> Dict:
+     # PHASE 2C
+     # --------------------------------------------------------
+ 
+-    beige = discover_beige_book(
+-        as_of=today
+-    )
++    beige, previous_beige = load_reports(get, today)
+ 
+     beige_analysis = build_beige_analysis(
+         beige.get("text", "")
+     )
+ 
++    previous_beige_analysis = build_beige_analysis(previous_beige.get("text", ""))
+     result = {
+ 
+         "available": True,
+-
++        "schema_version": "fed-evidence-2",
++        "generated_at": datetime.now(timezone.utc).isoformat(),
+         "as_of_date": today.isoformat(),
+ 
+         "latest_fomc": meeting.isoformat(),
+@@ -2018,18 +1869,32 @@ def build_fed_intelligence() -> Dict:
+         # PHASE 2C
+         # ----------------------------------------------------
+ 
+-        "beige_book": {
+-            "available": beige["available"],
+-            "issue_date": beige["issue_date"],
+-            "publication_date": beige[
+-                "publication_date"
+-            ],
+-            "title": beige["title"],
+-            "url": beige["url"]
+-        },
+-
+-        "beige_analysis": beige_analysis
++        "beige_book": beige_metadata(beige),
++        "beige_analysis": beige_analysis,
++        "beige_comparison": beige_comparison(beige, previous_beige, beige_analysis, previous_beige_analysis),
++    }
++    # Current-snapshot discovery verifies latest identifiers. Dates are recorded
++    # separately, and future/missing dates are not silently labeled PIT-safe.
++    def event_record(available, event, published, source):
++        return {"available": available, "meeting_date": event,
++                "publication_date": published, "publication_date_source": source,
++                "latest_publication_date": published, "catalog_verified": True}
++    result["evidence_dates"] = {
++        "statement": event_record(bool(statement_text), meeting.isoformat(), explicit_publication_date(statement_text), statement_url),
++        "minutes": event_record(bool(minutes_text), result["minutes_meeting_date"], result["minutes_publication_date"], CALENDAR),
++        "chair_press": event_record(bool(press.get("text")), meeting.isoformat(), None, press.get("pdf_url")),
++        "sep": event_record(bool(current_sep.get("available")), result["latest_sep_date"], None, current_sep.get("url")),
++        "beige_book": beige_metadata(beige),
+     }
++    if current_sep.get("available"):
++        sep_publication = explicit_publication_date(fetch_document(current_sep.get("url", "")))
++        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication)
++    # A transcript's meeting date is not evidence of its publication date.
++    # Require an explicit publication/release label; otherwise retain UNKNOWN.
++    if press.get("text"):
++        published = explicit_publication_date(press["text"])
++        result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published)
++
+     result["quality"] = fed_quality_contract(result, today)
+     return result
+ 
+@@ -2183,7 +2048,7 @@ def fed_summary(
+ 
+         lines.append(
+             f"Issue: "
+-            f"{beige.get('issue_date')}"
++            f"{beige.get('issue_month')}"
+         )
+ 
+         lines.append(
+diff --git a/fed_snapshot_ui_v1.py b/fed_snapshot_ui_v1.py
+new file mode 100644
+index 0000000..5e0e3e9
+--- /dev/null
++++ b/fed_snapshot_ui_v1.py
+@@ -0,0 +1,44 @@
++"""Read one Fed artifact without Streamlit's stacked data caches."""
++import hashlib
++import json
++from datetime import date
++
++from fed_beige_evidence_v1 import snapshot_quality
++
++
++def load_snapshot(local_path, remote_url, get):
++    if local_path.is_file():
++        try:
++            raw = local_path.read_bytes()
++            origin = "LOCAL"
++        except OSError:
++            return None, "UNREADABLE LOCAL FED SNAPSHOT"
++    else:
++        try:
++            response = get(remote_url)
++            response.raise_for_status()
++            raw, origin = response.content, "GITHUB RAW"
++        except Exception:
++            return None, "FED SNAPSHOT UNAVAILABLE"
++    try:
++        obj = json.loads(raw.decode("utf-8"))
++        if not isinstance(obj, dict):
++            raise ValueError("Expected a JSON object")
++        return obj, f"{origin} · snapshot {hashlib.sha256(raw).hexdigest()[:12]}"
++    except (ValueError, UnicodeDecodeError):
++        return None, "UNREADABLE FED SNAPSHOT"
++
++
++def display_quality(obj, today=None):
++    today = today or date.today()
++    quality = dict(obj.get("quality") or {})
++    quality.update(snapshot_quality(obj, today))
++    if quality["freshness_status"] != "CURRENT" or quality["pit_status"] != "DATE_CHECKED":
++        quality.update(quality_gate="DEGRADED", quality_status="UNVERIFIED",
++                       quality_reason="Snapshot is stale or document dates/availability are unverified.")
++    return quality
++
++
++def issue_month(beige):
++    # Legacy first-of-month identifiers are presented as a month, never a day.
++    return beige.get("issue_month") or str(beige.get("issue_date") or "Unavailable")[:7]
+diff --git a/tests/fixtures/fed_beige/202608-summary.html b/tests/fixtures/fed_beige/202608-summary.html
+new file mode 100644
+index 0000000..8edd593
+--- /dev/null
++++ b/tests/fixtures/fed_beige/202608-summary.html
+@@ -0,0 +1 @@
++<html><body><h3>National Summary</h3><h4 id="xsubsection-142-a0494490">Overall Economic Activity</h4><p>Economic activity increased modestly since early July. Ten of the twelve Federal Reserve Districts reported growth in the slight to moderate range; two Districts reported no change. Consumer spending grew slightly on balance; reports reflected both heightened price sensitivity on the one hand and solid high-end purchases on the other. Auto sales were mostly subdued, dampened by downbeat consumer confidence, high fuel prices, and rising financing costs. Tourism activity increased. Notably, airlines reported strong demand despite higher airfares. Manufacturing activity picked up across most Districts, with some highlighting ongoing strength in demand for defense and data center-related orders. Services firms reported slight to modest increases in activity. Financial conditions improved slightly as loan volumes remained solid or increased across most Districts. Residential construction declined while nonresidential construction increased on balance, with some Districts noting a high concentration of activity related to data center projects. Agriculture conditions saw slight improvement but generally remained strained; the livestock sector was strong while conditions were stressed among crop producers. The general outlook for the coming months was positive, but sentiment was mixed across sectors, with contacts reporting heightened uncertainty surrounding the effects of higher energy prices, policy, and international conflict.</p><h4 id="xsubsection-143-a0494cc9">Labor Markets</h4><p>Employment rose very slightly overall, with three Districts showing modest gains in employment, four reporting slight gains, and five Districts experiencing no change. Eight Districts saw a change in their pace of growth from the previous report, but there was less overall dispersion among Districts. Healthy labor demand was seen most frequently in manufacturing, construction, and some service sectors, while retail and hospitality sectors saw falling labor demand. Labor availability was mixed. Skilled trades and technical workers were difficult to find. Districts also reported both positive and negative effects of artificial intelligence on labor demand. Wage growth was modest to moderate in most Districts. Significant wage increases were most often connected to demand for skilled workers in construction and manufacturing.</p><h4 id="xsubsection-144-a04956bf">Prices</h4><p>Prices increased moderately in eight Districts, with two Districts reporting modest increases, one slight increases, and one robust increases. Compared with the previous reporting period, the pace of price increases was the same in eight Districts, decreased in three, and increased in one. Input price pressures were notably elevated in manufacturing and construction across multiple Districts, with widespread reports of price increases for energy, transportation, and raw materials, particularly metals and petrochemicals. Retail and manufacturing contacts continued to note tariff-related impacts in multiple Districts. Firms also broadly reported significant health care and insurance cost pressures. Consumer-facing contacts in a few Districts noted that heightened price sensitivity among customers was putting a limit on their ability to pass through input price increases.</p><p id="f2">Note: This report was prepared at the Federal Reserve Bank of Minneapolis based on information collected on or before August 24, 2026. This document summarizes comments received from contacts outside the Federal Reserve System and is not a commentary on the views of Federal Reserve officials.</p></body></html>
+\ No newline at end of file
+diff --git a/tests/fixtures/fed_beige/202610-summary.html b/tests/fixtures/fed_beige/202610-summary.html
+new file mode 100644
+index 0000000..3404ac3
+--- /dev/null
++++ b/tests/fixtures/fed_beige/202610-summary.html
+@@ -0,0 +1 @@
++<html><body><h3>National Summary</h3><h4 id="xoveralleconomicactivity-7b478cc0">Overall Economic Activity</h4><p>Since the prior Beige Book, two of the twelve Federal Reserve Districts reported moderate growth in economic activity. Three Districts reported modest growth, while four reported slight growth, and three reported no significant change. Robust, broad-based growth in manufacturing led the moderate growth reported in the Dallas District. While not as robust, another six Districts reported modest to moderate growth from their manufacturing firms. The remaining five Districts noted little or no manufacturing growth. Reports on other sectors indicate little growth overall. Most Districts reported little or no change in overall consumer spending. Auto contacts noted flat to modestly lower sales in five of the six Districts that reported. Over half of the Districts noted that consumer spending was driven by high-income households. Even in Dallas, where District firms reported solid retail sales, there were "some reports of lower-income customers being more cautious with spending." Tourism continued to grow, but firms in the Boston, Minneapolis, and San Francisco Districts noted a decline in sales from Canadian tourists. Overall, most Districts reported that firms have maintained a positive economic outlook for the coming months. However, expectations tend to be for slight growth, weighted toward manufacturing and burdened by persistent uncertainties.</p><h4 id="xlabormarkets-a810632b">Labor Markets</h4><p>Most Districts described little or no net change in overall employment levels. While three Districts described modest increases, five reported slight increases, and four reported no significant change. Overall, labor market conditions were little changed. Labor supply was generally adequate to meet demand; however, shortages persisted for specialized, technical, and skilled trade workers. Five Districts reported that some firms had either reduced staffing levels (through attrition), delayed hiring, or anticipated less job creation after increasing productivity by investing in AI. Five Districts described moderate growth in overall wages, four reported modest growth, and two reported slight growth. Several Districts noted that inflation has spawned additional wage pressure in the form of higher cost-of-living demands from individuals as well as challenges from rising benefit costs. Staffing contacts in the Boston District noted that workers were motivated to seek new jobs as wage increases lagged inflation.</p><h4 id="xprices-9e4eaea8">Prices</h4><p>Three Districts characterized overall price growth as robust, while eight noted that growth was moderate—and three of the eight noted that input price pressures were intensifying, if not already growing robustly. One District reported modest price growth. Moreover, four Districts reported that the pace of price increases picked up since the prior period. Higher oil prices permeated all District reports. Firms reported elevated diesel prices and noted that fuel surcharges were passing on increased costs throughout the supply chain. Contacts in multiple Districts also noted continued price pressure from other commodities, tariffs, and insurance. Consumer-facing firms noted tighter profit margins as price-sensitive customers continue to resist price hikes. Contacts are managing their margins with selective price hikes, targeted incentives, and menu changes that reduce their costs. Firms in several Districts cited persistent uncertainty around energy and tariffs and expect that prices will increase further in the coming months, as existing contracts expire, and firms must renegotiate hedge contracts for their own inputs and/or delivery contracts to their customers.</p><p id="f2">Note: This report was prepared at the Federal Reserve Bank of Philadelphia based on information collected on or before October 5, 2026. This document summarizes comments received from contacts outside the Federal Reserve System and is not a commentary on the views of Federal Reserve officials.</p></body></html>
+\ No newline at end of file
+diff --git a/tests/fixtures/fed_beige/README.md b/tests/fixtures/fed_beige/README.md
+new file mode 100644
+index 0000000..918f088
+--- /dev/null
++++ b/tests/fixtures/fed_beige/README.md
+@@ -0,0 +1,12 @@
++# Official Beige Book test excerpts
++
++Retrieved 2026-10-14 from:
++- https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm
++- https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm
++- https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm
++
++Summary fixtures retain the three national sections and the information-cutoff note.
++The index fixture retains the two explicit release labels and year heading.
++Navigation and district highlights are deliberately excluded. These are frozen
++parser regression fixtures, not a claim that economic wording will always follow
++the supported patterns. Future unrecognized numbers remain null.
+diff --git a/tests/fixtures/fed_beige/index.html b/tests/fixtures/fed_beige/index.html
+new file mode 100644
+index 0000000..e263f4b
+--- /dev/null
++++ b/tests/fixtures/fed_beige/index.html
+@@ -0,0 +1 @@
++<table><tr><th>2026</th></tr><tr><td>September 2: <a href="/monetarypolicy/beigebook202608-summary.htm">HTML</a></td></tr><tr><td>October 14: <a href="/monetarypolicy/beigebook202610-summary.htm">HTML</a></td></tr></table>
+\ No newline at end of file
+diff --git a/tests/test_fed_beige_evidence_v1.py b/tests/test_fed_beige_evidence_v1.py
+new file mode 100644
+index 0000000..fceba80
+--- /dev/null
++++ b/tests/test_fed_beige_evidence_v1.py
+@@ -0,0 +1,212 @@
++from datetime import date
++from pathlib import Path
++from types import SimpleNamespace
++import json
++
++import pytest
++import fed_intelligence as fed
++import fed_beige_evidence_v1 as evidence
++from fed_snapshot_ui_v1 import display_quality, issue_month, load_snapshot
++
++FIXTURES = Path(__file__).parent / "fixtures" / "fed_beige"
++TODAY = date(2026, 10, 14)
++
++
++def fetch(url):
++    if url == evidence.INDEX:
++        name = "index.html"
++    else:
++        name = "202610-summary.html" if "202610" in url else "202608-summary.html"
++    return SimpleNamespace(text=(FIXTURES / name).read_text())
++
++
++def reports():
++    return evidence.load_reports(fetch, TODAY)
++
++
++def test_real_official_release_labels_not_issue_month_or_last_update():
++    current, previous = reports()
++    assert current["publication_date"] == "2026-10-14"
++    assert current["issue_month"] == "2026-10"
++    assert current["issue_date"] is None
++    assert current["information_cutoff_date"] == "2026-10-05"
++    assert previous["publication_date"] == "2026-09-02"
++    assert previous["information_cutoff_date"] == "2026-08-24"
++
++
++def test_official_comparison_values_are_reproduced():
++    current, previous = reports()
++    out = evidence.comparison(current, previous, fed.build_beige_analysis(current["text"]),
++                              fed.build_beige_analysis(previous["text"]))
++    assert out["available"]
++    expected = {"districts_with_growth": (10, 9), "districts_with_robust_prices": (1, 3),
++                "districts_with_accelerating_prices": (1, 4), "employment_modest": (3, 3),
++                "employment_slight": (4, 5), "employment_unchanged": (5, 4)}
++    for key, (old, new) in expected.items():
++        assert out["changes"][key] == {"previous": old, "current": new, "change": new-old}
++    assert "grew slightly" in out["previous_facts"]["consumer_spending_evidence"][0]
++    assert "little or no change" in out["current_facts"]["consumer_spending_evidence"][0]
++
++
++def test_future_publication_is_not_used_even_if_url_month_is_current():
++    current, previous = evidence.load_reports(fetch, date(2026, 10, 13))
++    assert current["issue_month"] == "2026-08"
++    assert not previous["available"]
++
++
++def test_last_update_alone_is_not_a_publication_date():
++    html = '<h3>2026</h3><p><a href="beigebook202610-summary.htm">HTML</a></p><p>Last Update: October 14, 2026</p>'
++    assert evidence.release_catalog(html) == []
++
++
++def test_adjacent_release_date_is_not_borrowed():
++    html = '<h3>2026</h3><div><p>September 2: <a href="beigebook202608-summary.htm">HTML</a></p><p><a href="beigebook202610-summary.htm">HTML</a></p></div>'
++    assert [x["issue_month"] for x in evidence.release_catalog(html)] == ["2026-08"]
++
++
++def test_missing_latest_content_is_not_replaced_by_stale_content():
++    current, previous = evidence.load_reports(lambda u: None if "202610" in u else fetch(u), TODAY)
++    assert current["issue_month"] == "2026-10"
++    assert current["available"] is False
++    assert previous["available"] is True
++    assert not evidence.comparison(current, previous, {}, {})["available"]
++
++
++def test_missing_previous_is_not_broadly_unchanged():
++    current, previous = evidence.load_reports(lambda u: None if "202608" in u else fetch(u), TODAY)
++    out = evidence.comparison(current, previous, {}, {})
++    assert not out["available"]
++    assert out["changes"] == {}
++
++
++def test_navigation_and_district_highlights_do_not_contaminate_score():
++    html = (FIXTURES / "202610-summary.html").read_text()
++    baseline, _ = evidence.national_sections(html)
++    polluted = html.replace('<h3>National Summary</h3>', '<nav>economic activity increased</nav><h3>National Summary</h3>')
++    polluted = polluted.replace('<p id="f2">', '<h4>Highlights by Federal Reserve District</h4><p>economic activity increased</p><p id="f2">')
++    actual, _ = evidence.national_sections(polluted)
++    assert baseline == actual
++
++
++def test_unrecognized_numbers_are_null_not_zero_or_neutral():
++    facts = evidence.report_facts({"prices": "Many districts had price pressures."})
++    assert facts["districts_with_accelerating_prices"] is None
++    assert facts["districts_with_robust_prices"] is None
++
++
++def test_nested_keywords_are_counted_once():
++    signal = fed.beige_dimension_signal("economic activity increased.", "growth")
++    assert signal["positive_hits"] == 1
++
++
++def test_cutoff_after_publication_is_rejected():
++    def bad(url):
++        r = fetch(url)
++        return SimpleNamespace(text=r.text.replace("October 5, 2026", "October 15, 2026"))
++    current, _ = evidence.load_reports(bad, TODAY)
++    assert not current["available"]
++    assert current["text"] == ""
++
++
++def test_landing_page_is_not_a_transcript(monkeypatch):
++    monkeypatch.setattr(fed, "get", lambda _: SimpleNamespace(text="<h1>Press Conference</h1><p>Video</p>"))
++    out = fed.press_page_data("https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm")
++    assert out["text"] == ""
++    assert fed.analyze("Conference", out["text"])["available"] is False
++
++
++def complete_snapshot():
++    record = {"available": True, "publication_date": "2026-10-07",
++              "publication_date_source": fed.CALENDAR, "meeting_date": "2026-09-16",
++              "latest_publication_date": "2026-10-07", "catalog_verified": True}
++    data = {"as_of_date": TODAY.isoformat(),
++            "evidence_dates": {k: dict(record) for k in ["statement", "minutes", "chair_press", "sep", "beige_book"]}}
++    data["evidence_dates"]["beige_book"]["information_cutoff_date"] = "2026-10-05"
++    return data
++
++
++def test_missing_metadata_never_claims_current_or_pit_safe():
++    q = display_quality({"as_of_date": TODAY.isoformat(), "quality": {"freshness_status": "CURRENT", "pit_status": "PIT_SAFE"}}, TODAY)
++    assert q["freshness_status"] == "UNVERIFIED"
++    assert q["pit_status"] == "UNKNOWN"
++    assert q["quality_gate"] == "DEGRADED"
++
++
++def test_complete_metadata_is_only_date_checked_not_intraday_pit_guarantee():
++    q = evidence.snapshot_quality(complete_snapshot(), TODAY)
++    assert q["freshness_status"] == "CURRENT"
++    assert q["pit_status"] == "DATE_CHECKED"
++    assert "intraday" in q["pit_scope"]
++
++
++@pytest.mark.parametrize("field,value", [("publication_date", "2026-10-15"), ("meeting_date", "2026-10-08")])
++def test_invalid_date_order_is_exposed(field, value):
++    data = complete_snapshot()
++    data["evidence_dates"]["minutes"][field] = value
++    assert evidence.snapshot_quality(data, TODAY)["pit_status"] == "INVALID_DATES"
++
++
++def test_old_snapshot_and_superseded_document_are_stale():
++    data = complete_snapshot()
++    data["as_of_date"] = "2026-10-13"
++    assert evidence.snapshot_quality(data, TODAY)["freshness_status"] == "STALE"
++    data["as_of_date"] = TODAY.isoformat()
++    data["evidence_dates"]["beige_book"]["latest_publication_date"] = "2026-10-14"
++    assert evidence.snapshot_quality(data, TODAY)["document_checks"]["beige_book"] == "STALE"
++
++
++def test_minutes_release_after_as_of_is_not_selected():
++    links = {"minutes": {date(2026, 9, 16): "sep", date(2026, 7, 29): "jul"},
++             "minutes_publication_dates": {date(2026, 9, 16): "2026-10-07", date(2026, 7, 29): "2026-08-19"}}
++    assert fed.latest_document_date(links, "minutes", date(2026, 9, 30)) == date(2026, 7, 29)
++
++
++def test_ui_rereads_changed_local_snapshot_without_caches(tmp_path):
++    path = tmp_path / "fed.json"
++    path.write_text(json.dumps({"beige_analysis": {"score": 55}}))
++    first, first_source = load_snapshot(path, "unused", None)
++    path.write_text(json.dumps({"beige_analysis": {"score": 53}}))
++    second, second_source = load_snapshot(path, "unused", None)
++    assert first["beige_analysis"]["score"] == 55
++    assert second["beige_analysis"]["score"] == 53
++    assert first_source != second_source
++    assert issue_month({"issue_date": "2026-10-01"}) == "2026-10"
++
++
++def test_source_correction_changes_content_hash():
++    current, _ = reports()
++    def corrected(url):
++        r = fetch(url)
++        return SimpleNamespace(text=r.text.replace("four Districts reported that the pace", "five Districts reported that the pace"))
++    revised, _ = evidence.load_reports(corrected, TODAY)
++    assert revised["publication_date"] == current["publication_date"]
++    assert revised["content_sha256"] != current["content_sha256"]
++    assert revised["facts"]["districts_with_accelerating_prices"] == 5
++
++
++def test_insufficient_keyword_coverage_does_not_manufacture_neutral_score():
++    current, _ = reports()
++    analysis = fed.build_beige_analysis(current["text"])
++    assert analysis["score"] is None
++    assert analysis["tone"] == "INSUFFICIENT KEYWORD COVERAGE"
++    assert analysis["dimensions"]["growth"]["score_100"] is None
++    assert current["facts"]["districts_with_growth"] == 9
++
++
++def test_missing_cutoff_and_future_snapshot_never_claim_verified_dates():
++    data = complete_snapshot()
++    data["evidence_dates"]["beige_book"].pop("information_cutoff_date")
++    assert evidence.snapshot_quality(data, TODAY)["pit_status"] == "UNKNOWN"
++    data = complete_snapshot()
++    data["as_of_date"] = "2026-10-15"
++    assert evidence.snapshot_quality(data, TODAY)["pit_status"] == "INVALID_DATES"
++
++
++@pytest.mark.parametrize("text", ["September 16, 2026 Press Conference", "Last Update: October 7, 2026"])
++def test_document_title_or_update_date_is_not_used_as_publication(text):
++    assert fed.explicit_publication_date(text) is None
++
++
++@pytest.mark.parametrize("text", ["For release at 2:00 p.m. EDT September 16, 2026", "Published: September 16, 2026"])
++def test_document_explicit_publication_date_is_preserved(text):
++    assert fed.explicit_publication_date(text) == "2026-09-16"
+diff --git a/tests/test_fed_intelligence.py b/tests/test_fed_intelligence.py
+index fe2b98f..5b094af 100644
+--- a/tests/test_fed_intelligence.py
++++ b/tests/test_fed_intelligence.py
+@@ -177,7 +177,7 @@ def test_fed_quality_contract_marks_published_prior_meeting_minutes_as_lagged():
+     q = fed.fed_quality_contract(data, fed.date(2026, 9, 27))
+     assert q["quality_gate"] == "DEGRADED"
+     assert q["quality_reason"] == "LATEST_MINUTES_LAG_LATEST_FOMC"
+-    assert q["pit_status"] == "PIT_SAFE"
++    assert q["pit_status"] == "UNKNOWN"  # Lag status alone does not verify publication dates.
+ 
+ 
+ def test_fed_ui_labels_lagged_minutes_without_relabeling_them_current():
