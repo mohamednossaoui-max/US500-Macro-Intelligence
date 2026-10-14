@@ -1,5 +1,5 @@
 window,column,available_rows,mean,median,std,min,max
-5D,net_advances_5d,1912,95.1841,118.5,462.683059,-1834.0,1397.0
-20D,net_advances_20d,1897,371.698471,447.0,866.514751,-3202.0,2587.0
-60D_AD_LINE,ad_line_change_60d,1856,1078.595905,1191.0,1304.129237,-2649.0,4641.0
+5D,net_advances_5d,1912,95.252092,117.0,462.586962,-1834.0,1397.0
+20D,net_advances_20d,1897,372.033737,447.0,866.310562,-3202.0,2587.0
+60D_AD_LINE,ad_line_change_60d,1856,1079.58944,1193.5,1303.895831,-2649.0,4641.0
 20D_IDENTITY,net_advances_20d_vs_ad_line_change_20d,1896,0.0,0.0,0.0,0.0,0.0
