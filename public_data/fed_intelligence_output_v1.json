@@ -1,5 +1,7 @@
 {
   "available": true,
+  "schema_version": "fed-evidence-2",
+  "generated_at": "2026-10-14T21:48:59.485422+00:00",
   "as_of_date": "2026-10-14",
   "latest_fomc": "2026-09-16",
   "current_date": "2026-10-14",
@@ -33,27 +35,17 @@
   "minutes_publication_date": "2026-10-07",
   "chair_press": {
     "name": "Kevin Warsh Press Conference",
-    "available": true,
-    "tone": "NEUTRAL",
-    "tone_score": 0,
-    "inflation_mentions": 0,
-    "labor_mentions": 1,
-    "growth_mentions": 0,
-    "financial_mentions": 9,
-    "text_length": 9332
+    "available": false,
+    "tone": "UNAVAILABLE",
+    "tone_score": null
   },
   "chair_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "chair_pdf": null,
   "powell": {
     "name": "Kevin Warsh Press Conference",
-    "available": true,
-    "tone": "NEUTRAL",
-    "tone_score": 0,
-    "inflation_mentions": 0,
-    "labor_mentions": 1,
-    "growth_mentions": 0,
-    "financial_mentions": 9,
-    "text_length": 9332
+    "available": false,
+    "tone": "UNAVAILABLE",
+    "tone_score": null
   },
   "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "powell_pdf": null,
@@ -70,7 +62,7 @@
       "lagged": false
     },
     "chair_press": {
-      "available": true,
+      "available": false,
       "source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm"
     }
   },
@@ -131,7 +123,7 @@
       }
     },
     "chair_press": {
-      "current_date": "2026-09-16",
+      "current_date": null,
       "previous_date": "2026-07-29",
       "previous": {
         "name": "Previous Press Conference",
@@ -145,15 +137,10 @@
         "text_length": 40743
       },
       "comparison": {
-        "available": true,
-        "classification": "BROADLY UNCHANGED",
-        "tone_score_change": -2,
-        "mention_changes": {
-          "inflation_mentions": -60,
-          "labor_mentions": -13,
-          "growth_mentions": -7,
-          "financial_mentions": 7
-        }
+        "available": false,
+        "classification": "UNAVAILABLE",
+        "tone_score_change": null,
+        "mention_changes": {}
       }
     }
   },
@@ -217,17 +204,17 @@
     "document_availability": {
       "statement": true,
       "minutes": true,
-      "chair": true
+      "chair": false
     },
     "document_score_eligibility": {
       "statement": true,
       "minutes": true,
-      "chair": true
+      "chair": false
     },
     "document_weights": {
-      "statement": 0.35,
-      "minutes": 0.4,
-      "chair": 0.25
+      "statement": 0.466667,
+      "minutes": 0.533333,
+      "chair": 0.0
     },
     "statement": {
       "inflation": {
@@ -306,35 +293,35 @@
     "chair": {
       "inflation": {
         "score": 0,
-        "classification": "NEUTRAL",
+        "classification": "UNAVAILABLE",
         "hawkish_hits": 0,
         "dovish_hits": 0,
         "score_100": 50
       },
       "labor": {
         "score": 0,
-        "classification": "NEUTRAL",
+        "classification": "UNAVAILABLE",
         "hawkish_hits": 0,
         "dovish_hits": 0,
         "score_100": 50
       },
       "growth": {
         "score": 0,
-        "classification": "NEUTRAL",
+        "classification": "UNAVAILABLE",
         "hawkish_hits": 0,
         "dovish_hits": 0,
         "score_100": 50
       },
       "financial": {
         "score": 0,
-        "classification": "NEUTRAL",
+        "classification": "UNAVAILABLE",
         "hawkish_hits": 0,
         "dovish_hits": 0,
         "score_100": 50
       },
       "policy": {
         "score": 0,
-        "classification": "NEUTRAL",
+        "classification": "UNAVAILABLE",
         "hawkish_hits": 0,
         "dovish_hits": 0,
         "score_100": 50
@@ -342,7 +329,7 @@
     },
     "combined": {
       "inflation": {
-        "score_100": 61.8,
+        "score_100": 65.7,
         "classification": "MODERATELY HAWKISH",
         "statement": {
           "score": 1,
@@ -360,14 +347,14 @@
         },
         "chair": {
           "score": 0,
-          "classification": "NEUTRAL",
+          "classification": "UNAVAILABLE",
           "hawkish_hits": 0,
           "dovish_hits": 0,
           "score_100": 50
         }
       },
       "labor": {
-        "score_100": 55.8,
+        "score_100": 57.7,
         "classification": "MODERATELY HAWKISH",
         "statement": {
           "score": 1,
@@ -385,7 +372,7 @@
         },
         "chair": {
           "score": 0,
-          "classification": "NEUTRAL",
+          "classification": "UNAVAILABLE",
           "hawkish_hits": 0,
           "dovish_hits": 0,
           "score_100": 50
@@ -410,7 +397,7 @@
         },
         "chair": {
           "score": 0,
-          "classification": "NEUTRAL",
+          "classification": "UNAVAILABLE",
           "hawkish_hits": 0,
           "dovish_hits": 0,
           "score_100": 50
@@ -435,15 +422,15 @@
         },
         "chair": {
           "score": 0,
-          "classification": "NEUTRAL",
+          "classification": "UNAVAILABLE",
           "hawkish_hits": 0,
           "dovish_hits": 0,
           "score_100": 50
         }
       },
       "policy": {
-        "score_100": 54.0,
-        "classification": "NEUTRAL",
+        "score_100": 55.3,
+        "classification": "MODERATELY HAWKISH",
         "statement": {
           "score": 0,
           "classification": "NEUTRAL",
@@ -460,7 +447,7 @@
         },
         "chair": {
           "score": 0,
-          "classification": "NEUTRAL",
+          "classification": "UNAVAILABLE",
           "hawkish_hits": 0,
           "dovish_hits": 0,
           "score_100": 50
@@ -468,111 +455,282 @@
       }
     },
     "fed_score": {
-      "score": 60.2,
-      "base_score": 55.2,
+      "score": 61.9,
+      "base_score": 56.9,
       "sep_adjustment": 5.0,
       "classification": "MODERATELY HAWKISH"
     },
     "reasons": [
-      "- Inflation: None (+2.95)",
-      "- Labor: None (+0.87)",
+      "- Inflation: None (+3.93)",
+      "- Labor: None (+1.16)",
       "- Growth: None (+0.00)",
       "- Financial: None (+0.00)",
-      "- Policy: None (+1.40)",
+      "- Policy: None (+1.85)",
       "- SEP: HAWKISH SHIFT"
     ],
     "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
   },
   "fed_score": {
-    "score": 60.2,
-    "base_score": 55.2,
+    "score": 61.9,
+    "base_score": 56.9,
     "sep_adjustment": 5.0,
     "classification": "MODERATELY HAWKISH"
   },
   "beige_book": {
-    "available": true,
-    "issue_date": "2026-10-01",
+    "issue_date": null,
+    "issue_month": "2026-10",
     "publication_date": "2026-10-14",
-    "title": "Beige Book - October 2026",
-    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm"
+    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
+    "title": "Beige Book — 2026-10",
+    "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+    "available": true,
+    "information_cutoff_date": "2026-10-05",
+    "retrieved_at": "2026-10-14T21:48:59.277466+00:00",
+    "catalog_verified": true,
+    "latest_publication_date": "2026-10-14",
+    "content_sha256": "9376eeed1895632f2e0773f73ef98533f8e60c83eff1c28ad0b6b1ad2ea7daeb"
   },
   "beige_analysis": {
     "available": true,
-    "score": 53.0,
-    "tone": "NEUTRAL",
+    "score": null,
+    "recognized_weight_percent": 25,
+    "recognized_dimensions": 1,
+    "tone": "INSUFFICIENT KEYWORD COVERAGE",
     "dimensions": {
       "growth": {
-        "score": 10,
-        "score_100": 100,
-        "classification": "POSITIVE",
-        "positive_hits": 14,
+        "score": 0,
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
+        "positive_hits": 0,
         "negative_hits": 0
       },
       "labor": {
-        "score": 4,
-        "score_100": 70,
-        "classification": "POSITIVE",
-        "positive_hits": 4,
+        "score": 0,
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
+        "positive_hits": 0,
         "negative_hits": 0
       },
       "inflation": {
-        "score": -8,
-        "score_100": 10,
+        "score": -5,
+        "score_100": 25,
         "classification": "NEGATIVE",
         "positive_hits": 0,
-        "negative_hits": 8
+        "negative_hits": 5
       },
       "consumer_spending": {
         "score": 0,
-        "score_100": 50,
-        "classification": "NEUTRAL",
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
         "positive_hits": 0,
         "negative_hits": 0
       },
       "manufacturing": {
-        "score": 1,
-        "score_100": 55,
-        "classification": "SLIGHTLY POSITIVE",
-        "positive_hits": 1,
+        "score": 0,
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
+        "positive_hits": 0,
         "negative_hits": 0
       },
       "financial": {
-        "score": -1,
-        "score_100": 45,
-        "classification": "SLIGHTLY NEGATIVE",
+        "score": 0,
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
         "positive_hits": 0,
-        "negative_hits": 1
+        "negative_hits": 0
       },
       "housing": {
         "score": 0,
-        "score_100": 50,
-        "classification": "NEUTRAL",
+        "score_100": null,
+        "classification": "UNRECOGNIZED",
         "positive_hits": 0,
         "negative_hits": 0
       }
     },
     "reasons": [
-      "- Growth: POSITIVE (100.0/100)",
-      "- Labor: POSITIVE (70.0/100)",
-      "- Inflation: NEGATIVE (10.0/100)",
-      "- Consumer spending: NEUTRAL (50.0/100)",
-      "- Manufacturing: SLIGHTLY POSITIVE (55.0/100)",
-      "- Financial: SLIGHTLY NEGATIVE (45.0/100)",
-      "- Housing: NEUTRAL (50.0/100)"
+      "- Growth: UNRECOGNIZED (not scored)",
+      "- Labor: UNRECOGNIZED (not scored)",
+      "- Inflation: NEGATIVE (25.0/100)",
+      "- Consumer spending: UNRECOGNIZED (not scored)",
+      "- Manufacturing: UNRECOGNIZED (not scored)",
+      "- Financial: UNRECOGNIZED (not scored)",
+      "- Housing: UNRECOGNIZED (not scored)"
     ],
-    "method": "Heuristic analytical score based on directional language in the official National Summary. Not a probability."
+    "method": "Heuristic keyword balance (not a policy stance) based on directional language in the official National Summary. Unrecognized dimensions are excluded; an aggregate requires at least 3 dimensions and 50% of preset weight. Not a probability."
+  },
+  "beige_comparison": {
+    "available": true,
+    "current": {
+      "issue_date": null,
+      "issue_month": "2026-10",
+      "publication_date": "2026-10-14",
+      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
+      "title": "Beige Book — 2026-10",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+      "available": true,
+      "information_cutoff_date": "2026-10-05",
+      "retrieved_at": "2026-10-14T21:48:59.277466+00:00",
+      "catalog_verified": true,
+      "latest_publication_date": "2026-10-14",
+      "content_sha256": "9376eeed1895632f2e0773f73ef98533f8e60c83eff1c28ad0b6b1ad2ea7daeb"
+    },
+    "previous": {
+      "issue_date": null,
+      "issue_month": "2026-08",
+      "publication_date": "2026-09-02",
+      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm",
+      "title": "Beige Book — 2026-08",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+      "available": true,
+      "information_cutoff_date": "2026-08-24",
+      "retrieved_at": "2026-10-14T21:48:59.478316+00:00",
+      "catalog_verified": true,
+      "latest_publication_date": "2026-10-14",
+      "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
+    },
+    "current_facts": {
+      "districts_with_growth": 9,
+      "districts_with_robust_prices": 3,
+      "districts_with_accelerating_prices": 4,
+      "employment_modest": 3,
+      "employment_slight": 5,
+      "employment_unchanged": 4,
+      "consumer_spending_evidence": [
+        "Most Districts reported little or no change in overall consumer spending.",
+        "Over half of the Districts noted that consumer spending was driven by high-income households."
+      ],
+      "credit_evidence": [],
+      "price_evidence": [
+        "Higher oil prices permeated all District reports.",
+        "Firms reported elevated diesel prices and noted that fuel surcharges were passing on increased costs throughout the supply chain.",
+        "Consumer-facing firms noted tighter profit margins as price-sensitive customers continue to resist price hikes.",
+        "Contacts are managing their margins with selective price hikes, targeted incentives, and menu changes that reduce their costs.",
+        "Firms in several Districts cited persistent uncertainty around energy and tariffs and expect that prices will increase further in the coming months, as existing contracts expire, and firms must renegotiate hedge contracts for their own inputs and/or delivery contracts to their customers."
+      ]
+    },
+    "previous_facts": {
+      "districts_with_growth": 10,
+      "districts_with_robust_prices": 1,
+      "districts_with_accelerating_prices": 1,
+      "employment_modest": 3,
+      "employment_slight": 4,
+      "employment_unchanged": 5,
+      "consumer_spending_evidence": [
+        "Consumer spending grew slightly on balance; reports reflected both heightened price sensitivity on the one hand and solid high-end purchases on the other."
+      ],
+      "credit_evidence": [
+        "Financial conditions improved slightly as loan volumes remained solid or increased across most Districts."
+      ],
+      "price_evidence": []
+    },
+    "changes": {
+      "districts_with_growth": {
+        "previous": 10,
+        "current": 9,
+        "change": -1
+      },
+      "districts_with_robust_prices": {
+        "previous": 1,
+        "current": 3,
+        "change": 2
+      },
+      "districts_with_accelerating_prices": {
+        "previous": 1,
+        "current": 4,
+        "change": 3
+      },
+      "employment_modest": {
+        "previous": 3,
+        "current": 3,
+        "change": 0
+      },
+      "employment_slight": {
+        "previous": 4,
+        "current": 5,
+        "change": 1
+      },
+      "employment_unchanged": {
+        "previous": 5,
+        "current": 4,
+        "change": -1
+      }
+    },
+    "dimension_changes": {
+      "inflation": {
+        "previous": 30,
+        "current": 25,
+        "change": -5
+      }
+    },
+    "interpretation": "Comparison of reported evidence; no inference of a policy decision."
+  },
+  "evidence_dates": {
+    "statement": {
+      "available": true,
+      "meeting_date": "2026-09-16",
+      "publication_date": null,
+      "publication_date_source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "latest_publication_date": null,
+      "catalog_verified": true
+    },
+    "minutes": {
+      "available": true,
+      "meeting_date": "2026-09-16",
+      "publication_date": "2026-10-07",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "latest_publication_date": "2026-10-07",
+      "catalog_verified": true
+    },
+    "chair_press": {
+      "available": false,
+      "meeting_date": "2026-09-16",
+      "publication_date": null,
+      "publication_date_source": null,
+      "latest_publication_date": null,
+      "catalog_verified": true
+    },
+    "sep": {
+      "available": true,
+      "meeting_date": "2026-09-16",
+      "publication_date": "2026-09-16",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260916.htm",
+      "latest_publication_date": "2026-09-16",
+      "catalog_verified": true
+    },
+    "beige_book": {
+      "issue_date": null,
+      "issue_month": "2026-10",
+      "publication_date": "2026-10-14",
+      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
+      "title": "Beige Book — 2026-10",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+      "available": true,
+      "information_cutoff_date": "2026-10-05",
+      "retrieved_at": "2026-10-14T21:48:59.277466+00:00",
+      "catalog_verified": true,
+      "latest_publication_date": "2026-10-14",
+      "content_sha256": "9376eeed1895632f2e0773f73ef98533f8e60c83eff1c28ad0b6b1ad2ea7daeb"
+    }
   },
   "quality": {
-    "quality_gate": "ELIGIBLE",
-    "quality_status": "HIGH",
-    "quality_reason": null,
-    "pit_status": "PIT_SAFE",
-    "freshness_status": "CURRENT",
+    "quality_gate": "DEGRADED",
+    "quality_status": "MEDIUM",
+    "quality_reason": "PARTIAL_PUBLICATION_SET",
+    "pit_status": "UNKNOWN",
+    "freshness_status": "UNVERIFIED",
+    "document_checks": {
+      "statement": "UNKNOWN",
+      "minutes": "CURRENT",
+      "chair_press": "MISSING",
+      "sep": "CURRENT",
+      "beige_book": "CURRENT"
+    },
+    "pit_scope": "Publication-date ordering only; no intraday or archived-vintage guarantee.",
     "research_only": true,
     "forecast": false,
     "trading_signal": false,
     "as_of_date": "2026-10-14",
-    "communication_documents_available": 3,
+    "communication_documents_available": 2,
     "sep_available": true,
     "beige_book_available": true,
     "decision_role": "CONTEXTUAL"
