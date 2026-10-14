@@ -32,14 +32,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests beautifulsoup4 pypdf lxml pytest
+          pip install pandas requests beautifulsoup4 pypdf lxml pytest streamlit
 
       # ------------------------------------------------------
       # PR-05 availability-aware Fed scoring tests
       # ------------------------------------------------------
-      - name: Run PR-05 Fed Intelligence tests
+      - name: Run Fed comparison, date integrity and UI regression tests
         run: |
-          python -m pytest -q tests/test_fed_intelligence.py tests/test_fed_communication_dates_v1.py tests/test_fed_beige_evidence_v1.py tests/test_publication_integrity.py tests/test_point_in_time_integrity.py
+          python -m pytest -q tests/test_fed_intelligence.py tests/test_fed_communication_dates_v1.py tests/test_fed_beige_evidence_v1.py tests/test_fed_report_comparison_v2.py tests/test_publication_integrity.py tests/test_point_in_time_integrity.py tests/test_ui_v3_safe_overlay.py tests/test_research_context_quality_ui.py tests/test_pr07_multi_module_ui.py tests/test_ath_ui_polish_v1.py tests/test_economic_ui_integration.py tests/test_stage15_final_ui_integration.py tests/test_ui_theme_v1.py
 
       # ------------------------------------------------------
       # Run existing Fed Intelligence engine
