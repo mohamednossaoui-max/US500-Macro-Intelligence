@@ -157,8 +157,8 @@
       "sha256": "a5999e65ea38ca63285d5126ed2f8b8329b6db700a08cd2aca0fd48122878a82"
     },
     "fed_intelligence_output_v1.json": {
-      "bytes": 22044,
-      "sha256": "c2f67b6beeeb044e110c06015844d932f86ac2d947f47527388e38537561324b"
+      "bytes": 280399,
+      "sha256": "2dc78ee30a96ff2a2eaf9c7e368d4e7c0f78fc1215380ee655728e54e908d4d1"
     },
     "final_end_to_end_validation.json": {
       "bytes": 923,
