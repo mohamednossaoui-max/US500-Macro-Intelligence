@@ -1,0 +1,2328 @@
+diff --git a/.github/workflows/test-fed.yml b/.github/workflows/test-fed.yml
+index 602cb60..31fbade 100644
+--- a/.github/workflows/test-fed.yml
++++ b/.github/workflows/test-fed.yml
+@@ -32,14 +32,14 @@ jobs:
+       - name: Install dependencies
+         run: |
+           python -m pip install --upgrade pip
+-          pip install pandas requests beautifulsoup4 pypdf lxml pytest
++          pip install pandas requests beautifulsoup4 pypdf lxml pytest streamlit
+ 
+       # ------------------------------------------------------
+       # PR-05 availability-aware Fed scoring tests
+       # ------------------------------------------------------
+-      - name: Run PR-05 Fed Intelligence tests
++      - name: Run Fed comparison, date integrity and UI regression tests
+         run: |
+-          python -m pytest -q tests/test_fed_intelligence.py tests/test_fed_communication_dates_v1.py tests/test_fed_beige_evidence_v1.py tests/test_publication_integrity.py tests/test_point_in_time_integrity.py
++          python -m pytest -q tests/test_fed_intelligence.py tests/test_fed_communication_dates_v1.py tests/test_fed_beige_evidence_v1.py tests/test_fed_report_comparison_v2.py tests/test_publication_integrity.py tests/test_point_in_time_integrity.py tests/test_ui_v3_safe_overlay.py tests/test_research_context_quality_ui.py tests/test_pr07_multi_module_ui.py tests/test_ath_ui_polish_v1.py tests/test_economic_ui_integration.py tests/test_stage15_final_ui_integration.py tests/test_ui_theme_v1.py
+ 
+       # ------------------------------------------------------
+       # Run existing Fed Intelligence engine
+diff --git a/app.py b/app.py
+index 19f2e91..bbd00db 100644
+--- a/app.py
++++ b/app.py
+@@ -13,6 +13,7 @@ import requests
+ import streamlit as st
+ 
+ from fed_snapshot_ui_v1 import load_snapshot, display_quality, issue_month
++from fed_report_comparison_ui_v2 import render_comparison, render_metrics, coverage
+ from economic_indicator_details_v1 import card_details
+ from economic_observation_order_v1 import latest as latest_economic_observation
+ from ath_pullback_context_ui_v1 import render_ath_pullback_context
+@@ -1008,8 +1009,8 @@ def fed() -> None:
+         return
+ 
+     st.caption(
+-        "Research-only interpretation of official Federal Reserve communications. "
+-        "Scores are analytical indicators, not probabilities or trading signals."
++        "Official Federal Reserve reports compared with previous releases. "
++        "Reported facts are separate from interpretation; comparisons are not policy probabilities or trading signals."
+     )
+ 
+     fed_score = obj.get("fed_score") if isinstance(obj.get("fed_score"), dict) else {}
+@@ -1028,20 +1029,17 @@ def fed() -> None:
+         with col:
+             card(label, value)
+ 
+-    # --- Policy pulse: visual first ------------------------------------
+     st.subheader("Policy Pulse")
+-    if isinstance(score, (int, float)):
+-        marker = max(0.0, min(100.0, float(score)))
+-        st.markdown(
+-            f"<div class='fed-strip'><div class='kicker'>FED POLICY SCORE</div>"
+-            f"<div class='headline'>{score:.1f}/100 · {fmt(classification)} · {fmt(sep_direction)}</div>"
+-            f"<div class='fed-gauge'><span class='fed-marker' style='left:calc({marker:.1f}% - 2px)'></span></div>"
+-            "<div class='fed-scale'><span>DOVISH</span><span>NEUTRAL · 50</span><span>HAWKISH</span></div>"
+-            "<div class='detail' style='margin-top:8px'>Descriptive research gauge — not a policy probability or trading signal.</div></div>",
+-            unsafe_allow_html=True,
+-        )
++    evidence_pairs = obj.get("report_comparison") or {}
++    policy_pair = evidence_pairs.get("statement") or evidence_pairs.get("chair_press") or {}
++    if policy_pair.get("available"):
++        render_metrics(policy_pair)
+     else:
+-        st.info("A policy score is not available for the current evidence set.")
++        st.info("Official policy comparison is not ready; no direction is inferred from missing reports.")
++    st.caption(coverage(obj))
++    with st.expander("Legacy Fed Policy Score — separate keyword model"):
++        st.write(f"{fmt(score,1)} · {fmt(classification)}")
++        st.caption("Retained for compatibility. This model does not drive the report comparisons below.")
+ 
+     # --- SEP changes ----------------------------------------------------
+     fields = sep_shift.get("fields") if isinstance(sep_shift.get("fields"), dict) else {}
+@@ -1064,23 +1062,7 @@ def fed() -> None:
+             changes.append((abs(change), key, label, detail))
+     changes.sort(reverse=True, key=lambda x: x[0])
+ 
+-    # PATCH 4.1 — compact decision brief; presentation only.
+     quality = display_quality(obj)
+-    biggest = changes[0] if changes else None
+-    biggest_text = "No comparable SEP move"
+-    if biggest:
+-        _, _, biggest_label, biggest_detail = biggest
+-        biggest_delta = biggest_detail.get("change")
+-        biggest_text = f"{biggest_label} {biggest_delta:+.1f}" if isinstance(biggest_delta, (int, float)) else biggest_label
+-    st.markdown(
+-        "<div class='fed-brief'>"
+-        f"<div class='fed-brief-cell'><span>POLICY STANCE</span><b>{fmt(classification)}</b></div>"
+-        f"<div class='fed-brief-cell'><span>DIRECTION</span><b>{fmt(sep_direction)}</b></div>"
+-        f"<div class='fed-brief-cell'><span>BIGGEST SEP MOVE</span><b>{biggest_text}</b></div>"
+-        f"<div class='fed-brief-cell'><span>EVIDENCE QUALITY</span><b>{fmt(quality.get('quality_gate', 'UNKNOWN'))}</b></div>"
+-        "</div>",
+-        unsafe_allow_html=True,
+-    )
+ 
+     st.subheader("What Changed?")
+     if changes:
+@@ -1105,32 +1087,10 @@ def fed() -> None:
+     else:
+         st.info("No comparable SEP changes are available for this snapshot.")
+ 
+-    # --- Bottom line: move decision read near the top ------------------
+-    top_change = changes[0] if changes else None
+-    if top_change:
+-        _, top_key, top_label, top_detail = top_change
+-        top_delta = top_detail.get("change")
+-        top_reason = explanations[top_key][0] if top_delta > 0 else explanations[top_key][1]
+-        change_text = f"Largest SEP move: {top_label} {top_delta:+.1f} ({top_reason})."
+-    else:
+-        change_text = "No comparable SEP shift is available."
+-    minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
+-    minutes_status = (obj.get("document_status") or {}).get("minutes", {}) if isinstance(obj.get("document_status"), dict) else {}
+-    if minutes_payload.get("available"):
+-        minutes_date = obj.get("minutes_meeting_date") or minutes_status.get("meeting_date")
+-        if minutes_status.get("lagged"):
+-            minutes_text = f"Latest published Minutes ({fmt(minutes_date)}) are incorporated as lagged evidence for the prior meeting."
+-        else:
+-            minutes_text = f"Minutes ({fmt(minutes_date)}) are incorporated."
+-    else:
+-        minutes_text = "Minutes are pending and are not treated as evidence."
+-    st.markdown(
+-        f"<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
+-        f"<div class='read'>{fmt(classification)} · {fmt(sep_direction)}</div>"
+-        f"<div class='body'>Fed Policy Score: {fmt(score,1)}. {change_text} {minutes_text} "
+-        "Beige Book remains contextual rather than a direct score input.</div></div>",
+-        unsafe_allow_html=True,
+-    )
++    st.markdown("<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
++                "<div class='body'>Read the official policy decision, SEP projections and report comparisons together. "
++                "Beige Book is contextual evidence; missing text or dates do not imply neutral conditions.</div></div>",
++                unsafe_allow_html=True)
+ 
+     # --- Compact communication evidence --------------------------------
+     weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
+@@ -1138,7 +1098,7 @@ def fed() -> None:
+     score_eligibility = phase.get("document_score_eligibility") if isinstance(phase.get("document_score_eligibility"), dict) else {}
+     communication = [
+         ("Statement", "statement", obj.get("statement"), obj.get("statement_source")),
+-        ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_page") or obj.get("chair_pdf")),
++        ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_pdf") or obj.get("chair_page")),
+         ("Minutes", "minutes", obj.get("minutes"), obj.get("minutes_source")),
+     ]
+     st.subheader("FOMC Communication")
+@@ -1152,7 +1112,7 @@ def fed() -> None:
+     timeline_bits = []
+     for label, _, payload, _ in communication:
+         payload = payload if isinstance(payload, dict) else {}
+-        status = "AVAILABLE" if payload.get("available") else "PENDING"
++        status = "AVAILABLE" if payload.get("available") else "NOT RETRIEVED"
+         timeline_bits.append(f"{label} · {status}")
+     st.markdown(
+         f"<div class='timeline'>{' &nbsp; · &nbsp; '.join(timeline_bits)}</div>",
+@@ -1161,7 +1121,7 @@ def fed() -> None:
+     for label, key, payload, url in communication:
+         payload = payload if isinstance(payload, dict) else {}
+         available = bool(payload.get("available"))
+-        tone = fmt(payload.get("tone")) if available else "PENDING"
++        tone = "TEXT RETRIEVED" if available else "TEXT NOT RETRIEVED"
+         explicit_weight = weights.get(key)
+         explicit_availability = availability_meta.get(key)
+         scoring_key = "chair" if key == "chair" else key
+@@ -1169,11 +1129,11 @@ def fed() -> None:
+         if explicit_score_eligible is False and available:
+             note = "lagged evidence · excluded from current-meeting score"
+         elif isinstance(explicit_weight, (int, float)):
+-            note = f"score weight {explicit_weight * 100:.1f}%" if explicit_weight > 0 else "excluded from score"
++            note = "available for report comparison" if explicit_weight > 0 else "excluded from legacy score"
+         elif explicit_availability is False or not available:
+-            note = "excluded until published"
++            note = "source retrieval pending; publication is not inferred"
+         else:
+-            note = "included · weight metadata pending refresh"
++            note = "retrieved; comparison metadata pending refresh"
+         link = f" · <a href='{url}' target='_blank'>official source</a>" if url else ""
+         st.markdown(
+             f"<div class='comm-row'><span><span class='comm-name'>{label}</span> "
+@@ -1205,204 +1165,59 @@ def fed() -> None:
+         f"Directional shift: {fmt(sep_direction)}. SEP is a directional comparison, not a policy probability."
+     )
+ 
+-    # --- Communication current vs previous -----------------------------
+-    comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
+     st.subheader("Communication — Current vs Previous")
++    for key, label in (("statement", "FOMC Statement"), ("minutes", "FOMC Minutes"),
++                       ("chair_press", "Press Conference")):
++        render_comparison(evidence_pairs.get(key), label, key)
++    with st.expander("Raw communication comparison"):
++        st.json(evidence_pairs)
+ 
+-    from fed_communication_ui_v1 import communication_dates
+-    comparison_rows = []
+-
+-    for key, label in (
+-        ("statement", "FOMC Statement"),
+-        ("minutes", "FOMC Minutes"),
+-        ("chair_press", "Press Conference"),
+-    ):
+-        item = comparison.get(key) if isinstance(comparison.get(key), dict) else {}
+-        comp = item.get("comparison") if isinstance(item.get("comparison"), dict) else {}
+-        previous_doc = item.get("previous") if isinstance(item.get("previous"), dict) else {}
+-
+-        current_doc = obj.get(
+-            "chair_press" if key == "chair_press" else key
+-        )
+-        current_doc = current_doc if isinstance(current_doc, dict) else {}
+-
+-        current_tone = current_doc.get("tone", "UNAVAILABLE")
+-        previous_tone = previous_doc.get("tone", "UNAVAILABLE")
+-        change = comp.get("classification", "UNAVAILABLE")
+-
+-        current_date = item.get("current_date")
+-        previous_date = item.get("previous_date")
+-
+-        comparison_rows.append({
+-            "Report": label,
+-            "Current": current_date,
+-            "Previous": previous_date,
+-            "Current tone": current_tone,
+-            "Previous tone": previous_tone,
+-            "Change": change,
+-        })
+-
+-        change_text = str(change or "UNAVAILABLE")
+-        change_upper = change_text.upper()
+-
+-        if any(
+-            token in change_upper
+-            for token in (
+-                "HAWK",
+-                "TIGHT",
+-                "HIGHER",
+-                "FIRM",
+-            )
+-        ):
+-            signal = "HAWKISH SHIFT"
+-        elif any(
+-            token in change_upper
+-            for token in (
+-                "DOV",
+-                "EAS",
+-                "LOWER",
+-                "SOFT",
+-            )
+-        ):
+-            signal = "DOVISH SHIFT"
+-        elif change_upper in (
+-            "UNAVAILABLE",
+-            "PENDING",
+-            "NONE",
+-            "",
+-        ):
+-            signal = "NOT AVAILABLE"
+-        else:
+-            signal = "LIMITED / NEUTRAL SHIFT"
+-
+-        shift_icon = "↑" if signal == "HAWKISH SHIFT" else "↓" if signal == "DOVISH SHIFT" else "—"
+-        shift_class = "hawk" if signal == "HAWKISH SHIFT" else "dove" if signal == "DOVISH SHIFT" else "flat"
+-        st.markdown(
+-            f"<div class='comm-shift'>"
+-            f"<div class='comm-shift-head'><b>{label}</b><span class='shift-badge {shift_class}'>{shift_icon} {signal}</span></div>"
+-            f"<div class='comm-shift-flow'><span><small>PREVIOUS</small>{fmt(previous_tone)}</span>"
+-            f"<strong>→</strong><span><small>CURRENT</small>{fmt(current_tone)}</span></div>"
+-            f"<div class='comm-shift-date'>{communication_dates(key, item)}</div>"
+-            f"</div>",
+-            unsafe_allow_html=True,
+-        )
+-
+-    comparison_df = pd.DataFrame(comparison_rows)
+-
+-    with st.expander(
+-        "Raw communication comparison",
+-        expanded=False,
+-    ):
+-        table(comparison_df, 260)
+-
+-    st.caption(
+-        "Unavailable or not-yet-published reports remain unavailable; "
+-        "they are never converted into neutral evidence."
+-    )
+-
+-    # --- Synthesis ------------------------------------------------------
+-    combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
+     st.subheader("Fed Synthesis")
++    st.write("Compare actual decisions and reported inflation, labor, growth, risks and liquidity messages above. "
++             "Reported wording changes are distinct from numerical changes; neither is a policy probability.")
+     if minutes_status.get("available") and minutes_status.get("lagged"):
+-        st.caption(
+-            "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP. "
+-            "The latest published Minutes remain visible for research comparison but are excluded from the current-meeting score because they cover the prior meeting."
+-        )
+-    if combined:
+-        for name, data in combined.items():
+-            if not isinstance(data, dict):
+-                continue
+-            dim_score = data.get("score_100")
+-            dim_label = str(name).replace("_", " ").title()
+-            if isinstance(dim_score, (int, float)):
+-                direction = "Hawkish tilt" if dim_score > 52 else "Dovish tilt" if dim_score < 48 else "Balanced"
+-                c1, c2 = st.columns([1, 3])
+-                with c1:
+-                    st.markdown(f"**{dim_label}**")
+-                    st.caption(f"{dim_score:.1f} · {direction}")
+-                with c2:
+-                    st.progress(max(0, min(100, int(round(dim_score)))))
+-        reasons = phase.get("reasons")
+-        if isinstance(reasons, list) and reasons:
+-            with st.expander("Evidence behind the synthesis"):
+-                for reason in reasons:
+-                    st.write(reason)
+-    else:
+-        st.info("Dimension-level synthesis is not available in the current artifact.")
++        st.caption("Latest published FOMC Minutes cover the prior meeting. They remain lagged research evidence "
++                   "and are not relabeled as current-meeting minutes. "
++                   "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP.")
+ 
+-    # --- Beige Book -----------------------------------------------------
+     st.subheader("Beige Book Context")
+-    beige = obj.get("beige_book") if isinstance(obj.get("beige_book"), dict) else {}
+-    beige_analysis = obj.get("beige_analysis") if isinstance(obj.get("beige_analysis"), dict) else {}
++    beige = obj.get("beige_book") or {}
+     if not beige.get("available"):
+-        st.info("Beige Book is not available for the current as-of date.")
++        st.warning("Current Beige Book text was not retrieved. No unchanged conclusion is inferred.")
+     else:
+-        beige_cols = st.columns(4)
+-        for col, (label, value) in zip(beige_cols, [
+-            ("Issue month", issue_month(beige)), ("Published", beige.get("publication_date")),
+-            ("Keyword balance", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
+-        ]):
++        cols = st.columns(3)
++        for col, label, value in zip(cols, ("Issue month", "Published", "Information through"),
++                                    (issue_month(beige), beige.get("publication_date"), beige.get("information_cutoff_date"))):
+             with col:
+                 card(label, value)
+-        st.caption(f"Information collected through: {fmt(beige.get('information_cutoff_date'))}. "
+-                   f"Retrieved: {fmt(beige.get('retrieved_at'))}.")
+-        st.caption("Context Score is a keyword balance, not the Fed's policy stance. "
+-                   "Zero matches mean the wording was not recognized; they do not prove neutral conditions.")
+-        if beige_analysis.get("score") is None:
+-            st.info("Context Score is withheld because keyword coverage is insufficient. "
+-                    "Use the reported evidence and comparison below.")
+-        st.caption(f"Recognized keyword weight: {fmt(beige_analysis.get('recognized_weight_percent'))}%. "
+-                   "This measures parser coverage, not economic confidence.")
+         comp = obj.get("beige_comparison") or {}
+         if comp.get("available"):
+-            prior = comp.get("previous") or {}
+             st.markdown("**Beige Book — What changed?**")
+-            st.caption(f"Published: {fmt(prior.get('publication_date'))} → {fmt(beige.get('publication_date'))}. "
+-                       f"Information cutoffs: {fmt(prior.get('information_cutoff_date'))} → "
+-                       f"{fmt(beige.get('information_cutoff_date'))}.")
+-            labels_beige = {
+-                "districts_with_accelerating_prices": "Districts with faster price increases",
+-                "districts_with_robust_prices": "Districts with robust price growth",
+-                "districts_with_growth": "Districts reporting economic growth",
+-                "employment_modest": "Districts with modest employment gains",
+-                "employment_slight": "Districts with slight employment gains",
+-                "employment_unchanged": "Districts with unchanged employment",
+-            }
+-            for key, label in labels_beige.items():
+-                change = (comp.get("changes") or {}).get(key)
+-                if change:
+-                    st.write(f"**{label}:** {change['previous']} → {change['current']} "
+-                             f"({change['change']:+d})")
+-            with st.expander("Official reported evidence — previous and current"):
+-                for key, label in [("consumer_spending_evidence", "Consumer spending"),
+-                                   ("credit_evidence", "Credit and financial conditions"),
+-                                   ("price_evidence", "Price pressures")]:
+-                    st.markdown(f"**{label}**")
+-                    for side in ("previous", "current"):
+-                        evidence = (comp.get(f"{side}_facts") or {}).get(key, [])
+-                        st.write(f"{side.title()}: " + (" ".join(evidence) if evidence else
+-                                 "No supported sentence extracted; no conclusion of unchanged conditions."))
+-                if prior.get("url"):
+-                    st.markdown(f"[Previous official Beige Book]({prior['url']})")
+-            st.caption(comp.get("interpretation", ""))
++            key_labels = {"districts_with_accelerating_prices": "Faster price increases",
++                          "districts_with_robust_prices": "Robust price growth",
++                          "districts_with_growth": "Economic growth"}
++            cols = st.columns(3)
++            for col, (key, label) in zip(cols, key_labels.items()):
++                row = (comp.get("changes") or {}).get(key)
++                with col:
++                    if row:
++                        card(label, f"{row['previous']} → {row['current']}", f"Districts · change {row['change']:+d}")
++                    else:
++                        card(label, "Not comparable", "No supported numerical pair")
++            with st.expander("Employment — Previous → Current"):
++                for key, label in (("employment_modest", "Modest gains"), ("employment_slight", "Slight gains"),
++                                   ("employment_unchanged", "Unchanged")):
++                    row = (comp.get("changes") or {}).get(key)
++                    if row:
++                        st.write(f"{label}: {row['previous']} → {row['current']} districts ({row['change']:+d})")
+         else:
+             st.warning("Previous/current Beige Book comparison is unavailable. No unchanged conclusion is inferred.")
+-        dimensions = beige_analysis.get("dimensions")
+-        if isinstance(dimensions, dict) and dimensions:
+-            with st.expander("Beige Book dimension detail"):
+-                for name, data in dimensions.items():
+-                    if not isinstance(data, dict):
+-                        continue
+-                    dscore = data.get("score_100")
+-                    st.write(f"**{str(name).replace('_', ' ').title()}** — {fmt(dscore)}")
+-                    if isinstance(dscore, (int, float)):
+-                        st.progress(max(0, min(100, int(round(dscore)))))
+-        if beige.get("url"):
+-            st.markdown(f"[Official Beige Book source]({beige.get('url')})")
+-        st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
++        render_comparison(evidence_pairs.get("beige_book"), "Beige Book reported messages", "beige_book")
++        st.caption("Beige Book summarizes outside contacts. It is contextual evidence and is not included directly in the Fed Policy Score.")
+ 
+     st.caption(f"Snapshot generated: {fmt(obj.get('generated_at'))} · {src}")
+     st.subheader("Fed Evidence Quality")
++    st.write(coverage(obj))
+     qcols = st.columns(4)
+     for col, (label, value) in zip(qcols, [
+         ("Quality Gate", quality.get("quality_gate", "UNKNOWN")),
+diff --git a/fed_beige_evidence_v1.py b/fed_beige_evidence_v1.py
+index d57be2b..8ee173d 100644
+--- a/fed_beige_evidence_v1.py
++++ b/fed_beige_evidence_v1.py
+@@ -202,6 +202,10 @@ def snapshot_quality(data, as_of):
+         expected = parse_date(record.get("latest_publication_date"))
+         if not record.get("available"):
+             status = "MISSING"
++        elif event and event > as_of:
++            status = "INVALID_DATES"
++        elif pub is None and record.get("meeting_verified") and official(record.get("source")) and event == parse_date(record.get("latest_meeting_date")) and record.get("catalog_verified"):
++            status = "CURRENT_PUBLICATION_DATE_UNKNOWN"
+         elif pub is None or event is None or not official(record.get("publication_date_source")):
+             status = "UNKNOWN"
+         elif pub > as_of or (event and event > pub):
+@@ -220,6 +224,6 @@ def snapshot_quality(data, as_of):
+     pit = "INVALID_DATES" if "INVALID_DATES" in states or (snapshot_date and snapshot_date > as_of) else (
+         "DATE_CHECKED" if complete and all(x in ("CURRENT", "STALE") for x in states) else "UNKNOWN")
+     freshness = "STALE" if "STALE" in states or (parse_date(data.get("as_of_date")) and parse_date(data["as_of_date"]) < as_of) else (
+-        "CURRENT" if complete and all(x == "CURRENT" for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
++        "CURRENT" if complete and all(x in ("CURRENT", "CURRENT_PUBLICATION_DATE_UNKNOWN") for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
+     return {"pit_status": pit, "freshness_status": freshness, "document_checks": checks,
+             "pit_scope": "Publication-date ordering only; no intraday or archived-vintage guarantee."}
+diff --git a/fed_intelligence.py b/fed_intelligence.py
+index 54c8d4c..828fad9 100644
+--- a/fed_intelligence.py
++++ b/fed_intelligence.py
+@@ -13,6 +13,7 @@ import io
+ import re
+ from datetime import date, datetime, timezone
+ from typing import Dict, Optional
++from fed_report_comparison_v2 import load_press, report_body, document as evidence_document, compare as compare_evidence
+ 
+ import pandas as pd
+ import requests
+@@ -58,6 +59,8 @@ def get(url: str) -> Optional[requests.Response]:
+             timeout=TIMEOUT
+         )
+         r.raise_for_status()
++        if "text/html" in r.headers.get("Content-Type", ""):
++            r.encoding = "utf-8"
+         return r
+     except Exception:
+         return None
+@@ -267,7 +270,7 @@ def latest_completed_fomc(
+     as_of: Optional[date] = None
+ ) -> Optional[date]:
+ 
+-    as_of = as_of or date.today()
++    as_of = as_of or datetime.now(timezone.utc).date()
+ 
+     dates = (
+         set(links.get("statement", {}))
+@@ -288,7 +291,7 @@ def latest_sep(
+     as_of: Optional[date] = None
+ ) -> Optional[date]:
+ 
+-    as_of = as_of or date.today()
++    as_of = as_of or datetime.now(timezone.utc).date()
+ 
+     dates = [
+         d for d in links.get("sep", {})
+@@ -339,60 +342,14 @@ def fed_chair_for_date(d: Optional[date]) -> str:
+ # ============================================================
+ 
+ def press_page_data(url: str) -> Dict:
++    return load_press(url, get, as_of=datetime.now(timezone.utc).date())
+ 
+-    if not url:
+-        return {
+-            "page_url": None,
+-            "pdf_url": None,
+-            "text": ""
+-        }
+-
+-    r = get(url)
+-
+-    if r is None:
+-        return {
+-            "page_url": url,
+-            "pdf_url": None,
+-            "text": ""
+-        }
+-
+-    soup = BeautifulSoup(
+-        r.text,
+-        "html.parser"
+-    )
+-
+-    pdf = ""
+-
+-    for a in soup.find_all("a", href=True):
+-
+-        label = a.get_text(
+-            " ",
+-            strip=True
+-        ).lower()
+ 
+-        href = absolute(
+-            a.get("href", "")
+-        )
+-
+-        if (
+-            href.lower().endswith(".pdf")
+-            and official(href)
+-            and (
+-                "transcript" in label
+-                or "press conference" in label
+-            )
+-        ):
+-            pdf = href
+-            break
+-
+-    # A video/landing page is not a transcript and must never become neutral evidence.
+-    text = pdf_text(pdf) if pdf else ""
+-
+-    return {
+-        "page_url": url,
+-        "pdf_url": pdf or None,
+-        "text": text
+-    }
++def fetch_communication_text(url: str) -> str:
++    if not url:
++        return ""
++    response = get(url)
++    return report_body(response.text) if response is not None else ""
+ 
+ 
+ # ============================================================
+@@ -1192,7 +1149,7 @@ def build_deep_fed_analysis(
+ 
+ def discover_beige_book(as_of: Optional[date] = None) -> Dict:
+     """Compatibility entry point; release date comes from the official index."""
+-    current, _ = load_reports(get, as_of or date.today())
++    current, _ = load_reports(get, as_of or datetime.now(timezone.utc).date())
+     return current
+ 
+ 
+@@ -1600,7 +1557,7 @@ def build_fed_intelligence() -> Dict:
+ 
+     links = discover_links()
+ 
+-    today = date.today()
++    today = datetime.now(timezone.utc).date()
+ 
+     meeting = latest_completed_fomc(
+         links,
+@@ -1638,11 +1595,11 @@ def build_fed_intelligence() -> Dict:
+         )
+     )
+ 
+-    statement_text = fetch_document(
++    statement_text = fetch_communication_text(
+         statement_url
+     )
+ 
+-    minutes_text = fetch_document(
++    minutes_text = fetch_communication_text(
+         minutes_url
+     )
+ 
+@@ -1661,8 +1618,8 @@ def build_fed_intelligence() -> Dict:
+         else None
+     )
+     previous_press_date = previous_document_date(links, "press", meeting)
+-    previous_statement_text = fetch_document(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
+-    previous_minutes_text = fetch_document(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
++    previous_statement_text = fetch_communication_text(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
++    previous_minutes_text = fetch_communication_text(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
+     previous_press = press_page_data(links["press"].get(previous_press_date, "")) if previous_press_date else {"page_url": None, "pdf_url": None, "text": ""}
+ 
+     current_sep_date = latest_sep(
+@@ -1738,7 +1695,7 @@ def build_fed_intelligence() -> Dict:
+     result = {
+ 
+         "available": True,
+-        "schema_version": "fed-evidence-2",
++        "schema_version": "fed-comparison-3",
+         "generated_at": datetime.now(timezone.utc).isoformat(),
+         "as_of_date": today.isoformat(),
+ 
+@@ -1805,7 +1762,10 @@ def build_fed_intelligence() -> Dict:
+             },
+             "chair_press": {
+                 "available": bool(press.get("text", "").strip()),
+-                "source": press.get("page_url") or press.get("pdf_url") or None,
++                "source": press.get("pdf_url") or press.get("page_url") or None,
++                "source_status": press.get("source_status"),
++                "scope": press.get("scope"),
++                "retrieved_at": press.get("retrieved_at"),
+             },
+         },
+ 
+@@ -1880,21 +1840,65 @@ def build_fed_intelligence() -> Dict:
+                 "publication_date": published, "publication_date_source": source,
+                 "latest_publication_date": published, "catalog_verified": True}
+     result["evidence_dates"] = {
+-        "statement": event_record(bool(statement_text), meeting.isoformat(), explicit_publication_date(statement_text), statement_url),
++        "statement": event_record(bool(statement_text), meeting.isoformat(), press.get("related_release_dates", {}).get("statement") or explicit_publication_date(statement_text), press.get("page_url") or statement_url),
+         "minutes": event_record(bool(minutes_text), result["minutes_meeting_date"], result["minutes_publication_date"], CALENDAR),
+         "chair_press": event_record(bool(press.get("text")), meeting.isoformat(), None, press.get("pdf_url")),
+         "sep": event_record(bool(current_sep.get("available")), result["latest_sep_date"], None, current_sep.get("url")),
+         "beige_book": beige_metadata(beige),
+     }
+     if current_sep.get("available"):
+-        sep_publication = explicit_publication_date(fetch_document(current_sep.get("url", "")))
+-        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication)
++        sep_publication = (press.get("related_release_dates", {}).get("sep") if current_sep_date == meeting else None) or explicit_publication_date(fetch_document(current_sep.get("url", "")))
++        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication,
++            publication_date_source=press.get("page_url") if current_sep_date == meeting and press.get("related_release_dates", {}).get("sep") else current_sep.get("url"))
+     # A transcript's meeting date is not evidence of its publication date.
+     # Require an explicit publication/release label; otherwise retain UNKNOWN.
+     if press.get("text"):
+         published = explicit_publication_date(press["text"])
+         result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published)
+ 
++    result["evidence_dates"]["chair_press"].update(
++        source=press.get("pdf_url"), meeting_verified=press.get("source_status") == "VERIFIED_TRANSCRIPT",
++        latest_meeting_date=meeting.isoformat())
++    observed = result["generated_at"]
++    def meta(event, published, source, publication_source=None, retrieved_at=None):
++        return {"meeting_date": event.isoformat() if event else None,
++                "publication_date": published, "source": source,
++                "publication_date_source": publication_source,
++                "retrieved_at": retrieved_at or observed}
++    current_statement_pub = result["evidence_dates"]["statement"]["publication_date"]
++    previous_statement_pub = previous_press.get("related_release_dates", {}).get("statement")
++    report_pairs = {
++        "statement": (
++            evidence_document(previous_statement_text, meta(previous_statement_date, previous_statement_pub,
++                              links["statement"].get(previous_statement_date), previous_press.get("page_url")), "OFFICIAL_STATEMENT"),
++            evidence_document(statement_text, meta(meeting, current_statement_pub, statement_url, press.get("page_url")), "OFFICIAL_STATEMENT")),
++        "minutes": (
++            evidence_document(previous_minutes_text, meta(previous_minutes_date, links.get("minutes_publication_dates", {}).get(previous_minutes_date),
++                              links["minutes"].get(previous_minutes_date), CALENDAR), "OFFICIAL_MINUTES"),
++            evidence_document(minutes_text, meta(minutes_meeting_date, result["minutes_publication_date"], minutes_url, CALENDAR), "OFFICIAL_MINUTES")),
++        "chair_press": (
++            evidence_document(previous_press.get("text", ""), meta(previous_press_date, previous_press.get("publication_date"),
++                              previous_press.get("pdf_url"), previous_press.get("publication_date_source"), previous_press.get("retrieved_at")), previous_press.get("scope")),
++            evidence_document(press.get("text", ""), meta(meeting, press.get("publication_date"), press.get("pdf_url"),
++                              press.get("publication_date_source"), press.get("retrieved_at")), press.get("scope"))),
++        "beige_book": (
++            evidence_document(previous_beige.get("text", ""), beige_metadata(previous_beige), "NATIONAL_SUMMARY"),
++            evidence_document(beige.get("text", ""), beige_metadata(beige), "NATIONAL_SUMMARY")),
++    }
++    result["report_comparison"] = {key: compare_evidence(old, new) for key, (old, new) in report_pairs.items()}
++    for key in ("statement", "minutes", "chair_press"):
++        pair = result["report_comparison"][key]
++        result["communication_comparison"][key]["comparison"].update(legacy_only=True, method="Legacy tone model; not used for evidence comparisons")
++        result["communication_comparison"][key].update(
++            current_publication_date=pair["current"].get("publication_date"),
++            previous_publication_date=pair["previous"].get("publication_date"),
++            evidence_comparison_ref=f"report_comparison.{key}")
++    result["press_transcript"] = {k: v for k, v in press.items() if k != "text"}
++    result["report_coverage"] = {
++        key: {"current_available": pair["current"]["available"],
++              "previous_available": pair["previous"]["available"], "comparison_available": pair["available"]}
++        for key, pair in result["report_comparison"].items()
++    }
+     result["quality"] = fed_quality_contract(result, today)
+     return result
+ 
+diff --git a/fed_report_comparison_ui_v2.py b/fed_report_comparison_ui_v2.py
+new file mode 100644
+index 0000000..bc88db0
+--- /dev/null
++++ b/fed_report_comparison_ui_v2.py
+@@ -0,0 +1,83 @@
++"""Compact previous/current evidence, without keyword coverage indicators."""
++import streamlit as st
++
++
++def _value(fact):
++    if not fact:
++        return "Not reported / not comparable"
++    value = fact.get("value")
++    if isinstance(value, list):
++        return "–".join(f"{x:.2f}" for x in value) + "%"
++    return str(value)
++
++
++def render_metrics(pair):
++    labels = {"target_range": "Policy target range", "policy_action": "Policy decision", "vote": "Voting"}
++    rows = [(k, (pair.get("metrics") or {}).get(k, {})) for k in labels]
++    rows = [(k, row) for k, row in rows if row.get("previous") or row.get("current")]
++    if rows:
++        cols = st.columns(len(rows))
++        for col, (key, row) in zip(cols, rows):
++            with col:
++                st.markdown(f"**{labels[key]}**")
++                st.write(f"{_value(row.get('previous'))} → {_value(row.get('current'))}")
++                change = row.get("change")
++                if isinstance(change, list):
++                    if len(change) == 2 and change[0] == change[1]:
++                        st.caption(f"Range shift: {change[0]:+g} basis points (both bounds)")
++                    else:
++                        st.caption(f"Lower bound: {change[0]:+g}; upper bound: {change[1]:+g} basis points")
++                elif row.get("status") == "NOT_COMPARABLE":
++                    st.caption("A missing value is not an unchanged result.")
++
++
++def render_comparison(pair, title, namespace):
++    pair = pair if isinstance(pair, dict) else {}
++    st.markdown(f"**{title} — Previous → Current**")
++    previous, current = pair.get("previous", {}), pair.get("current", {})
++    event_key = "information_cutoff_date" if namespace == "beige_book" else "meeting_date"
++    event_label = "Information cutoffs" if namespace == "beige_book" else "Meeting dates"
++    st.caption(f"{event_label}: {previous.get(event_key) or 'Unknown'} → {current.get(event_key) or 'Unknown'}. "
++               f"Published: {previous.get('publication_date') or 'Not explicitly verified'} → "
++               f"{current.get('publication_date') or 'Not explicitly verified'}.")
++    cols = st.columns(2)
++    for col, side, record in zip(cols, ("Previous", "Current"), (previous, current)):
++        with col:
++            source = record.get("source") or record.get("url")
++            if source:
++                st.markdown(f"[{side} official source]({source})")
++            st.caption(f"{side} text: {'retrieved' if record.get('available') else 'not retrieved'} · "
++                       f"Observed: {record.get('retrieved_at') or 'Unknown'}")
++    if not pair.get("available"):
++        st.warning("Comparison is not ready: " + str(pair.get("status") or "Rebuild the Fed artifact with the comparison engine."))
++        return
++    render_metrics(pair)
++    for key, topic in (pair.get("topics") or {}).items():
++        pairs = topic.get("pairs") or []
++        if not pairs:
++            continue
++        with st.expander(topic.get("label", key), expanded=(key == "inflation")):
++            # Literal text differences first. Retain the complete evidence in JSON
++            # and link the official documents, rather than producing large tables.
++            ordered = sorted(pairs, key=lambda p: p.get("status") == "SAME_WORDING")
++            for item in ordered[:3]:
++                columns = st.columns(2)
++                for col, side in zip(columns, ("previous", "current")):
++                    with col:
++                        st.markdown(f"**{side.title()}**")
++                        st.write(item.get(side) or "No aligned statement extracted. No inference of unchanged conditions.")
++                status = item.get("status", "")
++                st.caption({"SAME_WORDING": "Same reported wording", "WORDING_CHANGED": "Reported wording differs",
++                            "CURRENT_ONLY_EVIDENCE": "Current-side evidence; no matched previous sentence",
++                            "PREVIOUS_ONLY_EVIDENCE": "Previous-side evidence; no matched current sentence"}.get(status, status))
++            if len(ordered) > 3:
++                st.caption(f"{len(ordered)-3} additional sentence pairs are retained in Complete Fed JSON and the official sources.")
++    st.caption("Official text is shown above. Sentence alignment and wording differences are mechanical comparisons; "
++               "they do not by themselves establish a hawkish/dovish shift or a policy forecast.")
++
++
++def coverage(obj):
++    reports = obj.get("report_coverage") or {}
++    ready = sum(bool(v.get("current_available")) for v in reports.values())
++    compared = sum(bool(v.get("comparison_available")) for v in reports.values())
++    return f"Report texts: {ready}/4 retrieved · Previous/current comparisons: {compared}/4 ready"
+diff --git a/fed_report_comparison_v2.py b/fed_report_comparison_v2.py
+new file mode 100644
+index 0000000..138e05b
+--- /dev/null
++++ b/fed_report_comparison_v2.py
+@@ -0,0 +1,253 @@
++"""Evidence comparisons, not keyword scores or inferred economic probabilities."""
++from __future__ import annotations
++
++import hashlib
++import io
++import re
++from datetime import datetime, timezone
++from difflib import SequenceMatcher
++from urllib.parse import urljoin
++
++from bs4 import BeautifulSoup
++from pypdf import PdfReader
++
++from fed_beige_evidence_v1 import official, parse_date
++
++TOPICS = {
++    "inflation": ("Inflation and prices", r"\b(?:inflation|PCE|CPI|price pressures|price growth|price increases|prices increased|prices rose)\b"),
++    "labor": ("Labor market", r"\b(?:employment|unemployment|jobless|job gains|labor market|wages)\b"),
++    "growth": ("Growth and demand", r"\b(?:economic activity|economic growth|GDP|consumer spending|investment|productivity)\b"),
++    "risks": ("Balance of risks", r"\b(?:risks?|uncertainty|uncertain|upside|downside)\b"),
++    "policy": ("Policy and guidance", r"\b(?:target range|policy rate|monetary policy|forward guidance|accommodation)\b"),
++    "liquidity": ("Balance sheet and liquidity", r"\b(?:balance sheet|reserves|repo|securities holdings|redemptions|runoff)\b"),
++    "credit": ("Credit and financial conditions", r"\b(?:credit|lending|loan|financial conditions|Treasury|yields)\b"),
++}
++
++
++def digest(text):
++    return hashlib.sha256(text.encode()).hexdigest()
++
++
++def normalize(text):
++    return re.sub(r"\s+", " ", text or "").strip()
++
++
++def chair_remarks(text):
++    """Exclude journalist questions from attributed Fed evidence."""
++    text = re.sub(r"(?m)^.*?(?:Chairman|Chair) .*?Press Conference\s+FINAL\s*$", "", text)
++    text = re.sub(r"(?m)^\s*Page \d+ of \d+\s*$", "", text)
++    speakers = list(re.finditer(r"(?m)^\s*([A-Z][A-Z ’'\-]{2,55})\.\s+", text))
++    remarks = []
++    for i, m in enumerate(speakers):
++        if re.match(r"CHAIR(?:MAN)?\s+", m[1]):
++            end = speakers[i+1].start() if i+1 < len(speakers) else len(text)
++            remarks.append(normalize(text[m.end():end]))
++    return " ".join(remarks)
++
++
++def release_dates(html):
++    """Explicit release labels in Related Information, never the page update."""
++    soup = BeautifulSoup(html or "", "html.parser")
++    out = {}
++    for a in soup.find_all("a", href=True):
++        href = a["href"].lower()
++        kind = ("minutes" if "fomcminutes" in href else
++                "statement" if re.search(r"monetary\d{8}a\.htm", href) else
++                "sep" if "fomcprojtabl" in href or "fomcprojtable" in href else
++                "chair_press" if "fomcpresconf" in href and ".pdf" in href else None)
++        if not kind:
++            continue
++        node = a.parent
++        for _ in range(3):
++            if node is None:
++                break
++            matches = re.findall(r"Released\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})", node.get_text(" ", strip=True), re.I)
++            if len(set(matches)) > 1:
++                break
++            if matches:
++                try:
++                    out[kind] = datetime.strptime(matches[0], "%B %d, %Y").date().isoformat()
++                except ValueError:
++                    pass
++                break
++            node = node.parent
++    return out
++
++
++def load_press(url, get, as_of=None):
++    """Linked or verified canonical transcript, with meeting/content validation."""
++    meeting_match = re.search(r"(20\d{6})", url or "")
++    result = {"page_url": url or None, "pdf_url": None, "text": "", "available": False,
++              "source_status": "NOT_RETRIEVED", "publication_date": None,
++              "publication_date_source": None, "retrieved_at": None,
++              "scope": None, "related_release_dates": {}}
++    if not official(url):
++        result["source_status"] = "NON_OFFICIAL_SOURCE"
++        return result
++    if not meeting_match:
++        return result
++    meeting = datetime.strptime(meeting_match[1], "%Y%m%d").date()
++    result["meeting_date"] = meeting.isoformat()
++    if as_of and meeting > as_of:
++        result["source_status"] = "FUTURE_MEETING"
++        return result
++    page = get(url)
++    candidates = []
++    if page is not None:
++        result["related_release_dates"] = release_dates(page.text)
++        published = result["related_release_dates"].get("chair_press")
++        if published:
++            result.update(publication_date=published, publication_date_source=url)
++            if as_of and parse_date(published) > as_of:
++                result["source_status"] = "FUTURE_PUBLICATION"
++                return result
++        soup = BeautifulSoup(page.text, "html.parser")
++        for a in soup.find_all("a", href=True):
++            candidate = urljoin(url, a["href"])
++            if official(candidate) and re.search(r"FOMCpresconf" + meeting_match[1] + r"(?:[a-z_-]*)\.pdf$", candidate, re.I):
++                candidates.append(candidate)
++    canonical = f"https://www.federalreserve.gov/mediacenter/files/FOMCpresconf{meeting_match[1]}.pdf"
++    # Full transcript first; an opening statement is explicitly scoped and never
++    # silently substituted for a complete Q&A transcript.
++    candidates = list(dict.fromkeys([canonical] + candidates))
++    for candidate in candidates:
++        response = get(candidate)
++        if response is None:
++            continue
++        if not getattr(response, "content", b"").startswith(b"%PDF-"):
++            result["source_status"] = "INVALID_PDF"
++            continue
++        try:
++            reader = PdfReader(io.BytesIO(response.content))
++            full = "\n".join(p.extract_text() or "" for p in reader.pages)
++        except Exception:
++            result["source_status"] = "PDF_EXTRACTION_FAILED"
++            continue
++        header_date = re.search(r"([A-Za-z]+\s+\d{1,2},\s+\d{4})", full[:1800])
++        try:
++            header_meeting = datetime.strptime(header_date[1], "%B %d, %Y").date() if header_date else None
++        except ValueError:
++            header_meeting = None
++        if header_meeting != meeting or not re.search(r"(?:Transcript|Opening Statement).*?Press Conference", normalize(full[:1800]), re.I):
++            result["source_status"] = "TRANSCRIPT_DATE_OR_TYPE_MISMATCH"
++            continue
++        remarks = chair_remarks(full)
++        if not remarks:
++            result["source_status"] = "CHAIR_REMARKS_NOT_EXTRACTED"
++            continue
++        scope = "OPENING_STATEMENT" if re.search(r"opening", candidate, re.I) or "opening statement" in full[:1800].lower() else "FULL_TRANSCRIPT_CHAIR_REMARKS"
++        result.update(available=True, text=remarks, pdf_url=candidate, source_status="VERIFIED_TRANSCRIPT",
++                      scope=scope, retrieved_at=datetime.now(timezone.utc).isoformat(),
++                      content_sha256=digest(remarks), pdf_sha256=hashlib.sha256(response.content).hexdigest())
++        return result
++    return result
++
++
++def report_body(html):
++    soup = BeautifulSoup(html or "", "html.parser")
++    # These containers hold the release/minutes, excluding site navigation.
++    body = soup.select_one("#article") or soup.select_one(".col-xs-12.col-sm-8.col-md-8")
++    if body is None:
++        return ""
++    for tag in body.select("script, style, nav, footer, .shareDL, .social, .panel, .heading"):
++        tag.decompose()
++    paragraphs = []
++    for p in body.find_all("p"):
++        text = p.get_text(" ", strip=True)
++        if text and not text.startswith(("Last Update", "For media inquiries", "Voting for", "Implementation Note")):
++            paragraphs.append(text)
++    return "\n".join(paragraphs)
++
++
++def sentences(text):
++    text = normalize(text)
++    for abbreviation in ("U.S.", "Mr.", "Ms.", "Dr.", "p.m.", "a.m."):
++        text = text.replace(abbreviation, abbreviation.replace(".", "\u2024"))
++    return [s.replace("\u2024", ".") for s in re.split(r"(?<=[.!?])\s+(?=[A-Z\"“])", text) if s]
++
++
++def _numeric_fractions(text):
++    values = {"¼": .25, "½": .5, "¾": .75}
++    text = re.sub(r"(\d+)?([¼½¾])", lambda m: str(float(m[1] or 0)+values[m[2]]), text)
++    return re.sub(r"\b(\d+)[ -](\d)\s*/\s*(\d)\b", lambda m: str(float(m[1])+float(m[2])/float(m[3])), text)
++
++
++def policy_facts(text):
++    facts = {}
++    for sentence in sentences(text):
++        if not re.search(r"(?:Committee|FOMC) (?:decided|voted)", sentence, re.I):
++            continue
++        numeric = _numeric_fractions(sentence)
++        action = re.search(r"\b(raise|increase|reduce|lower|maintain|keep)\b.{0,100}?target range", numeric, re.I)
++        rate_range = re.search(r"target range.{0,180}?\b(\d+(?:\.\d+)?)\s*(?:to|[-–])\s*(\d+(?:\.\d+)?)\s*percent", numeric, re.I)
++        if action and rate_range:
++            low, high = float(rate_range[1]), float(rate_range[2])
++            if not 0 <= low <= high <= 25:
++                continue
++            facts["policy_action"] = {"value": {"raise":"RAISE", "increase":"RAISE", "reduce":"CUT", "lower":"CUT", "maintain":"HOLD", "keep":"HOLD"}[action[1].lower()], "evidence": sentence}
++            facts["target_range"] = {"value": [low, high], "unit": "percent", "evidence": sentence}
++            vote = re.search(r"(\d+)\s*(?:[- ]to[- ]|to)\s*(\d+)\s+vote", sentence, re.I)
++            if vote:
++                facts["vote"] = {"value": f"{vote[1]}–{vote[2]}", "evidence": sentence}
++            break
++    unanimous = next((s for s in sentences(text) if "unanimous vote" in s.lower()), None)
++    if unanimous:
++        facts["vote"] = {"value": "UNANIMOUS", "evidence": unanimous}
++    explicit_vote = next((s for s in sentences(text) if re.search(r"approved.*?statement.*?by a \d+\s*[–-]\s*\d+ vote", s, re.I)), None)
++    if explicit_vote:
++        vote = re.search(r"by a (\d+)\s*[–-]\s*(\d+) vote", explicit_vote, re.I)
++        facts["vote"] = {"value": f"{vote[1]}–{vote[2]}", "evidence": explicit_vote}
++    return facts
++
++
++def document(text, metadata, scope):
++    return {**metadata, "available": bool(text.strip()), "scope": scope,
++            "content_sha256": digest(text), "facts": policy_facts(text),
++            "topics": {k: {"label": label, "evidence": [s for s in sentences(text) if re.search(pattern, s, re.I)]}
++                       for k, (label, pattern) in TOPICS.items()}}
++
++
++def pair_evidence(previous, current):
++    """Align wording within one topic. Labels describe text, not inferred policy."""
++    used = set()
++    pairs = []
++    for now in current:
++        remaining = [(i, old) for i, old in enumerate(previous) if i not in used]
++        if remaining:
++            i, old = max(remaining, key=lambda x: SequenceMatcher(None, x[1].lower(), now.lower()).ratio())
++            similarity = SequenceMatcher(None, old.lower(), now.lower()).ratio()
++            if similarity >= .28:
++                used.add(i)
++                pairs.append({"previous": old, "current": now,
++                              "status": "SAME_WORDING" if normalize(old).lower() == normalize(now).lower() else "WORDING_CHANGED"})
++                continue
++        pairs.append({"previous": None, "current": now, "status": "CURRENT_ONLY_EVIDENCE"})
++    pairs.extend({"previous": old, "current": None, "status": "PREVIOUS_ONLY_EVIDENCE"}
++                 for i, old in enumerate(previous) if i not in used)
++    return pairs
++
++
++def compare(previous, current):
++    out = {"available": bool(previous.get("available") and current.get("available")),
++           "previous": previous, "current": current, "metrics": {}, "topics": {},
++           "method": "Official numeric facts and aligned source sentences. Wording changes are not a semantic policy verdict. No keyword coverage score."}
++    if not out["available"]:
++        out["status"] = "CURRENT_OR_PREVIOUS_NOT_RETRIEVED"
++        return out
++    if previous.get("scope") != current.get("scope"):
++        out.update(available=False, status="SCOPE_MISMATCH")
++        return out
++    out["status"] = "COMPARISON_READY"
++    for key in ("policy_action", "target_range", "vote"):
++        old, new = previous["facts"].get(key), current["facts"].get(key)
++        row = {"previous": old, "current": new, "change": None}
++        if old and new and key == "target_range":
++            row["change"] = [round((n-o)*100, 2) for o, n in zip(old["value"], new["value"])]
++            row["change_unit"] = "basis points"
++        row["status"] = ("NOT_COMPARABLE" if not old or not new else "UNCHANGED" if old["value"] == new["value"] else "CHANGED")
++        out["metrics"][key] = row
++    for key, (label, _) in TOPICS.items():
++        old, new = previous["topics"][key]["evidence"], current["topics"][key]["evidence"]
++        out["topics"][key] = {"label": label, "pairs": pair_evidence(old, new),
++                              "status": "EVIDENCE_AVAILABLE" if old and new else "PARTIAL_TOPIC_EVIDENCE"}
++    return out
+diff --git a/fed_snapshot_ui_v1.py b/fed_snapshot_ui_v1.py
+index 5e0e3e9..dd33c96 100644
+--- a/fed_snapshot_ui_v1.py
++++ b/fed_snapshot_ui_v1.py
+@@ -1,7 +1,7 @@
+ """Read one Fed artifact without Streamlit's stacked data caches."""
+ import hashlib
+ import json
+-from datetime import date
++from datetime import date, datetime, timezone
+ 
+ from fed_beige_evidence_v1 import snapshot_quality
+ 
+@@ -30,12 +30,16 @@ def load_snapshot(local_path, remote_url, get):
+ 
+ 
+ def display_quality(obj, today=None):
+-    today = today or date.today()
++    today = today or datetime.now(timezone.utc).date()
+     quality = dict(obj.get("quality") or {})
+     quality.update(snapshot_quality(obj, today))
+     if quality["freshness_status"] != "CURRENT" or quality["pit_status"] != "DATE_CHECKED":
+-        quality.update(quality_gate="DEGRADED", quality_status="UNVERIFIED",
+-                       quality_reason="Snapshot is stale or document dates/availability are unverified.")
++        checks = quality.get("document_checks") or {}
++        problems = ", ".join(f"{key}: {value}" for key, value in checks.items() if value != "CURRENT")
++        note = ("Snapshot predates today's verification." if quality["freshness_status"] == "STALE" else
++                "Date/source checks: " + (problems or "not yet verified") +
++                ". A missing publication date does not mean missing document text.")
++        quality.update(quality_gate="DEGRADED", quality_status="UNVERIFIED", quality_reason=note)
+     return quality
+ 
+ 
+diff --git a/tests/fixtures/fed_communication/20260729-transcript.txt b/tests/fixtures/fed_communication/20260729-transcript.txt
+new file mode 100644
+index 0000000..4f0ee98
+--- /dev/null
++++ b/tests/fixtures/fed_communication/20260729-transcript.txt
+@@ -0,0 +1,551 @@
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 1 of 21
++
++Transcript of Chairman Warsh’s Press Conference
++July 29, 2026
++
++CHAIRMAN WARSH.  Good day.  My second FOMC Committee meeting as Chairman
++has come quickly.  It’s probably too early to call it a streak, but our discussions again were
++collegial and constructive.  I’m truly lucky to work with colleagues so capable and mission
++focused, and so determined, like I am, to sharpen the performance of the Federal Reserve.
++Today, as you know, our Committee decided to vote by a 9-to-3 vote to maintain the
++target range for the federal funds rate at 3½ to 3¾ percent.  The Committee is continuing its
++policy of making ample reserves in the banking system.  The economy is showing impressive
++resilience.  Even with recent shocks, the trends are positive and reveal solid growth.  Job gains
++have kept pace with the workforce, and the unemployment rate has changed little.  Inflation
++remains elevated relative to the Committee’s 2 percent goal.  The Committee remains resolute.
++You’ve heard this before, but we will deliver price stability.
++As before, the policy statement conveys just the facts.  It’s steering clear of forecasting, a
++choice we consider especially prudent at these uncertain times.  Uncertainty, however, does not
++mean a lack of clarity.  For some households, businesses, and market professionals, five years of
++high inflation have left a mistaken impression that’s hard to shake—that the Fed’s implicit
++inflation target was somehow above 2 percent.  Let me reiterate:  There is no soft inflation target;
++there is no soft implicit target—not on this Committee’s watch.  There’s only a target, and it’s 2
++percent.  Not one of my FOMC colleagues is under any illusion.  We’ve begun a new chapter,
++and we understand that the five-plus years of inflation above target cannot be cured in nine
++weeks—or by a single month of modest price decreases.
++This Fed will not waver.  Our credibility rests on performing our duties and delivering on
++our responsibilities.  Americans are right to expect that because our nation’s prosperity depends
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 2 of 21
++
++on it.  To the regulars here in the press room, today’s assessment might sound familiar.  Yet there
++was nothing inertial about our discussions, our policy, or our strategy.
++Two economic developments are worth highlighting.  The first is a very notable change
++since our last meeting 42 days ago:  Nominal and real yields are materially higher across the
++Treasury curve.  In fact, some of the increases in market interest rates between FOMC meetings
++are among the most significant in the last two decades, ranking around the top decile or so.
++But if the Committee didn’t change its policy rate, what happened?  In the intermeeting
++period, market attention centered on real data and real economic developments.  Prices reacted in
++real time to incoming information, and the reduction in forward guidance may have been a
++factor.  Market participants are learning to play the ball, not the referee—and market prices will
++continue to respond in the direction and magnitude they see fit.  This is, in my view, a change for
++the better—and we’re just getting started.  After all, the central bank need not always and
++everywhere be the center of attention.  I understand the desire for rolling forecasts and
++commentary from this Committee.  But for our part, we need to observe market reaction to
++developments, direct and unfiltered.  I want to stress, of course, that decisions by this Committee
++matter a great deal.  And where necessary and appropriate, we will not hesitate to act.
++A second economic development is one that I noted at the congressional oversight
++hearings this month, but it’s worth repeating.  The most striking feature of the economy is the
++strong growth of business investment.  The surge in high-tech capex has been remarkable.  But
++that does not necessarily make the Fed’s role any easier.  In the AI-related category of high-tech
++equipment and software, the most recent data shows four-quarter growth rates of nearly 20
++percent.  This is helping to sustain the healthy momentum of manufacturing output.  More
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 3 of 21
++
++generally, capex is preparing the ground for future growth.  Nonetheless, the precise timing and
++magnitude of effects on the supply side remain hard to predict.
++FOMC meetings produce policy decisions.  But just as important is candid discussion of
++the big things that matter most.  That, too, is a priority in this new chapter at the Fed.  In our
++meeting, vigorous discussion centered on four questions, which I will enumerate.
++First, we talked a lot about the implications of the past five years of high inflation on the
++current policy conjuncture.  To, to echo an old phrase, has the past really passed?
++Second, my colleagues and I considered the economic shocks of recent years.  Strained
++supply chains arising from the pandemic, military conflicts, energy supply disruptions,
++substantial increases in tariff rates, and, yes, the surge in AI-related investment.  These differ in
++their sources—do they also differ in their effects on output and employment?
++Third, we took up the related question of price increases arising from shocks.  The
++business capex boom, for example, is driving up prices of memory and logic chips and
++associated AI infrastructure.  Do those changes indicate a broader inflationary dynamic, or do we
++just focus on them because they are under the bright streetlight?
++Finally, we discussed monetary policy tools and strategies for achieving stable prices.  If,
++as the Fed has long held, interest rate policy should be its primary monetary policy instrument,
++how much accommodation are we getting from the balance sheet?
++In all of this, our work is advancing at the Fed.  We’re asking the right questions.  And in
++this consequential time, we know how very much depends on getting the right answers.
++Of course, you’ve all arrived with questions of your own, so let’s turn to them now.
++MICHELLE SMITH.  Let’s start with Steve.
++STEVE LIESMAN.  Thank you for taking our questions, Mr. Chairman.
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 4 of 21
++
++CHAIRMAN WARSH.  Sure.
++STEVE LIESMAN.  You’ve had a couple months now, or nine weeks—whatever
++number it is—to see the markets behave in the absence of forward guidance.  I’m wondering if
++you could tell me—what message are you getting from the markets as to where policy ought to
++be right now?
++CHAIRMAN WARSH.  Yeah, so I think officially it’s eight weeks and four days.  But,
++I’m not counting.  [Laughter]  The message from markets is the message from markets.  What
++I’ve really been trying to do, Steve, as I think you appreciate—and your colleagues appreciate—
++is getting an unfiltered message from markets.  Getting a direct message.  Letting buyers and
++sellers meet at prices for Treasuries—for the foreign exchange value of the dollar.  And then
++trying to judge for ourselves—what does that mean about our remit?  How are we doing on
++inflation?  How are we doing on employment?  We’re trying not to interfere with that market
++signal.  That’s part of the reason why we’ve been somewhat spare on our words when we pulled
++back from forward guidance.  So they’re reacting to events, I would say, much more directly
++over the 42 days since we last met.  This is a good thing.  As I mentioned in the prepared
++remarks, we’ve seen a material tightening, not just in nominal rates, but in real rates, too, and
++we’re observing it.  We’re trying to stay out of that because, you know, many of you might be
++interested in our reaction function—we’re interested in the reaction of financial markets.
++STEVE LIESMAN.  I—I get that, Mr. Chairman.  And I guess the follow-up question is,
++if the markets are talking to you, what do you hear them saying?  And if it’s “real rates are
++higher,” it would suggest that that’s where the funds rate ought to go.
++CHAIRMAN WARSH.  Yeah, so—
++STEVE LIESMAN.  And—sorry.
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 5 of 21
++
++CHAIRMAN WARSH.  I’m sorry—it’s your question.  So interpreting markets is an
++imperfect business.  We central bankers, like market pros, can think these things are
++overdetermined.  But let me offer some speculation.  First, as we said in the FOMC statement
++that you got at two o’clock, the economy—output is solid.  Capex and productivity are strong—
++labor markets—solid, steady.  The bond market—the Treasury market—it seems to be saying
++that as well.  If I were to try to break down—just aggregate the Treasury market signals—I
++wouldn’t be able to do it perfectly.  But the bond market’s saying many of those same things, and
++that’s why we’re seeing a tightening both in nominals and in reals, even while, at some level, we
++haven’t done much in 42 days.  The markets have done quite a bit.
++MICHELLE SMITH.  Claire.
++CLAIRE JONES.  Thank you.  Claire Jones, Financial Times.  You seem to have got the
++family fight you were after at this meeting.  [Laughter]  We saw three—we saw three dissents.
++Could you characterize the arguments that those dissenters put forward, please, and tell us a little
++bit why you weren’t persuaded by them at this stage?  Thank you.
++CHAIRMAN WARSH.  So I guess I shouldn’t give you their best arguments.  I’ll give
++you some others.  [Laughter]  So you’re right.  I asked for a good family fight, and I got one.
++That’s the purpose; that’s the design feature.  I come into this meeting, even this press
++conference, heartened by what I’ve experienced the last two days.  Most of our discussion were
++on the big questions that matter to the conduct of monetary policy.  We, we didn’t sort of hide
++from them—we weren’t scared of them.  There was a lot more interaction between and among
++my colleagues.  It was a real family fight.  My view, which you’ve long heard, is that’s the better
++way to get policy right.  That’s our North Star.
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 6 of 21
++
++So there was a lot of agreement that I heard—that we have the powers, the tools—also
++the authority to deliver stable prices.  No walking back from our responsibilities—there was a
++large majority support for the decision that we made in the room, but I also want to leave you,
++Claire, with one other impression.  There was nothing inertial about that discussion.  It was an
++active, robust discussion about what’s in the full range of what we can do, and might want to do,
++in the period ahead.  You characterized accurately—there was a disagreement about a decision
++today.  I would say that doesn’t sort of capture the full essence of the discussion.  The path to
++central bank heaven requires delivering on our remit.  These days, that means delivering on price
++stability.  I wouldn’t measure that path in 42 days—or any one particular meeting.  And I came
++out of that meeting even more confident that this is the right team to win the battle against high
++inflation.
++CLAIRE JONES.  How much do you think not going in July was down to the cool CPI
++“print” for June?
++CHAIRMAN WARSH.  So, in two words, not much—not much—I’d like to believe that
++the Committee shares my views, which is the historic problem with data dependence is the data
++and the dependence.  We are not relying on any one individual piece of data as cover or as an
++excuse or as validation.  What I care about, and what I think the Committee cares about, is trends
++on the data.  Sure, we got some encouraging inflation data.  I think at the meeting 42 days ago I
++said something like “63 months of inflation above target.”  I didn’t say “64,” though the final
++calculation might, might be a close one.  So we’ll be—we’ll be watching inflation data over the
++period ahead, but I also don’t want you to leave the misimpression that we’re sort of breathlessly
++waiting that.  I’ve called for a task force to revisit both the private and public data we use to
++make our decisionmaking.  That task force is out doing their work.  I’ll be checking back in with
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 7 of 21
++
++them in the next couple of weeks, but I wouldn’t say we overly relied on, on any one piece of
++data, including that data, which surprised some a couple of weeks ago.
++MICHELLE SMITH.  Neil.
++NEIL IRWIN.  Hi, Chairman Warsh, thanks.  Neil Irwin with Axios.  Thank you for
++taking our questions.  So the fed funds rate is now about 75 basis points below the two-year
++yield—suggests markets think you’ll have to tighten eventually—about 100 basis points below
++most Taylor rule estimates.  You’re hitting your employment mandate; inflation stays high.  Why
++should rates not be higher today?
++CHAIRMAN WARSH.  There’s a lot in there, Neil.  So rates are higher today than they
++were 42 days ago.  Markets have made decisions because we stepped back, in part, from trying to
++influence those.  Market judgments have moved up on what nominal rates are across the
++Treasury curve.  That doesn’t mean we take them as—by dictation, but we’re observing them.
++So I think it’s a mischaracterization to say that markets haven’t reacted because we didn’t move
++today.  Markets are reacting in real time.  In the period ahead, we’ve got important decisions to
++make about the policy rate.  Markets in the intervening period, I think, have quite a bit of
++decisions to make.  I’ll see if I can put it this way:  Monetary policy matters not just by what we
++say, or even what we do—monetary policy matters by how it affects the real economy.  And
++these prices that we see in financial markets is one of the many ways in which it affects the real
++economy.  We’ll be continuing to watch that market information—see how it responds to
++incoming events—and that can help inform our decisionmaking when we meet in seven or eight
++weeks.
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 8 of 21
++
++NEIL IRWIN.  How would you characterize, of the—in the family fight the last couple
++days—of you and the other eight members who wanted to hold?  Was that a strong conviction, or
++was that a hair-trigger close call on holding versus tightening?
++CHAIRMAN WARSH.  Well, I think, you know, the vote—the vote was 9 to 3.  The
++broader discussion, to my ear, over the course of the last days showed a lot of agreement on the
++hard questions—the four questions I raised at the outset about what’s really happening in the
++economy with the shocks and absent the shocks.  What are our tools and our capabilities?
++What’s the effect on prices and on output?  I heard a lot of commonality on the questions.  Were
++there different “leans” on the answers?  You bet there was.  So could people come to different
++conclusions?  Absolutely.  But my own judgment is this is a period of watchful thinking, not
++watchful waiting.  And I think the score on that vote was unanimous.
++MICHELLE SMITH.  Colby.
++COLBY SMITH.  Thank you, Colby Smith with the New York Times.  You’ve mentioned
++that looking at the Fed’s policy tools as one element of a three-pronged strategy to address the
++inflation problem.  So I’m curious how you view the effectiveness of those tools.  If inflation is
++too high and not coming down, is the best remedy to raise interest rates?
++CHAIRMAN WARSH.  So that’s—that was the discussion the last two days.  Is that the
++dominant remedy?  If inflation continues to be elevated through the forecast period, interest rates
++could well be part of that solution.  But I wouldn’t say it’s in isolation.  I tried to describe in my
++remarks today the point that I made in—to the oversight committees a couple of weeks ago.  I
++think there was a misimpression—by some in financial markets, by some households and
++businesses—that central bankers like me—we set a 2 percent inflation target, but maybe we were
++more tolerable of a somewhat higher inflation target.  In economics, we’d call that the revealed
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 9 of 21
++
++preference.  And so might it have been rational for people to think, “Well, their inflation target’s
++somewhat higher”?  The—what I heard in the last two days—what I’ve heard in eight and a half
++weeks is “no.”  We will deliver the 2 percent inflation target.  That is the Committee’s definition
++of price stability.
++So one way, absent the tools that you reference, to ensure that we get there is ensure that
++expectations are centered around the right number.  And I think we’ve made some progress on
++that.  I am not suggesting we’re done on that.  It’s worth reiterating.  And, ultimately, the
++business we’re in, Colby, is performance.  We’re going to be judged by how we perform.  And
++that’s what we intend to do with the inflation target—making clear expectations is one part of it.
++Making sure we demonstrate we’re responsible for it—we’re not blaming is another—and our
++policy tools, like you referenced, is the third and equally consequential part.
++COLBY SMITH.  How are you factoring the fact that a large portion of the inflation
++overshoot is being caused by supply shocks—as it’s mentioned again in, in the statement—does
++that blunt the effectiveness of rate hikes in your view?
++CHAIRMAN WARSH.  First, on the premise of your question, it was almost as if you
++were listening to our discussion in the last day and a half.  A lot of our focus was on trying to
++understand and identify underlying inflation dynamics amid shocks.  We take these shocks
++seriously.  There’ve been a series of them that have been hitting this economy.  We’re not
++looking through them and saying, “Oh, they don’t matter.”  But we’re trying to understand is—to
++what extent are these shocks broadening in their effect—broadening in their impact on prices that
++are quite far removed from it?  Our goal is to have growth that is broadening and inflation that is
++becoming more limited—more circumscribed.  I’ll be the first to admit the shocks make this job
++and this policy conjuncture a little tougher.  But that’s among the chief questions we’ve asked
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 10 of 21
++
++ourselves.  And, around the room, people have different views on it.  I tend to think, in the
++coming months, we’re going to refine that view and have a better judgment, and we’re going to
++have market prices trying to help inform it, too.
++MICHELLE SMITH.  Edward.
++EDWARD LAWRENCE.  Thank you, Mr. Chairman.  Edward Lawrence from FOX
++Business.  I guess I want to drill down maybe a little bit—what specifically in your mind would
++be the argument, then, for a pause today?
++CHAIRMAN WARSH.  So I wouldn’t characterize what we did as anything like a pause.
++I would characterize what we did as a rigorous review of the economic situation.  I would
++characterize what we did as a review of the big, hard questions.  And I’d characterize it as a view
++of what our own homework is to try to resolve those questions in the period ahead.  If you were
++to try to force a description that this was a pause, I would say financial market prices would take
++the other side of that.  Financial market prices in this intermeeting period—they didn’t pause.
++They reacted to the inflation data in one direction—strong economic growth in the other
++direction.  And nominal and real rates went up.  Did the Fed take an explicit change in its policy
++rate today?  No.  But I think that’s the beginning of the story, not the end of the story.
++EDWARD LAWRENCE.  And, and, if I could, I did want to ask—not forward guidance,
++but looking forward [laughter]—traditionally, a Federal Reserve Chairman uses the Jackson Hole
++summit as, as sort of a reset of monetary policy.  How do you look at the speech that you’re
++going to make in August?
++CHAIRMAN WARSH.  I look at it like a blank piece of paper right now.  I, I have not
++begun consideration with the incredible team here what would go into that document.  I think
++you characterized it correctly.  Historically, at least for my first tour of duty at the Fed, the more
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 11 of 21
++
++recent periods—it would be sort of a setting-up speech more often than not—of what was going
++to be happening in the fall.  I haven’t made any judgments on that.  But those are judgments
++we’ll have to come to.  If I could, in the high mountain air in Jackson, Wyoming, I’d like to also
++frame the big questions.  There is a tendency, especially with the proliferation of meetings and
++press conferences, to get caught up in the myopic:  “Did you do this by a quarter, or do that?”
++Ultimately, whether we deliver on price stability matters some—the decisions we make in six- or
++seven- or eight-week periods.  But they matter more—what are the big questions?  What’s really
++happening with productivity?  What’s really happening with demographics?  What’s really
++happening to the global economy amid the shocks?
++Haven’t made a decision whether it’s going to be a big-picture speech or whether it’s
++going to be a more traditional set up for all the action we’re going to have between September
++and December—I will tell you one other thing that I am doing between now and Jackson Hole—
++is I’m checking with those task forces.  My first principle of establishing a task force is—find the
++best subject matter experts anywhere in the world and put them together—especially put them
++together with other people who might disagree with them.  In the next couple weeks, I’m going
++to be doing a check back in—giving them time to sort of think hard about their agenda, their
++debate, their schedule, and when they might be ready for prime time.  I’ll be doing a little bit of
++that checking, and that may or may not inform anything I have to say in Jackson.
++MICHELLE SMITH.  Nick.
++NICK TIMIRAOS.  Nick Timiraos, the Wall Street Journal.  Chairman Warsh, I want to
++follow up on Colby’s question about policy transmission.  You’ve said there’s no cruel choice
++between stable prices and full employment.  Rates bring inflation down by cooling demand.  It’s
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 12 of 21
++
++generally thought that can show up in the labor market.  If that’s not the channel you’re relying
++on, what is?
++CHAIRMAN WARSH.  Yeah, so let me go back to first principles, Nick.  I don’t believe
++that either part of our mandate is generally at war with the other part.  I do not believe that price
++stability and full employment is an either-or proposition.  There have been policymakers over the
++last several generations who have thought that there is a strict tradeoff there.  That isn’t my
++judgment.  In fact, my judgment is, if and when we deliver on our remit, we’re going to be
++satisfying both prongs.  We’re going to have price stability and full employment.  And, in fact, if
++you want to do the most harm to the labor markets, you would run a period of high inflation
++that’s variable such that employers—businesses —wouldn’t really know what’s going on.  So I
++think the two parts of our mandate are equally important.  We have no legislative orphans here.
++I’ve been talking mostly about price stability because we’re doing pretty well, collectively, as a
++country—as policymakers—on the full-employment side.
++But we’re doing considerably less well on prices.  That’s why we describe them as
++elevated, and that’s what’s taken most of our discussion.  In terms of transmission mechanisms
++of monetary policy, I think different tools work through different transmission mechanisms.  The
++interest rates work through lending channels and credit channels—maybe confidence channels
++and foreign exchange.  The balance sheet probably works through some other channels, like
++signaling and portfolio balance.  We’re keeping full abreast of all these tools and making policy.
++But if the suggestion is somehow we’re going to be fine-tuning aggregate demand so it catches
++supply, that’s not my mental model.  I don’t think we’re great in the fine-tuning business.  We’re
++trying to get supply and demand in broad order, but, really, what we’re doing as we sit here
++today at this press conference—is I think we’ve got a reasonable sense of what aggregate
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 13 of 21
++
++demand looks like in this economy.  We’re inferring aggregate supply.  We’re making a
++judgment about what productivity is.  And, in some sense, there’s a race between supply and
++demand.  And the surge in business capex in and around AI is making that calculation a little
++harder to judge, but in the period ahead, we’re going to be trying to judge just that.
++NICK TIMIRAOS.  And if I could ask, where exactly was the disagreement today?  Was
++it about the inflation forecast, or was it something more around the, the risks—the, the tactics?
++CHAIRMAN WARSH.  Yeah, so I’m going to let the—I’ll let the dissenters speak for
++themselves.  The way I heard it over the last two days was overwhelming agreement on
++objectives and authority and commitment.  I didn’t hear anybody walking away from it.  The
++judgments as to how best to achieve the price stability—that was probably the question that we
++were trying to answer.  What’s the best move?  What’s the best strategy?  What’s the best way to
++achieve it?  And a second question that was asked is, when do we need to make those harder
++calls?  When do we need to make those decisions?  And like I said to one of your colleagues, I
++was comforted that markets in the intermeeting period weren’t reacting to us—they weren’t
++reacting to dots or to speeches—they appeared more than ever to be reacting to real-time events.
++So they’re gauging themselves the—how restrictive the Treasury curve should be.  And that, I
++think, has been a useful development.  We don’t endorse any particular market move, but it also
++suggests we observe them with keen interest.
++MICHELLE SMITH.  Jonnelle.
++JONNELLE MARTE.  Jonnelle Marte with Bloomberg.  Following up on that, there was
++more uncertainty in the markets about what the Fed would do at this meeting.  To some extent
++you might think that’s what you want to see, but my question is about—is there a point at which
++you would not want to surprise the markets if they were pricing in something with higher
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 14 of 21
++
++certainty that was opposite of what you were intending to do?  What are the risks that you see
++associated with that?
++CHAIRMAN WARSH.  Yeah, so it’s a good question.  Surprise is not the objective
++function.  Surprise is not what we’re solving for.  We have a clear North Star.  What we’re
++solving for is how to make the best decisions.  Almost everything else should be in service to
++that goal.  By not spoon-feeding markets, by not previewing our decisions, by not sort of giving
++nudges and leans, my colleagues and I have found in the intermeeting period what we’re getting
++is the views from a very accomplished [group of] economists.  That’s the internals of financial
++markets. Instead of just repeating or echoing what we’re saying back to us, they’re giving us
++somewhat—not perfect—their own judgment.  So surprises are not the objective.  But, at the
++same time, I would say, we didn’t come into this meeting feeling constrained by the full range of
++alternatives we had in front of us.
++JONNELLE MARTE.  So some of your peers have continued to discuss how they think
++about policy decisions, and if you don’t offer your reaction function or your way of thinking
++about it, how concerned are you that you’re ceding control of the narrative?
++CHAIRMAN WARSH.  So, not very concerned—that’s a short answer to the question.
++When some people that follow the Fed say, “Well, we don’t want your forecast—we don’t want
++your dot—we just want your reaction function,” part of me hears the—“What we really want is
++your forecast; what we really want is your dot.”  In terms of reaction function, let me sort of
++disabuse people of a question that may or may not be real and be out there.  Any central banker,
++especially a central banker where the labor markets are more or less at equilibrium—any central
++banker, when he or she sees underlying inflation moving higher—he or she is more inclined to
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 15 of 21
++
++tighten policy.  Again, when you’ve achieved the other side of your mandate and you see
++underlying inflation falling, he’s more inclined to loosen policy.
++That’s my reaction function, and I don’t suspect it will cause people to not continue to
++pry for more because the truth is, for a very long time, in a lot of countries, coming out of the
++2008 crisis, where in crisis mode we were purposely providing a lot of information—trying to
++provide a lot of assurance, trying to tell people exactly what we’re going to do, offering forward
++guidance with clarity—as if we’re tying our own hands behind our back.  Well, in crisis mode,
++that strikes me as a very prudent policy.  But in more benign conditions, it strikes me as worth
++revisiting.  But markets and market participants and reporters have learned to devour all that
++information, so I take seriously that the pullback of forward guidance requires some transition.
++Reform isn’t easy, but our general judgment is going to help us make better decisions and, in so
++doing, satisfy our remit.
++MICHELLE SMITH.  Paul Wiseman.
++PAUL WISEMAN.  Thank you.
++MICHELLE SMITH.  It’s coming.  There’s a mic coming.
++PAUL WISEMAN.  Thank you.  When you talk about the 2 percent inflation target, what
++measure are you relying on?
++CHAIRMAN WARSH.  Yeah, so I’ll give two answers.  First, let me give the proper,
++standard answer.  The, the Federal Reserve every January outlines a statement of purposes and
++strategy, and in that strategy document, which I believe was dated January of this year, it
++describes a measure of PCE inflation as the—as the objective function there.  I have enough of
++my—so that, that’s our number—we’re sticking with it.  Who knows, come after next January,
++what we might say about strategy.  I suspect the task forces might, might have something to add.
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 16 of 21
++
++But I’ll say this:  Some version of the Lucas critique, some version of Goodhart’s law, in
++economics should remind us that when we talk about measures of inflation or something else and
++we describe those measures as being consistent with our objectives, we might make them such
++that they’re not very good measures or very good objectives.
++Broadly, if you said to me standing in front of you, “I abide fully by the strategy
++document—we’re going to deliver 2 percent inflation,” and not a whisper more—but to achieve
++that, I’m looking at a broader set of inflation data than PCE.  So without sort of fully revealing
++my cards, I’m trying to understand, like my colleagues—what’s the underlying generalized
++change in prices that are happening in the economy?  It is not a perfect science.  I might have
++said 42 days ago, “I’ve got a task force for that.”  But we have a data project that’s trying to look
++and see whether we can’t separate the noise from the signal.  And so if you would hear a
++message from me—yes, I care about what the PCE “prints” are.  I care about what the
++contributions are from CPI and everything else.  But my—my lens is broader than that, even
++though the remit is quite narrow.
++MICHELLE SMITH.  Mike McKee.
++MICHAEL MCKEE.  Michael McKee from Bloomberg Radio and Television.  I’m
++struggling a little bit with some of what you’ve said today, and maybe you can help clarify this.
++You’ve said over and over again that your job is to bring down prices—to get prices stable—to
++hit your target and that you will hit your target.  The market says you’re not there yet because
++they’ve raised rates.  But all you’ve talked about today is talking about it, and it’s not like
++members of the Committee weren’t there before you talking about it.  So I guess what the
++American people might be asking is, what are you waiting for?
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 17 of 21
++
++CHAIRMAN WARSH.  Yeah.  So, believe it or not, this press conference is not all I’ve
++done today.  We have spent an inordinate amount of time in the last two—two days—two weeks
++looking at our monetary policy strategy, evaluating our tools—thinking hard about the sources of
++data that we have at our disposal and we wish we had.  We’ve also thought hard about the period
++ahead.  What among these questions will be answered with more clarity?  Certainly not
++certainty—so the decision we made today—the discussion we had in that room was the farthest
++thing from inertia I can imagine.  As a point estimate at this very moment, in a choice between
++two alternatives, you heard the results of it, but I would tell you that this discussion was far more
++robust.  And our thinking about how best to achieve that target is advanced, and over the coming
++months I expect it to be advanced much more significantly.  If you were to sort of—if I were to
++steal a follow-up question, I won’t let you—you won’t be giving it up.  If I were to steal a
++follow-up question, “Well, what’s—what’s the world think about what you’ve done?”  I would
++again reiterate what we do isn’t just about what we say—it’s not just about what we do—we’re
++in the performance business.
++And so, so if I look at the Treasury curve, if I look at the dollar, if I look at a lot of things
++that are internals inside of financial markets, I think what they’re broadly saying is that this
++Committee does own it—has the credibility to deliver it.  And they believe, like I do, that we
++will.  But I don’t want to leave you with a misimpression—we’ve got no magic wand.  This isn’t
++something that we’re going to be able to carry out in days or weeks.  But we’re going to deliver
++on the responsibility that Congress gave us, and today’s meeting—and the preparation for
++today’s meeting—was an important step towards that destination.
++MICHAEL MCKEE.  I’d like to follow up on the task forces as well and ask—what
++vetting did you do of the people that you appointed to the task forces?  In particular, given Marc
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 18 of 21
++
++Andreessen’s substantial political spending—$25 million in just the past year to back candidates
++who oppose stricter I—AI regulation—how can the public be confident that a committee he co-
++chairs will provide an independent assessment of AI’s economic effects, rather than one aligned
++with the interests of the AI industry?
++CHAIRMAN WARSH.  Yeah, so I selected 15 incredible subject market—subject matter
++experts to tackle five of the most important questions that, if we get the answers right, we’re
++going to do a far better job in delivering.  And if we get the answers wrong, we have a problem.
++The comfort that I can give you and your listeners is, we’re the decisionmakers.  The Chairman
++of the Board of the Federal Reserve and the members of the Board and the FOMC—we will be
++the consumers of the outputs from five different committees.  The judgments we’re making will
++be informed by—but not at all determined by—these outside groups.  My theory of the case in
++establishing the task forces were to pick people with extraordinary talent, depth of expertise, and
++a divergence of views inside every committee so they, too, can have a family fight.
++This is not outsourcing to people that aren’t known and haven’t been vetted—this is
++seeing whether new ideas can catalyze a broader, better, more-informed discussion inside the
++room.  And I’m very confident that we’re going to be able to do that.  I am impressed by the
++credentials of these 15 people.  And, full disclosure, I’ve known almost all of them for a very
++long time, and I think they’re going to give their best views on the subject.  But, ultimately, these
++are decisions we’re going to make, and we’re accountable to our oversight committees and to the
++remit Congress gave us to deliver.
++MICHELLE SMITH.  Ann.
++ANN SAPHIR.  Hi, Ann Saphir with Reuters.  Nice to see you again—so I need a little
++help here, too.  You’ve—you’ve said repeatedly you have no tolerance for inflation.  And yet we
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 19 of 21
++
++are seeing above-target inflation repeatedly for five years and through your term so far.  And
++sure, you have no magic wand, but you have not taken action.  You just gave us a little peek at
++your reaction function as well.  You said that, if underlying inflation is rising, that you would
++tend to think that you might need to tighten.  And, with the exception of the most recent inflation
++“print,” that is what we’ve been seeing.  So could you explain what you mean by “no tolerance
++for inflation” and what you plan to do about it?
++CHAIRMAN WARSH.  Sure.  So, Ann, I hear from you what I hear more broadly from
++households and businesses:  impatience.  “Deliver it already.”  This is not a—this is not an
++excuse.  This is a fact—this FOMC—this Board has been in business for eight and a half weeks.
++This—the, the patience—the impatience that households and businesses feel have been going on
++for 63 months.  We are on the job; we will deliver.  We are focused like a laser on making sure
++we can do it.  But the suggestion that we’re going to be able to do it with our magic wand is one I
++want to disabuse you and everyone else of.
++But the discussion in the last two days give me more confidence, even than I had eight
++and a half weeks ago.  This team that we have at the FOMC, the support that we have from
++Board staff, and the new hard questions we’re asking—we need to resolve those and, as we
++resolve those questions, get smarter on those.  We’re going to deliver on the remit.  You don’t
++have to take my word for it.  If you look broadly at market prices, they are certainly not saying
++“all clear,” but they are working in concert to, to keep us on our toes, and they have tightened
++financial conditions in this intermeeting period.  And, and that has given us a—that has provided
++us some—some comfort that, that we’ve got the ability and capability to deliver.
++ANN SAPHIR.  And, and is your read, or your, I guess, faith in markets’ ability to sort of
++make a judgment and then you to take signal from that judgment—is that—how does that affect
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 20 of 21
++
++you when you come up on the September meeting and markets are seeing a near 100 percent
++chance of a rate hike, as they see now?  How does that feed into your decisionmaking and your
++thinking?
++CHAIRMAN WARSH.  So we’re not going to be constrained by market prices.  We’re
++not going to be constrained or take verbatim from what the market’s doing.  But I think it’s
++useful, Ann, to understand that markets can be a very good source of information—not a
++determinative source—not a perfect source.  But if we’re trying to land the plane and deliver 2
++percent inflation and we take a very useful source of information and we get it all fogged up by
++giving it our own forecast—by providing rolling commentary—I can assure you that we’re going
++to have less information—less ability to land the plane successfully and deliver price stability.
++We’re just trying to make sure that that source of information is as direct and unfiltered as
++possible.  It isn’t to the exclusion of data sources and opinions and other surveys, but if you’re
++hearing from me, we wanted to make sure we’re getting a better source of information.  I think,
++in a relatively short time, we are.
++MICHELLE SMITH.  We’ll go to Brian Cheung for the last question.
++BRIAN CHEUNG.  Hi there, Chairman Warsh.  Brian Cheung with NBC News.  So you
++said you’d be open to having press conferences when there’s news to make.  So, today, no
++change to rates, no forward guidance—for the average household, I guess, what was the news
++today?
++CHAIRMAN WARSH.  So, apparently, it was news that I had a press conference.  Let
++me just see if I can offer some clarity on that.  Between now and year-end, my predecessors and
++the Federal Reserve committed to press conferences this year.  I’m committing to press
++conferences this year.  That might be news to the people in this room, and of no particular
++July 29, 2026   Chairman Warsh’s Press Conference  FINAL
++
++Page 21 of 21
++
++interest to your viewers and your—[laughter]—and your readers back at home.  What I can offer
++as assurance is that the Fed’s on the case—that this Fed Chairman feels better about this Board
++and this Committee’s ability to deliver than I did when I showed up here on the first day.  And I
++showed up pretty confident.  I’ve been heartened by the reception that I received.  No doubt in
++some of your commentaries today you’ll talk about a divided Federal Reserve, but that’s not the
++feeling I felt the last couple of days and the couple days before it.
++What I felt was a group of professionals—all the different perspectives, different views,
++different judgments—but eager to roll up their sleeves and have a family fight and eager to
++reform the way in which the Fed does policy—a keenness and open-mindedness and curiosity
++about that.  So we have a far better chance to deliver on the remit that Congress gave us, and so I
++want to leave you with the optimism of a new central banker that we’re committed as ever to
++deliver and to offer an assurance we will.  Thank you all very much.
+diff --git a/tests/fixtures/fed_communication/20260916-press-page.html b/tests/fixtures/fed_communication/20260916-press-page.html
+new file mode 100644
+index 0000000..2f6b623
+--- /dev/null
++++ b/tests/fixtures/fed_communication/20260916-press-page.html
+@@ -0,0 +1,3 @@
++<html><body><p>FOMC Meeting Statement:<br/>
++<a href="">PDF</a> | <a href="/newsevents/pressreleases/monetary20260916a.htm">HTML</a> <span class="time--sm">(Released
++                    September 16, 2026 at 2:00 p.m.)</span></p><p><a href="/newsevents/pressreleases/monetary20260916a1.htm">Implementation Note</a> <span class="time--sm">(Released September 16, 2026 at 2:00 p.m.)</span></p><p>Projections Materials:<br/><a href="/monetarypolicy/files/fomcprojtabl20260916.pdf">PDF</a> | <a href="/monetarypolicy/fomcprojtabl20260916.htm">HTML</a> <span class="time--sm">(Released September 16, 2026 at 2:00 p.m.)</span></p><p>Minutes: <a href="/monetarypolicy/files/fomcminutes20260916.pdf">PDF</a> | <a href="/monetarypolicy/fomcminutes20260916.htm">HTML</a> <span class="time--sm">(Released October 07, 2026 at 2:00 p.m.)</span></p></body></html>
+diff --git a/tests/fixtures/fed_communication/20260916-statement.html b/tests/fixtures/fed_communication/20260916-statement.html
+new file mode 100644
+index 0000000..0455128
+--- /dev/null
++++ b/tests/fixtures/fed_communication/20260916-statement.html
+@@ -0,0 +1,62 @@
++<div id="article">
++<div class="heading col-xs-12 col-sm-8 col-md-8">
++<p class="article__time">September 16, 2026</p>
++<h3 class="title">Federal Reserve issues FOMC statement</h3>
++<p class="releaseTime">For release at 2:00 p.m. EDT
++
++                <ul class="list-unstyled">
++<li class="share btn-group">
++<a aria-labelledby="shareMenu" class="dropdown-toggle shareLink" data-toggle="dropdown" href="#" role="button" title="Share">Share<span class="icon icon__sm icon-share icon--right"></span></a>
++<ul class="dropdown-menu shareDL__dropdown shareDL__dropdown--inline shareDL__dropdown--right" id="shareMenu" role="menu">
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable" href="https://twitter.com/share?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&amp;text=Federal Reserve issues FOMC statement&amp;via=FederalReserve">
++<!--<span class="icon icon__sm icon--centered icon-twitter-color"></span> -->
++<span class="icon icon__sm icon--centered icon-twitter-color"></span>
++</a>
++</li>
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable" href="https://www.facebook.com/sharer.php?u=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&amp;name=Federal Reserve issues FOMC statement">
++<!--<span class="icon icon__sm icon--centered icon-facebook-color"></span> -->
++<span class="icon icon__sm icon--centered icon-facebook-color"></span>
++</a>
++</li>
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable" href="https://www.linkedin.com/shareArticle?url=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm&amp;title=Federal Reserve issues FOMC statement&amp;mini=true">
++<!--<span class="icon icon__sm icon--centered icon-linkedin-color"></span> -->
++<span class="icon icon__sm icon--centered icon-linkedin-color"></span>
++</a>
++</li>
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable noIcon" href="https://www.threads.net/intent/post?text=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm">
++<!--<span class="icon icon__sm icon--centered icon-threads-color"></span> -->
++<span class="icon icon__sm icon--centered icon-threads"></span>
++</a>
++</li>
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable noIcon" href="https://bsky.app/intent/compose?text=https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm">
++<!--<span class="icon icon__sm icon--centered icon-bluesky-color"></span> -->
++<span class="icon icon__sm icon--centered icon-bluesky"></span>
++</a>
++</li>
++<li class="shareDL__item">
++<a class="shareDL__link icon__link sr-only-focusable noIcon" href="/cdn-cgi/l/email-protection#d0efb2bfb4a9edb8a4a4a0a3eaffffa7a7a7feb6b5b4b5a2b1bca2b5a3b5a2a6b5feb7bfa6ffbeb5a7a3b5a6b5bea4a3ffa0a2b5a3a3a2b5bcb5b1a3b5a3ffbdbfbeb5a4b1a2a9e2e0e2e6e0e9e1e6b1feb8a4bdf6a3a5b2bab5b3a4ed96b5b4b5a2b1bcf082b5a3b5a2a6b5f0b9a3a3a5b5a3f0969f9d93f0a3a4b1a4b5bdb5bea4">
++<!--<span class="icon icon__sm icon--centered icon-email-color"></span> -->
++<span class="icon icon__sm icon--centered icon-email-color"></span>
++</a>
++</li>
++</ul>
++</li>
++</ul>
++</p></div>
++<div class="col-xs-12 col-sm-4 col-md-4 hidden-sm"></div>
++<div class="col-xs-12 col-sm-8 col-md-8">
++<p>The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:</p>
++<p>The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point<strong> </strong>to 3-3/4<strong> </strong>to 4 percent, in support of the Federal Reserve's dual mandate. The Committee is continuing its policy of maintaining ample reserves in the banking system.</p>
++<p>Economic activity is expanding at a solid pace. While uncertainty remains elevated owing, in part, to geopolitical developments,<strong> </strong>domestic spending has been resilient. Productivity growth is strong, and capital investment is robust. Job gains have kept pace with the workforce, and the unemployment rate has changed little.</p>
++<p>Inflation remains elevated. Today's policy action will support a timelier return to the Committee's 2 percent goal. The Committee will deliver price stability.</p>
++<p>For media inquiries, please email <a href="/cdn-cgi/l/email-protection#0b666e6f626a4b6d7969256c647d"><span class="__cf_email__" data-cfemail="99f4fcfdf0f8d9ffebfbb7fef6ef">[email protected]</span></a> or call 202-452-2955.</p>
++<p><a href="/newsevents/pressreleases/monetary20260916a1.htm">Implementation Note issued September 16, 2026</a></p>
++</div>
++<div class="col-xs-12 col-sm-4 col-md-4">
++</div>
++</div>
+diff --git a/tests/fixtures/fed_communication/20260916-transcript.txt b/tests/fixtures/fed_communication/20260916-transcript.txt
+new file mode 100644
+index 0000000..3deb773
+--- /dev/null
++++ b/tests/fixtures/fed_communication/20260916-transcript.txt
+@@ -0,0 +1,385 @@
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 1 of 15
++
++Transcript of Chairman Warsh’s Press Conference
++September 16, 2026
++
++CHAIRMAN WARSH.  Good day.  In the meeting just concluded, the FOMC decided to
++raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in
++support of the Federal Reserve’s dual mandate.  The Committee is continuing its policy of
++maintaining ample reserves in the banking system.
++As noted in the policy statement, released just a short while ago, economic activity is
++expanding at a solid pace.  While uncertainty remains elevated—owing, in part, to geopolitical
++developments—domestic spending has been resilient.  Productivity growth—strong; and capital
++investment is robust.  Job gains have kept pace with the workforce, and the unemployment rate
++has changed little.
++But inflation remains elevated.  Today’s policy action will support a timelier return to the
++Committee’s 2 percent goal.  This Committee will deliver price stability.
++Now I’ll get into some further detail.
++Our decision comes at a time when the American economy appears to be strengthening.
++New hiring, private-sector earnings, business capital investment—each of these markers has
++improved in recent months and is pointing in a good direction.  Credit flows have been robust,
++particularly for businesses.  And, as I said at the policy symposium in Jackson Hole, I would be
++hard pressed to describe broad financial conditions as restrictive.  This view was widely shared
++by the Committee.  So we removed a dose of accommodation.
++Consider the geopolitical landscape of shocks and uncertainty, and you begin to
++appreciate the resilience of the U.S. economy.  Given that resilience, and the potential for even
++greater performance, an attitude of optimism is exactly what I heard inside the FOMC these last
++two days.
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 2 of 15
++
++One basic sign of strength is the state of America’s labor markets.  The jobless—the
++jobless rate remains low at around 4.1 percent, and both job openings and weekly hours have
++been increasing.  Unemployment claims, on a four-week moving average, are running at levels
++consistent with full employment.  So the labor side of the Fed’s congressional remit is in good
++shape.
++Yet, for more than five years, inflation has been running above target.  So our
++predominant focus is on the price-stability side of our mandate.  The plain fact is that inflation is
++too high and has been for too long.
++This summer’s inflation readings do not tell me that underlying trends have meaningfully
++improved.  Based on the most recent CPI and PPI data, the 12-month change in total PCE prices
++likely was around 3.6 percent in August.  Core PCE and CPI prices are running at about 3.2 and
++2.4 percent, respectively.  Too many categories are still posting increases above 3 percent on
++both a 6- and 12-month basis.  I noted in Jackson Hole that overall commodity prices also bear
++watching.  And, over the intermeeting period, the prices of many of these key inputs have risen.
++Since my first FOMC meeting as Chairman in June, my colleagues and I have been
++unequivocal in our commitment to price stability and to our 2 percent PCE inflation objective.
++At our July meeting, we all agreed that inflation remained too high, and we expressed our joint
++readiness to act as circumstances might require.  And a good majority of my colleagues and I
++thought the wiser course then would be to await new information in the intermeeting period.
++Last month in Wyoming, I expressed my commitment to a monetary policy discipline,
++not to a decision.  I defined the standard for action.  We must be confident that underlying
++inflation is moving to our objective, clearly and at sufficient speed.
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 3 of 15
++
++Today the FOMC decided that this standard has not been satisfied.  The Committee’s
++unanimous vote shows our resolve to achieve price stability on a timelier basis.  We aim to
++ensure that credit and financial conditions are consistent over time with our mandate, that
++relative price changes in some sectors of the economy do not broaden, that inflation
++compensation in market prices stays low, and that inflation expectations remain well anchored.
++This afternoon, you also received the Summary of Economic Projections.  It reflects the
++views of my colleagues on the Committee, but, as in June, I have not offered a projection of my
++own.  But, like in June, I said I would faithfully discharge the summary of their projections, so
++here goes.  In the summary’s median projections, real GDP rises at 2.3 percent this year,
++2.4 percent next year.  Total PCE inflation runs at 3.7 percent this year and falls to 2.3 percent
++next year.  The unemployment rate holds steady at about 4.1 percent.  The median participant
++judges that the appropriate federal funds rate to be 4.1 percent at the end of this year and to
++remain there next year.  Inflation risks are to the upside while labor risks are roughly balanced.
++In my meetings these last few weeks—in Jackson Hole; in Asheville at the G-20 meeting,
++which the U.S. hosted; and at a central bank conference in Basel—it was evident that most
++advanced economies are facing price pressures.  Their central banks are making their own
++judgments, consistent with their own remits.  Our decision today reflects our best judgment in
++service to our remit.
++The Fed has a role in sustaining the economic progress happening in America right now
++and the rising opportunities that come with it.  Those who are least well off have the most to gain
++from a durable expansion, a solid labor market, and stable prices.
++We at the Fed are unwavering in our vital and straightforward purpose:  full employment
++and price stability, and a thriving American economy that sets the standard for the world.
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 4 of 15
++
++And, with that, I’ll take a few of your questions.
++MICHELLE SMITH.  Richard.
++RICHARD ESCOBEDO.  Thank you.  Chair Warsh, thank you for doing this.  I’m
++Richard Escobedo with CBS.  Let me navigate over to my questions.  You know, a ¼ point rate
++hike does not reopen the Strait of Hormuz.  And so I wonder how you think these smaller rate
++hikes will be effective when it can’t necessarily address the energy supply side of inflationary
++pressures.
++CHAIRMAN WARSH.  It’s a—it’s a—it’s a good question, Richard.  We cannot affect
++any individual price, whether it be oil prices, whether it be foodstuffs at the grocery store.  But
++what we can do, and will do, is ensure that any change in relative prices don’t broaden out, don’t
++have second- and third-order effects in the economy.  That’s what we’re tasked to do, and that’s
++what we will do.
++MICHELLE SMITH.  Colby.
++COLBY SMITH.  Thank you.  Colby Smith from the New York Times.  When the Fed
++starts raising rates, it generally follows with a sequence of hikes.  Is there anything different in
++today’s assessment of the economic conditions that would suggest that the typical pattern does
++not apply, and I guess second to that, what impact do you expect higher rates to have at this
++juncture if the bulk of what is keeping inflation elevated is stemming from supply shocks?
++CHAIRMAN WARSH.  So we’re trying to get to more people, so now I get to cherry-
++pick my preferred question from you, Colby.  This won’t surprise you:  I’m not in the forward
++guidance business.  The decision we made today was a sober decision, serious decision,
++responsible decision, one that we have been preparing for and thinking about in my 110 or
++20 days here.  You heard from other people in the dots effectively, what their forecasts are.  I’m
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 5 of 15
++
++not going to prejudge any future decisions we make.  You might have heard me say in Jackson
++Hole, I committed to a discipline, a set of principles.  I committed to look outside the window
++and see what I can observe.  That’s what I did in Jackson.  That’s what we did today.
++MICHELLE SMITH.  Edward Lawrence.
++EDWARD LAWRENCE.  Thank you, Mr. Chairman.  Edward Lawrence from Fox
++Business.  So the market priced in a 90 percent chance of a rate hike today.  You don’t want the
++Fed to lead the markets.  Was this a market-led rate hike?  And then, with that, the bond yields
++are going up.  That’s one of the indicators.  Is debt part of that issue?
++CHAIRMAN WARSH.  So I’ve said this before—I’ll repeat it:  The Fed has an
++enormous amount of power.  These are decisions we make.  But getting the understanding right
++between financial markets and the Fed is a balance that I’ve long thought could be better struck.
++We made this decision today based on our assessment of the situation, based on our assessment
++of the trajectory for employment, based on our judgment on the strength of the economy.
++Sometimes the market tries to prejudge our outcomes.  I’ll observe market prices and, and see
++what they have to say.  But today was our decision.
++MICHELLE SMITH.  Steve Thompson, with the Washington Post.
++[Inaudible]
++MICHELLE SMITH.  Elizabeth Schulze.
++ELIZABETH SCHULZE.  Thanks so much.  Elizabeth Schulze with ABC News.  Big
++picture, I wonder if you could tell us just what will this move today actually do for American
++consumers?  And I have to ask, what is your message here to President Trump, who has
++repeatedly called to cut interest rates, not raise them?
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 6 of 15
++
++CHAIRMAN WARSH.  I’ve got nothing for you on the—on the discussion with the
++President.  So—but I won’t make that count as your question.  On the American people, as I said
++in my prepared remarks, the least well off are the ones who have the most to gain from stable
++prices.  The decision we made today was the right decision to deliver on the remit that Congress
++gave us to ensure stable prices.  Moreover, I would say, because of the underlying strength of the
++economy, because we are, as I mentioned, largely acting consistent with full employment, we
++can be focused on stable prices.  Some months ago, I said we will deliver stable prices.  Today’s
++action is consistent with that.
++MICHELLE SMITH.  Chris Rugaber.
++CHRIS RUGABER.  Hi.  How are you?  Thank you.  Can you tell us a little more about
++what changed from the July meeting when, as you noted, the Fed did stand pat until today, and as
++part of that, could you give us a sense of whether or not things like the retail sales report today
++suggested that demand is heating up and, and possibly threatening higher prices as well?  Thank
++you.
++CHAIRMAN WARSH.  Yeah.  So, as you might know, I’m not a data-point-dependent
++guy.  So I won’t—I won’t react one way or another to data that, that shows up on our doorstep.
++But, on your first question—I think the more important one—what transpired in the seven weeks
++since we last met?  First, I would say a good majority of my colleagues seven weeks ago thought
++seven weeks is a good investment.  It’s a way to buy time so we could make a wise decision.  I’ll
++highlight three things that have happened in that intermeeting period.  One is, I made out a
++judgment seven weeks ago about the strength of the economy.  There’s been a pretty wide-
++ranging set of data, including in the labor markets, that the economy has strengthened.  You
++might have heard me say that in Jackson Hole a few weeks ago.  It’s a judgment that I have, and
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 7 of 15
++
++the Committee has.  Second, inflation trends—I said in Jackson Hole, trends matter.  I said in
++Jackson Hole, we need to look outside the window and interrogate reality.  My judgment some
++weeks ago was, the inflation summer trends weren’t passing the test.  I’ve seen very little
++information since that would make me reverse that decision, so I’ve stuck with it.  And the third
++thing that’s changed in seven weeks is geopolitics.  And there’s no hiding from hot spots around
++the world, and our judgment about what is the most likely, or least likely, of the geopolitical
++situation has changed.  All three of those things led—lend themselves to a firm, unanimous
++decision today.
++MICHELLE SMITH.  Claire.
++CLAIRE JONES.  Claire Jones, Financial Times.  You said today’s decision removes a
++dose of accommodation in your view, and perhaps if you could share views around the table, too.
++Are interest rates now at a level that you would describe as restrictive or not?  Thank you.
++CHAIRMAN WARSH.  I’ve described previously I found it difficult to describe
++financial conditions as restrictive.  I think I said I was hard pressed.  What I heard around the
++table in the last couple of days is, my colleagues were hard pressed to describe it that way, too.
++We removed a dose of accommodation so that financial and credit conditions would be more
++consistent with our ultimate objectives.  That was the decision.  That was our judgment, and
++we’ll continue to evaluate that prospectively.
++MICHELLE SMITH.  Steve Liesman.
++STEVE LIESMAN.  Thank you, Mr. Chairman.  Steve Liesman, CNBC.  I want to
++follow up on that question.  Previously, most Fed officials have described the rate as modestly
++restrictive.  And if you removed accommodation, could you give us your sense of where the fed
++funds rate is relative to neutral and some detail, if you wouldn’t mind, on your sense of, is there a
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 8 of 15
++
++short-term neutral rate you’re aiming for and a longer-term neutral rate?  Do you think in terms
++of those?
++CHAIRMAN WARSH.  In a word, no.  In a few words, I’d say this.  I’ve always been
++interested in a neutral rate as an academic matter.  Back when I learned economics, we used to
++think of it as a Wicksellian rate.  It’s a real equilibrium rate.  It’s useful academically.  It’s, it’s a
++discussion to help us think about policy.  Do I think it has any operational effect on decisions
++that we make today?  No, I don’t.
++MICHELLE SMITH.  Victoria.
++VICTORIA GUIDA.  Hi, Victoria Guida with Politico.  I wanted to ask, you’ve talked
++about how you don’t like data dependence, including today.  But heading into this meeting, there
++was a ton of focus on the August CPI.  And I’m wondering if you think that that was appropriate
++on the part of markets, or if you learned anything about how you might approach
++communications going forward?
++CHAIRMAN WARSH.  So market participants and reporters, I think generally over the
++course of the last decade or so, have grown accustomed to waiting somewhat breathlessly on a
++data point.
++That isn’t my view.  I was not waiting breathlessly on what any particular data was,
++whether it was retail sales this morning or a CPI “print” last week.
++I’ll just reiterate:  Trends matter.  Data points are noisy.  Data point dependence is a
++dangerous preoccupation.  It’s not something that concerns me.
++Markets over time will come to understand how this Fed makes its decisions, what’s
++relevant and not, and I wouldn’t want to editorialize that for them beyond it.
++MICHELLE SMITH.  Zach Halaschak.
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 9 of 15
++
++ZACHARY HALASCHAK.  Thanks for doing this, Mr. Chairman.  Zach Halaschak, the
++Washington Examiner.  I’m just curious.  A couple weeks ago the President sent out a message
++essentially threatening to cut off trade to certain countries unless rates were lowered.  Obviously
++a unanimous decision to do the opposite.  What would you say to investors who sort of believe
++this is another test of the Fed’s independence?  And then, kind of, when was the last time you
++spoke with the President?  Do you anticipate a post-decision meeting, or—
++CHAIRMAN WARSH.  You gave me a long menu from which to choose.  They’re all
++very tempting.  I don’t have anything for you on, on discussions with the President.  And I’m not
++a Wall Street newsletter.  Part of the independence of the Federal Reserve is we stay in our lane.
++Independence is a two-way street.  We’ll let people that do trade policy and fiscal policy stay in
++their lane, too.  That’s how we can stand up here and call them the way we see them.
++MICHELLE SMITH.  Brian Cheung.
++BRIAN CHEUNG.  Hi there.  Brian Cheung with NBC News.  Just wondering if you
++could explain who is the least well off, and what does a rate hike do when those people might be
++pinched by higher mortgage rates, higher gas, higher grocery prices, and now broad higher rates?
++CHAIRMAN WARSH.  Yeah.  It’s a fair question.  In the macroeconomics, we tend to
++look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.
++A lot of people in Washington spend a lot of time on distributional consequences, and that’s their
++job and their business.  What I was referring to in the least well off tend to be people that don’t
++own financial assets—call that a bit less than 50 percent of the country.  They don’t have equity
++in their home.  They don’t have equity in a 401k plan.  So they’re living off their paycheck that
++comes every couple of weeks.  The thing that we can do consistent with our mandate is two
++things.  Ask ourselves, is the country running more or less at full employment?  And we’ve done
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 10 of 15
++
++that.  That doesn’t mean that individuals aren’t searching for a job, but in aggregate, we’re
++running more or less at full employment.  If so, we can then look at the other side of the—our
++mandate, and let that be our focus.  And stable prices, an environment where inflation is running
++consistent with our 2 percent objective, offers good news.  Because that way, when they get their
++wages, they can put their head above water and deliver real take-home pay increases.  We don’t
++have total responsibility for it.  But we do have responsibility for stable prices—as I’ve said
++before, inflation is a, is a choice—and today we took a step in delivering it.
++MICHELLE SMITH.  Myriam.
++MYRIAM LEMETAYER.  Yes, this is Myriam—[inaudible].
++MICHELLE SMITH.  [inaudible]—the mic.
++MYRIAM LEMETAYER.  Yes.  Sorry.  Myriam Lemetayer from Agence France-Presse,
++AFP.  Are you looking at the other central banks, and what do you think about the European
++Central Bank’s move?  They hiked twice this year but not in a row.  Thank you.
++CHAIRMAN WARSH.  Well, I don’t ask them to prejudge decisions that we’re going to
++make, so I won’t prejudge decisions that they make.  But I will say this, I’ve spent some time
++with foreign central bank counterparts, not just in the last 20 years, but over the course of the last
++several weeks, as I mentioned, in Jackson Hole, at the G-20 meeting we hosted in North
++Carolina, and at a central bank meeting in Basel.  What I heard around the table from most of the
++advanced economies is they’re suffering from price pressures, too.  And they’re making their
++own choices consistent with their remit.  It tells me a couple things.  One is, when the Federal
++Reserve makes a policy choice, it matters not just to the U.S. economy, but it spills over to the
++rest of the world.  To a lesser extent, that’s true for them, too.  When foreign central banks make
++decisions, where they’re confronted with higher prices, and they choose, consistent with their
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 11 of 15
++
++remit, to raise rates, then they’re helping to quash inflation in their countries.  And there’s
++spillovers and spillbacks in both directions.  Beyond that, I won’t opine on what other central
++banks may choose to do this week or beyond.
++MICHELLE SMITH.  Nick Timiraos.
++NICK TIMIRAOS.  Thank you.  Nick Timiraos of the Wall Street Journal.  Chairman
++Warsh, last fall you expressed concern that the Fed was about to make its, quote, sixth or seventh
++big mistake, by deciding the economy was too strong to justify lower rates.  Now today you
++raised rates.  Can you give some sense as to what changed your own assessment of the U.S.
++economy between then and now?
++CHAIRMAN WARSH.  So I don’t—I don’t remember the full context, but I can tell you,
++Nick, about the state of growth now.  My suspicion, 110 or 20 days ago when I showed up, was
++that the U.S. economy was strengthening.  Even over the last several weeks I think we now have
++data broadly defined that says the economy has indeed strengthened.  Underlying growth is
++higher.  Inflation is the problem.  Stable prices have been the problem for now more than five
++and a half years.  So what the Committee decided to do today was take an action to ensure a
++timelier return to our price-stability objective.  Price stability is foundational to economic
++growth, and I think we took an important step today to deliver it.  And we did it in part by
++removing the dose of accommodation that I—that I mentioned before.
++MICHELLE SMITH.  Neil Irwin.
++NEIL IRWIN.  Thank you, Mr.  Chairman.  Neil Irwin with Axios.  Longer-term bond
++yields are up quite a bit over the last few months, especially the last few weeks.  What do you
++believe the bond market is telling you, especially about the growth outlook, the neutral rate, and
++what are the implications for monetary policy?
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 12 of 15
++
++CHAIRMAN WARSH.  Yeah.  Let me speak to the history.  What bond market prices do
++prospectively, I want to let them do—I want to let them tell me any story they wish to.  I want to
++try to interrogate that.  But why did yields rise, let’s say, since the last FOMC meeting until this?
++I’ll give you three, three reasons, but I would say these things tend to be overdetermined.  This is
++a complicated set of things that are affecting the most important asset anywhere in the world, the
++10-year Treasury.  It’s the risk-free asset upon which every price of virtually every asset in the
++world is related to.  So I’ll say three things.  First is economic strength.  Part of the reason why
++we’ve seen, over the course of 2026, long-term yields go up is, the economy has strengthened.
++Second reason, competition for capital.  The surge in capital expenditures, which I referenced in
++my remarks, is real, and the so-called hyperscalers are out in the market raising funding.  And so
++the competition for capital is real, and I think it partly explains the increase in yields.  The third
++is geopolitics.  The situation hot spots around the world are driving long-term yields.  It’s not
++simply spot prices of energy or spot prices for corn or soybeans or wheat, but it’s the difference
++between those spot prices and so-called crack spreads—what that means for products that find
++their way into stores across the country.  I think those are the three leading explanations but
++certainly not an exclusive list.
++MICHELLE SMITH.  Michael McKee.
++MICHAEL MCKEE.  Michael McKee from Bloomberg Radio and Television.  You said
++in Jackson Hole that you want to see inflation come down clearly and at sufficient speed, which
++is a standard without necessarily a measurable threshold in it.  The reason I ask is because today
++you say today’s policy action will support a timelier return to the Committee’s 2 percent target,
++and yet, in the Summary of Economic Projections, the median pushes the 2 percent target
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 13 of 15
++
++achievement out to 2029, another two years.  And I’m wondering how you can square those two
++things.
++CHAIRMAN WARSH.  One easy way to square that, Mike, is those aren’t my forecasts.
++Those are the forecasts of my 18 colleagues, and I’ve tried to represent them dutifully to you.
++My business is to not give forward guidance.  But my commitment in June was to reaffirm to the
++American people, to anyone listening, that we will deliver price stability.  My commitment in
++July was to say, we want to buy a little bit of time.  We want to evaluate what’s happening across
++a range of dimensions, and what I said in Jackson Hole in August is, we’re committed to a
++discipline, not to a decision.  Today’s action starts to show we’re serious about this.  And we will
++deliver on the price-stability objective, and as the statement said, we’ll do it on a—on a timelier
++basis.  That’s our decision.  And when we continue our discussions over the course of the next
++several weeks and months, we’ll have more to say about it.  But I’m ill-prepared to prejudge
++those future actions.
++MICHELLE SMITH.  Matt, from CNN.
++MATT EGAN.  Thanks, Chairman Warsh.  Matt Egan with CNN.  You’ve spoken in the
++past about the positives that could come from widespread adoption of artificial intelligence.
++How concerned are you, if at all, about these increasingly alarming warnings we’ve heard from
++AI leaders about losing control of this powerful technology and doing real-world damage,
++damage that would presumably impact the real economy?
++CHAIRMAN WARSH.  So I’ve spent a lot of time thinking about AI, and before I found
++my way to this post, I spent a lot of time talking about it publicly.  Independence of the Federal
++Reserve is about staying in our lane.  We care very much about what’s happening in artificial
++intelligence.  We care much about the implications on the demand side of the economy and
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 14 of 15
++
++ultimately on the supply side of the economy.  I care so much—I think it’s so important—that we
++established a task force that should report by the end of the year to help us think about the
++implications for our future policy conjuncture.  But the policy decisions that are made about the
++risks and rewards, the challenges and opportunities, those are decisions made by other parts of
++the government.  I’m going to leave it to them to make those political decisions, those policy
++decisions.  The implications of those decisions obviously have some bearing on our day job, and
++that’s where we’ll be focused.
++MICHELLE SMITH.  Okay.  For the last question, we’ll go to Jennifer Schonberger in
++the back row.
++JENNIFER SCHONBERGER.  Thank you, Mr. Chairman.  Jennifer Schonberger with
++Yahoo Finance.  Inflation has run up mostly from higher energy prices and tariffs, which some
++say are supply shocks that rate hikes cannot fix and should fade on their own, so long as inflation
++expectations stay anchored.  Now that you have hiked rates, do you need to push growth below
++potential, unintentionally pushing weakness on the job market to bring inflation down, and how
++do those dynamics play out, given the forcefulness with which AI is driving the economy right
++now?
++CHAIRMAN WARSH.  So, there’s, there’s, there’s a lot there, Jennifer.  Let me see if I
++can’t do just a little bit of it.  First, we believe that the unemployment rate is basically running
++consistent with full employment.  I don’t believe that we need to do harm to the labor markets to
++achieve our objective.  I don’t believe that the two parts of our mandate, price stability and full
++employment, are working at cross purposes over the medium term.  So economic growth—that is
++ensuring continuous, sustainable, durable, economic growth—that’s the business we’re in.  And
++the job we did today, the job we’ll continue to do, is to ensure price stability, which can mean
++September 16, 2026 Chairman Warsh’s Press Conference FINAL
++
++Page 15 of 15
++
++that sustainable, durable, economic growth can go on for longer.  The economy can be stronger,
++and as I mentioned before, the least well off can get the benefits of it.
++JENNIFER SCHONBERGER.  Thank you.
++CHAIRMAN WARSH.  Thank you.
+diff --git a/tests/fixtures/fed_communication/README.md b/tests/fixtures/fed_communication/README.md
+new file mode 100644
+index 0000000..ba53683
+--- /dev/null
++++ b/tests/fixtures/fed_communication/README.md
+@@ -0,0 +1,9 @@
++Official Federal Reserve fixtures retrieved 2026-10-14.
++Full transcript text extracted using pypdf from:
++https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf
++https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260729.pdf
++Statement article and explicit Related Information release labels from:
++https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm
++https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm
++Tests mock PDF transport/extraction to isolate discovery and content-date checks;
++real PDF parsing was verified separately against both official files.
+diff --git a/tests/test_fed_intelligence.py b/tests/test_fed_intelligence.py
+index 5b094af..98a33ed 100644
+--- a/tests/test_fed_intelligence.py
++++ b/tests/test_fed_intelligence.py
+@@ -93,7 +93,7 @@ def test_fed_ui_exposes_required_report_sections():
+         'st.subheader("Beige Book Context")',
+         "<div class='title'>FED BOTTOM LINE</div>",
+         'with st.expander("View detailed data")',
+-        '"Minutes are pending and are not treated as evidence."',
++        '"Legacy Fed Policy Score — separate keyword model"',
+     ]
+     for marker in required:
+         assert marker in source
+@@ -101,8 +101,8 @@ def test_fed_ui_exposes_required_report_sections():
+ 
+ def test_fed_ui_does_not_mislabel_legacy_available_evidence_as_excluded():
+     source = (ROOT / "app.py").read_text(encoding="utf-8")
+-    assert "included · weight metadata pending refresh" in source
+-    assert "excluded until published" in source
++    assert "retrieved; comparison metadata pending refresh" in source
++    assert "source retrieval pending; publication is not inferred" in source
+     assert "explicit_weight" in source
+     assert "explicit_availability" in source
+ 
+diff --git a/tests/test_fed_report_comparison_v2.py b/tests/test_fed_report_comparison_v2.py
+new file mode 100644
+index 0000000..72351bf
+--- /dev/null
++++ b/tests/test_fed_report_comparison_v2.py
+@@ -0,0 +1,197 @@
++import json
++from datetime import date
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++import fed_intelligence as fed
++import fed_report_comparison_v2 as reports
++from fed_beige_evidence_v1 import snapshot_quality
++
++FIXTURES = Path(__file__).parent / "fixtures" / "fed_communication"
++PAGE = "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm"
++PDF = "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf"
++
++
++def text(when):
++    return (FIXTURES / f"{when}-transcript.txt").read_text()
++
++
++def pair():
++    old = reports.document(reports.chair_remarks(text("20260729")),
++                           {"meeting_date": "2026-07-29", "source": PDF.replace("20260916", "20260729")},
++                           "FULL_TRANSCRIPT_CHAIR_REMARKS")
++    new = reports.document(reports.chair_remarks(text("20260916")),
++                           {"meeting_date": "2026-09-16", "source": PDF}, "FULL_TRANSCRIPT_CHAIR_REMARKS")
++    return reports.compare(old, new)
++
++
++def mock_pdf(monkeypatch, full_text):
++    monkeypatch.setattr(reports, "PdfReader", lambda _: SimpleNamespace(
++        pages=[SimpleNamespace(extract_text=lambda: full_text)]))
++
++
++def test_verified_canonical_pdf_is_found_without_an_anchor(monkeypatch):
++    mock_pdf(monkeypatch, text("20260916"))
++    calls = []
++    def get(url):
++        calls.append(url)
++        return SimpleNamespace(text="<h1>Video player</h1>", content=b"%PDF-test") if url == PDF else SimpleNamespace(text="<h1>Video player</h1>", content=b"html")
++    result = reports.load_press(PAGE, get, date(2026, 10, 14))
++    assert result["available"]
++    assert result["source_status"] == "VERIFIED_TRANSCRIPT"
++    assert result["pdf_url"] == PDF
++    assert result["publication_date"] is None
++    assert PDF in calls
++
++
++def test_canonical_pdf_can_be_recovered_when_landing_page_fetch_fails(monkeypatch):
++    mock_pdf(monkeypatch, text("20260916"))
++    out = reports.load_press(PAGE, lambda u: SimpleNamespace(content=b"%PDF-test") if u == PDF else None)
++    assert out["available"]
++
++
++def test_wrong_meeting_pdf_is_rejected(monkeypatch):
++    mock_pdf(monkeypatch, text("20260729"))
++    out = reports.load_press(PAGE, lambda u: SimpleNamespace(text="", content=b"%PDF-test"))
++    assert not out["available"]
++    assert out["source_status"] == "TRANSCRIPT_DATE_OR_TYPE_MISMATCH"
++
++
++def test_html_error_page_is_never_a_transcript():
++    out = reports.load_press(PAGE, lambda u: SimpleNamespace(text="Video", content=b"<html>Video</html>"))
++    assert not out["available"]
++    assert out["text"] == ""
++
++
++def test_pdf_parse_error_remains_distinct_from_publication_status(monkeypatch):
++    def fail(_):
++        raise ValueError("corrupt PDF")
++    monkeypatch.setattr(reports, "PdfReader", fail)
++    out = reports.load_press(PAGE, lambda u: SimpleNamespace(text="", content=b"%PDF-corrupt"))
++    assert not out["available"]
++    assert out["source_status"] == "PDF_EXTRACTION_FAILED"
++
++
++def test_future_meeting_is_never_requested():
++    out = reports.load_press(PAGE, lambda u: pytest.fail("Network must not be called"), date(2026, 9, 15))
++    assert not out["available"]
++
++
++def test_reporter_assertions_are_not_attributed_to_chair():
++    raw = "CHAIRMAN WARSH. Inflation remains elevated.\nJANE REPORTER. GDP will crash by 10 percent.\nCHAIRMAN WARSH. We have not made that forecast."
++    remarks = reports.chair_remarks(raw)
++    assert "GDP will crash" not in remarks
++    assert "not made that forecast" in remarks
++
++
++def test_real_policy_range_decision_and_voting_comparisons():
++    out = pair()
++    assert out["available"]
++    rate = out["metrics"]["target_range"]
++    assert rate["previous"]["value"] == [3.5, 3.75]
++    assert rate["current"]["value"] == [3.75, 4.0]
++    assert rate["change"] == [25, 25]
++    assert out["metrics"]["policy_action"]["previous"]["value"] == "HOLD"
++    assert out["metrics"]["policy_action"]["current"]["value"] == "RAISE"
++    assert out["metrics"]["vote"]["previous"]["value"] == "9–3"
++    assert out["metrics"]["vote"]["current"]["value"] == "UNANIMOUS"
++
++
++def test_fractional_statement_rates_and_vote_are_not_misread():
++    body = reports.report_body((FIXTURES / "20260916-statement.html").read_text())
++    facts = reports.policy_facts(body)
++    assert facts["target_range"]["value"] == [3.75, 4.0]
++    assert facts["vote"]["value"] == "12–0"
++    assert "For release at" not in body
++    assert "Share" not in body
++
++
++def test_estimated_data_and_reference_period_are_preserved_as_source_text():
++    evidence = pair()["current"]["topics"]["inflation"]["evidence"]
++    assert any("likely was around 3.6 percent in August" in s for s in evidence)
++    # Do not turn a contemporaneous estimate into a later realized PCE release.
++    assert "pce" not in pair()["metrics"]
++
++
++def test_missing_previous_does_not_become_unchanged_or_neutral():
++    old = reports.document("", {}, "OFFICIAL_STATEMENT")
++    current = reports.document("Inflation remains elevated.", {}, "OFFICIAL_STATEMENT")
++    out = reports.compare(old, current)
++    assert not out["available"]
++    assert out["metrics"] == {}
++    assert "UNCHANGED" not in out["status"]
++
++
++def test_opening_only_and_full_transcript_do_not_silently_compare_different_scope():
++    out = pair()
++    out["current"]["scope"] = "OPENING_STATEMENT"
++    assert reports.compare(out["previous"], out["current"])["status"] == "SCOPE_MISMATCH"
++
++
++def test_wording_alignment_does_not_declare_a_hawkish_or_dovish_shift():
++    old = reports.document("Inflation remains elevated.", {}, "OFFICIAL_STATEMENT")
++    new = reports.document("Inflation is still elevated.", {}, "OFFICIAL_STATEMENT")
++    out = reports.compare(old, new)
++    assert out["topics"]["inflation"]["pairs"][0]["status"] == "WORDING_CHANGED"
++    assert "classification" not in out
++
++
++def test_same_words_and_one_sided_messages_are_distinguished():
++    pairs = reports.pair_evidence(["Inflation remains elevated."], ["Inflation remains elevated.", "Credit flows are robust."])
++    assert pairs[0]["status"] == "SAME_WORDING"
++    assert pairs[1]["status"] == "CURRENT_ONLY_EVIDENCE"
++
++
++def test_explicit_related_publication_dates_are_preserved():
++    dates = reports.release_dates((FIXTURES / "20260916-press-page.html").read_text())
++    assert dates == {"statement": "2026-09-16", "sep": "2026-09-16", "minutes": "2026-10-07"}
++    assert "chair_press" not in dates
++
++
++def test_adjacent_multiple_release_labels_are_not_borrowed():
++    html = '<div><a href="/monetarypolicy/fomcprojtabl20260916.htm">HTML</a> Released September 16, 2026 <a href="/monetarypolicy/fomcminutes20260916.htm">HTML</a> Released October 7, 2026</div>'
++    assert reports.release_dates(html) == {}
++
++
++def test_current_transcript_and_unknown_publication_date_are_distinct():
++    data = {"as_of_date": "2026-10-14", "evidence_dates": {"chair_press": {
++        "available": True, "meeting_date": "2026-09-16", "publication_date": None,
++        "source": PDF, "meeting_verified": True, "latest_meeting_date": "2026-09-16", "catalog_verified": True}}}
++    q = snapshot_quality(data, date(2026, 10, 14))
++    assert q["document_checks"]["chair_press"] == "CURRENT_PUBLICATION_DATE_UNKNOWN"
++    assert q["pit_status"] == "UNKNOWN"
++
++
++def test_streamlit_report_comparison_shows_facts_and_sources_not_keyword_coverage():
++    testing = pytest.importorskip("streamlit.testing.v1")
++    source = "import json\nfrom fed_report_comparison_ui_v2 import render_comparison\npair=json.loads(" + repr(json.dumps(pair())) + ")\nrender_comparison(pair,'Press Conference','chair_press')"
++    app = testing.AppTest.from_string(source, default_timeout=30).run()
++    assert not app.exception
++    rendered = "\n".join(x.value for group in (app.markdown, app.caption) for x in group)
++    assert "3.50–3.75% → 3.75–4.00%" in rendered
++    assert "Range shift: +25 basis points" in rendered
++    assert "HOLD → RAISE" in rendered
++    assert "UNANIMOUS" in rendered
++    assert "official source" in rendered
++    assert "keyword coverage" not in rendered.lower()
++
++
++def test_press_wrapper_uses_utc_date_not_host_local_day(monkeypatch):
++    from datetime import datetime, timezone
++    frozen = datetime(2026, 10, 14, 23, 50, tzinfo=timezone.utc)
++    monkeypatch.setattr(fed, "datetime", SimpleNamespace(now=lambda tz: frozen))
++    seen = {}
++    def loader(url, get, as_of):
++        seen["as_of"] = as_of
++        return {"text": ""}
++    monkeypatch.setattr(fed, "load_press", loader)
++    fed.press_page_data(PAGE)
++    assert seen["as_of"] == date(2026, 10, 14)
++
++
++def test_opening_transcript_is_explicitly_scoped_even_at_canonical_url(monkeypatch):
++    opening = text("20260916").replace("Transcript of Chairman", "Opening Statement Transcript of Chairman", 1)
++    mock_pdf(monkeypatch, opening)
++    out = reports.load_press(PAGE, lambda u: SimpleNamespace(text="", content=b"%PDF-test"))
++    assert out["scope"] == "OPENING_STATEMENT"

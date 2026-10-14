@@ -13,6 +13,7 @@ import requests
 import streamlit as st
 
 from fed_snapshot_ui_v1 import load_snapshot, display_quality, issue_month
+from fed_report_comparison_ui_v2 import render_comparison, render_metrics, coverage
 from economic_indicator_details_v1 import card_details
 from economic_observation_order_v1 import latest as latest_economic_observation
 from ath_pullback_context_ui_v1 import render_ath_pullback_context
@@ -1008,8 +1009,8 @@ def fed() -> None:
         return
 
     st.caption(
-        "Research-only interpretation of official Federal Reserve communications. "
-        "Scores are analytical indicators, not probabilities or trading signals."
+        "Official Federal Reserve reports compared with previous releases. "
+        "Reported facts are separate from interpretation; comparisons are not policy probabilities or trading signals."
     )
 
     fed_score = obj.get("fed_score") if isinstance(obj.get("fed_score"), dict) else {}
@@ -1028,20 +1029,17 @@ def fed() -> None:
         with col:
             card(label, value)
 
-    # --- Policy pulse: visual first ------------------------------------
     st.subheader("Policy Pulse")
-    if isinstance(score, (int, float)):
-        marker = max(0.0, min(100.0, float(score)))
-        st.markdown(
-            f"<div class='fed-strip'><div class='kicker'>FED POLICY SCORE</div>"
-            f"<div class='headline'>{score:.1f}/100 · {fmt(classification)} · {fmt(sep_direction)}</div>"
-            f"<div class='fed-gauge'><span class='fed-marker' style='left:calc({marker:.1f}% - 2px)'></span></div>"
-            "<div class='fed-scale'><span>DOVISH</span><span>NEUTRAL · 50</span><span>HAWKISH</span></div>"
-            "<div class='detail' style='margin-top:8px'>Descriptive research gauge — not a policy probability or trading signal.</div></div>",
-            unsafe_allow_html=True,
-        )
+    evidence_pairs = obj.get("report_comparison") or {}
+    policy_pair = evidence_pairs.get("statement") or evidence_pairs.get("chair_press") or {}
+    if policy_pair.get("available"):
+        render_metrics(policy_pair)
     else:
-        st.info("A policy score is not available for the current evidence set.")
+        st.info("Official policy comparison is not ready; no direction is inferred from missing reports.")
+    st.caption(coverage(obj))
+    with st.expander("Legacy Fed Policy Score — separate keyword model"):
+        st.write(f"{fmt(score,1)} · {fmt(classification)}")
+        st.caption("Retained for compatibility. This model does not drive the report comparisons below.")
 
     # --- SEP changes ----------------------------------------------------
     fields = sep_shift.get("fields") if isinstance(sep_shift.get("fields"), dict) else {}
@@ -1064,23 +1062,7 @@ def fed() -> None:
             changes.append((abs(change), key, label, detail))
     changes.sort(reverse=True, key=lambda x: x[0])
 
-    # PATCH 4.1 — compact decision brief; presentation only.
     quality = display_quality(obj)
-    biggest = changes[0] if changes else None
-    biggest_text = "No comparable SEP move"
-    if biggest:
-        _, _, biggest_label, biggest_detail = biggest
-        biggest_delta = biggest_detail.get("change")
-        biggest_text = f"{biggest_label} {biggest_delta:+.1f}" if isinstance(biggest_delta, (int, float)) else biggest_label
-    st.markdown(
-        "<div class='fed-brief'>"
-        f"<div class='fed-brief-cell'><span>POLICY STANCE</span><b>{fmt(classification)}</b></div>"
-        f"<div class='fed-brief-cell'><span>DIRECTION</span><b>{fmt(sep_direction)}</b></div>"
-        f"<div class='fed-brief-cell'><span>BIGGEST SEP MOVE</span><b>{biggest_text}</b></div>"
-        f"<div class='fed-brief-cell'><span>EVIDENCE QUALITY</span><b>{fmt(quality.get('quality_gate', 'UNKNOWN'))}</b></div>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
     st.subheader("What Changed?")
     if changes:
@@ -1105,32 +1087,10 @@ def fed() -> None:
     else:
         st.info("No comparable SEP changes are available for this snapshot.")
 
-    # --- Bottom line: move decision read near the top ------------------
-    top_change = changes[0] if changes else None
-    if top_change:
-        _, top_key, top_label, top_detail = top_change
-        top_delta = top_detail.get("change")
-        top_reason = explanations[top_key][0] if top_delta > 0 else explanations[top_key][1]
-        change_text = f"Largest SEP move: {top_label} {top_delta:+.1f} ({top_reason})."
-    else:
-        change_text = "No comparable SEP shift is available."
-    minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
-    minutes_status = (obj.get("document_status") or {}).get("minutes", {}) if isinstance(obj.get("document_status"), dict) else {}
-    if minutes_payload.get("available"):
-        minutes_date = obj.get("minutes_meeting_date") or minutes_status.get("meeting_date")
-        if minutes_status.get("lagged"):
-            minutes_text = f"Latest published Minutes ({fmt(minutes_date)}) are incorporated as lagged evidence for the prior meeting."
-        else:
-            minutes_text = f"Minutes ({fmt(minutes_date)}) are incorporated."
-    else:
-        minutes_text = "Minutes are pending and are not treated as evidence."
-    st.markdown(
-        f"<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
-        f"<div class='read'>{fmt(classification)} · {fmt(sep_direction)}</div>"
-        f"<div class='body'>Fed Policy Score: {fmt(score,1)}. {change_text} {minutes_text} "
-        "Beige Book remains contextual rather than a direct score input.</div></div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
+                "<div class='body'>Read the official policy decision, SEP projections and report comparisons together. "
+                "Beige Book is contextual evidence; missing text or dates do not imply neutral conditions.</div></div>",
+                unsafe_allow_html=True)
 
     # --- Compact communication evidence --------------------------------
     weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
@@ -1138,7 +1098,7 @@ def fed() -> None:
     score_eligibility = phase.get("document_score_eligibility") if isinstance(phase.get("document_score_eligibility"), dict) else {}
     communication = [
         ("Statement", "statement", obj.get("statement"), obj.get("statement_source")),
-        ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_page") or obj.get("chair_pdf")),
+        ("Press Conference", "chair", obj.get("chair_press"), obj.get("chair_pdf") or obj.get("chair_page")),
         ("Minutes", "minutes", obj.get("minutes"), obj.get("minutes_source")),
     ]
     st.subheader("FOMC Communication")
@@ -1152,7 +1112,7 @@ def fed() -> None:
     timeline_bits = []
     for label, _, payload, _ in communication:
         payload = payload if isinstance(payload, dict) else {}
-        status = "AVAILABLE" if payload.get("available") else "PENDING"
+        status = "AVAILABLE" if payload.get("available") else "NOT RETRIEVED"
         timeline_bits.append(f"{label} · {status}")
     st.markdown(
         f"<div class='timeline'>{' &nbsp; · &nbsp; '.join(timeline_bits)}</div>",
@@ -1161,7 +1121,7 @@ def fed() -> None:
     for label, key, payload, url in communication:
         payload = payload if isinstance(payload, dict) else {}
         available = bool(payload.get("available"))
-        tone = fmt(payload.get("tone")) if available else "PENDING"
+        tone = "TEXT RETRIEVED" if available else "TEXT NOT RETRIEVED"
         explicit_weight = weights.get(key)
         explicit_availability = availability_meta.get(key)
         scoring_key = "chair" if key == "chair" else key
@@ -1169,11 +1129,11 @@ def fed() -> None:
         if explicit_score_eligible is False and available:
             note = "lagged evidence · excluded from current-meeting score"
         elif isinstance(explicit_weight, (int, float)):
-            note = f"score weight {explicit_weight * 100:.1f}%" if explicit_weight > 0 else "excluded from score"
+            note = "available for report comparison" if explicit_weight > 0 else "excluded from legacy score"
         elif explicit_availability is False or not available:
-            note = "excluded until published"
+            note = "source retrieval pending; publication is not inferred"
         else:
-            note = "included · weight metadata pending refresh"
+            note = "retrieved; comparison metadata pending refresh"
         link = f" · <a href='{url}' target='_blank'>official source</a>" if url else ""
         st.markdown(
             f"<div class='comm-row'><span><span class='comm-name'>{label}</span> "
@@ -1205,204 +1165,59 @@ def fed() -> None:
         f"Directional shift: {fmt(sep_direction)}. SEP is a directional comparison, not a policy probability."
     )
 
-    # --- Communication current vs previous -----------------------------
-    comparison = obj.get("communication_comparison") if isinstance(obj.get("communication_comparison"), dict) else {}
     st.subheader("Communication — Current vs Previous")
+    for key, label in (("statement", "FOMC Statement"), ("minutes", "FOMC Minutes"),
+                       ("chair_press", "Press Conference")):
+        render_comparison(evidence_pairs.get(key), label, key)
+    with st.expander("Raw communication comparison"):
+        st.json(evidence_pairs)
 
-    from fed_communication_ui_v1 import communication_dates
-    comparison_rows = []
-
-    for key, label in (
-        ("statement", "FOMC Statement"),
-        ("minutes", "FOMC Minutes"),
-        ("chair_press", "Press Conference"),
-    ):
-        item = comparison.get(key) if isinstance(comparison.get(key), dict) else {}
-        comp = item.get("comparison") if isinstance(item.get("comparison"), dict) else {}
-        previous_doc = item.get("previous") if isinstance(item.get("previous"), dict) else {}
-
-        current_doc = obj.get(
-            "chair_press" if key == "chair_press" else key
-        )
-        current_doc = current_doc if isinstance(current_doc, dict) else {}
-
-        current_tone = current_doc.get("tone", "UNAVAILABLE")
-        previous_tone = previous_doc.get("tone", "UNAVAILABLE")
-        change = comp.get("classification", "UNAVAILABLE")
-
-        current_date = item.get("current_date")
-        previous_date = item.get("previous_date")
-
-        comparison_rows.append({
-            "Report": label,
-            "Current": current_date,
-            "Previous": previous_date,
-            "Current tone": current_tone,
-            "Previous tone": previous_tone,
-            "Change": change,
-        })
-
-        change_text = str(change or "UNAVAILABLE")
-        change_upper = change_text.upper()
-
-        if any(
-            token in change_upper
-            for token in (
-                "HAWK",
-                "TIGHT",
-                "HIGHER",
-                "FIRM",
-            )
-        ):
-            signal = "HAWKISH SHIFT"
-        elif any(
-            token in change_upper
-            for token in (
-                "DOV",
-                "EAS",
-                "LOWER",
-                "SOFT",
-            )
-        ):
-            signal = "DOVISH SHIFT"
-        elif change_upper in (
-            "UNAVAILABLE",
-            "PENDING",
-            "NONE",
-            "",
-        ):
-            signal = "NOT AVAILABLE"
-        else:
-            signal = "LIMITED / NEUTRAL SHIFT"
-
-        shift_icon = "↑" if signal == "HAWKISH SHIFT" else "↓" if signal == "DOVISH SHIFT" else "—"
-        shift_class = "hawk" if signal == "HAWKISH SHIFT" else "dove" if signal == "DOVISH SHIFT" else "flat"
-        st.markdown(
-            f"<div class='comm-shift'>"
-            f"<div class='comm-shift-head'><b>{label}</b><span class='shift-badge {shift_class}'>{shift_icon} {signal}</span></div>"
-            f"<div class='comm-shift-flow'><span><small>PREVIOUS</small>{fmt(previous_tone)}</span>"
-            f"<strong>→</strong><span><small>CURRENT</small>{fmt(current_tone)}</span></div>"
-            f"<div class='comm-shift-date'>{communication_dates(key, item)}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-    comparison_df = pd.DataFrame(comparison_rows)
-
-    with st.expander(
-        "Raw communication comparison",
-        expanded=False,
-    ):
-        table(comparison_df, 260)
-
-    st.caption(
-        "Unavailable or not-yet-published reports remain unavailable; "
-        "they are never converted into neutral evidence."
-    )
-
-    # --- Synthesis ------------------------------------------------------
-    combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
     st.subheader("Fed Synthesis")
+    st.write("Compare actual decisions and reported inflation, labor, growth, risks and liquidity messages above. "
+             "Reported wording changes are distinct from numerical changes; neither is a policy probability.")
     if minutes_status.get("available") and minutes_status.get("lagged"):
-        st.caption(
-            "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP. "
-            "The latest published Minutes remain visible for research comparison but are excluded from the current-meeting score because they cover the prior meeting."
-        )
-    if combined:
-        for name, data in combined.items():
-            if not isinstance(data, dict):
-                continue
-            dim_score = data.get("score_100")
-            dim_label = str(name).replace("_", " ").title()
-            if isinstance(dim_score, (int, float)):
-                direction = "Hawkish tilt" if dim_score > 52 else "Dovish tilt" if dim_score < 48 else "Balanced"
-                c1, c2 = st.columns([1, 3])
-                with c1:
-                    st.markdown(f"**{dim_label}**")
-                    st.caption(f"{dim_score:.1f} · {direction}")
-                with c2:
-                    st.progress(max(0, min(100, int(round(dim_score)))))
-        reasons = phase.get("reasons")
-        if isinstance(reasons, list) and reasons:
-            with st.expander("Evidence behind the synthesis"):
-                for reason in reasons:
-                    st.write(reason)
-    else:
-        st.info("Dimension-level synthesis is not available in the current artifact.")
+        st.caption("Latest published FOMC Minutes cover the prior meeting. They remain lagged research evidence "
+                   "and are not relabeled as current-meeting minutes. "
+                   "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP.")
 
-    # --- Beige Book -----------------------------------------------------
     st.subheader("Beige Book Context")
-    beige = obj.get("beige_book") if isinstance(obj.get("beige_book"), dict) else {}
-    beige_analysis = obj.get("beige_analysis") if isinstance(obj.get("beige_analysis"), dict) else {}
+    beige = obj.get("beige_book") or {}
     if not beige.get("available"):
-        st.info("Beige Book is not available for the current as-of date.")
+        st.warning("Current Beige Book text was not retrieved. No unchanged conclusion is inferred.")
     else:
-        beige_cols = st.columns(4)
-        for col, (label, value) in zip(beige_cols, [
-            ("Issue month", issue_month(beige)), ("Published", beige.get("publication_date")),
-            ("Keyword balance", beige_analysis.get("tone")), ("Context Score", beige_analysis.get("score")),
-        ]):
+        cols = st.columns(3)
+        for col, label, value in zip(cols, ("Issue month", "Published", "Information through"),
+                                    (issue_month(beige), beige.get("publication_date"), beige.get("information_cutoff_date"))):
             with col:
                 card(label, value)
-        st.caption(f"Information collected through: {fmt(beige.get('information_cutoff_date'))}. "
-                   f"Retrieved: {fmt(beige.get('retrieved_at'))}.")
-        st.caption("Context Score is a keyword balance, not the Fed's policy stance. "
-                   "Zero matches mean the wording was not recognized; they do not prove neutral conditions.")
-        if beige_analysis.get("score") is None:
-            st.info("Context Score is withheld because keyword coverage is insufficient. "
-                    "Use the reported evidence and comparison below.")
-        st.caption(f"Recognized keyword weight: {fmt(beige_analysis.get('recognized_weight_percent'))}%. "
-                   "This measures parser coverage, not economic confidence.")
         comp = obj.get("beige_comparison") or {}
         if comp.get("available"):
-            prior = comp.get("previous") or {}
             st.markdown("**Beige Book — What changed?**")
-            st.caption(f"Published: {fmt(prior.get('publication_date'))} → {fmt(beige.get('publication_date'))}. "
-                       f"Information cutoffs: {fmt(prior.get('information_cutoff_date'))} → "
-                       f"{fmt(beige.get('information_cutoff_date'))}.")
-            labels_beige = {
-                "districts_with_accelerating_prices": "Districts with faster price increases",
-                "districts_with_robust_prices": "Districts with robust price growth",
-                "districts_with_growth": "Districts reporting economic growth",
-                "employment_modest": "Districts with modest employment gains",
-                "employment_slight": "Districts with slight employment gains",
-                "employment_unchanged": "Districts with unchanged employment",
-            }
-            for key, label in labels_beige.items():
-                change = (comp.get("changes") or {}).get(key)
-                if change:
-                    st.write(f"**{label}:** {change['previous']} → {change['current']} "
-                             f"({change['change']:+d})")
-            with st.expander("Official reported evidence — previous and current"):
-                for key, label in [("consumer_spending_evidence", "Consumer spending"),
-                                   ("credit_evidence", "Credit and financial conditions"),
-                                   ("price_evidence", "Price pressures")]:
-                    st.markdown(f"**{label}**")
-                    for side in ("previous", "current"):
-                        evidence = (comp.get(f"{side}_facts") or {}).get(key, [])
-                        st.write(f"{side.title()}: " + (" ".join(evidence) if evidence else
-                                 "No supported sentence extracted; no conclusion of unchanged conditions."))
-                if prior.get("url"):
-                    st.markdown(f"[Previous official Beige Book]({prior['url']})")
-            st.caption(comp.get("interpretation", ""))
+            key_labels = {"districts_with_accelerating_prices": "Faster price increases",
+                          "districts_with_robust_prices": "Robust price growth",
+                          "districts_with_growth": "Economic growth"}
+            cols = st.columns(3)
+            for col, (key, label) in zip(cols, key_labels.items()):
+                row = (comp.get("changes") or {}).get(key)
+                with col:
+                    if row:
+                        card(label, f"{row['previous']} → {row['current']}", f"Districts · change {row['change']:+d}")
+                    else:
+                        card(label, "Not comparable", "No supported numerical pair")
+            with st.expander("Employment — Previous → Current"):
+                for key, label in (("employment_modest", "Modest gains"), ("employment_slight", "Slight gains"),
+                                   ("employment_unchanged", "Unchanged")):
+                    row = (comp.get("changes") or {}).get(key)
+                    if row:
+                        st.write(f"{label}: {row['previous']} → {row['current']} districts ({row['change']:+d})")
         else:
             st.warning("Previous/current Beige Book comparison is unavailable. No unchanged conclusion is inferred.")
-        dimensions = beige_analysis.get("dimensions")
-        if isinstance(dimensions, dict) and dimensions:
-            with st.expander("Beige Book dimension detail"):
-                for name, data in dimensions.items():
-                    if not isinstance(data, dict):
-                        continue
-                    dscore = data.get("score_100")
-                    st.write(f"**{str(name).replace('_', ' ').title()}** — {fmt(dscore)}")
-                    if isinstance(dscore, (int, float)):
-                        st.progress(max(0, min(100, int(round(dscore)))))
-        if beige.get("url"):
-            st.markdown(f"[Official Beige Book source]({beige.get('url')})")
-        st.caption("Beige Book is contextual evidence and is not included directly in the Fed Policy Score.")
+        render_comparison(evidence_pairs.get("beige_book"), "Beige Book reported messages", "beige_book")
+        st.caption("Beige Book summarizes outside contacts. It is contextual evidence and is not included directly in the Fed Policy Score.")
 
     st.caption(f"Snapshot generated: {fmt(obj.get('generated_at'))} · {src}")
     st.subheader("Fed Evidence Quality")
+    st.write(coverage(obj))
     qcols = st.columns(4)
     for col, (label, value) in zip(qcols, [
         ("Quality Gate", quality.get("quality_gate", "UNKNOWN")),

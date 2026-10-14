@@ -202,6 +202,10 @@ def snapshot_quality(data, as_of):
         expected = parse_date(record.get("latest_publication_date"))
         if not record.get("available"):
             status = "MISSING"
+        elif event and event > as_of:
+            status = "INVALID_DATES"
+        elif pub is None and record.get("meeting_verified") and official(record.get("source")) and event == parse_date(record.get("latest_meeting_date")) and record.get("catalog_verified"):
+            status = "CURRENT_PUBLICATION_DATE_UNKNOWN"
         elif pub is None or event is None or not official(record.get("publication_date_source")):
             status = "UNKNOWN"
         elif pub > as_of or (event and event > pub):
@@ -220,6 +224,6 @@ def snapshot_quality(data, as_of):
     pit = "INVALID_DATES" if "INVALID_DATES" in states or (snapshot_date and snapshot_date > as_of) else (
         "DATE_CHECKED" if complete and all(x in ("CURRENT", "STALE") for x in states) else "UNKNOWN")
     freshness = "STALE" if "STALE" in states or (parse_date(data.get("as_of_date")) and parse_date(data["as_of_date"]) < as_of) else (
-        "CURRENT" if complete and all(x == "CURRENT" for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
+        "CURRENT" if complete and all(x in ("CURRENT", "CURRENT_PUBLICATION_DATE_UNKNOWN") for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
     return {"pit_status": pit, "freshness_status": freshness, "document_checks": checks,
             "pit_scope": "Publication-date ordering only; no intraday or archived-vintage guarantee."}

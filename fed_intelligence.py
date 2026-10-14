@@ -13,6 +13,7 @@ import io
 import re
 from datetime import date, datetime, timezone
 from typing import Dict, Optional
+from fed_report_comparison_v2 import load_press, report_body, document as evidence_document, compare as compare_evidence
 
 import pandas as pd
 import requests
@@ -58,6 +59,8 @@ def get(url: str) -> Optional[requests.Response]:
             timeout=TIMEOUT
         )
         r.raise_for_status()
+        if "text/html" in r.headers.get("Content-Type", ""):
+            r.encoding = "utf-8"
         return r
     except Exception:
         return None
@@ -267,7 +270,7 @@ def latest_completed_fomc(
     as_of: Optional[date] = None
 ) -> Optional[date]:
 
-    as_of = as_of or date.today()
+    as_of = as_of or datetime.now(timezone.utc).date()
 
     dates = (
         set(links.get("statement", {}))
@@ -288,7 +291,7 @@ def latest_sep(
     as_of: Optional[date] = None
 ) -> Optional[date]:
 
-    as_of = as_of or date.today()
+    as_of = as_of or datetime.now(timezone.utc).date()
 
     dates = [
         d for d in links.get("sep", {})
@@ -339,60 +342,14 @@ def fed_chair_for_date(d: Optional[date]) -> str:
 # ============================================================
 
 def press_page_data(url: str) -> Dict:
+    return load_press(url, get, as_of=datetime.now(timezone.utc).date())
 
+
+def fetch_communication_text(url: str) -> str:
     if not url:
-        return {
-            "page_url": None,
-            "pdf_url": None,
-            "text": ""
-        }
-
-    r = get(url)
-
-    if r is None:
-        return {
-            "page_url": url,
-            "pdf_url": None,
-            "text": ""
-        }
-
-    soup = BeautifulSoup(
-        r.text,
-        "html.parser"
-    )
-
-    pdf = ""
-
-    for a in soup.find_all("a", href=True):
-
-        label = a.get_text(
-            " ",
-            strip=True
-        ).lower()
-
-        href = absolute(
-            a.get("href", "")
-        )
-
-        if (
-            href.lower().endswith(".pdf")
-            and official(href)
-            and (
-                "transcript" in label
-                or "press conference" in label
-            )
-        ):
-            pdf = href
-            break
-
-    # A video/landing page is not a transcript and must never become neutral evidence.
-    text = pdf_text(pdf) if pdf else ""
-
-    return {
-        "page_url": url,
-        "pdf_url": pdf or None,
-        "text": text
-    }
+        return ""
+    response = get(url)
+    return report_body(response.text) if response is not None else ""
 
 
 # ============================================================
@@ -1192,7 +1149,7 @@ def build_deep_fed_analysis(
 
 def discover_beige_book(as_of: Optional[date] = None) -> Dict:
     """Compatibility entry point; release date comes from the official index."""
-    current, _ = load_reports(get, as_of or date.today())
+    current, _ = load_reports(get, as_of or datetime.now(timezone.utc).date())
     return current
 
 
@@ -1600,7 +1557,7 @@ def build_fed_intelligence() -> Dict:
 
     links = discover_links()
 
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
 
     meeting = latest_completed_fomc(
         links,
@@ -1638,11 +1595,11 @@ def build_fed_intelligence() -> Dict:
         )
     )
 
-    statement_text = fetch_document(
+    statement_text = fetch_communication_text(
         statement_url
     )
 
-    minutes_text = fetch_document(
+    minutes_text = fetch_communication_text(
         minutes_url
     )
 
@@ -1661,8 +1618,8 @@ def build_fed_intelligence() -> Dict:
         else None
     )
     previous_press_date = previous_document_date(links, "press", meeting)
-    previous_statement_text = fetch_document(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
-    previous_minutes_text = fetch_document(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
+    previous_statement_text = fetch_communication_text(links["statement"].get(previous_statement_date, "")) if previous_statement_date else ""
+    previous_minutes_text = fetch_communication_text(links["minutes"].get(previous_minutes_date, "")) if previous_minutes_date else ""
     previous_press = press_page_data(links["press"].get(previous_press_date, "")) if previous_press_date else {"page_url": None, "pdf_url": None, "text": ""}
 
     current_sep_date = latest_sep(
@@ -1738,7 +1695,7 @@ def build_fed_intelligence() -> Dict:
     result = {
 
         "available": True,
-        "schema_version": "fed-evidence-2",
+        "schema_version": "fed-comparison-3",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "as_of_date": today.isoformat(),
 
@@ -1805,7 +1762,10 @@ def build_fed_intelligence() -> Dict:
             },
             "chair_press": {
                 "available": bool(press.get("text", "").strip()),
-                "source": press.get("page_url") or press.get("pdf_url") or None,
+                "source": press.get("pdf_url") or press.get("page_url") or None,
+                "source_status": press.get("source_status"),
+                "scope": press.get("scope"),
+                "retrieved_at": press.get("retrieved_at"),
             },
         },
 
@@ -1880,21 +1840,65 @@ def build_fed_intelligence() -> Dict:
                 "publication_date": published, "publication_date_source": source,
                 "latest_publication_date": published, "catalog_verified": True}
     result["evidence_dates"] = {
-        "statement": event_record(bool(statement_text), meeting.isoformat(), explicit_publication_date(statement_text), statement_url),
+        "statement": event_record(bool(statement_text), meeting.isoformat(), press.get("related_release_dates", {}).get("statement") or explicit_publication_date(statement_text), press.get("page_url") or statement_url),
         "minutes": event_record(bool(minutes_text), result["minutes_meeting_date"], result["minutes_publication_date"], CALENDAR),
         "chair_press": event_record(bool(press.get("text")), meeting.isoformat(), None, press.get("pdf_url")),
         "sep": event_record(bool(current_sep.get("available")), result["latest_sep_date"], None, current_sep.get("url")),
         "beige_book": beige_metadata(beige),
     }
     if current_sep.get("available"):
-        sep_publication = explicit_publication_date(fetch_document(current_sep.get("url", "")))
-        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication)
+        sep_publication = (press.get("related_release_dates", {}).get("sep") if current_sep_date == meeting else None) or explicit_publication_date(fetch_document(current_sep.get("url", "")))
+        result["evidence_dates"]["sep"].update(publication_date=sep_publication, latest_publication_date=sep_publication,
+            publication_date_source=press.get("page_url") if current_sep_date == meeting and press.get("related_release_dates", {}).get("sep") else current_sep.get("url"))
     # A transcript's meeting date is not evidence of its publication date.
     # Require an explicit publication/release label; otherwise retain UNKNOWN.
     if press.get("text"):
         published = explicit_publication_date(press["text"])
         result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published)
 
+    result["evidence_dates"]["chair_press"].update(
+        source=press.get("pdf_url"), meeting_verified=press.get("source_status") == "VERIFIED_TRANSCRIPT",
+        latest_meeting_date=meeting.isoformat())
+    observed = result["generated_at"]
+    def meta(event, published, source, publication_source=None, retrieved_at=None):
+        return {"meeting_date": event.isoformat() if event else None,
+                "publication_date": published, "source": source,
+                "publication_date_source": publication_source,
+                "retrieved_at": retrieved_at or observed}
+    current_statement_pub = result["evidence_dates"]["statement"]["publication_date"]
+    previous_statement_pub = previous_press.get("related_release_dates", {}).get("statement")
+    report_pairs = {
+        "statement": (
+            evidence_document(previous_statement_text, meta(previous_statement_date, previous_statement_pub,
+                              links["statement"].get(previous_statement_date), previous_press.get("page_url")), "OFFICIAL_STATEMENT"),
+            evidence_document(statement_text, meta(meeting, current_statement_pub, statement_url, press.get("page_url")), "OFFICIAL_STATEMENT")),
+        "minutes": (
+            evidence_document(previous_minutes_text, meta(previous_minutes_date, links.get("minutes_publication_dates", {}).get(previous_minutes_date),
+                              links["minutes"].get(previous_minutes_date), CALENDAR), "OFFICIAL_MINUTES"),
+            evidence_document(minutes_text, meta(minutes_meeting_date, result["minutes_publication_date"], minutes_url, CALENDAR), "OFFICIAL_MINUTES")),
+        "chair_press": (
+            evidence_document(previous_press.get("text", ""), meta(previous_press_date, previous_press.get("publication_date"),
+                              previous_press.get("pdf_url"), previous_press.get("publication_date_source"), previous_press.get("retrieved_at")), previous_press.get("scope")),
+            evidence_document(press.get("text", ""), meta(meeting, press.get("publication_date"), press.get("pdf_url"),
+                              press.get("publication_date_source"), press.get("retrieved_at")), press.get("scope"))),
+        "beige_book": (
+            evidence_document(previous_beige.get("text", ""), beige_metadata(previous_beige), "NATIONAL_SUMMARY"),
+            evidence_document(beige.get("text", ""), beige_metadata(beige), "NATIONAL_SUMMARY")),
+    }
+    result["report_comparison"] = {key: compare_evidence(old, new) for key, (old, new) in report_pairs.items()}
+    for key in ("statement", "minutes", "chair_press"):
+        pair = result["report_comparison"][key]
+        result["communication_comparison"][key]["comparison"].update(legacy_only=True, method="Legacy tone model; not used for evidence comparisons")
+        result["communication_comparison"][key].update(
+            current_publication_date=pair["current"].get("publication_date"),
+            previous_publication_date=pair["previous"].get("publication_date"),
+            evidence_comparison_ref=f"report_comparison.{key}")
+    result["press_transcript"] = {k: v for k, v in press.items() if k != "text"}
+    result["report_coverage"] = {
+        key: {"current_available": pair["current"]["available"],
+              "previous_available": pair["previous"]["available"], "comparison_available": pair["available"]}
+        for key, pair in result["report_comparison"].items()
+    }
     result["quality"] = fed_quality_contract(result, today)
     return result
 
