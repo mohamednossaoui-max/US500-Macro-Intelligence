@@ -210,3 +210,77 @@ def test_document_title_or_update_date_is_not_used_as_publication(text):
 @pytest.mark.parametrize("text", ["For release at 2:00 p.m. EDT September 16, 2026", "Published: September 16, 2026"])
 def test_document_explicit_publication_date_is_preserved(text):
     assert fed.explicit_publication_date(text) == "2026-09-16"
+
+
+def observed_snapshot():
+    data = complete_snapshot()
+    data['evidence_dates']['chair_press'].update(
+        publication_date=None, latest_publication_date=None,
+        source='https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf',
+        meeting_verified=True, latest_meeting_date='2026-09-16',
+        retrieved_at=TODAY.isoformat()+'T12:00:00+00:00',
+        pdf_sha256='a'*64, availability_basis='VERIFIED_PDF_RETRIEVAL')
+    data['quality'] = {'quality_gate': 'ELIGIBLE', 'quality_status': 'HIGH'}
+    return data
+
+
+def test_observation_bound_resolves_current_pit_without_inventing_publication():
+    data = observed_snapshot()
+    q = display_quality(data, TODAY)
+    assert q['pit_status'] == 'OBSERVATION_CHECKED'
+    assert q['document_checks']['chair_press'] == 'CURRENT_OBSERVED'
+    assert q['quality_gate'] == 'ELIGIBLE'
+    assert data['evidence_dates']['chair_press']['publication_date'] is None
+    assert q['availability_bounds']['chair_press'].endswith('T12:00:00+00:00')
+
+
+@pytest.mark.parametrize('field,value', [
+    ('retrieved_at', '2026-10-15T12:00:00+00:00'),
+    ('retrieved_at', '2026-10-07T12:00:00'),
+    ('retrieved_at', 'invalid'),
+    ('retrieved_at', '2026-09-15T12:00:00+00:00'),
+    ('pdf_sha256', None), ('availability_basis', None),
+    ('source', 'https://example.com/report.pdf'), ('meeting_verified', False)])
+def test_unverified_or_future_observation_cannot_clear_gate(field, value):
+    data = observed_snapshot()
+    data['evidence_dates']['chair_press'][field] = value
+    q = display_quality(data, TODAY)
+    assert q['pit_status'] == 'UNKNOWN'
+    assert q['quality_gate'] == 'DEGRADED'
+
+
+def test_observation_does_not_hide_other_missing_documents():
+    data = observed_snapshot()
+    data['evidence_dates']['minutes']['available'] = False
+    q = display_quality(data, TODAY)
+    assert q['pit_status'] == 'UNKNOWN'
+    assert q['quality_gate'] == 'DEGRADED'
+
+
+def test_future_explicit_publication_cannot_use_observation_fallback():
+    data = observed_snapshot()
+    data['evidence_dates']['chair_press']['publication_date'] = '2026-10-15'
+    q = display_quality(data, TODAY)
+    assert q['pit_status'] == 'INVALID_DATES'
+    assert q['quality_gate'] == 'DEGRADED'
+
+
+def test_observation_does_not_override_existing_quality_defect():
+    data = observed_snapshot()
+    data['quality']['quality_gate'] = 'DEGRADED'
+    data['quality']['quality_reason'] = 'PARTIAL_PUBLICATION_SET'
+    q = display_quality(data, TODAY)
+    assert q['quality_gate'] == 'DEGRADED'
+    assert q['quality_reason'] == 'PARTIAL_PUBLICATION_SET'
+
+
+def test_engine_gate_accepts_observation_check_only_with_complete_evidence():
+    data = observed_snapshot()
+    data.update(document_status={k: {'available': True} for k in ('statement','minutes','chair_press')},
+                sep_current={'available': True}, beige_book={'available': True},
+                beige_comparison={'available': True})
+    q = fed.fed_quality_contract(data, TODAY)
+    assert q['quality_gate'] == 'ELIGIBLE'
+    assert q['pit_status'] == 'OBSERVATION_CHECKED'
+    data['document_status']['minutes']['lagged'] = True
+    assert fed.fed_quality_contract(data, TODAY)['quality_gate'] == 'DEGRADED'
