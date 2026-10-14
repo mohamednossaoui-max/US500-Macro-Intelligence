@@ -491,14 +491,14 @@
   },
   "beige_book": {
     "available": true,
-    "issue_date": "2026-08-01",
-    "publication_date": "2026-09-02",
-    "title": "Beige Book - August 2026",
-    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm"
+    "issue_date": "2026-10-01",
+    "publication_date": "2026-10-14",
+    "title": "Beige Book - October 2026",
+    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm"
   },
   "beige_analysis": {
     "available": true,
-    "score": 53.2,
+    "score": 53.0,
     "tone": "NEUTRAL",
     "dimensions": {
       "growth": {
@@ -506,58 +506,58 @@
         "score_100": 100,
         "classification": "POSITIVE",
         "positive_hits": 14,
-        "negative_hits": 1
+        "negative_hits": 0
       },
       "labor": {
-        "score": 5,
-        "score_100": 75,
+        "score": 4,
+        "score_100": 70,
         "classification": "POSITIVE",
-        "positive_hits": 5,
+        "positive_hits": 4,
         "negative_hits": 0
       },
       "inflation": {
-        "score": -10,
-        "score_100": 0,
+        "score": -8,
+        "score_100": 10,
         "classification": "NEGATIVE",
         "positive_hits": 0,
-        "negative_hits": 12
+        "negative_hits": 8
       },
       "consumer_spending": {
         "score": 0,
         "score_100": 50,
         "classification": "NEUTRAL",
-        "positive_hits": 3,
-        "negative_hits": 3
+        "positive_hits": 0,
+        "negative_hits": 0
       },
       "manufacturing": {
-        "score": 2,
-        "score_100": 60,
+        "score": 1,
+        "score_100": 55,
         "classification": "SLIGHTLY POSITIVE",
-        "positive_hits": 2,
+        "positive_hits": 1,
         "negative_hits": 0
       },
       "financial": {
-        "score": 2,
-        "score_100": 60,
-        "classification": "SLIGHTLY POSITIVE",
-        "positive_hits": 3,
+        "score": -1,
+        "score_100": 45,
+        "classification": "SLIGHTLY NEGATIVE",
+        "positive_hits": 0,
         "negative_hits": 1
       },
       "housing": {
         "score": 0,
         "score_100": 50,
         "classification": "NEUTRAL",
-        "positive_hits": 1,
-        "negative_hits": 1
+        "positive_hits": 0,
+        "negative_hits": 0
       }
     },
     "reasons": [
       "- Growth: POSITIVE (100.0/100)",
-      "- Labor: POSITIVE (75.0/100)",
-      "- Inflation: NEGATIVE (0.0/100)",
+      "- Labor: POSITIVE (70.0/100)",
+      "- Inflation: NEGATIVE (10.0/100)",
       "- Consumer spending: NEUTRAL (50.0/100)",
-      "- Manufacturing: SLIGHTLY POSITIVE (60.0/100)",
-      "- Financial: SLIGHTLY POSITIVE (60.0/100)",
+      "- Manufacturing: SLIGHTLY POSITIVE (55.0/100)",
+      "- Financial: SLIGHTLY NEGATIVE (45.0/100)",
       "- Housing: NEUTRAL (50.0/100)"
     ],
     "method": "Heuristic analytical score based on directional language in the official National Summary. Not a probability."
