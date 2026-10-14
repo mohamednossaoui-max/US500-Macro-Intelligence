@@ -93,7 +93,7 @@ def test_fed_ui_exposes_required_report_sections():
         'st.subheader("Beige Book Context")',
         "<div class='title'>FED BOTTOM LINE</div>",
         'with st.expander("View detailed data")',
-        '"Minutes are pending and are not treated as evidence."',
+        '"Legacy Fed Policy Score — separate keyword model"',
     ]
     for marker in required:
         assert marker in source
@@ -101,8 +101,8 @@ def test_fed_ui_exposes_required_report_sections():
 
 def test_fed_ui_does_not_mislabel_legacy_available_evidence_as_excluded():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "included · weight metadata pending refresh" in source
-    assert "excluded until published" in source
+    assert "retrieved; comparison metadata pending refresh" in source
+    assert "source retrieval pending; publication is not inferred" in source
     assert "explicit_weight" in source
     assert "explicit_availability" in source
 
