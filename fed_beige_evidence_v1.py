@@ -193,6 +193,28 @@ def comparison(current, previous, current_analysis, previous_analysis):
     return out
 
 
+def observed_transcript(record, as_of):
+    """Conservative availability bound for the exact retrieved transcript.
+
+    This is not its publication date and never authorizes earlier backtests.
+    Day-level queries check the UTC observation day; no intraday claim is made.
+    """
+    try:
+        observed = datetime.fromisoformat(str(record.get("retrieved_at")).replace("Z", "+00:00"))
+        if observed.tzinfo is None:
+            return False
+        day = observed.astimezone(timezone.utc).date()
+    except (ValueError, TypeError):
+        return False
+    meeting = parse_date(record.get("meeting_date"))
+    return bool(meeting and meeting <= day <= as_of
+                and record.get("meeting_verified") and record.get("catalog_verified")
+                and meeting == parse_date(record.get("latest_meeting_date"))
+                and official(record.get("source"))
+                and record.get("availability_basis") == "VERIFIED_PDF_RETRIEVAL"
+                and re.fullmatch(r"[0-9a-f]{64}", str(record.get("pdf_sha256") or "")))
+
+
 def snapshot_quality(data, as_of):
     """Date-level checks, not a guarantee about archived intraday vintages."""
     checks = {}
@@ -205,7 +227,8 @@ def snapshot_quality(data, as_of):
         elif event and event > as_of:
             status = "INVALID_DATES"
         elif pub is None and record.get("meeting_verified") and official(record.get("source")) and event == parse_date(record.get("latest_meeting_date")) and record.get("catalog_verified"):
-            status = "CURRENT_PUBLICATION_DATE_UNKNOWN"
+            status = ("CURRENT_OBSERVED" if key == "chair_press" and observed_transcript(record, as_of)
+                      else "CURRENT_PUBLICATION_DATE_UNKNOWN")
         elif pub is None or event is None or not official(record.get("publication_date_source")):
             status = "UNKNOWN"
         elif pub > as_of or (event and event > pub):
@@ -222,8 +245,14 @@ def snapshot_quality(data, as_of):
     states = list(checks.values())
     snapshot_date = parse_date(data.get("as_of_date"))
     pit = "INVALID_DATES" if "INVALID_DATES" in states or (snapshot_date and snapshot_date > as_of) else (
+        "OBSERVATION_CHECKED" if complete and "CURRENT_OBSERVED" in states and all(x in ("CURRENT", "STALE", "CURRENT_OBSERVED") for x in states) else
         "DATE_CHECKED" if complete and all(x in ("CURRENT", "STALE") for x in states) else "UNKNOWN")
     freshness = "STALE" if "STALE" in states or (parse_date(data.get("as_of_date")) and parse_date(data["as_of_date"]) < as_of) else (
-        "CURRENT" if complete and all(x in ("CURRENT", "CURRENT_PUBLICATION_DATE_UNKNOWN") for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
+        "CURRENT" if complete and all(x in ("CURRENT", "CURRENT_OBSERVED", "CURRENT_PUBLICATION_DATE_UNKNOWN") for x in states) and parse_date(data.get("as_of_date")) == as_of else "UNVERIFIED")
     return {"pit_status": pit, "freshness_status": freshness, "document_checks": checks,
-            "pit_scope": "Publication-date ordering only; no intraday or archived-vintage guarantee."}
+            "pit_scope": ("Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; "
+                          "its publication date remains unknown. No intraday or archived-vintage guarantee."
+                          if pit == "OBSERVATION_CHECKED" else
+                          "Publication-date ordering only; no intraday or archived-vintage guarantee."),
+            "availability_bounds": {key: record.get("retrieved_at") for key, record in data.get("evidence_dates", {}).items()
+                                    if checks.get(key) == "CURRENT_OBSERVED"}}

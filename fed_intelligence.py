@@ -1536,7 +1536,7 @@ def fed_quality_contract(data: Dict, as_of: date) -> Dict:
     else:
         gate, quality, reason = "ELIGIBLE", "HIGH", None
     temporal = snapshot_quality(data, as_of)
-    if reason is None and (temporal["freshness_status"] != "CURRENT" or temporal["pit_status"] != "DATE_CHECKED"
+    if reason is None and (temporal["freshness_status"] != "CURRENT" or temporal["pit_status"] not in ("DATE_CHECKED", "OBSERVATION_CHECKED")
                            or not data.get("beige_comparison", {}).get("available")):
         gate, quality, reason = "DEGRADED", "MEDIUM", "EVIDENCE_DATES_OR_COMPARISON_UNVERIFIED"
     return {
@@ -1853,12 +1853,14 @@ def build_fed_intelligence() -> Dict:
     # A transcript's meeting date is not evidence of its publication date.
     # Require an explicit publication/release label; otherwise retain UNKNOWN.
     if press.get("text"):
-        published = explicit_publication_date(press["text"])
-        result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published)
+        published = press.get("publication_date") or explicit_publication_date(press["text"])
+        result["evidence_dates"]["chair_press"].update(publication_date=published, latest_publication_date=published,
+            publication_date_source=press.get("publication_date_source") or press.get("pdf_url"))
 
     result["evidence_dates"]["chair_press"].update(
         source=press.get("pdf_url"), meeting_verified=press.get("source_status") == "VERIFIED_TRANSCRIPT",
-        latest_meeting_date=meeting.isoformat())
+        latest_meeting_date=meeting.isoformat(), retrieved_at=press.get("retrieved_at"),
+        pdf_sha256=press.get("pdf_sha256"), availability_basis="VERIFIED_PDF_RETRIEVAL")
     observed = result["generated_at"]
     def meta(event, published, source, publication_source=None, retrieved_at=None):
         return {"meeting_date": event.isoformat() if event else None,

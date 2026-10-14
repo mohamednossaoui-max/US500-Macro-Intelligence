@@ -33,7 +33,7 @@ def display_quality(obj, today=None):
     today = today or datetime.now(timezone.utc).date()
     quality = dict(obj.get("quality") or {})
     quality.update(snapshot_quality(obj, today))
-    if quality["freshness_status"] != "CURRENT" or quality["pit_status"] != "DATE_CHECKED":
+    if quality["freshness_status"] != "CURRENT" or quality["pit_status"] not in ("DATE_CHECKED", "OBSERVATION_CHECKED"):
         checks = quality.get("document_checks") or {}
         problems = ", ".join(f"{key}: {value}" for key, value in checks.items() if value != "CURRENT")
         note = ("Snapshot predates today's verification." if quality["freshness_status"] == "STALE" else
