@@ -1,5 +1,7 @@
 """Compact previous/current evidence, without keyword coverage indicators."""
 import streamlit as st
+from contextlib import nullcontext
+from html import escape
 
 
 def _value(fact):
@@ -31,7 +33,7 @@ def render_metrics(pair):
                     st.caption("A missing value is not an unchanged result.")
 
 
-def render_comparison(pair, title, namespace):
+def render_comparison(pair, title, namespace, compact=False):
     pair = pair if isinstance(pair, dict) else {}
     st.markdown(f"**{title} — Previous → Current**")
     previous, current = pair.get("previous", {}), pair.get("current", {})
@@ -56,7 +58,9 @@ def render_comparison(pair, title, namespace):
         pairs = topic.get("pairs") or []
         if not pairs:
             continue
-        with st.expander(topic.get("label", key), expanded=(key == "inflation")):
+        with nullcontext() if compact else st.expander(topic.get("label", key), expanded=False):
+            if compact:
+                st.markdown(f"**{topic.get('label', key)}**")
             # Literal text differences first. Retain the complete evidence in JSON
             # and link the official documents, rather than producing large tables.
             ordered = sorted(pairs, key=lambda p: p.get("status") == "SAME_WORDING")
@@ -81,3 +85,26 @@ def coverage(obj):
     ready = sum(bool(v.get("current_available")) for v in reports.values())
     compared = sum(bool(v.get("comparison_available")) for v in reports.values())
     return f"Report texts: {ready}/4 retrieved · Previous/current comparisons: {compared}/4 ready"
+
+
+def compact_comparison(pair, title, namespace):
+    """Restore the original compact cards; keep full evidence collapsed."""
+    metrics = pair.get("metrics") or {}
+    row = metrics.get("target_range") or metrics.get("policy_action") or {}
+    ready = bool(pair.get("available"))
+    previous, current = pair.get("previous") or {}, pair.get("current") or {}
+    event_key = "meeting_date"
+    badge = "COMPARISON READY" if ready else "NOT AVAILABLE"
+    prev = _value(row.get("previous")) if ready else "Unavailable"
+    cur = _value(row.get("current")) if ready else "Unavailable"
+    if ready and not row:
+        prev, cur = "Text retrieved", "Text retrieved"
+    st.markdown(
+        f"<div class='comm-shift'><div class='comm-shift-head'><b>{escape(title)}</b>"
+        f"<span class='shift-badge flat'>{badge}</span></div>"
+        f"<div class='comm-shift-flow'><span><small>PREVIOUS</small>{escape(prev)}</span>"
+        f"<strong>→</strong><span><small>CURRENT</small>{escape(cur)}</span></div>"
+        f"<div class='comm-shift-date'>Meeting dates: {escape(str(previous.get(event_key) or 'Unknown'))} → "
+        f"{escape(str(current.get(event_key) or 'Unknown'))}</div></div>", unsafe_allow_html=True)
+    with st.expander(f"{title} — Detailed report comparison", expanded=False):
+        render_comparison(pair, title, namespace, compact=True)

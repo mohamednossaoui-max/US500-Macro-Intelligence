@@ -1029,17 +1029,27 @@ def fed() -> None:
         with col:
             card(label, value)
 
+    # --- Policy pulse: visual first ------------------------------------
     st.subheader("Policy Pulse")
-    evidence_pairs = obj.get("report_comparison") or {}
-    policy_pair = evidence_pairs.get("statement") or evidence_pairs.get("chair_press") or {}
-    if policy_pair.get("available"):
-        render_metrics(policy_pair)
+    if isinstance(score, (int, float)):
+        marker = max(0.0, min(100.0, float(score)))
+        st.markdown(
+            f"<div class='fed-strip'><div class='kicker'>FED POLICY SCORE</div>"
+            f"<div class='headline'>{score:.1f}/100 · {fmt(classification)} · {fmt(sep_direction)}</div>"
+            f"<div class='fed-gauge'><span class='fed-marker' style='left:calc({marker:.1f}% - 2px)'></span></div>"
+            "<div class='fed-scale'><span>DOVISH</span><span>NEUTRAL · 50</span><span>HAWKISH</span></div>"
+            "<div class='detail' style='margin-top:8px'>Descriptive research gauge — not a policy probability or trading signal.</div></div>",
+            unsafe_allow_html=True,
+        )
     else:
-        st.info("Official policy comparison is not ready; no direction is inferred from missing reports.")
-    st.caption(coverage(obj))
+        st.info("A policy score is not available for the current evidence set.")
+
+    evidence_pairs = obj.get("report_comparison") or {}
     with st.expander("Legacy Fed Policy Score — separate keyword model"):
-        st.write(f"{fmt(score,1)} · {fmt(classification)}")
-        st.caption("Retained for compatibility. This model does not drive the report comparisons below.")
+        st.caption("The gauge and synthesis are descriptive model indicators. Official report comparisons are separate below.")
+        policy_pair = evidence_pairs.get("statement") or {}
+        if policy_pair.get("available"):
+            render_metrics(policy_pair)
 
     # --- SEP changes ----------------------------------------------------
     fields = sep_shift.get("fields") if isinstance(sep_shift.get("fields"), dict) else {}
@@ -1062,7 +1072,23 @@ def fed() -> None:
             changes.append((abs(change), key, label, detail))
     changes.sort(reverse=True, key=lambda x: x[0])
 
+    # PATCH 4.1 — compact decision brief; presentation only.
     quality = display_quality(obj)
+    biggest = changes[0] if changes else None
+    biggest_text = "No comparable SEP move"
+    if biggest:
+        _, _, biggest_label, biggest_detail = biggest
+        biggest_delta = biggest_detail.get("change")
+        biggest_text = f"{biggest_label} {biggest_delta:+.1f}" if isinstance(biggest_delta, (int, float)) else biggest_label
+    st.markdown(
+        "<div class='fed-brief'>"
+        f"<div class='fed-brief-cell'><span>POLICY STANCE</span><b>{fmt(classification)}</b></div>"
+        f"<div class='fed-brief-cell'><span>DIRECTION</span><b>{fmt(sep_direction)}</b></div>"
+        f"<div class='fed-brief-cell'><span>BIGGEST SEP MOVE</span><b>{biggest_text}</b></div>"
+        f"<div class='fed-brief-cell'><span>EVIDENCE QUALITY</span><b>{fmt(quality.get('quality_gate', 'UNKNOWN'))}</b></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     st.subheader("What Changed?")
     if changes:
@@ -1087,10 +1113,32 @@ def fed() -> None:
     else:
         st.info("No comparable SEP changes are available for this snapshot.")
 
-    st.markdown("<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
-                "<div class='body'>Read the official policy decision, SEP projections and report comparisons together. "
-                "Beige Book is contextual evidence; missing text or dates do not imply neutral conditions.</div></div>",
-                unsafe_allow_html=True)
+    # --- Bottom line: move decision read near the top ------------------
+    top_change = changes[0] if changes else None
+    if top_change:
+        _, top_key, top_label, top_detail = top_change
+        top_delta = top_detail.get("change")
+        top_reason = explanations[top_key][0] if top_delta > 0 else explanations[top_key][1]
+        change_text = f"Largest SEP move: {top_label} {top_delta:+.1f} ({top_reason})."
+    else:
+        change_text = "No comparable SEP shift is available."
+    minutes_payload = obj.get("minutes") if isinstance(obj.get("minutes"), dict) else {}
+    minutes_status = (obj.get("document_status") or {}).get("minutes", {}) if isinstance(obj.get("document_status"), dict) else {}
+    if minutes_payload.get("available"):
+        minutes_date = obj.get("minutes_meeting_date") or minutes_status.get("meeting_date")
+        if minutes_status.get("lagged"):
+            minutes_text = f"Latest published Minutes ({fmt(minutes_date)}) are incorporated as lagged evidence for the prior meeting."
+        else:
+            minutes_text = f"Minutes ({fmt(minutes_date)}) are incorporated."
+    else:
+        minutes_text = "Minutes are pending and are not treated as evidence."
+    st.markdown(
+        f"<div class='bottom-line'><div class='title'>FED BOTTOM LINE</div>"
+        f"<div class='read'>{fmt(classification)} · {fmt(sep_direction)}</div>"
+        f"<div class='body'>Fed Policy Score: {fmt(score,1)}. {change_text} {minutes_text} "
+        "Beige Book remains contextual rather than a direct score input.</div></div>",
+        unsafe_allow_html=True,
+    )
 
     # --- Compact communication evidence --------------------------------
     weights = phase.get("document_weights") if isinstance(phase.get("document_weights"), dict) else {}
@@ -1168,17 +1216,41 @@ def fed() -> None:
     st.subheader("Communication — Current vs Previous")
     for key, label in (("statement", "FOMC Statement"), ("minutes", "FOMC Minutes"),
                        ("chair_press", "Press Conference")):
-        render_comparison(evidence_pairs.get(key), label, key)
+        pair = evidence_pairs.get(key) or {}
+        from fed_report_comparison_ui_v2 import compact_comparison
+        compact_comparison(pair, label, key)
     with st.expander("Raw communication comparison"):
         st.json(evidence_pairs)
 
+    # --- Synthesis ------------------------------------------------------
+    combined = phase.get("combined") if isinstance(phase.get("combined"), dict) else {}
     st.subheader("Fed Synthesis")
-    st.write("Compare actual decisions and reported inflation, labor, growth, risks and liquidity messages above. "
-             "Reported wording changes are distinct from numerical changes; neither is a policy probability.")
     if minutes_status.get("available") and minutes_status.get("lagged"):
-        st.caption("Latest published FOMC Minutes cover the prior meeting. They remain lagged research evidence "
-                   "and are not relabeled as current-meeting minutes. "
-                   "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP.")
+        st.caption(
+            "Current-meeting synthesis uses the current Statement and Press Conference plus the current SEP. "
+            "The latest published Minutes remain visible for research comparison but are excluded from the current-meeting score because they cover the prior meeting."
+        )
+    if combined:
+        for name, data in combined.items():
+            if not isinstance(data, dict):
+                continue
+            dim_score = data.get("score_100")
+            dim_label = str(name).replace("_", " ").title()
+            if isinstance(dim_score, (int, float)):
+                direction = "Hawkish tilt" if dim_score > 52 else "Dovish tilt" if dim_score < 48 else "Balanced"
+                c1, c2 = st.columns([1, 3])
+                with c1:
+                    st.markdown(f"**{dim_label}**")
+                    st.caption(f"{dim_score:.1f} · {direction}")
+                with c2:
+                    st.progress(max(0, min(100, int(round(dim_score)))))
+        reasons = phase.get("reasons")
+        if isinstance(reasons, list) and reasons:
+            with st.expander("Evidence behind the synthesis"):
+                for reason in reasons:
+                    st.write(reason)
+    else:
+        st.info("Dimension-level synthesis is not available in the current artifact.")
 
     st.subheader("Beige Book Context")
     beige = obj.get("beige_book") or {}
@@ -1212,7 +1284,8 @@ def fed() -> None:
                         st.write(f"{label}: {row['previous']} → {row['current']} districts ({row['change']:+d})")
         else:
             st.warning("Previous/current Beige Book comparison is unavailable. No unchanged conclusion is inferred.")
-        render_comparison(evidence_pairs.get("beige_book"), "Beige Book reported messages", "beige_book")
+        with st.expander("Beige Book — Detailed report comparison", expanded=False):
+            render_comparison(evidence_pairs.get("beige_book"), "Beige Book reported messages", "beige_book", compact=True)
         st.caption("Beige Book summarizes outside contacts. It is contextual evidence and is not included directly in the Fed Policy Score.")
 
     st.caption(f"Snapshot generated: {fmt(obj.get('generated_at'))} · {src}")
