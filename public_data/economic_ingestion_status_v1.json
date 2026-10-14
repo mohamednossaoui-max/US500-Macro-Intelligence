@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-10-14",
-  "retrieved_at": "2026-10-14T13:47:25.025321+00:00",
+  "retrieved_at": "2026-10-14T20:17:46.392879+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -89,11 +89,11 @@
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "CPIAUCSL",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-11",
-      "before_merge_canonical_value": 0.4,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "September 2026",
+      "before_merge_canonical_release_date": "2026-10-14",
+      "before_merge_canonical_value": 0.6,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "CORE_CPI",
@@ -112,11 +112,11 @@
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "CPILFESL",
-      "before_merge_canonical_latest_reference_period": "August 2026",
-      "before_merge_canonical_release_date": "2026-09-11",
+      "before_merge_canonical_latest_reference_period": "September 2026",
+      "before_merge_canonical_release_date": "2026-10-14",
       "before_merge_canonical_value": 0.3,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "PPI_FINAL_DEMAND",
