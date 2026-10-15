@@ -98,7 +98,7 @@ def test_http_failure_preserves_value_no_date_no_key(monkeypatch):
 
 
 def test_evidence_cache_excludes_fred_secret(tmp_path):
- c=s.Client(tmp_path);response=SimpleNamespace(url=BASE+'series',content=b'{}',raise_for_status=lambda:None)
+ c=s.Client(tmp_path);response=SimpleNamespace(url=BASE+'series',content=b'{}',status_code=200,headers={},raise_for_status=lambda:None)
  c.session.get=lambda *a,**kw:response
  c.get(BASE+'series',params={'api_key':'KEY_A','series_id':'PAYEMS'});files=list(tmp_path.iterdir())
  c.get(BASE+'series',params={'api_key':'KEY_B','series_id':'PAYEMS'})

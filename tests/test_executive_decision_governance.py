@@ -47,7 +47,17 @@ def test_fed_artifact_remains_research_only_contextual():
     q = fed['quality']
     assert q['research_only'] is True
     assert q['decision_role'] == 'CONTEXTUAL'
-    assert q['pit_status'] == 'PIT_SAFE'
+    # Current Fed evidence has date/observation-level checks, not a guarantee
+    # of archived vintages or intraday publication availability.
+    assert q['pit_status'] in {'DATE_CHECKED', 'OBSERVATION_CHECKED'}
+    assert q['pit_scope']
+    assert q['forecast'] is False
+    assert q['trading_signal'] is False
+    if q['pit_status'] == 'OBSERVATION_CHECKED':
+        bounds = q['availability_bounds']
+        assert bounds.get('chair_press')
+        observed_at = pd.Timestamp(bounds['chair_press'])
+        assert observed_at.tzinfo is not None
 
 
 def test_decision_summary_separates_core_and_overall_pit_semantics(tmp_path):
