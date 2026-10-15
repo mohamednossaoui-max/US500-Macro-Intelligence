@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -128,7 +129,25 @@ class Client:
         key = url + str({k:v for k,v in kwargs.get('params',{}).items() if k not in ('key','registrationkey','UserID','api_key')})
         if key in self.cache:
             return self.cache[key]
-        r = self.session.get(url, timeout=30, **kwargs)
+        # Retry only transient failures of idempotent GETs. Never cache failed
+        # responses or relax source, release-date, redirect or PIT validation.
+        for attempt in range(4):
+            try:
+                r = self.session.get(url, timeout=30, **kwargs)
+            except (requests.ConnectionError, requests.Timeout):
+                if attempt == 3:
+                    raise
+                time.sleep(2 ** (attempt + 1))
+                continue
+            if r.status_code not in {429, 500, 502, 503, 504} or attempt == 3:
+                break
+            delay = 2 ** (attempt + 1)
+            # Honor numeric Retry-After within a bounded ingestion wait.
+            retry_after = r.headers.get('Retry-After', '').strip()
+            if retry_after.isdigit():
+                delay = max(delay, min(int(retry_after), 30))
+            r.close()
+            time.sleep(delay)
         r.raise_for_status()
         expected, actual = urlparse(url).hostname, urlparse(r.url).hostname
         if actual=='ecommerce.ismworld.org':
