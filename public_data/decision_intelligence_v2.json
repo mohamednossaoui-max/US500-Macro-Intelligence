@@ -1,8 +1,8 @@
 {
   "decision_intelligence_version": "DIV2.0",
-  "context_date": "2026-10-14",
+  "context_date": "2026-10-15",
   "decision_state": "SUPPORTIVE",
-  "current_environment": "Economic regime is MIXED: inflation +0.33, labor -0.02, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is ELEVATED_RESEARCH_STRESS; sentiment is BULLISH; technical regime is STRONG_BULLISH. Published Decision Engine state remains SUPPORTIVE.",
+  "current_environment": "Economic regime is MIXED: inflation +0.33, labor -0.03, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is ELEVATED_RESEARCH_STRESS; sentiment is NEUTRAL; technical regime is BULLISH. Published Decision Engine state remains SUPPORTIVE.",
   "what_changed": {
     "status": "UNAVAILABLE",
     "reason": "No prior canonical USV1.0 snapshot is published; change is not inferred from non-canonical history."
@@ -13,80 +13,80 @@
     "freshness": "AGING",
     "core_pit_safe": true,
     "overall_pit_status": "PIT_LIMITED",
-    "overall_pit_safe_pct": 78.6
+    "overall_pit_safe_pct": 66.7
   },
   "historical_analogs": {
-    "count": 9,
-    "closest_date": "2025-10-01",
-    "closest_similarity_pct": 78.4204,
+    "count": 8,
+    "closest_date": "2025-06-27",
+    "closest_similarity_pct": 71.9013,
     "closest_coverage_pct": 88.89,
-    "summary": "Stage 10 selected 9 independent analog regimes without using outcomes. Closest is 2025-10-01 with 78.42% similarity and 88.89% comparable CORE coverage.",
-    "key_differences": "economic_growth: hist=1.386632475029813, current=-0.0507334623403759 | financial_stress: hist=-0.2774840933884968, current=0.1050190913174598 | economic_labor: hist=-0.0317686710477259, current=-0.0246016158557906"
+    "summary": "Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-06-27 with 71.90% similarity and 88.89% comparable CORE coverage.",
+    "key_differences": "economic_labor: hist=0.0099398810616049, current=-0.0270411763771128 | economic_growth: hist=-1.1616112758223234, current=-0.0507334623403759 | financial_stress: hist=0.1459237549351694, current=0.4327441476895011"
   },
   "historical_market_reaction": {
-    "summary": "Across the locked analog set, historical median US500 return was +3.79% at 60 trading days (66.7% positive) and +7.45% at 120 trading days (88.9% positive). Outcomes were dispersed: 60D range -14.46% to +13.68%. These are conditional historical outcomes, not expected returns or forecasts.",
+    "summary": "Across the locked analog set, historical median US500 return was +4.87% at 60 trading days (75.0% positive) and +8.17% at 120 trading days (100.0% positive). Outcomes were dispersed: 60D range -8.93% to +18.89%. These are conditional historical outcomes, not expected returns or forecasts.",
     "horizons": {
       "5d": {
-        "available_analogs": 9,
-        "total_analogs": 9,
-        "mean_return_pct": -0.605229,
-        "median_return_pct": 0.540073,
-        "positive_hit_rate_pct": 66.6667,
-        "min_return_pct": -9.08198,
-        "max_return_pct": 1.470956,
-        "return_std_pct": 3.285804,
-        "median_max_drawdown_pct": -0.857256,
-        "median_realized_volatility_pct": 9.788034
+        "available_analogs": 8,
+        "total_analogs": 8,
+        "mean_return_pct": -0.134787,
+        "median_return_pct": 0.241171,
+        "positive_hit_rate_pct": 62.5,
+        "min_return_pct": -2.274795,
+        "max_return_pct": 0.92191,
+        "return_std_pct": 1.14512,
+        "median_max_drawdown_pct": -1.072758,
+        "median_realized_volatility_pct": 10.162021
       },
       "20d": {
-        "available_analogs": 9,
-        "total_analogs": 9,
-        "mean_return_pct": 0.974,
-        "median_return_pct": 1.820475,
-        "positive_hit_rate_pct": 55.5556,
-        "min_return_pct": -6.827594,
-        "max_return_pct": 5.487904,
-        "return_std_pct": 3.695128,
-        "median_max_drawdown_pct": -2.582183,
-        "median_realized_volatility_pct": 13.70084
+        "available_analogs": 8,
+        "total_analogs": 8,
+        "mean_return_pct": 0.31602,
+        "median_return_pct": 1.789889,
+        "positive_hit_rate_pct": 62.5,
+        "min_return_pct": -12.064055,
+        "max_return_pct": 7.438433,
+        "return_std_pct": 5.711132,
+        "median_max_drawdown_pct": -2.639105,
+        "median_realized_volatility_pct": 12.384985
       },
       "60d": {
-        "available_analogs": 9,
-        "total_analogs": 9,
-        "mean_return_pct": 2.403805,
-        "median_return_pct": 3.790256,
-        "positive_hit_rate_pct": 66.6667,
-        "min_return_pct": -14.463735,
-        "max_return_pct": 13.681309,
-        "return_std_pct": 8.85652,
-        "median_max_drawdown_pct": -5.110085,
-        "median_realized_volatility_pct": 12.898347
+        "available_analogs": 8,
+        "total_analogs": 8,
+        "mean_return_pct": 4.678966,
+        "median_return_pct": 4.86656,
+        "positive_hit_rate_pct": 75.0,
+        "min_return_pct": -8.934356,
+        "max_return_pct": 18.89143,
+        "return_std_pct": 8.110754,
+        "median_max_drawdown_pct": -4.846675,
+        "median_realized_volatility_pct": 13.901254
       },
       "120d": {
-        "available_analogs": 9,
-        "total_analogs": 9,
-        "mean_return_pct": 8.921101,
-        "median_return_pct": 7.452457,
-        "positive_hit_rate_pct": 88.8889,
-        "min_return_pct": -1.77763,
-        "max_return_pct": 19.543761,
-        "return_std_pct": 6.972493,
-        "median_max_drawdown_pct": -6.765255,
-        "median_realized_volatility_pct": 12.624993
+        "available_analogs": 8,
+        "total_analogs": 8,
+        "mean_return_pct": 11.089702,
+        "median_return_pct": 8.167782,
+        "positive_hit_rate_pct": 100.0,
+        "min_return_pct": 3.692461,
+        "max_return_pct": 27.47317,
+        "return_std_pct": 7.797031,
+        "median_max_drawdown_pct": -5.110085,
+        "median_realized_volatility_pct": 12.207745
       }
     },
     "selection_locked": true,
     "outcomes_used_in_selection": false
   },
-  "important_differences": "economic_growth: hist=1.386632475029813, current=-0.0507334623403759 | financial_stress: hist=-0.2774840933884968, current=0.1050190913174598 | economic_labor: hist=-0.0317686710477259, current=-0.0246016158557906",
+  "important_differences": "economic_labor: hist=0.0099398810616049, current=-0.0270411763771128 | economic_growth: hist=-1.1616112758223234, current=-0.0507334623403759 | financial_stress: hist=0.1459237549351694, current=0.4327441476895011",
   "risks_and_limitations": [
-    "Closest analog similarity is 78.42%, not a close match.",
+    "Closest analog similarity is 71.90%, not a close match.",
     "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
     "Overall evidence PIT status is PIT_LIMITED; CORE PIT remains True.",
     "CONTEXTUAL evidence does not alter the Decision Engine state.",
     "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
   ],
-  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (78.42%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
+  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (71.90%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
   "research_only": true,
   "forecast_generated": false,
   "trading_signal_generated": false,

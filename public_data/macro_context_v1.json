@@ -1,22 +1,22 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-14",
+  "context_date": "2026-10-15",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
-    "source_date": "2026-10-14",
+    "source_date": "2026-10-15",
     "age_days": 0,
     "economic_regime": "MIXED",
     "inflation_score": 0.3290131994082034,
-    "labor_score": -0.0246016158557906,
+    "labor_score": -0.0270411763771128,
     "growth_score": -0.0507334623403759,
     "dimensions_available": 3,
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-14",
+    "as_of_date": "2026-10-15",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -113,18 +113,18 @@
       },
       "chair": {
         "inflation": {
-          "score": 0,
-          "classification": "NEUTRAL",
-          "hawkish_hits": 0,
+          "score": 4,
+          "classification": "HAWKISH",
+          "hawkish_hits": 4,
           "dovish_hits": 0,
-          "score_100": 50
+          "score_100": 70
         },
         "labor": {
-          "score": 0,
-          "classification": "NEUTRAL",
-          "hawkish_hits": 0,
+          "score": 1,
+          "classification": "MODERATELY HAWKISH",
+          "hawkish_hits": 1,
           "dovish_hits": 0,
-          "score_100": 50
+          "score_100": 55
         },
         "growth": {
           "score": 0,
@@ -150,7 +150,7 @@
       },
       "combined": {
         "inflation": {
-          "score_100": 61.8,
+          "score_100": 66.8,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -167,15 +167,15 @@
             "score_100": 75
           },
           "chair": {
-            "score": 0,
-            "classification": "NEUTRAL",
-            "hawkish_hits": 0,
+            "score": 4,
+            "classification": "HAWKISH",
+            "hawkish_hits": 4,
             "dovish_hits": 0,
-            "score_100": 50
+            "score_100": 70
           }
         },
         "labor": {
-          "score_100": 55.8,
+          "score_100": 57.0,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -192,11 +192,11 @@
             "score_100": 60
           },
           "chair": {
-            "score": 0,
-            "classification": "NEUTRAL",
-            "hawkish_hits": 0,
+            "score": 1,
+            "classification": "MODERATELY HAWKISH",
+            "hawkish_hits": 1,
             "dovish_hits": 0,
-            "score_100": 50
+            "score_100": 55
           }
         },
         "growth": {
@@ -276,14 +276,14 @@
         }
       },
       "fed_score": {
-        "score": 60.2,
-        "base_score": 55.2,
+        "score": 61.6,
+        "base_score": 56.6,
         "sep_adjustment": 5.0,
         "classification": "MODERATELY HAWKISH"
       },
       "reasons": [
-        "- Inflation: None (+2.95)",
-        "- Labor: None (+0.87)",
+        "- Inflation: None (+4.20)",
+        "- Labor: None (+1.05)",
         "- Growth: None (+0.00)",
         "- Financial: None (+0.00)",
         "- Policy: None (+1.40)",
@@ -291,7 +291,7 @@
       ],
       "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
     },
-    "fed_score": 60.2,
+    "fed_score": 61.6,
     "sep_shift": {
       "classification": "HAWKISH SHIFT",
       "hawkish_points": 5,
@@ -328,21 +328,21 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-10-13",
-    "age_days": 1,
-    "composite_stress_score": 0.1050190913174598,
+    "source_date": "2026-10-15",
+    "age_days": 0,
+    "composite_stress_score": 0.4327441476895011,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
-    "vix": 15.27,
-    "treasury_2y": 4.8,
-    "treasury_10y": 5.24,
-    "yield_10y_2y_spread": 0.4400000000000004,
+    "vix": 16.87,
+    "treasury_2y": 4.82,
+    "treasury_10y": 5.19,
+    "yield_10y_2y_spread": 0.3700000000000001,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-10-14",
+    "source_date": "2026-10-15",
     "age_days": 0,
-    "latest_published_at": "2026-10-14T14:00:00+00:00",
-    "latest_title": "Business Formation Statistics",
+    "latest_published_at": "2026-10-15T14:00:00+00:00",
+    "latest_title": "Manufacturing and Trade Inventories and Sales",
     "latest_source": "U.S. Census Bureau",
     "latest_topic": "growth",
     "events_available": 97,
@@ -356,7 +356,7 @@
   },
   "temporal_alignment": {
     "economic_age_days": 0,
-    "financial_stress_age_days": 1,
+    "financial_stress_age_days": 0,
     "event_news_age_days": 0,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,

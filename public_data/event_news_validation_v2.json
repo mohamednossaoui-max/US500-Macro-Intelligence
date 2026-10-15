@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-10-14T20:20:57.311070+00:00",
+  "generated_at": "2026-10-15T20:36:51.302257+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -773,6 +773,24 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Manufacturing and Trade Inventories and Sales",
+        "description": "U.S. total business end-of-month inventories for August 2026 were $2,818.8 billion, up 0.4 percent (+/- 0.1 percent) from last month. U.S. total business sales were $2,123.5 billion, up 1.1 percent (+/- 0.1 percent) from last month.<p><br>August 2026: +0.4 % Change in Inventories<br>July 2026 (r): +0.9 % Change in Inventories<br></p>",
+        "published_at": "2026-10-15T14:00:00+00:00",
+        "url": "https://www.census.gov/mtis/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Advance Monthly Sales for Retail and Food Services",
+        "description": "U.S. retail and food services sales for September 2026 were $745.0 billion, up 0.8 percent (+/-0.4 percent) from the previous month.<p><br>September 2026: +0.8 % Change<br>August 2026 (r): +1.3 % Change<br></p>",
+        "published_at": "2026-10-15T12:30:00+00:00",
+        "url": "https://www.census.gov/retail/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Business Formation Statistics",
         "description": "Total U.S. Business Applications were 534,947 in September 2026, up 0.5% from August 2026.<p><br>September 2026: +0.5° % Change<br>August 2026 (r): -7.7° % Change<br></p>",
         "published_at": "2026-10-14T14:00:00+00:00",
@@ -867,24 +885,6 @@
         "description": "Privately-owned housing starts in August 2026 were at a seasonally adjusted annual rate of 1,275,000. This is 2.6 percent (+/- 12.0%)* below the revised July 2026 estimate of 1,309,000.<p><br>August 2026: -2.6* % Change<br>July 2026 (r): -9.0* % Change<br></p>",
         "published_at": "2026-09-17T12:30:00+00:00",
         "url": "https://www.census.gov/construction/nrc/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Manufacturing and Trade Inventories and Sales",
-        "description": "U.S. total business end-of-month inventories for July 2026 were $2,764.7 billion, up 0.8 percent (+/- 0.1 percent) from last month. U.S. total business sales were $2,120.7 billion, up 0.3 percent (+/- 0.2 percent) from last month.<p><br>July 2026: +0.8 % Change in Inventories<br>June 2026 (r): +0.1* % Change in Inventories<br></p>",
-        "published_at": "2026-09-16T14:00:00+00:00",
-        "url": "https://www.census.gov/mtis/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance Monthly Sales for Retail and Food Services",
-        "description": "U.S. retail and food services sales for August 2026 were $773.9 billion, up 1.2 percent (+/-0.4 percent) from the previous month.<p><br>August 2026: +1.2 % Change<br>July 2026 (r): -0.5 % Change<br></p>",
-        "published_at": "2026-09-16T12:30:00+00:00",
-        "url": "https://www.census.gov/retail/index.html",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"

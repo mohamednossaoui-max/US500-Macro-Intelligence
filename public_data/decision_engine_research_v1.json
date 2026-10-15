@@ -1,14 +1,14 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-10-14",
+  "as_of_date": "2026-10-15",
   "state": "SUPPORTIVE",
   "confidence": 1.0,
   "confidence_type": "evidence_coverage",
   "evidence_count": 4,
-  "supportive_count": 2,
+  "supportive_count": 1,
   "contradictory_count": 0,
-  "mixed_count": 2,
+  "mixed_count": 3,
   "missing": [],
   "point_in_time_safe": true,
   "core_point_in_time_safe": true,
@@ -17,7 +17,7 @@
   "overall_evidence_freshness": "AGING",
   "overall_evidence_freshness_current_pct": 97.6,
   "overall_evidence_pit_status": "PIT_LIMITED",
-  "overall_evidence_pit_safe_pct": 78.6,
+  "overall_evidence_pit_safe_pct": 66.7,
   "research_only": true,
   "decision_engine_enabled": true,
   "trading_signal": null,
@@ -46,16 +46,16 @@
     {
       "source": "Sentiment Engine",
       "category": "sentiment",
-      "stance": "SUPPORTIVE",
-      "reason": "Unified sentiment regime is BULLISH.",
-      "value": "BULLISH"
+      "stance": "MIXED",
+      "reason": "Unified sentiment regime is NEUTRAL.",
+      "value": "NEUTRAL"
     },
     {
       "source": "Technical Intelligence",
       "category": "technical",
       "stance": "SUPPORTIVE",
-      "reason": "Technical research regime is STRONG_BULLISH.",
-      "value": "STRONG_BULLISH"
+      "reason": "Technical research regime is BULLISH.",
+      "value": "BULLISH"
     }
   ]
 }
