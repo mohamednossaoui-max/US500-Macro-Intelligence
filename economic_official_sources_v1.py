@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import urljoin, urlparse
+from email.utils import parsedate_to_datetime
 
 import pandas as pd
 import requests
@@ -145,7 +146,16 @@ class Client:
             # Honor numeric Retry-After within a bounded ingestion wait.
             retry_after = r.headers.get('Retry-After', '').strip()
             if retry_after.isdigit():
-                delay = max(delay, min(int(retry_after), 30))
+                if int(retry_after)>30:
+                    r.raise_for_status()  # Respect provider wait; fail instead of retrying early.
+                delay = max(delay, int(retry_after))
+            elif retry_after:
+                try:
+                    until=parsedate_to_datetime(retry_after)
+                    wait=max(0,(until-datetime.now(timezone.utc)).total_seconds())
+                except (ValueError,TypeError,OverflowError):wait=0
+                if wait>30:r.raise_for_status()
+                delay=max(delay,wait)
             r.close()
             time.sleep(delay)
         r.raise_for_status()

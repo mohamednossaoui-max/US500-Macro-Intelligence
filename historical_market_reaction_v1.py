@@ -78,11 +78,14 @@ def _reaction_for_one(row, prices):
 def build_reactions():
     analogs = load_locked_analogs(); prices = load_price_history()
     rows = [_reaction_for_one(r.to_dict(), prices) for _, r in analogs.iterrows()]
-    result = pd.DataFrame(rows)
+    columns=list(analogs.columns)+['reaction_engine_version','selection_locked','anchor_session','anchor_close']
+    for h in HORIZONS:
+        columns += [f'horizon_{h}d_available',f'horizon_{h}d_end_session',f'return_{h}d_pct',f'max_drawdown_{h}d_pct',f'realized_volatility_{h}d_pct']
+    result = pd.DataFrame(rows, columns=list(dict.fromkeys(columns)))
     # Immutability gate: reaction layer must preserve Stage-10 identity and ranking.
     if result['historical_date'].astype(str).tolist() != analogs['historical_date'].astype(str).tolist():
         raise AssertionError('Analog order changed')
-    if not np.allclose(result['similarity_pct'], analogs['similarity_pct'], equal_nan=True):
+    if len(result) and not np.allclose(pd.to_numeric(result['similarity_pct']), pd.to_numeric(analogs['similarity_pct']), equal_nan=True):
         raise AssertionError('Analog similarity changed')
     return result
 
@@ -108,6 +111,7 @@ def build_summary(reactions):
         }
     return {
         'reaction_engine_version': VERSION,
+        'context_date': json.loads((P/'historical_analog_summary_v1.json').read_text()).get('context_date') if (P/'historical_analog_summary_v1.json').exists() else None,
         'analog_engine_version': ANALOG_VERSION,
         'analog_count': int(len(reactions)),
         'analog_selection_locked': True,

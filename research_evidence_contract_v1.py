@@ -8,9 +8,13 @@ from evidence_adapters import economic,fed,financial_stress,liquidity,sentiment,
 
 ROOT=Path(__file__).resolve().parent; PUBLIC=ROOT/'public_data'
 
-def build_rows(public=PUBLIC):
+def build_rows(public=PUBLIC, as_of=None):
+ from evidence_adapters.common import evaluation_date
+ clock = as_of or evaluation_date(public)
  rows=[]
  for fn in [economic,fed,financial_stress,liquidity,sentiment,technical,breadth,cross_asset]: rows.extend(fn(public))
+ if clock:
+  for r in rows: r['as_of_date'] = str(clock)
  return apply_quality(rows)
 
 def validate(df):

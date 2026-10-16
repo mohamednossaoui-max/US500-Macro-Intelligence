@@ -18,7 +18,7 @@ def qagg(module):
         return next(iter(vals),'UNKNOWN')
     return dict(
       quality=worst('quality_status',['LOW','DEGRADED','MEDIUM','HIGH']),
-      pit=worst('pit_status',['PIT_LIMITED','PIT_UNSAFE','UNKNOWN','PIT_SAFE']),
+      pit=worst('pit_status',['NOT_PIT_SAFE','PIT_UNSAFE','UNKNOWN','OBSERVATION_CHECKED','PIT_LIMITED','PIT_SAFE']),
       freshness=worst('freshness_status',['STALE','AGING','UNKNOWN','CURRENT']),
       eligible=bool(x.decision_engine_eligible.fillna(False).astype(bool).all()),
       age=int(pd.to_numeric(x.age_days,errors='coerce').max()) if pd.to_numeric(x.age_days,errors='coerce').notna().any() else None)
@@ -39,7 +39,7 @@ rows.append(row('economic_regime','ECONOMIC','CORE',state=str(rc['economic_regim
 # Fed: source independent Fed artifact, not legacy macro/fed duplicate.
 fed=json.loads((P/'fed_intelligence_output_v1.json').read_text())
 fs=fed.get('fed_score',{}) if isinstance(fed.get('fed_score'),dict) else {}
-rows.append(row('fed_stance','FED','CORE',fs.get('score'),fs.get('classification') or fed.get('fed_stance'),as_of=fed.get('as_of_date'),source='fed_intelligence_output_v1.json',force_eligible=True,notes='Independent Fed feature; legacy Macro Fed field intentionally not duplicated.'))
+rows.append(row('fed_stance','FED','CORE',fs.get('score'),fs.get('classification') or fed.get('fed_stance'),as_of=fed.get('as_of_date'),source='fed_intelligence_output_v1.json',notes='Independent Fed feature; legacy Macro Fed field intentionally not duplicated.'))
 rows.append(row('financial_stress','FINANCIAL_STRESS','CORE',float(rc['financial_stress_composite']),str(rc['financial_stress_regime']),source='research_context_summary_v1.csv'))
 # Liquidity has no sanctioned aggregate score. Encode coverage/state only; never invent neutral/score.
 liq=pd.read_csv(P/'liquidity_intelligence_summary_v1.csv'); elig=int(liq.eligible.fillna(False).astype(bool).sum())

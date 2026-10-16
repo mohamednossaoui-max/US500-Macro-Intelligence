@@ -41,8 +41,8 @@ def _rollup(frame: pd.DataFrame) -> dict[str, object]:
         freshness = "UNKNOWN"
     else:
         quality = "HIGH" if high == total else ("MEDIUM" if available and eligible else "LOW")
-        pit = "PIT_SAFE" if pit_safe == total else ("PIT_LIMITED" if pit_limited else "UNKNOWN")
-        freshness = "CURRENT" if current == total else ("AGING" if current else "STALE")
+        pit = next((v for v in ['NOT_PIT_SAFE','UNKNOWN','PIT_LIMITED','OBSERVATION_CHECKED','PIT_SAFE'] if frame['pit_status'].eq(v).any()),'UNKNOWN')
+        freshness = "STALE" if frame["freshness_status"].eq("STALE").any() else ("UNKNOWN" if frame["freshness_status"].eq("UNKNOWN").any() else ("AGING" if frame["freshness_status"].eq("AGING").any() else "CURRENT"))
     return {
         "evidence_count": total,
         "available_count": available,

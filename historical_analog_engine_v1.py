@@ -9,9 +9,9 @@ CORE_FEATURES=['economic_inflation','economic_labor','economic_growth','economic
 HISTORICAL_FEATURES=[x for x in CORE_FEATURES if x!='fed_stance']
 MIN_COMPARABLE=7; MIN_COVERAGE=MIN_COMPARABLE/len(CORE_FEATURES); DECLUSTER_DAYS=30; RECENT_EXCLUSION_DAYS=90
 
-def _asof(left, right, ldate, rdate, cols):
+def _asof(left, right, ldate, rdate, cols, max_age_days=21):
     l=left.sort_values(ldate).copy(); r=right[[rdate]+cols].copy().sort_values(rdate)
-    return pd.merge_asof(l,r,left_on=ldate,right_on=rdate,direction='backward')
+    return pd.merge_asof(l,r,left_on=ldate,right_on=rdate,direction='backward', tolerance=pd.Timedelta(days=max_age_days))
 
 def build_history():
     econ=pd.read_csv(P/'economic_regime_events_v1.csv')
@@ -29,15 +29,19 @@ def build_history():
     tech=pd.read_csv(P/'technical_intelligence_research_v1.csv'); tech['tech_available']=pd.to_datetime(tech.availability_date)
     h=_asof(h,tech,'candidate_date','tech_available',['technical_regime','point_in_time_safe']).rename(columns={'technical_regime':'technical','point_in_time_safe':'technical_pit'})
     # Fail closed on source PIT. No forward lookup is used anywhere above.
-    for c in ['stress_pit','liq_pit','sentiment_pit','technical_pit']:
-        h.loc[~h[c].fillna(False).astype(bool), [x for x in HISTORICAL_FEATURES if x.split('_')[0] in c]] = np.nan
+    for flag, features in {'stress_pit':['financial_stress'], 'liq_pit':['liquidity_coverage'],
+                           'sentiment_pit':['sentiment'], 'technical_pit':['technical']}.items():
+        safe = h[flag].astype(str).str.lower().isin(['true','1'])
+        h.loc[~safe, features] = np.nan
     return h
 
 def target():
     d=pd.read_csv(P/'unified_state_vector_v1.csv'); assert d.state_vector_version.eq(VECTOR_VERSION).all()
     out={}
     for f in CORE_FEATURES:
-        x=d[d.feature.eq(f)].iloc[-1]; out[f]=x['value'] if pd.notna(x['value']) else x['state']
+        x=d[d.feature.eq(f)].iloc[-1]
+        allowed = str(x.get('eligible', False)).lower() in {'true','1'}
+        out[f]=(x['value'] if pd.notna(x['value']) else x['state']) if allowed else np.nan
     return out,pd.Timestamp(d.context_date.iloc[-1])
 
 def similarity_table():
@@ -64,14 +68,14 @@ def similarity_table():
         sim=100*sum(scores.values())/comparable
         diffs=sorted(diffs,reverse=True)[:3]
         rows.append({'historical_date':r.candidate_date.date().isoformat(),'similarity_pct':round(sim,4),'comparable_features':comparable,'core_feature_count':len(CORE_FEATURES),'coverage_pct':round(100*coverage,2),'fed_historical_available':False,'key_differences':' | '.join(f'{f}: hist={a}, current={b}' for _,f,a,b in diffs),'state_vector_version':VECTOR_VERSION,'analog_engine_version':VERSION,'pit_safe_selection':True,'outcomes_used_in_selection':False})
-    allr=pd.DataFrame(rows).sort_values(['similarity_pct','coverage_pct','historical_date'],ascending=[False,False,False]).reset_index(drop=True)
+    allr=pd.DataFrame(rows, columns=['historical_date','similarity_pct','comparable_features','core_feature_count','coverage_pct','fed_historical_available','key_differences','state_vector_version','analog_engine_version','pit_safe_selection','outcomes_used_in_selection']).sort_values(['similarity_pct','coverage_pct','historical_date'],ascending=[False,False,False]).reset_index(drop=True)
     # Temporal de-clustering after ranking: nearby dates are one regime episode, not independent analogs.
     chosen=[]
     for _,r in allr.iterrows():
         d=pd.Timestamp(r.historical_date)
         if all(abs((d-pd.Timestamp(x.historical_date)).days)>=DECLUSTER_DAYS for x in chosen): chosen.append(r)
         if len(chosen)>=10: break
-    top=pd.DataFrame(chosen)
+    top=pd.DataFrame(chosen, columns=allr.columns)
     return allr,top,ctx
 
 def main():

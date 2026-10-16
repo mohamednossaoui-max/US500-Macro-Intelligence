@@ -75,8 +75,8 @@ START_DATE = os.getenv(
 
 END_DATE = os.getenv(
     "LIQUIDITY_END_DATE",
-    "2026-09-21"
-)
+    ""
+).strip() or pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
 
 FRED_API_KEY = os.getenv(
     "FRED_API_KEY"

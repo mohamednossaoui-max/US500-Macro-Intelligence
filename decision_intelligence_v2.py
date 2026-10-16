@@ -22,35 +22,34 @@ def build():
     def row(feature): return usv.loc[usv.feature.eq(feature)].iloc[-1]
     inf,lab,growth=row('economic_inflation'),row('economic_labor'),row('economic_growth')
     econ=row('economic_regime'); fed=row('fed_stance'); stress=row('financial_stress'); sent=row('sentiment'); tech=row('technical')
-    top=analog.iloc[0]
+    top=analog.iloc[0] if not analog.empty else pd.Series(dict(historical_date=None, similarity_pct=float('nan'), coverage_pct=float('nan'), key_differences='INSUFFICIENT_ELIGIBLE_FEATURES'))
     horizons={k:{kk:v for kk,v in val.items()} for k,val in reaction['horizons'].items()}
     current=(f"Economic regime is {econ.state}: inflation {_fmt(inf.value)}, labor {_fmt(lab.value)}, and growth {_fmt(growth.value)}. "
              f"Fed stance is {fed.state}; financial stress is {stress.state}; sentiment is {sent.state}; technical regime is {tech.state}. "
              f"Published Decision Engine state remains {dec.state}.")
     what_changed={"status":"UNAVAILABLE","reason":"No prior canonical USV1.0 snapshot is published; change is not inferred from non-canonical history."}
     hist=(f"Stage 10 selected {len(analog)} independent analog regimes without using outcomes. Closest is {top.historical_date} "
-          f"with {top.similarity_pct:.2f}% similarity and {top.coverage_pct:.2f}% comparable CORE coverage.")
+          f"with {top.similarity_pct:.2f}% similarity and {top.coverage_pct:.2f}% comparable CORE coverage.") if not analog.empty else "No eligible historical analogs: insufficient comparable PIT-safe and fresh features."
     h60=horizons['60d']; h120=horizons['120d']
-    reaction_text=(f"Across the locked analog set, historical median US500 return was {h60['median_return_pct']:+.2f}% at 60 trading days "
-                   f"({h60['positive_hit_rate_pct']:.1f}% positive) and {h120['median_return_pct']:+.2f}% at 120 trading days "
-                   f"({h120['positive_hit_rate_pct']:.1f}% positive). Outcomes were dispersed: 60D range {h60['min_return_pct']:+.2f}% to {h60['max_return_pct']:+.2f}%. "
-                   "These are conditional historical outcomes, not expected returns or forecasts.")
+    def horizon_text(label,h):
+        if h['median_return_pct'] is None:return f"{label}: insufficient completed horizons."
+        return f"{label}: historical median {h['median_return_pct']:+.2f}% ({h['positive_hit_rate_pct']:.1f}% positive), range {h['min_return_pct']:+.2f}% to {h['max_return_pct']:+.2f}%."
+    reaction_text=horizon_text('60D',h60)+' '+horizon_text('120D',h120)+' These are conditional historical outcomes, not expected returns or forecasts.'
     limitations=[
-      f"Closest analog similarity is {top.similarity_pct:.2f}%, not a close match.",
+      (f"Closest analog similarity is {top.similarity_pct:.2f}%; similarity is not a probability." if not analog.empty else "No qualified analogs; historical outcomes withheld."),
       "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
       f"Overall evidence PIT status is {dec.overall_evidence_pit_status}; CORE PIT remains {bool(dec.core_point_in_time_safe)}.",
       "CONTEXTUAL evidence does not alter the Decision Engine state.",
       "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
     ]
-    synthesis=(f"The current research state is {dec.state}, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. "
-               f"The closest historical analog is only moderately similar ({top.similarity_pct:.2f}%). The locked analog set had positive median outcomes over 60D and 120D, "
-               "but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. "
-               f"Evidence quality is {dec.overall_evidence_quality} and overall PIT status is {dec.overall_evidence_pit_status}.")
+    synthesis=(f"The current research state is {dec.state}. Economic regime: {econ.state}; financial stress: {stress.state}; sentiment: {sent.state}; technicals: {tech.state}. "
+               +hist+" "+reaction_text+" This is not a directional forecast. "
+               +f"Evidence quality is {dec.overall_evidence_quality} and overall PIT status is {dec.overall_evidence_pit_status}.")
     obj={
       'decision_intelligence_version':VERSION,'context_date':ctx,'decision_state':str(dec.state),
       'current_environment':current,'what_changed':what_changed,
       'evidence_quality':{'overall_quality':str(dec.overall_evidence_quality),'coverage_pct':float(dec.overall_evidence_coverage_pct),'freshness':str(dec.overall_evidence_freshness),'core_pit_safe':bool(dec.core_point_in_time_safe),'overall_pit_status':str(dec.overall_evidence_pit_status),'overall_pit_safe_pct':float(dec.overall_evidence_pit_safe_pct)},
-      'historical_analogs':{'count':int(len(analog)),'closest_date':str(top.historical_date),'closest_similarity_pct':float(top.similarity_pct),'closest_coverage_pct':float(top.coverage_pct),'summary':hist,'key_differences':str(top.key_differences)},
+      'historical_analogs':{'count':int(len(analog)),'closest_date':str(top.historical_date) if not analog.empty else None,'closest_similarity_pct':float(top.similarity_pct) if not analog.empty else None,'closest_coverage_pct':float(top.coverage_pct) if not analog.empty else None,'summary':hist,'key_differences':str(top.key_differences)},
       'historical_market_reaction':{'summary':reaction_text,'horizons':horizons,'selection_locked':bool(reaction['analog_selection_locked']),'outcomes_used_in_selection':bool(reaction['outcomes_used_in_selection'])},
       'important_differences':str(top.key_differences),'risks_and_limitations':limitations,'final_research_synthesis':synthesis,
       'research_only':True,'forecast_generated':False,'trading_signal_generated':False,'expected_return_generated':False,'execution':False,

@@ -6,6 +6,7 @@ observation date is substituted for a release date. No release time is inferred.
 """
 from decimal import Decimal
 import os
+import re
 from urllib.parse import urlparse
 import pandas as pd
 
@@ -20,6 +21,37 @@ SERIES = {
     'CORE_PPI': ('PPIFES', 'Producer Price Index by Commodity: Final Demand: Final Demand Less Foods and Energy', 'Index Apr 2010=100'),
 }
 BASE = 'https://api.stlouisfed.org/fred/'
+
+
+def pending_release_time(client, group, day):
+    """A date-only FRED calendar cannot prove that today's release is due.
+
+    Require the official BLS clock time; blocked/malformed calendars fail closed.
+    This is schedule evidence only, never proof that new data were published.
+    """
+    from economic_official_sources_v1 import MetadataError
+    url = 'https://www.bls.gov/schedule/news_release/bls.ics'
+    labels = {'empsit': 'Employment Situation', 'cpi': 'Consumer Price Index',
+              'ppi': 'Producer Price Index'}
+    try:
+        content = client.get(url).content.decode('utf-8-sig')
+        content = re.sub(r'\r?\n[ \t]', '', content)
+        matches = []
+        for event in re.findall(r'BEGIN:VEVENT(.*?)END:VEVENT', content, re.S):
+            summary = re.search(r'^SUMMARY:(.*)$', event, re.M)
+            start = re.search(r'^DTSTART;TZID=(?:US-Eastern|America/New_York):(\d{8}T\d{6})\s*$', event, re.M)
+            if summary and summary.group(1).strip() == labels[group] and start:
+                timestamp = pd.to_datetime(start.group(1), format='%Y%m%dT%H%M%S').tz_localize('America/New_York')
+                if timestamp.strftime('%Y-%m-%d') == day:
+                    matches.append(timestamp)
+        if len(matches) != 1:
+            raise MetadataError('BLS calendar must identify exactly one release time for today')
+        return matches[0], url
+    except MetadataError:
+        raise
+    except Exception as exc:
+        # Do not expose HTTP URLs with credentials or response bodies.
+        raise MetadataError('BLS official release-time calendar unavailable ('+type(exc).__name__+')') from exc
 
 
 def corroborate(client, indicator, bls_records, failure, now=None):
@@ -63,6 +95,19 @@ def corroborate(client, indicator, bls_records, failure, now=None):
     rd = max(due)
     vintages = fetch('series/vintagedates', series_id=sid, sort_order='desc', limit=1,
                      realtime_end=today).get('vintage_dates', [])
+    schedule_extra = {}
+    if len(vintages) == 1 and vintages[0] != rd and rd == today:
+        # Before an explicitly scheduled release, the prior verified vintage is
+        # still the latest published one. After that time, keep blocking lag.
+        try:
+            scheduled, calendar_url = pending_release_time(client, group, today)
+        except MetadataError as exc:
+            raise MetadataError('FRED latest vintage differs from latest source release; '+str(exc)) from exc
+        prior = [d for d in due if d < today]
+        if now < scheduled and prior and vintages[0] == max(prior):
+            rd = max(prior)
+            schedule_extra = dict(metadata_scheduled_release_at=scheduled.isoformat(),
+                                  release_calendar_url=calendar_url)
     if len(vintages) != 1 or vintages[0] != rd:
         raise MetadataError('FRED latest vintage differs from latest source release; refuse lag/revision ambiguity')
     updated = pd.Timestamp(meta[0]['last_updated'])
@@ -95,5 +140,6 @@ def corroborate(client, indicator, bls_records, failure, now=None):
             dict(metadata_provider='FRED_ALFRED', metadata_verification='BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY',
                  metadata_source_url=BASE+'release/dates', metadata_series=sid,
                  metadata_release_id=rid, source_alternate_reason=failure,
+                 **schedule_extra,
                  fred_vintage_date=vintages[0], fred_last_updated=meta[0]['last_updated'],
                  source='BLS API values; release/vintage corroborated via St. Louis Fed FRED/ALFRED'))

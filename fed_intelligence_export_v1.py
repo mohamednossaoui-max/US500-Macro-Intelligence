@@ -63,21 +63,8 @@ def main():
         encoding="utf-8"
     )
 
-    # Keep the canonical publication manifest synchronized with the artifact.
-    manifest = {}
-    if MANIFEST_FILE.exists():
-        manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
-    files = manifest.setdefault("files", {})
-    payload = OUTPUT_FILE.read_bytes()
-    files[OUTPUT_FILE.name] = {
-        "bytes": len(payload),
-        "sha256": hashlib.sha256(payload).hexdigest(),
-    }
-    manifest["research_only"] = True
-    MANIFEST_FILE.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-
+    # This is a candidate artifact only. The master owns the manifest and
+    # publishes after rebuilding and verifying all dependent layers.
     print()
     print(f"Output file: {OUTPUT_FILE}")
     print(f"Available: {data.get('available')}")

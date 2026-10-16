@@ -10,10 +10,15 @@ def _date(v):
 
 def classify_pit(row):
     explicit = row.get("pit_status")
-    if explicit in {"PIT_LIMITED", "NOT_PIT_SAFE"}: return explicit
+    # Chronology is checked even for explicitly limited evidence.
     available, asof = _date(row.get("available_at") or row.get("release_date")), _date(row.get("as_of_date"))
-    if available is not None and asof is not None and available > asof: return "NOT_PIT_SAFE"
-    if explicit == "PIT_SAFE": return "PIT_SAFE"
+    if available is not None and asof is not None:
+        # Date-only evaluation denotes a daily snapshot, not midnight intraday.
+        if len(str(row.get("as_of_date", ""))) == 10: asof += pd.Timedelta(days=1)-pd.Timedelta(nanoseconds=1)
+        if available > asof: return "NOT_PIT_SAFE"
+    if explicit in {"PIT_LIMITED", "NOT_PIT_SAFE", "OBSERVATION_CHECKED"}: return explicit
+    available, asof = _date(row.get("available_at") or row.get("release_date")), _date(row.get("as_of_date"))
+    if explicit == "PIT_SAFE" and available is not None and asof is not None: return "PIT_SAFE"
     return "UNKNOWN"
 
 def classify_freshness(row):
@@ -40,11 +45,12 @@ def apply_quality(rows):
         elif pit == "PIT_SAFE" and fresh == "CURRENT" and not limitations: quality="HIGH"
         elif pit in {"PIT_SAFE","PIT_LIMITED"} and fresh in {"CURRENT","AGING"}: quality="MEDIUM"
         else: quality="LOW"
-        eligible = bool(avail == "AVAILABLE" and pit == "PIT_SAFE" and fresh != "STALE")
+        eligible = bool(avail == "AVAILABLE" and pit == "PIT_SAFE" and fresh in {"CURRENT", "AGING"})
         reason=""
         if avail != "AVAILABLE": reason="EVIDENCE_UNAVAILABLE_OR_PARTIAL"
         elif pit != "PIT_SAFE": reason=f"{pit}_EVIDENCE"
         elif fresh == "STALE": reason="STALE_EVIDENCE"
+        elif fresh not in {"CURRENT", "AGING"}: reason=f"{fresh}_FRESHNESS"
         r.update(pit_status=pit, freshness_status=fresh, quality_status=quality,
                  age_days=age if age is not None else "", expected_next_release=nxt,
                  included_in_synthesis=eligible, decision_engine_eligible=eligible,

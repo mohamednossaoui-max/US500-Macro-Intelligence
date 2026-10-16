@@ -18,7 +18,7 @@ import pandas as pd
 
 def normalize_as_of_date(value) -> pd.Timestamp:
     """Return a normalized, timezone-naive Timestamp or raise ValueError."""
-    ts = pd.to_datetime(value, errors="coerce", utc=True)
+    ts = pd.to_datetime(value, errors="coerce", utc=True, format="mixed")
     if pd.isna(ts):
         raise ValueError(f"Invalid as-of date: {value!r}")
     return ts.tz_convert(None).normalize()
@@ -27,7 +27,7 @@ def normalize_as_of_date(value) -> pd.Timestamp:
 def _optional_date(value) -> Optional[pd.Timestamp]:
     if value is None or pd.isna(value):
         return None
-    ts = pd.to_datetime(value, errors="coerce", utc=True)
+    ts = pd.to_datetime(value, errors="coerce", utc=True, format="mixed")
     if pd.isna(ts):
         return None
     return ts.tz_convert(None).normalize()
@@ -39,13 +39,17 @@ def _effective_availability(df: pd.DataFrame, *, release_col: str,
     if release_col not in df.columns:
         raise ValueError(f"Missing required PIT column: {release_col}")
 
-    release = pd.to_datetime(df[release_col], errors="coerce", utc=True)
+    release = pd.to_datetime(df[release_col], errors="coerce", utc=True, format="mixed")
     if available_col in df.columns:
-        explicit = pd.to_datetime(df[available_col], errors="coerce", utc=True)
+        explicit = pd.to_datetime(df[available_col], errors="coerce", utc=True, format="mixed")
         effective = explicit.fillna(release)
     else:
         effective = release
-    return effective.dt.tz_convert(None).dt.normalize()
+    if "available_at_utc" in df:
+        precise=pd.to_datetime(df["available_at_utc"],errors="coerce",utc=True,format="mixed")
+        populated=df["available_at_utc"].notna() & df["available_at_utc"].astype(str).str.strip().ne("")
+        effective=effective.where(~populated,precise)
+    return effective.dt.tz_convert(None)
 
 
 def validate_temporal_order(*, release_date, vintage_date=None,
@@ -90,7 +94,10 @@ def filter_available_as_of(df: pd.DataFrame, as_of_date, *,
     ``release_date``. Rows with neither a valid explicit availability nor a
     valid release date fail closed and are excluded.
     """
-    cutoff = normalize_as_of_date(as_of_date)
+    cutoff = pd.to_datetime(as_of_date,errors="raise",utc=True).tz_convert(None)
+    # A date string requests the whole daily snapshot. Timestamp requests are exact.
+    if isinstance(as_of_date,str) and len(as_of_date.strip())==10:
+        cutoff=cutoff.normalize()+pd.Timedelta(days=1)-pd.Timedelta(nanoseconds=1)
     work = df.copy()
     effective = _effective_availability(
         work, release_col=release_col, available_col=available_col

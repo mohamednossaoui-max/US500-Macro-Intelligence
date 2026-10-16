@@ -16,6 +16,8 @@ import pandas as pd
 import requests
 from economic_official_sources_v1 import Client, MAPPINGS, MetadataError, collect, http_error_diagnostic
 from point_in_time import validate_temporal_order
+from release_clock_v1 import official_release_at
+from workspace_transaction_v1 import install_bundle, recover
 from economic_indicator_details_v1 import DETAIL_FIELDS, detail_changed
 
 EVENTS='economic_historical_events_v1.csv'
@@ -37,6 +39,9 @@ def compare(row,canonical):
         if not math.isfinite(float(row['actual'])) or not row.get('source_url') or not row.get('reference_period') or not row.get('release_date'):
             raise ValueError('Incomplete source evidence')
         release=pd.Timestamp(row['release_date'])
+        clock=official_release_at(row)
+        if clock is not None and clock>pd.Timestamp(row['retrieved_at']):
+            raise ValueError('Official release time is still in the future')
         if release>pd.Timestamp(row['retrieved_at']).tz_localize(None).normalize():
             raise ValueError('Future official release')
     except (ValueError,TypeError,KeyError):
@@ -105,6 +110,11 @@ def merge(canonical,quality,rows):
         r['source_snapshot_history']=bool(r.get('latest_official_period') and period_key(r['reference_period'])!=period_key(r['latest_official_period']))
         r['metadata_only']=metadata_only
         r['available_as_of']=pd.Timestamp(r['retrieved_at']).strftime('%Y-%m-%d')
+        r['available_at_utc']=pd.Timestamp(r['retrieved_at']).tz_convert('UTC').isoformat()
+        clock=official_release_at(r)
+        r['official_release_at_utc']=clock.isoformat() if clock is not None else None
+        r['availability_precision']='OBSERVED_TIMESTAMP'
+        r['intraday_publication_verified']=clock is not None
         r['vintage_date']=r['release_date']
         r['observation_date']=r['release_date']
         ident={k:r.get(k) for k in ('indicator','reference_period','release_date','actual','source_series')}
@@ -125,6 +135,7 @@ def merge(canonical,quality,rows):
 
 def run(root,staging,mode='audit',collector=collect,now=None):
     root,staging=Path(root),Path(staging);staging.mkdir(parents=True,exist_ok=True)
+    if mode=='merge':recover(root)
     now=now or datetime.now(timezone.utc)
     canonical=pd.read_csv(root/'public_data'/EVENTS);quality=pd.read_csv(root/'public_data'/QUALITY)
     client=Client(staging/'evidence');rows=[];reports=[]
@@ -158,12 +169,12 @@ def run(root,staging,mode='audit',collector=collect,now=None):
         # Prepare the pair before installing either; public_data stays read-only.
         assert_current(events,reports)
         events.to_csv(staging/EVENTS,index=False);q.to_csv(staging/QUALITY,index=False)
-        for name in (EVENTS,QUALITY):
-            data=(staging/name).read_bytes();tmp=root/(name+'.tmp');tmp.write_bytes(data);os.replace(tmp,root/name)
         result['added']=added
         assert_current(events,reports)
         status=dict(provider='official',as_of_date=now.date().isoformat(),retrieved_at=now.isoformat(),indicators=merged_status_reports(events,reports),source_verification='VERIFIED')
-        (root/'economic_ingestion_status_v1.json').write_text(json.dumps(status,indent=2)+'\n')
+        payloads={name:(staging/name).read_bytes() for name in (EVENTS,QUALITY)}
+        payloads['economic_ingestion_status_v1.json']=(json.dumps(status,indent=2)+'\n').encode()
+        install_bundle(root,payloads)
     return result
 
 
