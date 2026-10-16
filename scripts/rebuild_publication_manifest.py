@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, hashlib, json
+import argparse, hashlib, json, os
 from pathlib import Path
 
 def rebuild(root:Path, source='autonomous-intelligence-pipeline-v1'):
@@ -7,6 +7,9 @@ def rebuild(root:Path, source='autonomous-intelligence-pipeline-v1'):
     for p in sorted(root.iterdir()):
         if not p.is_file() or p.name=='README.md' or p.name=='manifest.json' or (p.suffix=='.json' and 'manifest' in p.stem.lower()): continue
         data=p.read_bytes(); manifest['files'][p.name]={'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}
+    manifest['generation_id']=hashlib.sha256(json.dumps(manifest['files'],sort_keys=True).encode()).hexdigest()
+    manifest['source_commit']=os.getenv('GITHUB_SHA','offline-verified-build')
+    manifest['source_run_id']=os.getenv('GITHUB_RUN_ID','offline')
     (root/'manifest.json').write_text(json.dumps(manifest,indent=2,sort_keys=True)+'\n',encoding='utf-8')
     return manifest
 
