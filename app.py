@@ -1615,6 +1615,9 @@ def system_health() -> None:
     tone="positive" if overall=="HEALTHY" else "warning" if overall=="DEGRADED" else "negative"
     alert_item(f"SYSTEM {overall}",f"{summary.get('healthy','—')} healthy · {summary.get('attention','—')} need attention · {summary.get('failed','—')} failed · {summary.get('lkg_available','—')} with Last Known Good",tone)
     st.caption(f"Health snapshot: {summary.get('as_of', '—')} · {summary.get('snapshot_freshness', 'UNKNOWN')}. LKG counts hash-verified publications; rollback uses the previous Git commit.")
+    excluded=summary.get('excluded_from_overall', [])
+    if excluded:
+        st.caption('Overall health excludes: ' + ', '.join(str(x) for x in excluded) + '. Their states remain visible below and in the attention counts; research quality and PIT gates still apply.')
     cols=st.columns(5)
     for c,(a,b,n) in zip(cols,[("Layers",summary.get("layer_count","—"),"Registry nodes"),("Healthy",summary.get("healthy","—"),"Within operational gates"),("Attention",summary.get("attention","—"),"Review required"),("Failed",summary.get("failed","—"),"Active failures"),("LKG",summary.get("lkg_available","—"),"Verified published outputs")]):
         with c: card(a,b,n)

@@ -87,20 +87,27 @@ def derive_health(registry=None, ledger=None, public=PUBLIC, now=None):
           'last_data_update':last_data.isoformat() if last_data else None,'file_modified_at':file_updated.isoformat() if file_updated else None,'age_days':round(age,2) if age is not None else None,
           'freshness_sla_days':sla,'pit_status':'UNKNOWN','pit_policy':pit,'last_known_good':verified,'last_known_good_basis':'CANONICAL_MANIFEST_HASH_VERIFIED' if verified else 'UNVERIFIED','rollback_requires_previous_commit':True,'publication_verified':verified,'output_complete':complete,
           'failure_reason':failure_reason,'next_expected_check':next_check,
+          'affects_system_health':node.get('affects_system_health') is not False,
+          'health_scope_reason':node.get('health_scope_reason','Included in overall operational health'),
           'downstream_impact':[]})
     by={r['id']:r for r in rows}
     for n in reg['nodes']:
         for dep in n.get('depends_on',[]):
             if dep in by and n['id'] in by: by[dep]['downstream_impact'].append(n['id'])
-    critical=[r for r in rows if r['criticality']=='critical']
+    assessed=[r for r in rows if r['affects_system_health']]
+    excluded=[r for r in rows if not r['affects_system_health']]
+    critical=[r for r in assessed if r['criticality']=='critical']
     if any(r['state']=='FAILED' for r in critical): overall='FAILED'
     elif any(r['state'] in {'BLOCKED','STALE'} for r in critical): overall='DEGRADED'
-    elif any(r['state'] in {'FAILED','BLOCKED','STALE','AGING','UNKNOWN'} for r in rows): overall='DEGRADED'
+    elif any(r['state'] in {'FAILED','BLOCKED','STALE','AGING','UNKNOWN'} for r in assessed): overall='DEGRADED'
     else: overall='HEALTHY'
     summary={'as_of':now.isoformat(),'overall_health':overall,'layer_count':len(rows),
       'healthy':sum(r['state']=='HEALTHY' for r in rows),'attention':sum(r['state']!='HEALTHY' for r in rows),
       'failed':sum(r['state']=='FAILED' for r in rows),'stale':sum(r['state']=='STALE' for r in rows),
-      'lkg_available':sum(bool(r['last_known_good']) for r in rows),'research_only':True}
+      'lkg_available':sum(bool(r['last_known_good']) for r in rows),'research_only':True,
+      'assessed_layer_count':len(assessed),'excluded_from_overall':[r['id'] for r in excluded],
+      'excluded_attention':sum(r['state']!='HEALTHY' for r in excluded),
+      'overall_health_scope':'Registry-selected layers; all layer states and counts remain visible'}
     return {'summary':summary,'layers':rows}
 
 def publish(out=None, public=PUBLIC):

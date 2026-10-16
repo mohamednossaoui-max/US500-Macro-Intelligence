@@ -1,8 +1,3 @@
-Python 3.11.17
-Scheduling, registry, orchestrator, end-to-end scheduling and PIT: 47 passed in 1.15s
-Breadth collector and report regressions: 12 passed in 3.34s; return code 0
-Total: 59 passed across two separate pytest invocations.
-Snapshot check at 2026-10-16T17:30Z:
-technical: DEFERRED_AVAILABILITY_WAIT; due=false; pending=2026-10-17
-cross_asset: DEFERRED_AVAILABILITY_WAIT; due=false; pending=2026-10-17
-breadth: CONTENT_AGE_DUE; due=true
+........................................................................ [ 93%]
+.....                                                                    [100%]
+77 passed in 3.24s

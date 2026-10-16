@@ -1,21 +1,18 @@
-إصلاح الإتاحة المؤجلة وتنبيه حداثة Breadth
+نطاق تجميع System Health
 
-ارفع الملفات الثلاثة مع الحفاظ على المسارات:
-1. autonomy_due_detector_v1.py
-2. scripts/breadth_validation_report_v1.py
-3. tests/test_deferred_availability_scheduling_v1.py
+تطبيق الخيار الثاني: الاحتفاظ بـBreadth وCross Asset في البرنامج وفي التحديثات، واستبعادهما فقط من حساب overall_health.
+ارفع الملفات الأربعة مع الحفاظ على المسارات:
+- system_health_monitor_v1.py
+- autonomy_source_registry_v1.json
+- app.py
+- tests/test_health_scope_v1.py
 
-هذا تحديث لاحق لحزمة US500-Autonomous-Freshness-Fix، يحتفظ بإصلاح CONTENT السابق.
+بعد الرفع، شغّل Autonomous تشغيلًا جديدًا من main وانتظر نجاح Master ونشر البيانات. إعادة تحميل التطبيق وحدها لا تعيد توليد ملخص الصحة المنشور. لا ترفع ملفات الملخص يدويًا ولا تعدّل manifest.json.
 
-التغيير الأول: يسمح لكاشف الجدولة بانتظار إتاحة اليوم التالي فقط لملفي Technical وCross Asset المعروفين، بشرط أن تكون آخر مشاهدة اليوم وأن تتطابق جميع الصفوف مع observation_date + يوم واحد. التواريخ المستقبلية غير المطابقة تبقى تستدعي التحقق. لا يعدّل أي CSV ولا يغيّر بوابة PIT أو صلاحية استخدام البيانات. ستعرض السجلات DEFERRED_AVAILABILITY_WAIT وpending_available_at. تاريخ last_data_at في هذه الحالة هو تاريخ المشاهدة المستخدم للجدولة؛ scheduling_basis يوضح ذلك.
+التحقق: system_health_summary_v1.json يحتوي excluded_from_overall=[breadth,cross_asset] وassessed_layer_count=24 في التسجيل الحالي. على آخر حزمة تشخيص كانت النتيجة HEALTHY مع healthy=24 وattention=2 وstale=1. حالة كل طبقة الأصلية محفوظة. قد تبقى الحالة العامة DEGRADED/FAILED إذا ظهر سبب آخر أو تقادمت لقطة المراقبة أو فشل التحديث.
+ستظهر عبارة توضيحية تحت ملخص صفحة System Health. لم يتغير تصميم البطاقات.
 
-التغيير الثاني: تقرير Breadth يضيف data_status وfreshness_pass وvalidation_scope وتحذير GitHub عند نقص الفترة. يبقى final_status=PASS خاصًا بسلامة الحسابات؛ لا يعني أن البيانات حديثة. لا نفشل Master كله بسبب مصدر سياقي قديم، ولا نخفي STALE.
+هذا ليس إصلاحًا للبيانات القديمة أو لتوقيت Cross Asset؛ حالات STALE وPIT_LIMITED تبقى صحيحة. لم يتغير أي حساب بحثي أو بوابة جودة أو PIT أو القرار أو محلل الأدلة أو جدول اختيار المصادر. استبعاد الوحدتين لا يغيّر DECISION READY إلى True تلقائيًا.
 
-قيد لم يُحل: مصدر العضوية الحالي ينتهي في 18 أغسطس 2026، وتأكدنا من ذلك بتنزيل CSV الأصلي مباشرة. لم نعثر في الفحص على مصدر أحدث موثّق يغطي الفترة المطلوبة؛ لم نمدّد العضوية ولم نغيّر public_data. استعادة Breadth بعد هذا التاريخ تتطلب بيانات عضوية مؤرخة ومراجعة تغييرات الإضافة والحذف، ثم إعادة الجمع.
-المصدر الحالي: https://github.com/fja05680/sp500
-
-التحقق بعد الرفع: شغّل Autonomous من main تشغيلًا جديدًا وراجع Detect due root sources. شغّل Market Breadth Full Validation لتوليد تقريره الجديد؛ لا حاجة لإعادة نشر Streamlit أو تشغيل جميع المصادر يدويًا لمجرد تثبيت هذه الملفات.
-
-الاختبارات: 59 نجحت على Python 3.11.17 في مجموعتين، التفاصيل في TEST_RESULTS.log.
-التراجع: استعادة نسختي ملفي الإنتاج السابقين وحذف ملف الاختبار الجديد.
-لا تغييرات على app.py أو الحسابات أو أوزان التحليل أو البيانات المنشورة أو تقويم الإصدارات.
+التراجع: إزالة affects_system_health=false وhealth_scope_reason من العقدتين، أو استعادة الملفات السابقة وإعادة تشغيل Master.
+الاختبارات: 77 passed على Python 3.11؛ النتائج مرفقة.
