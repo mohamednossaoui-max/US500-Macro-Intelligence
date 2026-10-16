@@ -23,7 +23,12 @@ def build_report(root,step_outcomes=None):
     logs=root/'market_breadth_full_validation_v1/logs'
     failures=[key for key,value in steps.items() if value in {'failure','cancelled'}]
     metadata=load(root/'market_breadth_historical_v1/market_breadth_metadata_v1.json')
-    return {'validator':'Market Breadth Full Validation v1','research_only':True,'pit_perfect':False,
+    stale=metadata.get('collection_status')=='STALE' or metadata.get('requested_range_complete') is False
+    data_status='STALE' if stale else 'CURRENT' if metadata.get('requested_range_complete') is True else 'UNKNOWN'
+    return {'data_status':data_status,'validation_scope':'STRUCTURE_AND_ACCOUNTING_ONLY',
+            'freshness_pass':data_status=='CURRENT',
+            'warnings':['Membership coverage ends before the requested date; validation PASS does not mean current data.'] if stale else [],
+            'validator':'Market Breadth Full Validation v1','research_only':True,'pit_perfect':False,
             'decision_engine_ready':False,'trading_signal':False,'forecast':False,
             'stages':stages,'final_status':'PASS' if passed else 'FAIL',
             'collector':reports['historical_collector'],'analyzer':reports['analyzer'],'robustness':reports['validation_robustness'],
@@ -37,5 +42,7 @@ def main():
         'preflight':'STEP_PREFLIGHT','historical_collector':'STEP_COLLECTOR','analyzer':'STEP_ANALYZER','validation_robustness':'STEP_ROBUSTNESS'}.items()}
     report=build_report(root,steps);output=root/'market_breadth_full_validation_v1';output.mkdir(parents=True,exist_ok=True)
     (output/'market_breadth_full_validation_summary_v1.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+    if report['data_status']=='STALE':
+        print('::warning title=Breadth membership coverage is stale::Historical validation passed only for the available period. See requested_range; do not extrapolate membership.')
     print(json.dumps(report,indent=2,ensure_ascii=False));return 0 if report['final_status']=='PASS' else 1
 if __name__=='__main__':raise SystemExit(main())
