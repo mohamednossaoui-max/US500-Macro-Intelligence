@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas numpy yfinance
+          pip install pandas numpy yfinance pytest PyYAML
 
       - name: Verify Market Breadth modules
         run: |
@@ -51,104 +51,59 @@ jobs:
 
           echo "All modules found."
 
-      - name: 1 - Historical Collector
+      - name: Run collector and diagnostic regressions
+        id: preflight
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p market_breadth_full_validation_v1/logs
+          python -m pytest -q tests/test_breadth_collector_run_v1.py 2>&1 | tee market_breadth_full_validation_v1/logs/preflight.log
+
+      - name: 1 - Historical Collector
+        id: collector
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p market_breadth_full_validation_v1/logs
           echo "=============================================="
           echo "MARKET BREADTH FULL VALIDATION v1"
           echo "STAGE 1/3 — HISTORICAL COLLECTOR"
           echo "=============================================="
 
-          python tests/market_breadth/market_breadth_historical_collector_v1.py             --start 2019-01-01             --output market_breadth_historical_v1
+          python tests/market_breadth/market_breadth_historical_collector_v1.py             --start 2019-01-01             --output market_breadth_historical_v1 2>&1 | tee market_breadth_full_validation_v1/logs/collector.log
 
       - name: 2 - Analyzer
+        id: analyzer
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p market_breadth_full_validation_v1/logs
           echo "=============================================="
           echo "STAGE 2/3 — ANALYZER"
           echo "=============================================="
 
-          python tests/market_breadth/market_breadth_analyzer_v1.py             --input market_breadth_historical_v1/market_breadth_records_v1.csv             --output market_breadth_analysis_v1
+          python tests/market_breadth/market_breadth_analyzer_v1.py             --input market_breadth_historical_v1/market_breadth_records_v1.csv             --output market_breadth_analysis_v1 2>&1 | tee market_breadth_full_validation_v1/logs/analyzer.log
 
       - name: 3 - Validation & Robustness
+        id: robustness
+        shell: bash
         run: |
+          set -euo pipefail
+          mkdir -p market_breadth_full_validation_v1/logs
           echo "=============================================="
           echo "STAGE 3/3 — VALIDATION & ROBUSTNESS"
           echo "=============================================="
 
-          python tests/market_breadth/market_breadth_validation_robustness_v1.py             --input market_breadth_analysis_v1/market_breadth_analysis_v1.csv             --output market_breadth_validation_robustness_v1
+          python tests/market_breadth/market_breadth_validation_robustness_v1.py             --input market_breadth_analysis_v1/market_breadth_analysis_v1.csv             --output market_breadth_validation_robustness_v1 2>&1 | tee market_breadth_full_validation_v1/logs/robustness.log
 
       - name: Build unified final report
         if: always()
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          out = Path("market_breadth_full_validation_v1")
-          out.mkdir(exist_ok=True)
-
-          collector = Path("market_breadth_historical_v1/market_breadth_validation_v1.json")
-          analyzer = Path("market_breadth_analysis_v1/market_breadth_analysis_validation_v1.json")
-          robustness = Path("market_breadth_validation_robustness_v1/market_breadth_robustness_validation_v1.json")
-
-          def load(path):
-              if not path.exists():
-                  return {"file_found": False}
-              try:
-                  data = json.loads(path.read_text())
-                  data["file_found"] = True
-                  return data
-              except Exception as exc:
-                  return {"file_found": True, "parse_error": str(exc)}
-
-          c = load(collector)
-          a = load(analyzer)
-          r = load(robustness)
-
-          collector_pass = bool(c.get("validation_pass", False))
-          analyzer_pass = bool(a.get("validation_pass", False))
-          robustness_pass = bool(r.get("validation_pass", False))
-
-          report = {
-              "validator": "Market Breadth Full Validation v1",
-              "research_only": True,
-              "pit_perfect": False,
-              "decision_engine_ready": False,
-              "trading_signal": False,
-              "forecast": False,
-              "stages": {
-                  "historical_collector": collector_pass,
-                  "analyzer": analyzer_pass,
-                  "validation_robustness": robustness_pass,
-              },
-              "final_status": (
-                  "PASS"
-                  if collector_pass and analyzer_pass and robustness_pass
-                  else "FAIL"
-              ),
-              "collector": c,
-              "analyzer": a,
-              "robustness": r,
-          }
-
-          (out / "market_breadth_full_validation_summary_v1.json").write_text(
-              json.dumps(report, indent=2, ensure_ascii=False)
-          )
-
-          print("==============================================")
-          print("MARKET BREADTH FULL VALIDATION v1")
-          print("==============================================")
-          print(f"Collector:   {'PASS' if collector_pass else 'FAIL'}")
-          print(f"Analyzer:    {'PASS' if analyzer_pass else 'FAIL'}")
-          print(f"Robustness:  {'PASS' if robustness_pass else 'FAIL'}")
-          print(f"FINAL STATUS: {report['final_status']}")
-          print("Research-only: TRUE")
-          print("PIT-perfect: FALSE")
-          print("Decision Engine: FALSE")
-          print("Trading signal: FALSE")
-          print("Forecast: FALSE")
-          PY
-
-          cat market_breadth_full_validation_v1/market_breadth_full_validation_summary_v1.json
+        env:
+          STEP_PREFLIGHT: ${{ steps.preflight.outcome }}
+          STEP_COLLECTOR: ${{ steps.collector.outcome }}
+          STEP_ANALYZER: ${{ steps.analyzer.outcome }}
+          STEP_ROBUSTNESS: ${{ steps.robustness.outcome }}
+        run: python scripts/breadth_validation_report_v1.py
 
       - name: Upload unified Market Breadth artifact
         if: always()
