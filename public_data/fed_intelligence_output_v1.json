@@ -1,7 +1,7 @@
 {
   "available": true,
   "schema_version": "fed-comparison-3",
-  "generated_at": "2026-10-16T09:59:14.052642+00:00",
+  "generated_at": "2026-10-16T15:37:15.986454+00:00",
   "as_of_date": "2026-10-16",
   "latest_fomc": "2026-09-16",
   "current_date": "2026-10-16",
@@ -42,7 +42,7 @@
     "labor_mentions": 23,
     "growth_mentions": 12,
     "financial_mentions": 5,
-    "text_length": 18803
+    "text_length": 18821
   },
   "chair_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "chair_pdf": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
@@ -55,7 +55,7 @@
     "labor_mentions": 23,
     "growth_mentions": 12,
     "financial_mentions": 5,
-    "text_length": 18803
+    "text_length": 18821
   },
   "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
   "powell_pdf": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
@@ -76,7 +76,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
       "source_status": "VERIFIED_TRANSCRIPT",
       "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-      "retrieved_at": "2026-10-16T09:59:12.108456+00:00"
+      "retrieved_at": "2026-10-16T15:37:13.713585+00:00"
     }
   },
   "communication_comparison": {
@@ -155,7 +155,7 @@
         "labor_mentions": 11,
         "growth_mentions": 7,
         "financial_mentions": 2,
-        "text_length": 31922
+        "text_length": 31997
       },
       "comparison": {
         "available": true,
@@ -516,7 +516,7 @@
     "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
     "available": true,
     "information_cutoff_date": "2026-10-05",
-    "retrieved_at": "2026-10-16T09:59:13.926966+00:00",
+    "retrieved_at": "2026-10-16T15:37:15.796177+00:00",
     "catalog_verified": true,
     "latest_publication_date": "2026-10-14",
     "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -600,7 +600,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-16T09:59:13.926966+00:00",
+      "retrieved_at": "2026-10-16T15:37:15.796177+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -614,7 +614,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-08-24",
-      "retrieved_at": "2026-10-16T09:59:14.045515+00:00",
+      "retrieved_at": "2026-10-16T15:37:15.980712+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
@@ -722,7 +722,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
       "meeting_verified": true,
       "latest_meeting_date": "2026-09-16",
-      "retrieved_at": "2026-10-16T09:59:12.108456+00:00",
+      "retrieved_at": "2026-10-16T15:37:13.713585+00:00",
       "pdf_sha256": "aa308d25613c429101f2b2ac540d5d3b38a1448cf30ebf61b6f15acd74ae927c",
       "availability_basis": "VERIFIED_PDF_RETRIEVAL"
     },
@@ -743,7 +743,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-16T09:59:13.926966+00:00",
+      "retrieved_at": "2026-10-16T15:37:15.796177+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -757,7 +757,7 @@
         "publication_date": "2026-07-29",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260729.htm",
-        "retrieved_at": "2026-10-16T09:59:14.052642+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.986454+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "4e562ad9f77c6ff2d347f69dafec3603e0e222941fae5876f00d6773742988d3",
@@ -830,7 +830,7 @@
         "publication_date": "2026-09-16",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
-        "retrieved_at": "2026-10-16T09:59:14.052642+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.986454+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "fc27d85fa8d02c2afe3ef5e54416802aac2fa1d2b926b26424f0fbf70842367b",
@@ -1049,7 +1049,7 @@
         "publication_date": "2026-08-19",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-16T09:59:14.052642+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.986454+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "8f5914c96ce15c0b9a74b22158704d1c9795f0ccf0463fd53d6f552fb5af1335",
@@ -1283,7 +1283,7 @@
         "publication_date": "2026-10-07",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-16T09:59:14.052642+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.986454+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "3547a0f56c6460166e652ad8911ad779b0a5afe9140f4692091ec864f7e51bb3",
@@ -2717,10 +2717,10 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260729.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-16T09:59:13.075888+00:00",
+        "retrieved_at": "2026-10-16T15:37:14.756230+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-        "content_sha256": "747df184a9597c564affd6eec918f1bfe716122c108dfd675b89a138aac47014",
+        "content_sha256": "3b27531eaa731b33cadd16407a384794c688705b8c3fdb280acbf39f5f31d5ef",
         "facts": {
           "policy_action": {
             "value": "HOLD",
@@ -2744,8 +2744,8 @@
             "label": "Inflation and prices",
             "evidence": [
               "Inflation remains elevated relative to the Committee’s 2 percent goal.",
-              "For some households, businesses, and market professionals, five years of high inflation have left a mistaken impression that’s hard to shake—that the Fed’s implicit inflation target was somehow above 2 percent.",
-              "Let me reiterate: There is no soft inflation target; there is no soft implicit target—not on this Committee’s watch.",
+              "For some households, businesses, and market professionals, five years of high inflation have left a mistaken impression that’s hard to shake—that the Fed’ s implicit inflation target was somehow above 2 percent.",
+              "Let me reiterate: There is no soft inflation target; there is no soft implicit target—not on this Committee ’s watch.",
               "We’ve begun a new chapter, and we understand that the five-plus years of inflation above target cannot be cured in nine weeks—or by a single month of modest price decreases.",
               "First, we talked a lot about the implications of the past five years of high inflation on the current policy conjuncture.",
               "Third, we took up the related question of price increases arising from shocks.",
@@ -2753,24 +2753,24 @@
               "And I came out of that meeting even more confident that this is the right team to win the battle against high inflation.",
               "Sure, we got some encouraging inflation data.",
               "I think at the meeting 42 days ago I said something like “63 months of inflation above target.” I didn’t say “64,” though the final calculation might, might be a close one.",
-              "So we’ll be—we’ll be watching inflation data over the period ahead, but I also don’t want you to leave the misimpression that we’re sort of breathlessly waiting that.",
+              "So we’ll be—we ’ll be watching inflation data over the period ahead, but I also don’t want you to leave the misimpression that we’re sort of breathlessly waiting that.",
               "If inflation continues to be elevated through the forecast period, interest rates could well be part of that solution.",
-              "I think there was a misimpression—by some in financial markets, by some households and businesses—that central bankers like me—we set a 2 percent inflation target, but maybe we were more tolerable of a somewhat higher inflation target.",
+              "I think there was a misimpression—by some in financial markets, by some households and businesses—that central bankers like me —we set a 2 percent inflation target, but maybe we were more tolerable of a somewhat higher inflation target.",
               "And so might it have been rational for people to think, “Well, their inflation target’s somewhat higher”?",
-              "The—what I heard in the last two days—what I’ve heard in eight and a half weeks is “no.” We will deliver the 2 percent inflation target.",
+              "The—what I heard in the last two days —what I ’ve heard in eight and a half weeks is “no.” We will deliver the 2 percent inflation target.",
               "And that’s what we intend to do with the inflation target—making clear expectations is one part of it.",
               "A lot of our focus was on trying to understand and identify underlying inflation dynamics amid shocks.",
               "Our goal is to have growth that is broadening and inflation that is becoming more limited—more circumscribed.",
               "They reacted to the inflation data in one direction—strong economic growth in the other direction.",
-              "And, in fact, if you want to do the most harm to the labor markets, you would run a period of high inflation that’s variable such that employers—businesses —wouldn’t really know what’s going on.",
-              "Any central banker, especially a central banker where the labor markets are more or less at equilibrium—any central banker, when he or she sees underlying inflation moving higher—he or she is more inclined to tighten policy.",
+              "And, in fact, if you want to do the most harm to the labor markets, you would run a period of high inflation that’s variable such that employers—businesses —wouldn’ t really know what’s going on.",
+              "Any central banker, especially a central banker where the labor markets are more or less at equilibrium— any central banker, when he or she sees underlying inflation moving higher—he or she is more inclined to tighten policy.",
               "Again, when you’ve achieved the other side of your mandate and you see underlying inflation falling, he’s more inclined to loosen policy.",
               "The, the Federal Reserve every January outlines a statement of purposes and strategy, and in that strategy document, which I believe was dated January of this year, it describes a measure of PCE inflation as the—as the objective function there.",
               "But I’ll say this: Some version of the Lucas critique, some version of Goodhart’s law, in economics should remind us that when we talk about measures of inflation or something else and we describe those measures as being consistent with our objectives, we might make them such that they’re not very good measures or very good objectives.",
-              "Broadly, if you said to me standing in front of you, “I abide fully by the strategy document—we’re going to deliver 2 percent inflation,” and not a whisper more—but to achieve that, I’m looking at a broader set of inflation data than PCE.",
-              "And so if you would hear a message from me—yes, I care about what the PCE “prints” are.",
+              "Broadly, if you said to me standing in front of you, “I abide fully by the strategy document— we’re going to deliver 2 percent inflation,” and not a whisper more—but to achieve that, I’m looking at a broader set of inflation data than PCE.",
+              "And so if you would hear a message from me—yes, I care about what the PCE “ prints” are.",
               "I care about what the contributions are from CPI and everything else.",
-              "But if we’re trying to land the plane and deliver 2 percent inflation and we take a very useful source of information and we get it all fogged up by giving it our own forecast—by providing rolling commentary—I can assure you that we’re going to have less information—less ability to land the plane successfully and deliver price stability."
+              "B ut if we’re trying to land the plane and deliver 2 percent inflation and we take a very useful source of information and we get it all fogged up by giving it our own forecast—by providing rolling commentary —I can assure you that we’ re going to have less information—less ability to land the plane successfully and deliver price stability."
             ]
           },
           "labor": {
@@ -2781,7 +2781,7 @@
               "How are we doing on employment?",
               "I do not believe that price stability and full employment is an either-or proposition.",
               "We’re going to have price stability and full employment.",
-              "I’ve been talking mostly about price stability because we’re doing pretty well, collectively, as a country—as policymakers—on the full-employment side."
+              "I’ve been talking mostly about price stability because we’re doing pretty well, collectively, as a country—as policymakers —on the full -employment side."
             ]
           },
           "growth": {
@@ -2789,7 +2789,7 @@
             "evidence": [
               "The most striking feature of the economy is the strong growth of business investment.",
               "Strained supply chains arising from the pandemic, military conflicts, energy supply disruptions, substantial increases in tariff rates, and, yes, the surge in AI-related investment.",
-              "Capex and productivity are strong— labor markets—solid, steady.",
+              "Cap ex and productivity are strong— labor markets—solid, steady.",
               "They reacted to the inflation data in one direction—strong economic growth in the other direction.",
               "What’s really happening with productivity?",
               "We’re making a judgment about what productivity is."
@@ -2816,9 +2816,9 @@
               "I’ll see if I can put it this way: Monetary policy matters not just by what we say, or even what we do—monetary policy matters by how it affects the real economy.",
               "Did the Fed take an explicit change in its policy rate today?",
               "In terms of transmission mechanisms of monetary policy, I think different tools work through different transmission mechanisms.",
-              "That’s my reaction function, and I don’t suspect it will cause people to not continue to pry for more because the truth is, for a very long time, in a lot of countries, coming out of the 2008 crisis, where in crisis mode we were purposely providing a lot of information—trying to provide a lot of assurance, trying to tell people exactly what we’re going to do, offering forward guidance with clarity—as if we’re tying our own hands behind our back.",
+              "That’s my reaction function, and I don’t suspect it will cause people to not continue to pry for more because the truth is, for a very long time, in a lot of countries, coming out of the 2008 crisis, where in crisis mode we were purposely providing a lot of information— trying to provide a lot of assurance, trying to tell people exactly what we’re going to do, offering forward guidance with clarity—as if we ’re tying our own hands behind our back.",
               "But markets and market participants and reporters have learned to devour all that information, so I take seriously that the pullback of forward guidance requires some transition.",
-              "We have spent an inordinate amount of time in the last two—two days—two weeks looking at our monetary policy strategy, evaluating our tools—thinking hard about the sources of data that we have at our disposal and we wish we had."
+              "We have spent an inordinate amount of time in the last two—two days —two weeks looking at our monetary policy strategy, evaluating our tools—t hinking hard about the sources of data that we have at our disposal and we wish we had."
             ]
           },
           "liquidity": {
@@ -2833,11 +2833,11 @@
             "label": "Credit and financial conditions",
             "evidence": [
               "The first is a very notable change since our last meeting 42 days ago: Nominal and real yields are materially higher across the Treasury curve.",
-              "The bond market—the Treasury market—it seems to be saying that as well.",
+              "The bond market — the Treasury market—it seems to be saying that as well.",
               "If I were to try to break down—just aggregate the Treasury market signals—I wouldn’t be able to do it perfectly.",
               "Market judgments have moved up on what nominal rates are across the Treasury curve.",
               "The interest rates work through lending channels and credit channels—maybe confidence channels and foreign exchange.",
-              "So they’re gauging themselves the—how restrictive the Treasury curve should be.",
+              "So they’re gauging themselves the— how restrictive the Treasury curve should be.",
               "And so, so if I look at the Treasury curve, if I look at the dollar, if I look at a lot of things that are internals inside of financial markets, I think what they’re broadly saying is that this Committee does own it—has the credibility to deliver it.",
               "If you look broadly at market prices, they are certainly not saying “all clear,” but they are working in concert to, to keep us on our toes, and they have tightened financial conditions in this intermeeting period."
             ]
@@ -2849,10 +2849,10 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-16T09:59:12.108456+00:00",
+        "retrieved_at": "2026-10-16T15:37:13.713585+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-        "content_sha256": "23d732167d175f4d3192a52264fba35a5b4f9941c9b27f4a42bd57670d3cccd6",
+        "content_sha256": "b96650f08db348d43dd5e24d2fa0610fb4192aaeec7b9ad3ea9432705f5f86e1",
         "facts": {
           "policy_action": {
             "value": "RAISE",
@@ -2887,13 +2887,13 @@
               "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored.",
               "Total PCE inflation runs at 3.7 percent this year and falls to 2.3 percent next year.",
               "Inflation risks are to the upside while labor risks are roughly balanced.",
-              "In my meetings these last few weeks—in Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—it was evident that most advanced economies are facing price pressures.",
-              "Second, inflation trends—I said in Jackson Hole, trends matter.",
+              "In my meetings these last few weeks—i n Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—i t was evident that most advanced economies are facing price pressures.",
+              "Second, inflation trends— I said in Jackson Hole, trends matter.",
               "My judgment some weeks ago was, the inflation summer trends weren’t passing the test.",
               "I was not waiting breathlessly on what any particular data was, whether it was retail sales this morning or a CPI “print” last week.",
               "In the macroeconomics, we tend to look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.",
               "And stable prices, an environment where inflation is running consistent with our 2 percent objective, offers good news.",
-              "But we do have responsibility for stable prices—as I’ve said before, inflation is a, is a choice—and today we took a step in delivering it.",
+              "But we do have responsibility for stable prices— as I’ve said before, inflation is a, is a choice—and today we took a step in delivering it.",
               "What I heard around the table from most of the advanced economies is they’re suffering from price pressures, too.",
               "When foreign central banks make decisions, where they’re confronted with higher prices, and they choose, consistent with their remit, to raise rates, then they’re helping to quash inflation in their countries.",
               "Inflation is the problem."
@@ -2923,19 +2923,19 @@
             "evidence": [
               "As noted in the policy statement, released just a short while ago, economic activity is expanding at a solid pace.",
               "Productivity growth—strong; and capital investment is robust.",
-              "New hiring, private-sector earnings, business capital investment—each of these markers has improved in recent months and is pointing in a good direction.",
+              "New hiring, private-sector earnings, business capital investment—each of these markers ha s improved in recent months and is pointing in a good direction.",
               "In the summary’s median projections, real GDP rises at 2.3 percent this year, 2.4 percent next year.",
               "First, I would say a good majority of my colleagues seven weeks ago thought seven weeks is a good investment.",
               "In the macroeconomics, we tend to look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.",
               "Price stability is foundational to economic growth, and I think we took an important step today to deliver it.",
-              "So economic growth—that is ensuring continuous, sustainable, durable, economic growth—that’s the business we’re in.",
+              "So economic growth—that is ensuring continuous, sustainable, durable, economic growth—that ’s the business we’re in.",
               "And the job we did today, the job we’ll continue to do, is to ensure price stability, which can mean that sustainable, durable, economic growth can go on for longer."
             ]
           },
           "risks": {
             "label": "Balance of risks",
             "evidence": [
-              "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient.",
+              "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient .",
               "Consider the geopolitical landscape of shocks and uncertainty, and you begin to appreciate the resilience of the U.S. economy.",
               "Inflation risks are to the upside while labor risks are roughly balanced.",
               "It’s the risk-free asset upon which every price of virtually every asset in the world is related to.",
@@ -3047,7 +3047,7 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "So we’ll be—we’ll be watching inflation data over the period ahead, but I also don’t want you to leave the misimpression that we’re sort of breathlessly waiting that.",
+              "previous": "So we’ll be—we ’ll be watching inflation data over the period ahead, but I also don’t want you to leave the misimpression that we’re sort of breathlessly waiting that.",
               "current": "This summer’s inflation readings do not tell me that underlying trends have meaningfully improved.",
               "status": "WORDING_CHANGED"
             },
@@ -3057,17 +3057,17 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "And so if you would hear a message from me—yes, I care about what the PCE “prints” are.",
+              "previous": "And so if you would hear a message from me—yes, I care about what the PCE “ prints” are.",
               "current": "Core PCE and CPI prices are running at about 3.2 and 2.4 percent, respectively.",
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "The—what I heard in the last two days—what I’ve heard in eight and a half weeks is “no.” We will deliver the 2 percent inflation target.",
+              "previous": "The—what I heard in the last two days —what I ’ve heard in eight and a half weeks is “no.” We will deliver the 2 percent inflation target.",
               "current": "Since my first FOMC meeting as Chairman in June, my colleagues and I have been unequivocal in our commitment to price stability and to our 2 percent PCE inflation objective.",
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "Let me reiterate: There is no soft inflation target; there is no soft implicit target—not on this Committee’s watch.",
+              "previous": "Let me reiterate: There is no soft inflation target; there is no soft implicit target—not on this Committee ’s watch.",
               "current": "At our July meeting, we all agreed that inflation remained too high, and we expressed our joint readiness to act as circumstances might require.",
               "status": "WORDING_CHANGED"
             },
@@ -3093,12 +3093,12 @@
             },
             {
               "previous": null,
-              "current": "In my meetings these last few weeks—in Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—it was evident that most advanced economies are facing price pressures.",
+              "current": "In my meetings these last few weeks—i n Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—i t was evident that most advanced economies are facing price pressures.",
               "status": "CURRENT_ONLY_EVIDENCE"
             },
             {
               "previous": "Sure, we got some encouraging inflation data.",
-              "current": "Second, inflation trends—I said in Jackson Hole, trends matter.",
+              "current": "Second, inflation trends— I said in Jackson Hole, trends matter.",
               "status": "WORDING_CHANGED"
             },
             {
@@ -3107,7 +3107,7 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "And I came out of that meeting even more confident that this is the right team to win the battle against high inflation.",
+              "previous": "Any central banker, especially a central banker where the labor markets are more or less at equilibrium— any central banker, when he or she sees underlying inflation moving higher—he or she is more inclined to tighten policy.",
               "current": "I was not waiting breathlessly on what any particular data was, whether it was retail sales this morning or a CPI “print” last week.",
               "status": "WORDING_CHANGED"
             },
@@ -3123,11 +3123,11 @@
             },
             {
               "previous": "Again, when you’ve achieved the other side of your mandate and you see underlying inflation falling, he’s more inclined to loosen policy.",
-              "current": "But we do have responsibility for stable prices—as I’ve said before, inflation is a, is a choice—and today we took a step in delivering it.",
+              "current": "But we do have responsibility for stable prices— as I’ve said before, inflation is a, is a choice—and today we took a step in delivering it.",
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "We’ve begun a new chapter, and we understand that the five-plus years of inflation above target cannot be cured in nine weeks—or by a single month of modest price decreases.",
+              "previous": "And I came out of that meeting even more confident that this is the right team to win the battle against high inflation.",
               "current": "What I heard around the table from most of the advanced economies is they’re suffering from price pressures, too.",
               "status": "WORDING_CHANGED"
             },
@@ -3142,7 +3142,12 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "For some households, businesses, and market professionals, five years of high inflation have left a mistaken impression that’s hard to shake—that the Fed’s implicit inflation target was somehow above 2 percent.",
+              "previous": "For some households, businesses, and market professionals, five years of high inflation have left a mistaken impression that’s hard to shake—that the Fed’ s implicit inflation target was somehow above 2 percent.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "We’ve begun a new chapter, and we understand that the five-plus years of inflation above target cannot be cured in nine weeks—or by a single month of modest price decreases.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
@@ -3152,17 +3157,12 @@
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "I think there was a misimpression—by some in financial markets, by some households and businesses—that central bankers like me—we set a 2 percent inflation target, but maybe we were more tolerable of a somewhat higher inflation target.",
+              "previous": "I think there was a misimpression—by some in financial markets, by some households and businesses—that central bankers like me —we set a 2 percent inflation target, but maybe we were more tolerable of a somewhat higher inflation target.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "And, in fact, if you want to do the most harm to the labor markets, you would run a period of high inflation that’s variable such that employers—businesses —wouldn’t really know what’s going on.",
-              "current": null,
-              "status": "PREVIOUS_ONLY_EVIDENCE"
-            },
-            {
-              "previous": "Any central banker, especially a central banker where the labor markets are more or less at equilibrium—any central banker, when he or she sees underlying inflation moving higher—he or she is more inclined to tighten policy.",
+              "previous": "And, in fact, if you want to do the most harm to the labor markets, you would run a period of high inflation that’s variable such that employers—businesses —wouldn’ t really know what’s going on.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
@@ -3177,12 +3177,12 @@
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "Broadly, if you said to me standing in front of you, “I abide fully by the strategy document—we’re going to deliver 2 percent inflation,” and not a whisper more—but to achieve that, I’m looking at a broader set of inflation data than PCE.",
+              "previous": "Broadly, if you said to me standing in front of you, “I abide fully by the strategy document— we’re going to deliver 2 percent inflation,” and not a whisper more—but to achieve that, I’m looking at a broader set of inflation data than PCE.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "But if we’re trying to land the plane and deliver 2 percent inflation and we take a very useful source of information and we get it all fogged up by giving it our own forecast—by providing rolling commentary—I can assure you that we’re going to have less information—less ability to land the plane successfully and deliver price stability.",
+              "previous": "B ut if we’re trying to land the plane and deliver 2 percent inflation and we take a very useful source of information and we get it all fogged up by giving it our own forecast—by providing rolling commentary —I can assure you that we’ re going to have less information—less ability to land the plane successfully and deliver price stability.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             }
@@ -3218,7 +3218,7 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "I’ve been talking mostly about price stability because we’re doing pretty well, collectively, as a country—as policymakers—on the full-employment side.",
+              "previous": "I’ve been talking mostly about price stability because we’re doing pretty well, collectively, as a country—as policymakers —on the full -employment side.",
               "current": "We at the Fed are unwavering in our vital and straightforward purpose: full employment and price stability, and a thriving American economy that sets the standard for the world.",
               "status": "WORDING_CHANGED"
             },
@@ -3274,13 +3274,13 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "Capex and productivity are strong— labor markets—solid, steady.",
+              "previous": "Cap ex and productivity are strong— labor markets—solid, steady.",
               "current": "Productivity growth—strong; and capital investment is robust.",
               "status": "WORDING_CHANGED"
             },
             {
               "previous": "The most striking feature of the economy is the strong growth of business investment.",
-              "current": "New hiring, private-sector earnings, business capital investment—each of these markers has improved in recent months and is pointing in a good direction.",
+              "current": "New hiring, private-sector earnings, business capital investment—each of these markers ha s improved in recent months and is pointing in a good direction.",
               "status": "WORDING_CHANGED"
             },
             {
@@ -3305,7 +3305,7 @@
             },
             {
               "previous": null,
-              "current": "So economic growth—that is ensuring continuous, sustainable, durable, economic growth—that’s the business we’re in.",
+              "current": "So economic growth—that is ensuring continuous, sustainable, durable, economic growth—that ’s the business we’re in.",
               "status": "CURRENT_ONLY_EVIDENCE"
             },
             {
@@ -3331,7 +3331,7 @@
           "pairs": [
             {
               "previous": "Uncertainty, however, does not mean a lack of clarity.",
-              "current": "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient.",
+              "current": "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient .",
               "status": "WORDING_CHANGED"
             },
             {
@@ -3416,7 +3416,7 @@
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "That’s my reaction function, and I don’t suspect it will cause people to not continue to pry for more because the truth is, for a very long time, in a lot of countries, coming out of the 2008 crisis, where in crisis mode we were purposely providing a lot of information—trying to provide a lot of assurance, trying to tell people exactly what we’re going to do, offering forward guidance with clarity—as if we’re tying our own hands behind our back.",
+              "previous": "That’s my reaction function, and I don’t suspect it will cause people to not continue to pry for more because the truth is, for a very long time, in a lot of countries, coming out of the 2008 crisis, where in crisis mode we were purposely providing a lot of information— trying to provide a lot of assurance, trying to tell people exactly what we’re going to do, offering forward guidance with clarity—as if we ’re tying our own hands behind our back.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
@@ -3426,7 +3426,7 @@
               "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "We have spent an inordinate amount of time in the last two—two days—two weeks looking at our monetary policy strategy, evaluating our tools—thinking hard about the sources of data that we have at our disposal and we wish we had.",
+              "previous": "We have spent an inordinate amount of time in the last two—two days —two weeks looking at our monetary policy strategy, evaluating our tools—t hinking hard about the sources of data that we have at our disposal and we wish we had.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             }
@@ -3473,7 +3473,7 @@
               "status": "CURRENT_ONLY_EVIDENCE"
             },
             {
-              "previous": "The bond market—the Treasury market—it seems to be saying that as well.",
+              "previous": "The bond market — the Treasury market—it seems to be saying that as well.",
               "current": "I’ve described previously I found it difficult to describe financial conditions as restrictive.",
               "status": "WORDING_CHANGED"
             },
@@ -3488,7 +3488,7 @@
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "So they’re gauging themselves the—how restrictive the Treasury curve should be.",
+              "previous": "So they’re gauging themselves the— how restrictive the Treasury curve should be.",
               "current": "This is a complicated set of things that are affecting the most important asset anywhere in the world, the 10-year Treasury.",
               "status": "WORDING_CHANGED"
             },
@@ -3530,7 +3530,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-08-24",
-        "retrieved_at": "2026-10-16T09:59:14.045515+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.980712+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb",
@@ -3590,7 +3590,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-10-05",
-        "retrieved_at": "2026-10-16T09:59:13.926966+00:00",
+        "retrieved_at": "2026-10-16T15:37:15.796177+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef",
@@ -3802,7 +3802,7 @@
     "source_status": "VERIFIED_TRANSCRIPT",
     "publication_date": null,
     "publication_date_source": null,
-    "retrieved_at": "2026-10-16T09:59:12.108456+00:00",
+    "retrieved_at": "2026-10-16T15:37:13.713585+00:00",
     "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
     "related_release_dates": {
       "statement": "2026-09-16",
@@ -3810,7 +3810,7 @@
       "minutes": "2026-10-07"
     },
     "meeting_date": "2026-09-16",
-    "content_sha256": "23d732167d175f4d3192a52264fba35a5b4f9941c9b27f4a42bd57670d3cccd6",
+    "content_sha256": "b96650f08db348d43dd5e24d2fa0610fb4192aaeec7b9ad3ea9432705f5f86e1",
     "pdf_sha256": "aa308d25613c429101f2b2ac540d5d3b38a1448cf30ebf61b6f15acd74ae927c"
   },
   "report_coverage": {
@@ -3850,7 +3850,7 @@
     },
     "pit_scope": "Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; its publication date remains unknown. No intraday or archived-vintage guarantee.",
     "availability_bounds": {
-      "chair_press": "2026-10-16T09:59:12.108456+00:00"
+      "chair_press": "2026-10-16T15:37:13.713585+00:00"
     },
     "research_only": true,
     "forecast": false,

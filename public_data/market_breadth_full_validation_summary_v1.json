@@ -57,5 +57,26 @@
     "forecast_all_false": true,
     "pit_perfect_all_false": true,
     "file_found": true
+  },
+  "workflow_steps": {
+    "preflight": "success",
+    "historical_collector": "success",
+    "analyzer": "success",
+    "validation_robustness": "success"
+  },
+  "failure_stage": null,
+  "log_files": [
+    "market_breadth_full_validation_v1/logs/analyzer.log",
+    "market_breadth_full_validation_v1/logs/collector.log",
+    "market_breadth_full_validation_v1/logs/preflight.log",
+    "market_breadth_full_validation_v1/logs/robustness.log"
+  ],
+  "requested_range": {
+    "requested_end_date": "2026-10-16",
+    "end_date": "2026-08-18",
+    "membership_last_date": "2026-08-18",
+    "source_lag_days": 59,
+    "collection_status": "STALE",
+    "requested_range_complete": false
   }
 }
