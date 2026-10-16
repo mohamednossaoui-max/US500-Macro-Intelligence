@@ -1,4 +1,10 @@
 {
+  "data_status": "STALE",
+  "validation_scope": "STRUCTURE_AND_ACCOUNTING_ONLY",
+  "freshness_pass": false,
+  "warnings": [
+    "Membership coverage ends before the requested date; validation PASS does not mean current data."
+  ],
   "validator": "Market Breadth Full Validation v1",
   "research_only": true,
   "pit_perfect": false,
