@@ -2,6 +2,8 @@
 # Research-only frontend. Token-free. No trading/execution/forecasting.
 
 from __future__ import annotations
+from published_snapshot_v1 import PublishedSnapshot
+from system_health_monitor_v1 import display_summary
 
 import io
 import json
@@ -186,29 +188,16 @@ DATE_COLUMNS = [
 ]
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+_verified_publication = None
+
+def publication_snapshot():
+    global _verified_publication
+    if _verified_publication is None:
+        _verified_publication = PublishedSnapshot(PUBLIC_DATA, fetch_raw)
+    return _verified_publication
+
 def get_manifest() -> dict[str, Any]:
-    """Load the single canonical publication manifest: manifest.json."""
-    filename = "manifest.json"
-    local = PUBLIC_DATA / filename
-    if local.exists() and local.is_file():
-        try:
-            manifest = json.loads(local.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            manifest = None
-        if isinstance(manifest, dict):
-            return manifest
-
-    raw = fetch_raw(filename)
-    if raw is not None:
-        try:
-            manifest = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError):
-            manifest = None
-        if isinstance(manifest, dict):
-            return manifest
-
-    return {}
+    return publication_snapshot().manifest
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -253,27 +242,10 @@ def manifest_files() -> list[str]:
     return sorted({name.replace("\\", "/").lstrip("/") for name in result})
 
 
-@st.cache_data(ttl=900, show_spinner=False)
 def load_bytes(filename: str) -> tuple[Optional[bytes], str]:
-    clean = filename.replace("\\", "/").lstrip("/")
-    if clean.startswith("public_data/"):
-        clean = clean.split("public_data/", 1)[1]
-
-    local = PUBLIC_DATA / clean
-    if local.exists() and local.is_file():
-        try:
-            return local.read_bytes(), f"LOCAL: public_data/{clean}"
-        except OSError:
-            pass
-
-    raw = fetch_raw(clean)
-    if raw is not None:
-        return raw, f"GITHUB RAW: public_data/{clean}"
-
-    return None, "NOT PUBLISHED"
+    return publication_snapshot().read(filename)
 
 
-@st.cache_data(ttl=900, show_spinner=False)
 def load_csv(filename: str) -> tuple[Optional[pd.DataFrame], str]:
     raw, source = load_bytes(filename)
     if raw is None:
@@ -286,7 +258,6 @@ def load_csv(filename: str) -> tuple[Optional[pd.DataFrame], str]:
         return None, f"UNREADABLE: {source}"
 
 
-@st.cache_data(ttl=900, show_spinner=False)
 def load_json(filename: str) -> tuple[Optional[Any], str]:
     raw, source = load_bytes(filename)
     if raw is None:
@@ -299,13 +270,12 @@ def load_json(filename: str) -> tuple[Optional[Any], str]:
 
 def load_named(name: str) -> tuple[Any, str]:
     filename = DATASETS[name]
-    if name == "Fed Intelligence":
-        return load_snapshot(
-            PUBLIC_DATA / filename, f"{RAW_BASE}/{filename}",
-            lambda url: requests.get(url, headers=HEADERS, timeout=15),
-        )
     if filename.endswith(".json"):
-        return load_json(filename)
+        obj, origin = load_json(filename)
+        if name == "System Health Summary" and isinstance(obj, dict):
+            attempt, _ = load_json("pipeline_attempt_v1.json")
+            obj = display_summary(obj, attempt=attempt)
+        return obj, origin
     return load_csv(filename)
 
 
@@ -566,7 +536,7 @@ def executive() -> None:
     if isinstance(health, dict) or isinstance(di, dict):
         hv = health.get("overall_health","UNKNOWN") if isinstance(health,dict) else "UNKNOWN"
         av = di.get("historical_analogs",{}) if isinstance(di,dict) else {}
-        quick=[("System Health",hv,"Autonomous pipeline"),("Closest Analog",av.get("closest_date","—"),"Historical context"),("Similarity",f"{av.get('closest_similarity_pct','—')}%","Not probability"),("Context Date",di.get("context_date","—") if isinstance(di,dict) else rc_date,"Published synthesis")]
+        quick=[("System Health",hv,"Autonomous pipeline"),("Closest Analog",(av.get("closest_date") or "—"),"Historical context"),("Similarity",f"{fmt(av.get('closest_similarity_pct'))}%","Not probability"),("Context Date",di.get("context_date","—") if isinstance(di,dict) else rc_date,"Published synthesis")]
         st.markdown("<div class='command-strip'>"+"".join(f"<div class='command-cell'><div class='k'>{k}</div><div class='v'>{v}</div><div class='n'>{n}</div></div>" for k,v,n in quick)+"</div>",unsafe_allow_html=True)
 
     ui_section("Command Status", "SYSTEM STATE")
@@ -1579,9 +1549,9 @@ def decision() -> None:
         q=di.get("evidence_quality",{})
         a=di.get("historical_analogs",{})
         strip=[
-            ("Closest Analog",a.get("closest_date","—"),"Locked Stage-10 selection"),
-            ("Similarity",f"{a.get('closest_similarity_pct','—')}%","Not a probability"),
-            ("Comparable Coverage",f"{a.get('closest_coverage_pct','—')}%","Comparable CORE dimensions"),
+            ("Closest Analog",(a.get("closest_date") or "—"),"Locked Stage-10 selection"),
+            ("Similarity",f"{fmt(a.get('closest_similarity_pct'))}%","Not a probability"),
+            ("Comparable Coverage",f"{fmt(a.get('closest_coverage_pct'))}%","Comparable CORE dimensions"),
             ("Evidence Quality",q.get("overall_quality","—"),f"PIT: {q.get('overall_pit_status','—')}"),
         ]
         html="<div class='command-strip'>"+"".join(f"<div class='command-cell'><div class='k'>{k}</div><div class='v'>{v}</div><div class='n'>{n}</div></div>" for k,v,n in strip)+"</div>"
@@ -1639,11 +1609,14 @@ def system_health() -> None:
     st.markdown('<div class="v3-title">System Health Command Center</div>', unsafe_allow_html=True)
     st.markdown('<div class="v3-sub">Freshness, PIT policy, failures and Last Known Good visibility. Operational status never changes research scores.</div>', unsafe_allow_html=True)
     if not isinstance(summary,dict): st.error("System Health summary is not published."); return
+    if summary.get("attempt_warning"):
+        st.warning(f"Latest update: {summary.get('latest_attempt_status')} · {summary.get('latest_attempt_at')}. {summary['attempt_warning']}")
     overall=str(summary.get("overall_health","UNKNOWN"))
     tone="positive" if overall=="HEALTHY" else "warning" if overall=="DEGRADED" else "negative"
     alert_item(f"SYSTEM {overall}",f"{summary.get('healthy','—')} healthy · {summary.get('attention','—')} need attention · {summary.get('failed','—')} failed · {summary.get('lkg_available','—')} with Last Known Good",tone)
+    st.caption(f"Health snapshot: {summary.get("as_of","—")} · {summary.get("snapshot_freshness","UNKNOWN")}. LKG counts hash-verified publications; rollback uses the previous Git commit.")
     cols=st.columns(5)
-    for c,(a,b,n) in zip(cols,[("Layers",summary.get("layer_count","—"),"Registry nodes"),("Healthy",summary.get("healthy","—"),"Within operational gates"),("Attention",summary.get("attention","—"),"Review required"),("Failed",summary.get("failed","—"),"Active failures"),("LKG",summary.get("lkg_available","—"),"Recoverable layers")]):
+    for c,(a,b,n) in zip(cols,[("Layers",summary.get("layer_count","—"),"Registry nodes"),("Healthy",summary.get("healthy","—"),"Within operational gates"),("Attention",summary.get("attention","—"),"Review required"),("Failed",summary.get("failed","—"),"Active failures"),("LKG",summary.get("lkg_available","—"),"Verified published outputs")]):
         with c: card(a,b,n)
     if isinstance(layers,list):
         attention=[x for x in layers if x.get("state")!="HEALTHY"]
@@ -2015,8 +1988,8 @@ with st.sidebar:
     selected = render_navigation(list(PAGES.keys()))
     st.divider()
     st.caption("Token-free")
-    st.caption("local public_data → GitHub Raw → NOT PUBLISHED")
-    st.caption(f"Manifest datasets: {get_manifest().get('dataset_count', '—')}")
+    st.caption("Verified publication · one manifest generation per view")
+    st.caption(f"Manifest datasets: {len(manifest_files())}")
 
 st.markdown(
     f'<div class="hero"><h1>US500 Macro Intelligence — Research Terminal {APP_VERSION}</h1>'

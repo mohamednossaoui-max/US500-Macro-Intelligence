@@ -1,7 +1,9 @@
-streamlit>=1.50,<2
-pandas>=2.0,<4
-requests>=2.31,<3
-numpy>=1.24,<3
-yfinance>=0.2,<2
-beautifulsoup4>=4.12,<5
-pypdf>=5,<7
+-c constraints-repair-20261016.txt
+streamlit
+pandas
+requests
+numpy
+yfinance
+beautifulsoup4
+pypdf
+pandas-market-calendars

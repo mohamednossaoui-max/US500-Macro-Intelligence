@@ -64,7 +64,7 @@
       "authority": "Federal Reserve official publications",
       "frequency": "release_driven",
       "workflow": ".github/workflows/test-fed.yml",
-      "freshness_sla_days": 60,
+      "freshness_sla_days": 2,
       "pit_policy": "publication-time",
       "criticality": "critical",
       "depends_on": [],
@@ -340,6 +340,10 @@
       ],
       "outputs": [
         "research_evidence_quality_v1.csv",
+        "research_evidence_quality_summary_v1.json",
+        "research_evidence_quality_summary_v1.json"
+      ],
+      "freshness_outputs": [
         "research_evidence_quality_summary_v1.json"
       ]
     },
@@ -390,7 +394,11 @@
         "usv"
       ],
       "outputs": [
-        "historical_analog_top_v1.csv"
+        "historical_analog_top_v1.csv",
+        "historical_analog_summary_v1.json"
+      ],
+      "freshness_outputs": [
+        "historical_analog_summary_v1.json"
       ]
     },
     {
@@ -406,7 +414,11 @@
         "analogs"
       ],
       "outputs": [
-        "historical_market_reaction_v1.csv"
+        "historical_market_reaction_v1.csv",
+        "historical_market_reaction_summary_v1.json"
+      ],
+      "freshness_outputs": [
+        "historical_market_reaction_summary_v1.json"
       ]
     },
     {
