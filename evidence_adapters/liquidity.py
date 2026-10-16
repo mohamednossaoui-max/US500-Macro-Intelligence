@@ -1,5 +1,5 @@
 import pandas as pd
-from .common import row
+from .common import row, evaluation_date, as_bool
 
 
 def build(p):
@@ -15,7 +15,7 @@ def build(p):
         ('SOFR', 'CONTEXT'),
     ]
     for ind, interp in specs:
-        fresh = bool(x.get(ind + '_fresh', False))
+        fresh = as_bool(x.get(ind + '_fresh', False))
         available_at = x.get(ind + '_available_at', '')
         age = x.get(ind + '_age_days', '')
         value = x.get(ind, '') if fresh else ''
@@ -29,10 +29,10 @@ def build(p):
             value=value,
             observation_date=x.get(ind + '_observation_date', ''),
             available_at=available_at,
-            as_of_date=x.asof_date,
+            as_of_date=evaluation_date(p, str(x.asof_date)),
             source_name='Published liquidity research',
             source_artifact='liquidity_intelligence_research_v1.csv',
-            pit_status=('PIT_SAFE' if x.point_in_time_safe and fresh else 'PIT_LIMITED'),
+            pit_status=('PIT_SAFE' if as_bool(x.point_in_time_safe) and fresh else 'PIT_LIMITED'),
             expected_frequency='WEEKLY' if ind not in {'EFFR', 'SOFR', 'ON_RRP'} else 'DAILY',
             limitations=limitation,
         ))

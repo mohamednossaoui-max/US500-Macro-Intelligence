@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pandas as pd
-from .common import row
+from .common import row, as_bool
 
 
 def _context_date(p, fallback):
@@ -42,7 +42,7 @@ def build(p):
             as_of_date=context_date,
             source_name=x.source,
             source_artifact='technical_intelligence_research_v1.csv',
-            pit_status='PIT_SAFE' if x.point_in_time_safe else 'NOT_PIT_SAFE',
+            pit_status='PIT_SAFE' if as_bool(x.point_in_time_safe) else 'NOT_PIT_SAFE',
             expected_frequency='DAILY',
             limitations=x.availability_semantics,
         ))

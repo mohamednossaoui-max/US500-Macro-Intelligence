@@ -1,5 +1,5 @@
 import pandas as pd
-from .common import row
+from .common import row, as_bool, evaluation_date
 
 FRESHNESS_LIMIT_DAYS = {"AAII": 10, "VIX": 5, "COT": 10}
 
@@ -25,6 +25,7 @@ def build(p):
         pd.Timestamp(cot.availability_date),
     )
 
+    as_of = pd.Timestamp(evaluation_date(p, as_of.date().isoformat()))
     out = []
     for x, mod, freq, filename in [
         (aaii, "AAII", "WEEKLY", "aaii_sentiment_research_v1.csv"),
@@ -42,8 +43,8 @@ def build(p):
             as_of_date=as_of.strftime("%Y-%m-%d"),
             source_name=x.get("source", ""),
             source_artifact=filename,
-            pit_status="PIT_SAFE" if bool(x.point_in_time_safe) else "NOT_PIT_SAFE",
-            availability_status="AVAILABLE" if fresh else "STALE",
+            pit_status="PIT_SAFE" if as_bool(x.point_in_time_safe) else "NOT_PIT_SAFE",
+            availability_status="AVAILABLE" if fresh else "PARTIAL",
             expected_frequency=freq,
             limitations=x.get("availability_semantics", ""),
         ) | {
@@ -67,8 +68,8 @@ def build(p):
             as_of_date=as_of.strftime("%Y-%m-%d"),
             source_name="CFTC COT",
             source_artifact="cot_positioning_research_v1.csv",
-            pit_status="PIT_SAFE" if bool(cot.point_in_time_safe) else "NOT_PIT_SAFE",
-            availability_status="AVAILABLE" if fresh else "STALE",
+            pit_status="PIT_SAFE" if as_bool(cot.point_in_time_safe) else "NOT_PIT_SAFE",
+            availability_status="AVAILABLE" if fresh else "PARTIAL",
             expected_frequency="WEEKLY",
         ) | {
             "freshness_status": "CURRENT" if fresh else "STALE",
