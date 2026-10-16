@@ -745,7 +745,13 @@ def calculate_breadth(
                 "point_in_time_reconstructed":
                     True,
 
-                "membership_source":
+                "requested_end_date": str(requested_end.date()),
+        "membership_last_date": str(membership_last_date.date()),
+        "source_lag_days": int((requested_end-effective_end).days),
+        "collection_status": "STALE" if effective_end < requested_end else "CURRENT",
+        "requested_range_complete": bool(effective_end >= requested_end),
+
+        "membership_source":
                     "FREE_PUBLIC_RECONSTRUCTION",
 
                 "membership_quality":
@@ -1065,6 +1071,7 @@ def main() -> int:
         membership_snapshots
     )
 
+    requested_end = end_date
     effective_end = min(
         end_date,
         membership_last_date,

@@ -103,3 +103,61 @@ def test_evidence_cache_excludes_fred_secret(tmp_path):
  c.get(BASE+'series',params={'api_key':'KEY_A','series_id':'PAYEMS'});files=list(tmp_path.iterdir())
  c.get(BASE+'series',params={'api_key':'KEY_B','series_id':'PAYEMS'})
  assert list(tmp_path.iterdir())==files and len(c.cache)==1
+
+
+def intraday_fixture(indicator):
+ """Synthetic values, reproducing the release/vintage dates in the failure."""
+ c,r,p=fixture(indicator)
+ p['release/dates']['release_dates']=[dict(release_id=99,date=d) for d in ['2026-11-10','2026-10-14','2026-09-11']]
+ p['series/vintagedates']['vintage_dates']=['2026-09-11']
+ p['series']['seriess'][0]['last_updated']='2026-09-11 09:00:00-04:00'
+ p['series']['seriess'][0]['observation_end']='2026-08-01'
+ r[0].update(year='2026',period='M08');r[1].update(year='2026',period='M07')
+ p['series/observations']['observations'][0]['date']='2026-08-01'
+ p['series/observations']['observations'][1]['date']='2026-07-01'
+ calendar='BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:Consumer Price Index\r\nDTSTART;TZID=US-Eastern:20261014T083000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+ get=c.get
+ def with_calendar(url,**kw):
+  if url.endswith('bls.ics'):return SimpleNamespace(content=calendar.encode())
+  if url==BASE+'series/observations':
+   assert kw['params']['realtime_start']==kw['params']['realtime_end']=='2026-09-11'
+   return SimpleNamespace(json=lambda:copy.deepcopy(p['series/observations']))
+  return get(url,**kw)
+ c.get=with_calendar
+ return c,r,p
+
+
+@pytest.mark.parametrize('indicator',['CPI','CORE_CPI'])
+def test_before_today_release_requires_official_clock_and_full_parity(indicator,monkeypatch):
+ monkeypatch.setenv('FRED_API_KEY','TEST_ONLY_KEY');c,r,p=intraday_fixture(indicator)
+ out=corroborate(c,indicator,r,'BLS HTTP403',now=pd.Timestamp('2026-10-14T08:52:11Z'))
+ assert out[0]=='August 2026' and out[1]=='2026-09-11' and out[2] is None
+ assert out[4]['metadata_scheduled_release_at']=='2026-10-14T08:30:00-04:00'
+ assert out[4]['fred_vintage_date']=='2026-09-11'
+ p['series/observations']['observations'][1]['value']='101'
+ with pytest.raises(s.MetadataError,match='raw values'):corroborate(c,indicator,r,'403',now=pd.Timestamp('2026-10-14T08:52:11Z'))
+
+
+@pytest.mark.parametrize('stamp',['2026-10-14T12:30:00Z','2026-10-14T13:30:00Z','2026-10-15T08:00:00Z'])
+def test_at_and_after_release_old_vintage_still_blocked(stamp,monkeypatch):
+ monkeypatch.setenv('FRED_API_KEY','TEST_ONLY_KEY');c,r,_=intraday_fixture('CPI')
+ with pytest.raises(s.MetadataError,match='latest vintage'):corroborate(c,'CPI',r,'403',now=pd.Timestamp(stamp))
+
+
+@pytest.mark.parametrize('case',['blocked','empty','duplicate','wrong_group','wrong_day','older_vintage','newer_bls_period'])
+def test_intraday_ambiguity_never_passes(case,monkeypatch):
+ monkeypatch.setenv('FRED_API_KEY','TEST_ONLY_KEY');c,r,p=intraday_fixture('CPI');get=c.get
+ def altered(url,**kw):
+  if url.endswith('bls.ics'):
+   if case=='blocked':raise requests.HTTPError('fixture')
+   content=get(url,**kw).content
+   if case=='empty':content=b'BEGIN:VCALENDAR\nEND:VCALENDAR'
+   if case=='duplicate':content+=content
+   if case=='wrong_group':content=content.replace(b'Consumer Price Index',b'Producer Price Index')
+   if case=='wrong_day':content=content.replace(b'20261014',b'20261015')
+   return SimpleNamespace(content=content)
+  return get(url,**kw)
+ c.get=altered
+ if case=='older_vintage':p['series/vintagedates']['vintage_dates']=['2026-08-12']
+ if case=='newer_bls_period':r[0]['period']='M09'
+ with pytest.raises(s.MetadataError):corroborate(c,'CPI',r,'403',now=pd.Timestamp('2026-10-14T08:52:11Z'))

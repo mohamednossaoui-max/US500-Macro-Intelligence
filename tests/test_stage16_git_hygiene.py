@@ -18,14 +18,14 @@ def test_runtime_artifacts_are_ignored():
         assert rule in text
 
 
-def test_final_sync_restores_only_tracked_runtime_cache_before_rebase():
+def test_final_sync_restores_only_tracked_runtime_cache_before_publication_gate():
     text = WORKFLOW.read_text(encoding="utf-8")
     section = text.split("- name: Final Git Synchronization and Push", 1)[1]
     assert "TRACKED_RUNTIME=$(git ls-files" in section
     assert "git restore --worktree" in section
     assert "git clean -fdX" in section
     assert section.index("git clean -fdX") < section.index("git fetch origin main")
-    assert section.index("git clean -fdX") < section.index("git rebase origin/main")
+    assert section.index("git clean -fdX") < section.index("git merge-base --is-ancestor origin/main HEAD")
 
 
 def test_final_sync_refuses_real_unstaged_or_untracked_source_changes():

@@ -15,7 +15,8 @@ def test_manifest_reader_supports_canonical_files_mapping():
 def test_public_data_root_is_anchored_to_app_file():
     source = _app_source()
     assert 'PUBLIC_DATA = Path(__file__).resolve().parent / "public_data"' in source
-    assert 'local = PUBLIC_DATA / clean' in source
+    assert 'PublishedSnapshot(PUBLIC_DATA, fetch_raw)' in source
+    assert 'return publication_snapshot().read(filename)' in source
 
 
 def test_explorer_routes_only_json_to_json_parser():

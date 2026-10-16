@@ -67,7 +67,7 @@ def test_transient_network_failure_recovers(tmp_path, error_type):
     assert c.session.get.call_count == 2
 
 
-@pytest.mark.parametrize('header, expected', [('12', 12), ('9999', 30), ('invalid', 2)])
+@pytest.mark.parametrize('header, expected', [('12', 12), ('invalid', 2)])
 def test_numeric_retry_after_is_bounded(tmp_path, header, expected):
     c = client(tmp_path, [response(503, {'Retry-After': header}), response(200)])
     with patch('economic_official_sources_v1.time.sleep') as sleep:
@@ -82,3 +82,11 @@ def test_redirect_validation_still_applies_after_retry(tmp_path):
             c.get(URL)
     assert not c.cache
     assert not c.directory.exists()
+
+
+def test_long_retry_after_fails_without_retrying_early(tmp_path):
+    c=client(tmp_path,[response(429,{'Retry-After':'9999'}),response(200)])
+    with patch('economic_official_sources_v1.time.sleep') as sleep:
+        with pytest.raises(requests.HTTPError):c.get(URL)
+    assert c.session.get.call_count==1 and not c.cache
+    sleep.assert_not_called()

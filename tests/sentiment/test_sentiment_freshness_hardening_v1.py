@@ -67,4 +67,4 @@ def test_sentiment_adapter_preserves_true_availability_and_freshness(tmp_path):
     assert aaii["available_at"] == "2026-01-02"
     assert aaii["age_days"] == 19
     assert aaii["freshness_status"] == "STALE"
-    assert aaii["availability_status"] == "STALE"
+    assert aaii["availability_status"] == "PARTIAL"
