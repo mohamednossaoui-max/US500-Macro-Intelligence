@@ -1,0 +1,18 @@
+{
+  "analysis_code": {
+    "aaii_sentiment_analyzer_v1.py": "fb2934f5fafca40b1559a61c6c50ef1fa79b3e460d145f1e96a2060a44d365e1",
+    "cot_positioning_analyzer_v1.py": "e12bbc707da7daf2f142f6c3a63c5fd698dcb326fcea387dbb286512e517e205",
+    "financial_stress_analyzer_v1.py": "9ac531f6e11a8dd11327e4c12b9bf87145a47bfe217db8d991dacb9bac43b5a6",
+    "liquidity_intelligence_analyzer_v1.py": "80e93c6c3b94a992ca62389b15cca0c24e514064d8b27abccf73d1972ab6aa01",
+    "sentiment-engine-v1.py": "ea20c3a78969f1a66728cb492441967d114202f249e75105cb332dc2ab781618",
+    "vix_sentiment_analyzer_v1.py": "9b704c42fcd5e42042db53825d5818cf1a1a956fecd9064be217248f21dcd4b9"
+  },
+  "recomputed_from_synchronized_inputs": true,
+  "source_files": {
+    "aaii_historical_records_input_v1.csv": "61fb05004de87cafab10baa5a1e3de96a9c0b431173e574853e1b557ae6fbc5c",
+    "cot_historical_records_input_v1.csv": "2cef308dc7a2e4e81b643d4a756a91a73b682393fb2ec26c0b4c470bd38868c4",
+    "financial_stress_records_input_v1.csv": "81104e5ba9467e45e38f83997f3d7cf31bca4859f4416b3477b90021e068261f",
+    "liquidity_historical_records_input_v1.csv": "90346b1c6de061ab8c974cd2c3b8265434a244bc327dc107c5d22f5ae66b8968",
+    "vix_historical_records_input_v1.csv": "c70062e35b14c75523f61552d37548f61eefccdd88fef75e4e8563280c8d6761"
+  }
+}

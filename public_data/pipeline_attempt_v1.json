@@ -1,0 +1,9 @@
+{
+  "status": "SUCCESS",
+  "attempted_at": "2026-10-16T12:39:25.576477+00:00",
+  "run_id": "offline",
+  "run_url": "",
+  "data_source_run_id": "offline",
+  "message": "Integrated publication passed its validation gate.",
+  "research_scores_changed": false
+}

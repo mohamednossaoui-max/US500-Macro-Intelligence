@@ -10,7 +10,7 @@
   "evidence_quality": {
     "overall_quality": "MEDIUM",
     "coverage_pct": 100.0,
-    "freshness": "AGING",
+    "freshness": "STALE",
     "core_pit_safe": true,
     "overall_pit_status": "PIT_LIMITED",
     "overall_pit_safe_pct": 66.7
@@ -18,13 +18,13 @@
   "historical_analogs": {
     "count": 8,
     "closest_date": "2025-06-27",
-    "closest_similarity_pct": 71.9013,
-    "closest_coverage_pct": 88.89,
-    "summary": "Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-06-27 with 71.90% similarity and 88.89% comparable CORE coverage.",
+    "closest_similarity_pct": 67.8872,
+    "closest_coverage_pct": 77.78,
+    "summary": "Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-06-27 with 67.89% similarity and 77.78% comparable CORE coverage.",
     "key_differences": "economic_labor: hist=0.0099398810616049, current=-0.0270411763771128 | economic_growth: hist=-1.1616112758223234, current=-0.0507334623403759 | financial_stress: hist=0.1459237549351694, current=0.4327441476895011"
   },
   "historical_market_reaction": {
-    "summary": "Across the locked analog set, historical median US500 return was +4.87% at 60 trading days (75.0% positive) and +8.17% at 120 trading days (100.0% positive). Outcomes were dispersed: 60D range -8.93% to +18.89%. These are conditional historical outcomes, not expected returns or forecasts.",
+    "summary": "60D: historical median +4.87% (75.0% positive), range -8.93% to +18.89%. 120D: historical median +8.17% (100.0% positive), range +3.69% to +27.47%. These are conditional historical outcomes, not expected returns or forecasts.",
     "horizons": {
       "5d": {
         "available_analogs": 8,
@@ -80,13 +80,13 @@
   },
   "important_differences": "economic_labor: hist=0.0099398810616049, current=-0.0270411763771128 | economic_growth: hist=-1.1616112758223234, current=-0.0507334623403759 | financial_stress: hist=0.1459237549351694, current=0.4327441476895011",
   "risks_and_limitations": [
-    "Closest analog similarity is 71.90%, not a close match.",
+    "Closest analog similarity is 67.89%; similarity is not a probability.",
     "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
     "Overall evidence PIT status is PIT_LIMITED; CORE PIT remains True.",
     "CONTEXTUAL evidence does not alter the Decision Engine state.",
     "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
   ],
-  "final_research_synthesis": "The current research state is SUPPORTIVE, with a mixed economic backdrop, low research stress, neutral sentiment and bullish technicals. The closest historical analog is only moderately similar (71.90%). The locked analog set had positive median outcomes over 60D and 120D, but dispersion included negative cases and material drawdowns. This supports historical context, not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
+  "final_research_synthesis": "The current research state is SUPPORTIVE. Economic regime: MIXED; financial stress: ELEVATED_RESEARCH_STRESS; sentiment: NEUTRAL; technicals: BULLISH. Stage 10 selected 8 independent analog regimes without using outcomes. Closest is 2025-06-27 with 67.89% similarity and 77.78% comparable CORE coverage. 60D: historical median +4.87% (75.0% positive), range -8.93% to +18.89%. 120D: historical median +8.17% (100.0% positive), range +3.69% to +27.47%. These are conditional historical outcomes, not expected returns or forecasts. This is not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
   "research_only": true,
   "forecast_generated": false,
   "trading_signal_generated": false,

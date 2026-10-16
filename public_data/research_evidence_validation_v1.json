@@ -8,9 +8,7 @@
   "research_only_violations": 0,
   "trading_field_violations": 0,
   "warnings": [
-    "CONTEXTUAL_ONLY;QUALITY_GATE=ELIGIBLE",
     "Calendar-day availability proxy only; exchange/session-aware availability is not represented. No cross-session forward-fill.",
-    "DIRECTIONAL_COMPARISON_NOT_POLICY_PROBABILITY",
     "Historical constituent membership is a free-public reconstruction; pit_perfect=false; membership_quality=RESEARCH_GRADE; price_pit_perfect=false"
   ]
 }
