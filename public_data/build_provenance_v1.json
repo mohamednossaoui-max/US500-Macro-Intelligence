@@ -9,10 +9,10 @@
   },
   "recomputed_from_synchronized_inputs": true,
   "source_files": {
-    "aaii_historical_records_input_v1.csv": "61fb05004de87cafab10baa5a1e3de96a9c0b431173e574853e1b557ae6fbc5c",
+    "aaii_historical_records_input_v1.csv": "0d22bd9ea0ea564b0680fa8773c0f77d2b96ffbd4a8c735ffa13edd0d1712190",
     "cot_historical_records_input_v1.csv": "2cef308dc7a2e4e81b643d4a756a91a73b682393fb2ec26c0b4c470bd38868c4",
-    "financial_stress_records_input_v1.csv": "81104e5ba9467e45e38f83997f3d7cf31bca4859f4416b3477b90021e068261f",
+    "financial_stress_records_input_v1.csv": "98e18e2c084d5c762a5e514ee453274e18b38f482bcc1c233ff41e12d3737098",
     "liquidity_historical_records_input_v1.csv": "ed21e0d2a705b800cb2d2bc54eb61a567518534d10f44b41d47b66aef91d4b3c",
-    "vix_historical_records_input_v1.csv": "c70062e35b14c75523f61552d37548f61eefccdd88fef75e4e8563280c8d6761"
+    "vix_historical_records_input_v1.csv": "1334588f90fa9114ce0616771fc00dc0945cc110e9a247558d43b1ac36e2be3b"
   }
 }

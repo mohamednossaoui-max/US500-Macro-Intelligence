@@ -1,12 +1,12 @@
 [
   {
-    "age_days": 1.66,
+    "age_days": 1.71,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:46:43.640352+00:00",
+    "file_modified_at": "2026-10-16T16:36:04.146881+00:00",
     "freshness_sla_days": 45.0,
     "id": "economic",
     "kind": "source_layer",
@@ -24,13 +24,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 1.66,
+    "age_days": 1.71,
     "criticality": "critical",
     "downstream_impact": [
       "stress"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.240966+00:00",
+    "file_modified_at": "2026-10-16T16:55:03.788776+00:00",
     "freshness_sla_days": 10.0,
     "id": "stress_historical",
     "kind": "source_layer",
@@ -48,13 +48,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 1.66,
+    "age_days": 1.71,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:04.689565+00:00",
+    "file_modified_at": "2026-10-16T16:55:25.304928+00:00",
     "freshness_sla_days": 10.0,
     "id": "stress",
     "kind": "analysis_layer",
@@ -72,13 +72,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:46:43.658033+00:00",
+    "file_modified_at": "2026-10-16T16:55:03.783385+00:00",
     "freshness_sla_days": 2.0,
     "id": "fed",
     "kind": "source_analysis",
@@ -96,13 +96,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.03,
+    "age_days": 0.08,
     "criticality": "contextual",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:29.480065+00:00",
+    "file_modified_at": "2026-10-16T16:56:04.850792+00:00",
     "freshness_sla_days": 14.0,
     "id": "event_news",
     "kind": "source_analysis",
@@ -120,13 +120,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 3.66,
+    "age_days": 3.71,
     "criticality": "important",
     "downstream_impact": [
       "cot"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.209966+00:00",
+    "file_modified_at": "2026-10-16T16:36:04.116881+00:00",
     "freshness_sla_days": 10.0,
     "id": "cot_historical",
     "kind": "source_layer",
@@ -144,13 +144,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 3.66,
+    "age_days": 3.71,
     "criticality": "important",
     "downstream_impact": [
       "sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:05.223861+00:00",
+    "file_modified_at": "2026-10-16T16:55:26.097736+00:00",
     "freshness_sla_days": 10.0,
     "id": "cot",
     "kind": "analysis_layer",
@@ -168,112 +168,16 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 1.66,
+    "age_days": 0.71,
     "criticality": "important",
     "downstream_impact": [
       "vix_sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.289966+00:00",
+    "file_modified_at": "2026-10-16T16:55:03.904021+00:00",
     "freshness_sla_days": 5.0,
     "id": "vix_historical",
     "kind": "source_layer",
-    "last_attempt": null,
-    "last_data_update": "2026-10-15T00:00:00+00:00",
-    "last_known_good": true,
-    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
-    "last_success": null,
-    "next_expected_check": "2026-10-20T00:00:00+00:00",
-    "output_complete": true,
-    "pit_policy": "market-close-aware",
-    "pit_status": "UNKNOWN",
-    "publication_verified": true,
-    "rollback_requires_previous_commit": true,
-    "state": "HEALTHY"
-  },
-  {
-    "age_days": 1.66,
-    "criticality": "important",
-    "downstream_impact": [
-      "sentiment"
-    ],
-    "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:06.422854+00:00",
-    "freshness_sla_days": 5.0,
-    "id": "vix_sentiment",
-    "kind": "analysis_layer",
-    "last_attempt": null,
-    "last_data_update": "2026-10-15T00:00:00+00:00",
-    "last_known_good": true,
-    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
-    "last_success": null,
-    "next_expected_check": "2026-10-20T00:00:00+00:00",
-    "output_complete": true,
-    "pit_policy": "inherit",
-    "pit_status": "UNKNOWN",
-    "publication_verified": true,
-    "rollback_requires_previous_commit": true,
-    "state": "HEALTHY"
-  },
-  {
-    "age_days": 7.66,
-    "criticality": "important",
-    "downstream_impact": [
-      "aaii_sentiment"
-    ],
-    "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.204966+00:00",
-    "freshness_sla_days": 10.0,
-    "id": "aaii_historical",
-    "kind": "source_layer",
-    "last_attempt": null,
-    "last_data_update": "2026-10-09T00:00:00+00:00",
-    "last_known_good": true,
-    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
-    "last_success": null,
-    "next_expected_check": "2026-10-19T00:00:00+00:00",
-    "output_complete": true,
-    "pit_policy": "publication-time",
-    "pit_status": "UNKNOWN",
-    "publication_verified": true,
-    "rollback_requires_previous_commit": true,
-    "state": "AGING"
-  },
-  {
-    "age_days": 7.66,
-    "criticality": "important",
-    "downstream_impact": [
-      "sentiment"
-    ],
-    "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:06.888851+00:00",
-    "freshness_sla_days": 10.0,
-    "id": "aaii_sentiment",
-    "kind": "analysis_layer",
-    "last_attempt": null,
-    "last_data_update": "2026-10-09T00:00:00+00:00",
-    "last_known_good": true,
-    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
-    "last_success": null,
-    "next_expected_check": "2026-10-19T00:00:00+00:00",
-    "output_complete": true,
-    "pit_policy": "inherit",
-    "pit_status": "UNKNOWN",
-    "publication_verified": true,
-    "rollback_requires_previous_commit": true,
-    "state": "AGING"
-  },
-  {
-    "age_days": 0.66,
-    "criticality": "critical",
-    "downstream_impact": [
-      "research_context"
-    ],
-    "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.287966+00:00",
-    "freshness_sla_days": 5.0,
-    "id": "technical",
-    "kind": "source_analysis",
     "last_attempt": null,
     "last_data_update": "2026-10-16T00:00:00+00:00",
     "last_known_good": true,
@@ -288,13 +192,109 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
+    "criticality": "important",
+    "downstream_impact": [
+      "sentiment"
+    ],
+    "failure_reason": "",
+    "file_modified_at": "2026-10-16T16:55:28.174732+00:00",
+    "freshness_sla_days": 5.0,
+    "id": "vix_sentiment",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-10-16T00:00:00+00:00",
+    "last_known_good": true,
+    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
+    "last_success": null,
+    "next_expected_check": "2026-10-21T00:00:00+00:00",
+    "output_complete": true,
+    "pit_policy": "inherit",
+    "pit_status": "UNKNOWN",
+    "publication_verified": true,
+    "rollback_requires_previous_commit": true,
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.71,
+    "criticality": "important",
+    "downstream_impact": [
+      "aaii_sentiment"
+    ],
+    "failure_reason": "",
+    "file_modified_at": "2026-10-16T16:55:03.694710+00:00",
+    "freshness_sla_days": 10.0,
+    "id": "aaii_historical",
+    "kind": "source_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-10-16T00:00:00+00:00",
+    "last_known_good": true,
+    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
+    "last_success": null,
+    "next_expected_check": "2026-10-26T00:00:00+00:00",
+    "output_complete": true,
+    "pit_policy": "publication-time",
+    "pit_status": "UNKNOWN",
+    "publication_verified": true,
+    "rollback_requires_previous_commit": true,
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.71,
+    "criticality": "important",
+    "downstream_impact": [
+      "sentiment"
+    ],
+    "failure_reason": "",
+    "file_modified_at": "2026-10-16T16:55:28.732731+00:00",
+    "freshness_sla_days": 10.0,
+    "id": "aaii_sentiment",
+    "kind": "analysis_layer",
+    "last_attempt": null,
+    "last_data_update": "2026-10-16T00:00:00+00:00",
+    "last_known_good": true,
+    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
+    "last_success": null,
+    "next_expected_check": "2026-10-26T00:00:00+00:00",
+    "output_complete": true,
+    "pit_policy": "inherit",
+    "pit_status": "UNKNOWN",
+    "publication_verified": true,
+    "rollback_requires_previous_commit": true,
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": -0.29,
+    "criticality": "critical",
+    "downstream_impact": [
+      "research_context"
+    ],
+    "failure_reason": "",
+    "file_modified_at": "2026-10-16T16:55:03.895187+00:00",
+    "freshness_sla_days": 5.0,
+    "id": "technical",
+    "kind": "source_analysis",
+    "last_attempt": null,
+    "last_data_update": "2026-10-17T00:00:00+00:00",
+    "last_known_good": true,
+    "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
+    "last_success": null,
+    "next_expected_check": "2026-10-22T00:00:00+00:00",
+    "output_complete": true,
+    "pit_policy": "market-close-aware",
+    "pit_status": "UNKNOWN",
+    "publication_verified": true,
+    "rollback_requires_previous_commit": true,
+    "state": "HEALTHY"
+  },
+  {
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "liquidity"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:46:43.665988+00:00",
+    "file_modified_at": "2026-10-16T16:36:04.161881+00:00",
     "freshness_sla_days": 10.0,
     "id": "liquidity_historical",
     "kind": "source_layer",
@@ -312,13 +312,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:25.635158+00:00",
+    "file_modified_at": "2026-10-16T16:56:00.181722+00:00",
     "freshness_sla_days": 10.0,
     "id": "liquidity",
     "kind": "analysis_layer",
@@ -336,13 +336,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 59.66,
+    "age_days": 59.71,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.256966+00:00",
+    "file_modified_at": "2026-10-16T16:36:04.173881+00:00",
     "freshness_sla_days": 5.0,
     "id": "breadth",
     "kind": "source_analysis",
@@ -360,22 +360,22 @@
     "state": "STALE"
   },
   {
-    "age_days": 1.66,
+    "age_days": 0.71,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:34:48.229966+00:00",
+    "file_modified_at": "2026-10-16T16:55:03.730366+00:00",
     "freshness_sla_days": 5.0,
     "id": "cross_asset",
     "kind": "source_analysis",
     "last_attempt": null,
-    "last_data_update": "2026-10-15T00:00:00+00:00",
+    "last_data_update": "2026-10-16T00:00:00+00:00",
     "last_known_good": true,
     "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
     "last_success": null,
-    "next_expected_check": "2026-10-20T00:00:00+00:00",
+    "next_expected_check": "2026-10-21T00:00:00+00:00",
     "output_complete": true,
     "pit_policy": "PIT_LIMITED-session-aware-unavailable",
     "pit_status": "UNKNOWN",
@@ -384,13 +384,13 @@
     "state": "PIT_LIMITED"
   },
   {
-    "age_days": 3.66,
+    "age_days": 3.71,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:29.063706+00:00",
+    "file_modified_at": "2026-10-16T16:56:04.436667+00:00",
     "freshness_sla_days": 30.0,
     "id": "earnings",
     "kind": "source_analysis",
@@ -408,22 +408,22 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 1.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:07.473847+00:00",
+    "file_modified_at": "2026-10-16T16:55:29.433730+00:00",
     "freshness_sla_days": 10.0,
     "id": "sentiment",
     "kind": "composite_layer",
     "last_attempt": null,
-    "last_data_update": "2026-10-15T00:00:00+00:00",
+    "last_data_update": "2026-10-16T00:00:00+00:00",
     "last_known_good": true,
     "last_known_good_basis": "CANONICAL_MANIFEST_HASH_VERIFIED",
     "last_success": null,
-    "next_expected_check": "2026-10-25T00:00:00+00:00",
+    "next_expected_check": "2026-10-26T00:00:00+00:00",
     "output_complete": true,
     "pit_policy": "inherit",
     "pit_status": "UNKNOWN",
@@ -432,13 +432,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:26.370096+00:00",
+    "file_modified_at": "2026-10-16T16:56:01.012103+00:00",
     "freshness_sla_days": 2.0,
     "id": "macro_context",
     "kind": "integration_layer",
@@ -456,13 +456,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "evidence_quality"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:28.247712+00:00",
+    "file_modified_at": "2026-10-16T16:56:03.435668+00:00",
     "freshness_sla_days": 2.0,
     "id": "research_context",
     "kind": "integration_layer",
@@ -480,13 +480,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "decision_engine"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:27.887329+00:00",
+    "file_modified_at": "2026-10-16T16:56:02.979450+00:00",
     "freshness_sla_days": 2.0,
     "id": "evidence_quality",
     "kind": "integration_layer",
@@ -504,13 +504,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "usv"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:29.601888+00:00",
+    "file_modified_at": "2026-10-16T16:56:04.878418+00:00",
     "freshness_sla_days": 2.0,
     "id": "decision_engine",
     "kind": "integration_layer",
@@ -528,13 +528,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [
       "analogs"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:29.985472+00:00",
+    "file_modified_at": "2026-10-16T16:56:05.315569+00:00",
     "freshness_sla_days": 2.0,
     "id": "usv",
     "kind": "integration_layer",
@@ -552,13 +552,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "important",
     "downstream_impact": [
       "market_reaction"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:30.529853+00:00",
+    "file_modified_at": "2026-10-16T16:56:06.016595+00:00",
     "freshness_sla_days": 2.0,
     "id": "analogs",
     "kind": "research_layer",
@@ -576,13 +576,13 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "important",
     "downstream_impact": [
       "decision_intelligence"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:30.892652+00:00",
+    "file_modified_at": "2026-10-16T16:56:06.465130+00:00",
     "freshness_sla_days": 2.0,
     "id": "market_reaction",
     "kind": "research_layer",
@@ -600,11 +600,11 @@
     "state": "HEALTHY"
   },
   {
-    "age_days": 0.66,
+    "age_days": 0.71,
     "criticality": "critical",
     "downstream_impact": [],
     "failure_reason": "",
-    "file_modified_at": "2026-10-16T15:47:31.224349+00:00",
+    "file_modified_at": "2026-10-16T16:56:06.893755+00:00",
     "freshness_sla_days": 2.0,
     "id": "decision_intelligence",
     "kind": "integration_layer",

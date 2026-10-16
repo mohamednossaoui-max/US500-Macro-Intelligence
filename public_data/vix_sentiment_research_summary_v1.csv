@@ -1,12 +1,12 @@
 metric,value
-total_observations,9294
+total_observations,9295
 first_observation_date,1990-01-02
-last_observation_date,2026-10-14
+last_observation_date,2026-10-15
 rolling_window_observations,252
 minimum_observations,126
-latest_VIX,16.87
-latest_VIX_percentile,46.03174603174603
-latest_VIX_z,-0.33493025098880114
+latest_VIX,16.46
+latest_VIX_percentile,40.07936507936508
+latest_VIX_z,-0.4585764402973275
 latest_research_regime,NEUTRAL
 point_in_time_safe,True
 research_only,True
