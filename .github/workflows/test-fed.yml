@@ -1,10 +1,24 @@
 name: Fed Intelligence
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
+    inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   fed-intelligence:
@@ -17,6 +31,8 @@ jobs:
       # ------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
       # ------------------------------------------------------
       # Python
@@ -84,17 +100,8 @@ jobs:
       # The Streamlit app reads public_data from the deployed checkout,
       # so uploading an Actions artifact alone does not refresh the UI.
       # ------------------------------------------------------
-      - name: Publish refreshed Fed Intelligence data
-        run: |
-          if git diff --quiet -- public_data/fed_intelligence_output_v1.json public_data/manifest.json; then
-            echo "Fed Intelligence public_data is already current."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add public_data/fed_intelligence_output_v1.json public_data/manifest.json
-            git commit -m "data: refresh Fed Intelligence artifact"
-            git push
-          fi
+      - name: Keep publication under the master generation gate
+        run: echo "Fed candidate built. Run Master Pipeline with changed_sources=fed to refresh the complete published generation."
 
       # ------------------------------------------------------
       # Upload artifact

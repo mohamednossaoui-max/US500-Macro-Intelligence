@@ -1,11 +1,25 @@
 name: Cross-Asset Intelligence v1
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
+    inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
   push:
     paths:
       - ".github/workflows/cross-asset-intelligence-v1.yml"
       - "tests/cross_asset/cross_asset_intelligence_v1.py"
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   contents: read
@@ -21,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v5

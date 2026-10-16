@@ -1,17 +1,30 @@
 name: Liquidity Historical v1
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
     inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
       start_date:
         description: "Start date (YYYY-MM-DD)"
         required: false
         default: "2019-01-01"
 
       end_date:
-        description: "End date (YYYY-MM-DD)"
+        description: "End date (YYYY-MM-DD; blank = current UTC date)"
         required: false
-        default: "2026-09-21"
+        default: ""
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   contents: read
@@ -34,6 +47,12 @@ jobs:
 
     steps:
 
+      - name: Resolve liquidity date range
+        shell: bash
+        run: |
+          echo "LIQUIDITY_START_DATE=${LIQUIDITY_START_DATE:-2019-01-01}" >> "$GITHUB_ENV"
+          echo "LIQUIDITY_END_DATE=${LIQUIDITY_END_DATE:-$(date -u +%F)}" >> "$GITHUB_ENV"
+
       # =========================================================
       # 1. Checkout repository
       # =========================================================
@@ -41,6 +60,10 @@ jobs:
       - name: Checkout repository
 
         uses: actions/checkout@v4
+
+        with:
+
+          ref: ${{ inputs.source_ref || github.sha }}
 
 
       # =========================================================

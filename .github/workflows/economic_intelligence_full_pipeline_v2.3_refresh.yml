@@ -1,7 +1,21 @@
 name: Economic Intelligence Full Pipeline v2.3 Refresh
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
+    inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   contents: read
@@ -16,11 +30,13 @@ jobs:
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: pip install pandas numpy requests beautifulsoup4 pypdf pytest
+        run: pip install -r requirements-dev.txt
       - name: Official refresh, staging validation and canonical merge
         run: python economic_official_ingestion_v1.py --mode merge
       - name: Validate merged canonical Economic input
@@ -32,7 +48,7 @@ jobs:
       - name: Release-aware canonical gate
         run: python economic_official_ingestion_v1.py --mode gate
       - name: PIT and ingestion regressions
-        run: python -m pytest -q tests/test_point_in_time_integrity.py tests/test_economic_official_ingestion_v1.py
+        run: python -m pytest -q tests/test_point_in_time_integrity.py tests/test_economic_official_ingestion_v1.py tests/test_bls_fred_metadata.py tests/test_repair_integrity_20261016.py
       - name: Upload audit evidence even on source failure
         if: always()
         uses: actions/upload-artifact@v4

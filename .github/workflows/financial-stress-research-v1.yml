@@ -1,10 +1,21 @@
 name: financial-stress-research-v1
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   # ------------------------------------------------------------
   # Manual execution
   # ------------------------------------------------------------
   workflow_dispatch:
+    inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
 
   # ------------------------------------------------------------
   # Automatic execution after successful Historical Collector
@@ -19,6 +30,9 @@ on:
 # ==============================================================
 # Permissions
 # ==============================================================
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   actions: read
@@ -54,6 +68,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
 
       # ========================================================

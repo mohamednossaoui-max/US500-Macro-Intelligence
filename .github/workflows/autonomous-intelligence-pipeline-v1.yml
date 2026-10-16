@@ -44,9 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh workflow run us500-full-research-pipeline.yml --ref main -f changed_sources="${ROOTS}"
-          sleep 5
-          RUN_ID="$(gh run list --workflow us500-full-research-pipeline.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')"
+          RUN_ID="$(python scripts/dispatch_correlated_run.py us500-full-research-pipeline.yml --ref main --sha "$(git rev-parse HEAD)" --field "changed_sources=${ROOTS}")"
           test -n "${RUN_ID}"
           echo "Master run: ${RUN_ID}"
           gh run watch "${RUN_ID}" --exit-status

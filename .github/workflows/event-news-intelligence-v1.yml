@@ -1,12 +1,26 @@
 name: Event News Intelligence v1
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
+    inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
 
   push:
     paths:
       - ".github/workflows/event-news-intelligence-v1.yml"
       - "tests/event_news/event_news_intelligence_v1.py"
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   contents: read
@@ -22,6 +36,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v5

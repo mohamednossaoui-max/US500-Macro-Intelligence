@@ -1,12 +1,25 @@
 name: US500 Macro Intelligence - Master Pipeline
 
+run-name: "${{ github.workflow }} [${{ inputs.correlation_id || github.run_id }}]"
+
 on:
   workflow_dispatch:
     inputs:
+      correlation_id:
+        description: "Internal dispatch correlation token; blank for manual runs"
+        required: false
+        default: ""
+      source_ref:
+        description: "Pinned source commit; blank uses dispatched commit"
+        required: false
+        default: ""
       changed_sources:
         description: "Space-separated root source IDs. Blank = full source refresh."
         required: false
         default: ""
+
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/constraints-repair-20261016.txt
 
 permissions:
   contents: write
@@ -37,7 +50,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ inputs.source_ref || github.sha }}
           fetch-depth: 0
 
       # ============================================================
@@ -105,54 +118,7 @@ jobs:
           echo "Workflow: ${WORKFLOW}"
           echo "============================================================"
 
-          START_EPOCH="$(date +%s)"
-
-          echo "Dispatching workflow..."
-
-          gh workflow run "${WORKFLOW}" \
-            --repo "${GH_REPO}" \
-            --ref "${GH_REF}"
-
-          echo "Workflow dispatched."
-
-          RUN_ID=""
-
-          echo "Waiting for GitHub to create the run..."
-
-          for i in $(seq 1 30); do
-
-            RUN_ID="$(
-              gh run list \
-                --repo "${GH_REPO}" \
-                --workflow "${WORKFLOW}" \
-                --branch "${GH_REF}" \
-                --limit 20 \
-                --json databaseId,status,conclusion,createdAt \
-                --jq '
-                  map(
-                    select(
-                      (.createdAt | fromdateiso8601) >= '"${START_EPOCH}"'
-                    )
-                  )
-                  | sort_by(.databaseId)
-                  | last
-                  | .databaseId // empty
-                '
-            )"
-
-            if [ -n "${RUN_ID}" ]; then
-              break
-            fi
-
-            sleep 2
-          done
-
-          if [ -z "${RUN_ID}" ]; then
-            echo ""
-            echo "ERROR: Could not identify dispatched run."
-            echo "Workflow: ${WORKFLOW}"
-            exit 1
-          fi
+          RUN_ID="$(python scripts/dispatch_correlated_run.py "${WORKFLOW}" --ref "${GH_REF}" --sha "$(git rev-parse HEAD)")"
 
           echo "Detected Run ID: ${RUN_ID}"
 
@@ -747,7 +713,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
           # The full test suite imports ATH exchange-calendar research modules.
           # Match the calendar version used by the dedicated ATH audits.
           python -m pip install pytest 'pandas_market_calendars==5.5.0'
@@ -760,6 +726,7 @@ jobs:
           # Rebuild contexts from the exact validated Economic artifacts installed above.
           cp public_data/*.csv .
           cp public_data/*.json .
+          python scripts/rebuild_source_analyses_v1.py
           python macro_context_v1.py
           cp macro_context_v1.csv macro_context_v1.json public_data/
           MACRO_CONTEXT_FILE="$PWD/macro_context_v1.csv" SENTIMENT_ENGINE_FILE="$PWD/sentiment_engine_research_v1.csv" TECHNICAL_INTELLIGENCE_FILE="$PWD/technical_intelligence_research_v1.csv" python research-context-v1.py
@@ -778,9 +745,12 @@ jobs:
           python historical_analog_engine_v1.py
           python historical_market_reaction_v1.py
           python decision_intelligence_v2.py
+          python scripts/rebuild_publication_manifest.py --public-data public_data --source us500-full-research-pipeline
           python system_health_monitor_v1.py
           python -m pytest -q
-          python scripts/rebuild_publication_manifest.py --public-data public_data --source autonomous-intelligence-pipeline-v1
+          python scripts/rebuild_publication_manifest.py --public-data public_data --source us500-full-research-pipeline
+          python scripts/record_pipeline_attempt_v1.py --status SUCCESS
+          python scripts/rebuild_publication_manifest.py --public-data public_data --source us500-full-research-pipeline
           python scripts/verify_publication_integrity.py --public-data public_data
           # Only validated publications return to the checkout. Root inputs,
           # tests and generated datasets remain in the disposable workspace.
@@ -811,8 +781,8 @@ jobs:
           echo "PUBLICATION MANIFEST OWNERSHIP"
           echo "============================================================"
           echo "Canonical publication manifest: public_data/manifest.json"
-          echo "Manifest owner: publish_research_data_v1.yml"
-          echo "This workflow does not generate or modify a publication manifest."
+          echo "Manifest owner: us500-full-research-pipeline.yml"
+          echo "The isolated integrated build verifies and installs the canonical manifest."
           if [ -f "public_data/manifest.json" ]; then
             echo "STATUS: canonical manifest detected."
           else
@@ -1009,31 +979,14 @@ jobs:
             git fetch origin main
 
             echo ""
-            echo "Rebasing local commit(s) onto origin/main..."
+            echo "Checking that origin/main is still an ancestor of the candidate..."
 
-            if git rebase origin/main; then
-
-              echo ""
-              echo "Rebase successful."
-
-            else
-
-              echo ""
-              echo "ERROR: Rebase conflict detected."
-
-              echo ""
-              echo "Aborting rebase..."
-
-              git rebase --abort || true
-
-              echo ""
-              echo "Git status after abort:"
-              git status --short
-
+            # Never rebase old generated data over a newer source/code generation.
+            if ! git merge-base --is-ancestor origin/main HEAD; then
+              echo "Origin changed during the build. Re-run the master; publication was not pushed."
               exit 1
             fi
 
-            echo ""
             echo "Pushing to origin/main..."
 
             if git push origin HEAD:main; then
@@ -1189,3 +1142,26 @@ jobs:
             public_data/
           if-no-files-found: warn
           retention-days: 14
+
+  record-failed-attempt:
+    name: Record failed update without replacing research data
+    needs: master
+    if: ${{ always() && needs.master.result != 'success' && needs.master.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Keep last verified generation and record the failed attempt
+        run: |
+          set -euo pipefail
+          python scripts/record_pipeline_attempt_v1.py --status FAILED
+          python scripts/verify_publication_integrity.py --public-data public_data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public_data/pipeline_attempt_v1.json public_data/manifest.json
+          git commit -m "ops: record failed pipeline attempt; preserve research data"
+          git push origin HEAD:main
