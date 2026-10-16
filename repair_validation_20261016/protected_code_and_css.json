@@ -1,0 +1,54 @@
+{
+  "protected_scoring_modules": [
+    {
+      "file": "fed_intelligence.py",
+      "unchanged": true
+    },
+    {
+      "file": "economic_surprise_engine_v1.1.py",
+      "unchanged": true
+    },
+    {
+      "file": "economic_regime_classifier_v1.5.py",
+      "unchanged": true
+    },
+    {
+      "file": "macro_context_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "research-context-v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "financial_stress_analyzer_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "cot_positioning_analyzer_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "vix_sentiment_analyzer_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "aaii_sentiment_analyzer_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "sentiment-engine-v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "liquidity_intelligence_analyzer_v1.py",
+      "unchanged": true
+    },
+    {
+      "file": "tests/decision_engine/decision_engine_v1.py",
+      "unchanged": true
+    }
+  ],
+  "all_protected_modules_unchanged": true,
+  "inline_css_unchanged": true
+}

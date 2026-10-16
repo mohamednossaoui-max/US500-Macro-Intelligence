@@ -1,0 +1,210 @@
+{
+  "version": "remaining-layers-quality-v1",
+  "status": "PASS",
+  "research_only": true,
+  "forecast": false,
+  "trading_signal": false,
+  "layer_count": 9,
+  "eligible_count": 5,
+  "degraded_count": 3,
+  "excluded_count": 1,
+  "future_evidence_count": 0,
+  "historical_edge_published": false,
+  "decision_semantics_changed": false,
+  "warnings": [
+    "Historical Edge remains explicitly unavailable until dedicated artifacts are published.",
+    "Earnings reaction horizons are contextual/post-event evidence and are PIT_LIMITED for contemporaneous decisions."
+  ]
+}
+{
+  "validator": "Final Remaining-Layers Hardening v1",
+  "generated_at": "2026-10-16T12:39:22.741682+00:00",
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "event_news_structured",
+      "pass": true
+    },
+    {
+      "check": "event_news_contextual",
+      "pass": true
+    },
+    {
+      "check": "earnings_contextual",
+      "pass": true
+    },
+    {
+      "check": "event_study_reliability",
+      "pass": true
+    },
+    {
+      "check": "decision_registry_has_context",
+      "pass": true
+    },
+    {
+      "check": "context_excluded_from_state",
+      "pass": true
+    }
+  ],
+  "research_only": true,
+  "decision_semantics_changed": false
+}
+{
+  "state_vector_version": "USV1.0",
+  "context_date": "2026-10-16",
+  "feature_count": 13,
+  "core_feature_count": 9,
+  "contextual_feature_count": 4,
+  "eligible_feature_count": 7,
+  "fingerprint_sha256": "683d1404b12d14a919fd70990cc56b573352bb1c6d952609f2c3f7f567be973b",
+  "missing_to_neutral": false,
+  "double_counting_policy": "Direct canonical layer features only; Macro composite and legacy Fed duplicate are excluded.",
+  "research_only": true,
+  "decision_engine_ready": false,
+  "forecast_generated": false,
+  "trading_signal_generated": false
+}
+{
+  "analog_engine_version": "HAE1.0",
+  "state_vector_version": "USV1.0",
+  "context_date": "2026-10-16",
+  "candidate_count": 56,
+  "selected_analog_count": 8,
+  "minimum_comparable_features": 7,
+  "core_feature_count": 9,
+  "minimum_coverage_pct": 77.78,
+  "temporal_decluster_days": 30,
+  "recent_exclusion_days": 90,
+  "historical_fed_available": false,
+  "historical_fed_policy": "Missing historical Fed feature is never imputed; similarity coverage is reduced accordingly.",
+  "missing_to_neutral": false,
+  "outcomes_used_in_selection": false,
+  "research_only": true,
+  "decision_engine_ready": false,
+  "forecast_generated": false,
+  "trading_signal_generated": false
+}
+historical_date  similarity_pct  coverage_pct  comparable_features                                                                                                                                                                                                          key_differences
+     2025-06-27         67.8872         77.78                    7    economic_labor: hist=0.0099398810616049, current=-0.0270411763771128 | economic_growth: hist=-1.1616112758223234, current=-0.0507334623403759 | financial_stress: hist=0.1459237549351694, current=0.4327441476895011
+     2025-09-11         57.2874         77.78                    7                         technical: hist=STRONG_BULLISH, current=BULLISH | economic_growth: hist=1.5598329955786616, current=-0.0507334623403759 | financial_stress: hist=-0.0571364768923753, current=0.4327441476895011
+     2025-04-10         55.6926         77.78                    7                                          technical: hist=BEARISH, current=BULLISH | sentiment: hist=8.221408221408224, current=53.56634106634107 | economic_labor: hist=-0.0133264713859722, current=-0.0270411763771128
+     2025-01-30         53.9758         77.78                    7 economic_labor: hist=0.0407828150668911, current=-0.0270411763771128 | financial_stress: hist=-1.2829325548743469, current=0.4327441476895011 | economic_inflation: hist=-0.7209121159103569, current=0.3290131994082034
+     2026-01-13         43.6649         77.78                    7                          technical: hist=STRONG_BULLISH, current=BULLISH | economic_labor: hist=0.0791506380026415, current=-0.0270411763771128 | financial_stress: hist=-0.8241882447398405, current=0.4327441476895011
+     2025-08-12         41.0992         77.78                    7                                       technical: hist=STRONG_BULLISH, current=BULLISH | economic_regime: hist=INFLATIONARY_GROWTH, current=MIXED | economic_growth: hist=1.6253333143866076, current=-0.0507334623403759
+     2025-05-13         36.0730         77.78                    7                                                    technical: hist=NEUTRAL, current=BULLISH | economic_regime: hist=STAGFLATIONARY, current=MIXED | economic_labor: hist=0.0118108375486769, current=-0.0270411763771128
+     2025-03-07         26.7448         77.78                    7                                               technical: hist=NEUTRAL, current=BULLISH | economic_regime: hist=STAGFLATIONARY, current=MIXED | economic_labor: hist=-1.7809481678364436e-05, current=-0.0270411763771128
+historical_date  similarity_pct  return_5d_pct  return_20d_pct  return_60d_pct  return_120d_pct
+     2025-06-27         67.8872       0.921910        3.510412        7.838079         8.883106
+     2025-09-11         57.2874       0.675369        2.241219        4.294967         3.692461
+     2025-04-10         55.6926       0.278099        7.438433       18.891430        27.473170
+     2025-01-30         53.9758       0.204242       -1.921704       -8.934356         4.812584
+     2026-01-13         43.6649      -1.265414       -0.319800       -2.108782         7.452457
+     2025-08-12         41.0992      -0.533524        1.338559        5.438153         7.323424
+     2025-05-13         36.0730       0.915819        2.305093        8.543211        16.400446
+     2025-03-07         26.7448      -2.274795      -12.064055        3.469029        12.679970
+{
+  "reaction_engine_version": "HMR1.0",
+  "context_date": "2026-10-16",
+  "analog_engine_version": "HAE1.0",
+  "analog_count": 8,
+  "analog_selection_locked": true,
+  "analog_reranking_by_outcome": false,
+  "outcomes_used_in_selection": false,
+  "anchor_semantics": "First US500 trading session on or after historical analog date; forward horizons use subsequent trading sessions.",
+  "horizons_trading_days": [
+    5,
+    20,
+    60,
+    120
+  ],
+  "incomplete_horizons_excluded_from_summary": true,
+  "research_only": true,
+  "decision_engine_ready": false,
+  "forecast_generated": false,
+  "trading_signal_generated": false,
+  "horizons": {
+    "5d": {
+      "available_analogs": 8,
+      "total_analogs": 8,
+      "mean_return_pct": -0.134787,
+      "median_return_pct": 0.241171,
+      "positive_hit_rate_pct": 62.5,
+      "min_return_pct": -2.274795,
+      "max_return_pct": 0.92191,
+      "return_std_pct": 1.14512,
+      "median_max_drawdown_pct": -1.072758,
+      "median_realized_volatility_pct": 10.162021
+    },
+    "20d": {
+      "available_analogs": 8,
+      "total_analogs": 8,
+      "mean_return_pct": 0.31602,
+      "median_return_pct": 1.789889,
+      "positive_hit_rate_pct": 62.5,
+      "min_return_pct": -12.064055,
+      "max_return_pct": 7.438433,
+      "return_std_pct": 5.711132,
+      "median_max_drawdown_pct": -2.639105,
+      "median_realized_volatility_pct": 12.384985
+    },
+    "60d": {
+      "available_analogs": 8,
+      "total_analogs": 8,
+      "mean_return_pct": 4.678966,
+      "median_return_pct": 4.86656,
+      "positive_hit_rate_pct": 75.0,
+      "min_return_pct": -8.934356,
+      "max_return_pct": 18.89143,
+      "return_std_pct": 8.110754,
+      "median_max_drawdown_pct": -4.846675,
+      "median_realized_volatility_pct": 13.901254
+    },
+    "120d": {
+      "available_analogs": 8,
+      "total_analogs": 8,
+      "mean_return_pct": 11.089702,
+      "median_return_pct": 8.167782,
+      "positive_hit_rate_pct": 100.0,
+      "min_return_pct": 3.692461,
+      "max_return_pct": 27.47317,
+      "return_std_pct": 7.797031,
+      "median_max_drawdown_pct": -5.110085,
+      "median_realized_volatility_pct": 12.207745
+    }
+  }
+}
+manifest files: 107
+{
+  "as_of": "2026-10-16T12:39:25.053309+00:00",
+  "overall_health": "DEGRADED",
+  "layer_count": 26,
+  "healthy": 20,
+  "attention": 6,
+  "failed": 0,
+  "stale": 3,
+  "lkg_available": 26,
+  "research_only": true
+}
+manifest files: 107
+{
+  "status": "SUCCESS",
+  "attempted_at": "2026-10-16T12:39:25.576477+00:00",
+  "run_id": "offline",
+  "run_url": "",
+  "data_source_run_id": "offline",
+  "message": "Integrated publication passed its validation gate.",
+  "research_scores_changed": false
+}
+
+============================================
+US500 PUBLICATION INTEGRITY
+============================================
+
+Manifest: manifest.json
+Total:     108
+Match:     108
+Mismatch:  0
+Missing:   0
+Error:     0
+
+PUBLICATION INTEGRITY PASSED

@@ -1,0 +1,20 @@
+{
+  "source_archive": "US500-Macro-Intelligence-main(20261016-121314).zip",
+  "source_sha256": "58917aa1dbc89e711f786129300926671b8db71a9b99a74a2dd4e480fcfb2396",
+  "baseline_passed": 644,
+  "final_passed": 708,
+  "skipped": 1,
+  "skip_reason": "Optional retired entry-strategy module",
+  "ui_pages": 22,
+  "verified_publications": 108,
+  "protected_code_files_unchanged": 12,
+  "source_artifacts_unchanged": 12,
+  "css_unchanged": true,
+  "live_provider_refresh_performed": false,
+  "github_modified": false,
+  "tested_python": "3.12.14",
+  "data_limits": {
+    "liquidity_last_source_date": "2026-09-21",
+    "breadth_last_source_date": "2026-08-18"
+  }
+}

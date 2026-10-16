@@ -1,0 +1,137 @@
+{
+  "verified_artifacts": 108,
+  "pages": [
+    {
+      "page": "Executive Dashboard",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.14
+    },
+    {
+      "page": "Research Context",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.17
+    },
+    {
+      "page": "Macro Context",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    },
+    {
+      "page": "Economic Intelligence",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.26
+    },
+    {
+      "page": "Fed Intelligence",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.27
+    },
+    {
+      "page": "Financial Stress",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.28
+    },
+    {
+      "page": "Liquidity",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.17
+    },
+    {
+      "page": "Sentiment",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.17
+    },
+    {
+      "page": "Technical Intelligence",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.29
+    },
+    {
+      "page": "ATH Pullback Context",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 1.5
+    },
+    {
+      "page": "Market Breadth",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.25
+    },
+    {
+      "page": "Cross-Asset",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.22
+    },
+    {
+      "page": "Event / News",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    },
+    {
+      "page": "Earnings",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.14
+    },
+    {
+      "page": "Decision Engine",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.13
+    },
+    {
+      "page": "System Health",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.2
+    },
+    {
+      "page": "Historical Event Study",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    },
+    {
+      "page": "Historical Edge",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    },
+    {
+      "page": "Final Validation",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    },
+    {
+      "page": "Data Status",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.11
+    },
+    {
+      "page": "Data Explorer",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.14
+    },
+    {
+      "page": "Methodology",
+      "exceptions": [],
+      "error_messages": [],
+      "seconds": 0.12
+    }
+  ]
+}

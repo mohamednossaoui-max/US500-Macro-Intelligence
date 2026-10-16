@@ -1,0 +1,62 @@
+[
+  {
+    "file": "economic_historical_events_v1.csv",
+    "unchanged": true,
+    "sha256": "38fe8bbc3c7b9d37fd27a50579c0566d4ece3436db28e49ddfbfe771565b8ad5"
+  },
+  {
+    "file": "economic_historical_quality_v1.csv",
+    "unchanged": true,
+    "sha256": "d1ae83acfd5ab0da5c1b374d736f8594f768ec36e8e3bba2f43afd044d02d90f"
+  },
+  {
+    "file": "economic_ingestion_status_v1.json",
+    "unchanged": true,
+    "sha256": "f9cc318f84dc0bbbe1828531aaf460a794730b5ffc228bc61a307d8efde8469a"
+  },
+  {
+    "file": "fed_intelligence_output_v1.json",
+    "unchanged": true,
+    "sha256": "5fa9131d690b727297eb841880efc259c9fe194abc433e8a90c2db3c2a85306b"
+  },
+  {
+    "file": "financial_stress_records_input_v1.csv",
+    "unchanged": true,
+    "sha256": "81104e5ba9467e45e38f83997f3d7cf31bca4859f4416b3477b90021e068261f"
+  },
+  {
+    "file": "liquidity_historical_records_input_v1.csv",
+    "unchanged": true,
+    "sha256": "90346b1c6de061ab8c974cd2c3b8265434a244bc327dc107c5d22f5ae66b8968"
+  },
+  {
+    "file": "cot_historical_records_input_v1.csv",
+    "unchanged": true,
+    "sha256": "2cef308dc7a2e4e81b643d4a756a91a73b682393fb2ec26c0b4c470bd38868c4"
+  },
+  {
+    "file": "aaii_historical_records_input_v1.csv",
+    "unchanged": true,
+    "sha256": "61fb05004de87cafab10baa5a1e3de96a9c0b431173e574853e1b557ae6fbc5c"
+  },
+  {
+    "file": "vix_historical_records_input_v1.csv",
+    "unchanged": true,
+    "sha256": "c70062e35b14c75523f61552d37548f61eefccdd88fef75e4e8563280c8d6761"
+  },
+  {
+    "file": "technical_intelligence_research_v1.csv",
+    "unchanged": true,
+    "sha256": "12cfdcb938c562502c799dd4e80f74f57baf165bcea72ce9170b423fe6fb5908"
+  },
+  {
+    "file": "market_breadth_analysis_v1.csv",
+    "unchanged": true,
+    "sha256": "5e31e1777afd22c59ba02a49e064184f7e4f0a1624de78b42eb3eee2841fd31f"
+  },
+  {
+    "file": "cross_asset_research_v1.csv",
+    "unchanged": true,
+    "sha256": "8f104b6d79b84a40858a037b9e7e77600b18b407eed6c69ffa509bc68aefe66e"
+  }
+]
