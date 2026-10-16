@@ -745,13 +745,7 @@ def calculate_breadth(
                 "point_in_time_reconstructed":
                     True,
 
-                "requested_end_date": str(requested_end.date()),
-        "membership_last_date": str(membership_last_date.date()),
-        "source_lag_days": int((requested_end-effective_end).days),
-        "collection_status": "STALE" if effective_end < requested_end else "CURRENT",
-        "requested_range_complete": bool(effective_end >= requested_end),
-
-        "membership_source":
+                "membership_source":
                     "FREE_PUBLIC_RECONSTRUCTION",
 
                 "membership_quality":
@@ -1208,6 +1202,14 @@ def main() -> int:
 
         "end_date":
             str(effective_end.date()),
+
+        # Range metadata belongs to the collector run, not individual
+        # breadth rows. calculate_breadth has no access to main's locals.
+        "requested_end_date": str(requested_end.date()),
+        "membership_last_date": str(membership_last_date.date()),
+        "source_lag_days": int((requested_end-effective_end).days),
+        "collection_status": "STALE" if effective_end < requested_end else "CURRENT",
+        "requested_range_complete": bool(effective_end >= requested_end),
 
         "membership_source":
             "FREE_PUBLIC_RECONSTRUCTION",

@@ -1,0 +1,5 @@
+
+========================================================================
+CALCULATING MARKET BREADTH
+========================================================================
+REPRODUCED_ORIGINAL_DEFECT: NameError name 'requested_end' is not defined
