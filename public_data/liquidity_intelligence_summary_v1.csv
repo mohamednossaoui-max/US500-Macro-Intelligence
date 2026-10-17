@@ -2,7 +2,7 @@ asof_date,indicator,latest_value,latest_observation_date,latest_available_at,age
 2026-10-16,EFFR,3.88,2026-10-15,2026-10-16,0,True,True,True,True,False,False,False,False
 2026-10-16,FED_TOTAL_ASSETS,6755639.0,2026-10-14,2026-10-15,1,True,True,True,True,False,False,False,False
 2026-10-16,MBS,1898160.0,2026-10-14,2026-10-15,1,True,True,True,True,False,False,False,False
-2026-10-16,ON_RRP,1.201,2026-10-15,2026-10-15,1,True,True,True,True,False,False,False,False
+2026-10-16,ON_RRP,0.1,2026-10-16,2026-10-16,0,True,True,True,True,False,False,False,False
 2026-10-16,RESERVE_BALANCES,3022140.0,2026-10-14,2026-10-15,1,True,True,True,True,False,False,False,False
 2026-10-16,SOFR,3.89,2026-10-15,2026-10-16,0,True,True,True,True,False,False,False,False
 2026-10-16,TREASURY_GENERAL_ACCOUNT,883373.0,2026-10-14,2026-10-15,1,True,True,True,True,False,False,False,False

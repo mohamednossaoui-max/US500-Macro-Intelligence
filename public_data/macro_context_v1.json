@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-16",
+  "context_date": "2026-10-17",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-10-15",
-    "age_days": 1,
+    "age_days": 2,
     "economic_regime": "MIXED",
     "inflation_score": 0.3290131994082034,
     "labor_score": -0.0270411763771128,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-16",
+    "as_of_date": "2026-10-17",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,19 +328,19 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-10-15",
+    "source_date": "2026-10-16",
     "age_days": 1,
-    "composite_stress_score": 0.405404876961052,
+    "composite_stress_score": 0.736345108280275,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
-    "vix": 16.46,
-    "treasury_2y": 4.82,
-    "treasury_10y": 5.19,
-    "yield_10y_2y_spread": 0.3700000000000001,
+    "vix": 19.99,
+    "treasury_2y": 4.77,
+    "treasury_10y": 5.1,
+    "yield_10y_2y_spread": 0.33,
     "pit_safe": true
   },
   "event_news": {
     "source_date": "2026-10-16",
-    "age_days": 0,
+    "age_days": 1,
     "latest_published_at": "2026-10-16T15:00:00+00:00",
     "latest_title": "Federal Reserve Board announces termination of enforcement actions with Gardner Bancshares, Inc. and Small Business Bank",
     "latest_source": "Federal Reserve",
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 1,
+    "economic_age_days": 2,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 0,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

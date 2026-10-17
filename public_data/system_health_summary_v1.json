@@ -1,11 +1,18 @@
 {
-  "as_of": "2026-10-16T17:46:32.576755+00:00",
+  "as_of": "2026-10-17T09:35:38.102933+00:00",
+  "assessed_layer_count": 24,
   "attention": 2,
+  "excluded_attention": 2,
+  "excluded_from_overall": [
+    "breadth",
+    "cross_asset"
+  ],
   "failed": 0,
   "healthy": 24,
   "layer_count": 26,
   "lkg_available": 26,
-  "overall_health": "DEGRADED",
+  "overall_health": "HEALTHY",
+  "overall_health_scope": "Registry-selected layers; all layer states and counts remain visible",
   "research_only": true,
   "stale": 1
 }

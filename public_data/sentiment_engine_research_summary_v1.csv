@@ -1,10 +1,10 @@
 metric,value
-total_asof_rows,14329
+total_asof_rows,14330
 first_asof_date,1987-07-25
-last_asof_date,2026-10-16
+last_asof_date,2026-10-17
 minimum_components,2
-latest_unified_sentiment_score,49.14021164021164
-latest_research_regime,NEUTRAL
+latest_unified_sentiment_score,35.11904761904762
+latest_research_regime,BEARISH
 latest_component_count,3
 latest_eligible_component_count,3
 freshness_limits_days,"{'cot': 10, 'aaii': 10, 'vix': 5}"
@@ -17,6 +17,6 @@ forecast_generated,False
 regime_EXTREME_BULLISH_rows,1709
 regime_BULLISH_rows,3669
 regime_NEUTRAL_rows,3842
-regime_BEARISH_rows,2847
+regime_BEARISH_rows,2848
 regime_EXTREME_BEARISH_rows,1184
 regime_INSUFFICIENT_DATA_rows,1078
