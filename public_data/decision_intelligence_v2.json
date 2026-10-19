@@ -1,6 +1,6 @@
 {
   "decision_intelligence_version": "DIV2.0",
-  "context_date": "2026-10-18",
+  "context_date": "2026-10-19",
   "decision_state": "MIXED",
   "current_environment": "Economic regime is MIXED: inflation +0.33, labor -0.03, and growth -0.05. Fed stance is MODERATELY HAWKISH; financial stress is ELEVATED_RESEARCH_STRESS; sentiment is BEARISH; technical regime is BULLISH. Published Decision Engine state remains MIXED.",
   "what_changed": {
