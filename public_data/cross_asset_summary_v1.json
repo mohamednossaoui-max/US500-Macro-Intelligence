@@ -1,13 +1,13 @@
 {
   "asset_coverage": {
     "BITCOIN": 1.0,
-    "DXY": 0.8309,
-    "GOLD": 0.8224,
-    "NASDAQ": 0.8276,
-    "SP500": 0.8276,
-    "US10Y": 0.8268,
+    "DXY": 0.831,
+    "GOLD": 0.8225,
+    "NASDAQ": 0.8274,
+    "SP500": 0.8274,
+    "US10Y": 0.8266,
     "VIX": 0.8276,
-    "WTI": 0.8229
+    "WTI": 0.823
   },
   "asset_first_dates": {
     "BITCOIN": "2014-09-17",
@@ -20,24 +20,24 @@
     "WTI": "2000-08-23"
   },
   "asset_last_dates": {
-    "BITCOIN": "2026-10-19",
-    "DXY": "2026-10-19",
-    "GOLD": "2026-10-19",
-    "NASDAQ": "2026-10-16",
-    "SP500": "2026-10-16",
-    "US10Y": "2026-10-16",
-    "VIX": "2026-10-19",
-    "WTI": "2026-10-19"
+    "BITCOIN": "2026-10-20",
+    "DXY": "2026-10-20",
+    "GOLD": "2026-10-20",
+    "NASDAQ": "2026-10-19",
+    "SP500": "2026-10-19",
+    "US10Y": "2026-10-19",
+    "VIX": "2026-10-20",
+    "WTI": "2026-10-20"
   },
   "asset_observation_counts": {
-    "BITCOIN": 4416,
-    "DXY": 6768,
-    "GOLD": 6559,
-    "NASDAQ": 6738,
-    "SP500": 6738,
-    "US10Y": 6732,
-    "VIX": 6741,
-    "WTI": 6567
+    "BITCOIN": 4417,
+    "DXY": 6769,
+    "GOLD": 6560,
+    "NASDAQ": 6739,
+    "SP500": 6739,
+    "US10Y": 6733,
+    "VIX": 6742,
+    "WTI": 6568
   },
   "available_assets": [
     "SP500",
@@ -51,7 +51,7 @@
   ],
   "columns": 46,
   "correlation_feature_count": 10,
-  "date_end": "2026-10-19",
+  "date_end": "2026-10-20",
   "date_start": "2000-01-03",
   "decision_engine_ready": false,
   "forecast_generated": false,
@@ -60,7 +60,7 @@
   "pit_status": "PIT_LIMITED",
   "point_in_time_safe": false,
   "research_only": true,
-  "rows": 8145,
+  "rows": 8146,
   "session_aware_pit_safe": false,
   "trading_signal_generated": false,
   "unified_decision_generated": false,
