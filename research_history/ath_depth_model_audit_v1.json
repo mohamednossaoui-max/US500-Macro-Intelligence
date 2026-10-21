@@ -6,12 +6,12 @@
   "sampling": "First eligible record high, then more than three calendar months between anchors",
   "source_pit_status": "PIT_LIMITED_HISTORICAL_RESEARCH_PROXIES",
   "source_hashes": {
-    "technical_intelligence_research_v1.csv": "27abe45251b137f179c54db3c46664a727b102e6bc0cb922349199ddd28eaec1",
-    "financial_stress_research_v1.csv": "54b4b2f264e8ca992dfbb32943a8868c3ded8ce8195758e796a6b25034395e44",
-    "sentiment_engine_research_v1.csv": "a2d3a930e71b7c95920ce4c5c1d1b3d7f372dd76027d41a9bba74c9030c99acc",
-    "liquidity_intelligence_research_v1.csv": "8c78f79d3bb76d3ed9b731df8b812254b9cea3aca316cc0f87c0e4fc37e29b97"
+    "technical_intelligence_research_v1.csv": "808ee094b2919f468623dde9a7515f4e30569d8c53edac5c0a2d9805ed4e4c71",
+    "financial_stress_research_v1.csv": "f2b8c01c66aa7546f0ec8b64c573e3a77690684b897d451b1a334f821bf6c9f7",
+    "sentiment_engine_research_v1.csv": "0711881ba434487fc798e68faeeae95acba86fd06269ea210b85fd17bbe9e19d",
+    "liquidity_intelligence_research_v1.csv": "7a3f8b98c2f9614c322ff2c4285869b9eedca5becc5ffc9242a690c0b514acb2"
   },
-  "source_snapshot_count": 29,
+  "source_snapshot_count": 30,
   "archive_snapshot_ids": [
     "fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4",
     "cd3c3b10f577e514ef66c7b719862194175170533bd2ca2669b19c6713c6a7ac",
@@ -41,7 +41,8 @@
     "6b4891b3fb8acfa9a5dc92282dc4589fc7fc158db43fa0e29a1a60b069957a20",
     "4df994a1c512d0909422b2166e30f5cdca5d9153307c48eac30e998b27cc4387",
     "e226108d7c1ac38815a27232a9938c7c97b7aed6ad5869bbc36961d5dbf2e2bf",
-    "278c00258a875a07c9b747f1a09842c6f17119f84cb3d402f7c3648d42fd7eb3"
+    "278c00258a875a07c9b747f1a09842c6f17119f84cb3d402f7c3648d42fd7eb3",
+    "cff50d7551b6f06e684a1094ff81b5484fa62cac972557c93f155a79b71f5c9d"
   ],
   "snapshot_first_available_at": "2026-10-04T19:00:18.670929+00:00",
   "analyses": [

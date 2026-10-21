@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-10-20T10:06:21.998800+00:00",
+  "generated_at": "2026-10-21T09:18:34.562916+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -773,6 +773,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "New Residential Construction",
+        "description": "Privately-owned housing starts in September 2026 were at a seasonally adjusted annual rate of 1,221,000. This is 5.2 percent (+/- 11.8%)* below the revised August 2026 estimate of 1,288,000.<p><br>September 2026: -5.2* % Change<br>August 2026 (r): -5.9* % Change<br></p>",
+        "published_at": "2026-10-20T12:30:00+00:00",
+        "url": "https://www.census.gov/construction/nrc/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Manufacturing and Trade Inventories and Sales",
         "description": "U.S. total business end-of-month inventories for August 2026 were $2,818.8 billion, up 0.4 percent (+/- 0.1 percent) from last month. U.S. total business sales were $2,123.5 billion, up 1.1 percent (+/- 0.1 percent) from last month.<p><br>August 2026: +0.4 % Change in Inventories<br>July 2026 (r): +0.9 % Change in Inventories<br></p>",
         "published_at": "2026-10-15T14:00:00+00:00",
@@ -876,15 +885,6 @@
         "description": "Sales of new single-family houses in August 2026 were at a seasonally adjusted annual rate of 684,000. This is 6.4 percent (+/- 19.5%)* above the revised July 2026 estimate of 643,000.<p><br>August 2026: +6.4* % Change<br>July 2026 (r): -4.3* % Change<br></p>",
         "published_at": "2026-09-24T14:00:00+00:00",
         "url": "https://www.census.gov/construction/nrs/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "New Residential Construction",
-        "description": "Privately-owned housing starts in August 2026 were at a seasonally adjusted annual rate of 1,275,000. This is 2.6 percent (+/- 12.0%)* below the revised July 2026 estimate of 1,309,000.<p><br>August 2026: -2.6* % Change<br>July 2026 (r): -9.0* % Change<br></p>",
-        "published_at": "2026-09-17T12:30:00+00:00",
-        "url": "https://www.census.gov/construction/nrc/index.html",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"
