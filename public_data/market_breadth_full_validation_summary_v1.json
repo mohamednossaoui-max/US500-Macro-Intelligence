@@ -78,10 +78,10 @@
     "market_breadth_full_validation_v1/logs/robustness.log"
   ],
   "requested_range": {
-    "requested_end_date": "2026-10-21",
+    "requested_end_date": "2026-10-22",
     "end_date": "2026-08-18",
     "membership_last_date": "2026-08-18",
-    "source_lag_days": 64,
+    "source_lag_days": 65,
     "collection_status": "STALE",
     "requested_range_complete": false
   }
