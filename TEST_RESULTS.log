@@ -1,3 +1,5 @@
-........................................................................ [ 93%]
-.....                                                                    [100%]
-77 passed in 3.24s
+11 unittest cases passed on Python 3.12.14.
+Actual classifier reproduced: supportive_count=1, contradictory_count=0, mixed_count=3, state=SUPPORTIVE, confidence=1.0.
+Patcher applied to isolated app copy; backup bytes match original; second application made no changes.
+Patched app syntax parsed with Python 3.11 grammar. No Python 3.11 runtime test performed.
+No changes to Decision Engine or public_data. Current October 22 repository snapshot not supplied.
