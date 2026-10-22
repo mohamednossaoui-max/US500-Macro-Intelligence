@@ -2,6 +2,7 @@
 # Research-only frontend. Token-free. No trading/execution/forecasting.
 
 from __future__ import annotations
+from executive_attention_v1 import attention_rows, decision_explanation
 from published_snapshot_v1 import PublishedSnapshot
 from system_health_monitor_v1 import display_summary
 
@@ -580,19 +581,16 @@ def executive() -> None:
 
     left, right = st.columns([1.05, 1.45])
     with left:
-        ui_section("Evidence Attention Order", "CORE EVIDENCE")
-        if isinstance(evidence, pd.DataFrame) and not evidence.empty:
-            # Display order only: contradictory -> mixed -> supportive -> other.
-            # This does not alter Decision Engine weighting or state semantics.
-            priority = {"CONTRADICTORY": 0, "MIXED": 1, "SUPPORTIVE": 2}
-            view = evidence.copy()
-            view["_ui_order"] = view.get("stance", pd.Series(index=view.index, dtype=object)).astype(str).str.upper().map(priority).fillna(3)
-            view = view.sort_values(["_ui_order", "category"], kind="stable")
-            for i, (_, row) in enumerate(view.iterrows(), 1):
-                rank_item(i, str(row.get("source", row.get("category", "Evidence"))), row.get("stance", "—"), str(row.get("reason", "")))
-            st.caption("Attention order is visual only: contradictory → mixed → supportive. It does not change CORE eligibility, weights or state.")
+        # FED_ATTENTION_UI_V1: presentation only; published state unchanged.
+        ui_section("Evidence Attention Order", "CORE + FED CONTEXT")
+        core_records = evidence.to_dict("records") if isinstance(evidence, pd.DataFrame) and not evidence.empty else []
+        for i, row in enumerate(attention_rows(core_records, fed_obj), 1):
+            rank_item(i, str(row.get("source", row.get("category", "Evidence"))), row.get("stance", "—"), str(row.get("reason", "")))
+        if core_records:
+            st.caption(decision_explanation(core_records, safe_value(dec_row, ["state"])))
         else:
-            st.info("Decision evidence artifact is not available.")
+            st.info("Decision evidence artifact is not available; only independent Fed context is displayed.")
+        st.caption("Attention order is visual only: contradictory → mixed → supportive → contextual. It does not change CORE eligibility, weights or state.")
     with right:
         ui_section("Publication & Freshness", "AS-OF MAP")
         coverage = st.columns(2)

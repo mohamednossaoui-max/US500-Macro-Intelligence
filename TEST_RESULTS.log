@@ -1,5 +1,19 @@
-11 unittest cases passed on Python 3.12.14.
-Actual classifier reproduced: supportive_count=1, contradictory_count=0, mixed_count=3, state=SUPPORTIVE, confidence=1.0.
-Patcher applied to isolated app copy; backup bytes match original; second application made no changes.
-Patched app syntax parsed with Python 3.11 grammar. No Python 3.11 runtime test performed.
-No changes to Decision Engine or public_data. Current October 22 repository snapshot not supplied.
+test_actual_v1_rule_reproduced (test_fed_attention_ui_v1.AttentionTests.test_actual_v1_rule_reproduced) ... ok
+test_changed_ui_rejected (test_fed_attention_ui_v1.AttentionTests.test_changed_ui_rejected) ... ok
+test_counts_explain_actual_screenshot (test_fed_attention_ui_v1.AttentionTests.test_counts_explain_actual_screenshot) ... ok
+test_degraded_snapshot_limits_visible (test_fed_attention_ui_v1.AttentionTests.test_degraded_snapshot_limits_visible) ... ok
+test_fed_added_without_directional_vote (test_fed_attention_ui_v1.AttentionTests.test_fed_added_without_directional_vote) ... ok
+test_inputs_unchanged (test_fed_attention_ui_v1.AttentionTests.test_inputs_unchanged) ... ok
+test_missing_snapshot_not_invented (test_fed_attention_ui_v1.AttentionTests.test_missing_snapshot_not_invented) ... ok
+test_no_duplicate_independent_fed (test_fed_attention_ui_v1.AttentionTests.test_no_duplicate_independent_fed) ... ok
+test_other_published_state_not_reclassified (test_fed_attention_ui_v1.AttentionTests.test_other_published_state_not_reclassified) ... ok
+test_patch_is_idempotent_and_syntax_valid (test_fed_attention_ui_v1.AttentionTests.test_patch_is_idempotent_and_syntax_valid) ... ok
+test_patch_preserves_other_executable_code (test_fed_attention_ui_v1.AttentionTests.test_patch_preserves_other_executable_code) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.237s
+
+OK
+
+Verified input: uploaded app(4).py.
+Python 3.11 grammar: PASS. Executable code outside executive unchanged; existing Health Scope UI retained.
