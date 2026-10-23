@@ -1,11 +1,11 @@
 metric,value
-total_observations,9299
+total_observations,9300
 first_observation_date,1990-01-02
-last_observation_date,2026-10-21
+last_observation_date,2026-10-22
 minimum_expected_records,5000
 minimum_vix,9.14
 maximum_vix,82.69
-mean_vix,19.418266480266695
+mean_vix,19.418224731182796
 point_in_time_safe,True
 research_only,True
 decision_engine_ready,False

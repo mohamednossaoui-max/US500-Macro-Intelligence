@@ -631,3 +631,5 @@ official-77ac16ee39bfb08e8833f9db,CORE_PPI,BLS,2026-10-15,September 2026,True,,F
 official-94e2eada70873438a689db63,RETAIL_SALES,Census,2026-10-15,September 2026,True,,False,2026-10-15
 official-066585078898a0b5b73d1a8e,INITIAL_JOBLESS_CLAIMS,DOL,2026-10-15,"Week ending October 03, 2026",True,,False,2026-10-15
 official-283349449ba78057caaab3ac,INITIAL_JOBLESS_CLAIMS,DOL,2026-10-15,"Week ending October 10, 2026",True,,False,2026-10-15
+official-db52974fe170fc2503c216a1,INITIAL_JOBLESS_CLAIMS,DOL,2026-10-22,"Week ending October 10, 2026",True,,False,2026-10-23
+official-6e85c04fca0f7e0fcc7724e6,INITIAL_JOBLESS_CLAIMS,DOL,2026-10-22,"Week ending October 17, 2026",True,,False,2026-10-23
