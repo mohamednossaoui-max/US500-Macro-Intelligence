@@ -80,8 +80,31 @@ class AttentionTests(unittest.TestCase):
             return ast.dump(tree)
         self.assertEqual(outside(original),outside(updated))
 
+    def legacy_dashboard(self):
+        # Exercise the legacy patch path even when app.py is already patched.
+        return ('from __future__ import annotations\n'
+                'def executive():\n'
+                '    if True:\n'
+                '        ui_section("Evidence Attention Order", "CORE EVIDENCE")\n'
+                '        view = evidence.copy()\n'
+                '        rank_item(1, "source", "MIXED", "reason")\n'
+                '        st.caption("CORE eligibility, weights or state.")\n'
+                '    with right:\n'
+                '        pass\n')
+
+    def test_legacy_dashboard_patch_is_valid_and_idempotent(self):
+        source = self.legacy_dashboard()
+        updated = patch(source)
+        ast.parse(updated)
+        self.assertNotEqual(updated, source)
+        self.assertIn('CORE + FED CONTEXT', updated)
+        self.assertEqual(patch(updated), updated)
+
     def test_changed_ui_rejected(self):
-        source=(BASE/'app.py').read_text().replace('view = evidence.copy()','view = evidence')
-        with self.assertRaises(ValueError):patch(source)
+        source = self.legacy_dashboard()
+        changed = source.replace('view = evidence.copy()', 'view = evidence')
+        self.assertNotEqual(changed, source)
+        with self.assertRaises(ValueError):
+            patch(changed)
 
 if __name__=='__main__': unittest.main()
