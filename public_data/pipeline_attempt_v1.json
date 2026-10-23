@@ -1,8 +1,8 @@
 {
   "status": "FAILED",
-  "attempted_at": "2026-10-23T09:11:02.852690+00:00",
-  "run_id": "39927511051",
-  "run_url": "https://github.com/mohamednossaoui-max/US500-Macro-Intelligence/actions/runs/39927511051",
+  "attempted_at": "2026-10-23T10:19:40.878954+00:00",
+  "run_id": "39936071634",
+  "run_url": "https://github.com/mohamednossaoui-max/US500-Macro-Intelligence/actions/runs/39936071634",
   "data_source_run_id": "39771838392",
   "message": "Last verified research data retained; inspect workflow diagnostics.",
   "research_scores_changed": false
