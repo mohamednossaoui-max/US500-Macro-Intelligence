@@ -20,7 +20,7 @@
     "WTI": "2000-08-23"
   },
   "asset_last_dates": {
-    "BITCOIN": "2026-10-23",
+    "BITCOIN": "2026-10-24",
     "DXY": "2026-10-23",
     "GOLD": "2026-10-23",
     "NASDAQ": "2026-10-23",
@@ -30,7 +30,7 @@
     "WTI": "2026-10-23"
   },
   "asset_observation_counts": {
-    "BITCOIN": 4420,
+    "BITCOIN": 4421,
     "DXY": 6772,
     "GOLD": 6563,
     "NASDAQ": 6743,
@@ -51,7 +51,7 @@
   ],
   "columns": 46,
   "correlation_feature_count": 10,
-  "date_end": "2026-10-23",
+  "date_end": "2026-10-24",
   "date_start": "2000-01-03",
   "decision_engine_ready": false,
   "forecast_generated": false,
@@ -60,7 +60,7 @@
   "pit_status": "PIT_LIMITED",
   "point_in_time_safe": false,
   "research_only": true,
-  "rows": 8149,
+  "rows": 8150,
   "session_aware_pit_safe": false,
   "trading_signal_generated": false,
   "unified_decision_generated": false,

@@ -1,9 +1,9 @@
 metric,value
-total_asof_rows,14336
+total_asof_rows,14337
 first_asof_date,1987-07-25
-last_asof_date,2026-10-23
+last_asof_date,2026-10-24
 minimum_components,2
-latest_unified_sentiment_score,34.67134717134717
+latest_unified_sentiment_score,33.877696377696374
 latest_research_regime,BEARISH
 latest_component_count,3
 latest_eligible_component_count,3
@@ -17,6 +17,6 @@ forecast_generated,False
 regime_EXTREME_BULLISH_rows,1709
 regime_BULLISH_rows,3669
 regime_NEUTRAL_rows,3845
-regime_BEARISH_rows,2851
+regime_BEARISH_rows,2852
 regime_EXTREME_BEARISH_rows,1184
 regime_INSUFFICIENT_DATA_rows,1078
