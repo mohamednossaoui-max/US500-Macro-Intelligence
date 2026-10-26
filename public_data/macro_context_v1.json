@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-10-25",
+  "context_date": "2026-10-26",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-10-23",
-    "age_days": 2,
+    "age_days": 3,
     "economic_regime": "MIXED",
     "inflation_score": 0.3290131994082034,
     "labor_score": -0.0270411763771128,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-10-25",
+    "as_of_date": "2026-10-26",
     "latest_fomc": "2026-09-16",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -329,7 +329,7 @@
   },
   "financial_stress": {
     "source_date": "2026-10-23",
-    "age_days": 2,
+    "age_days": 3,
     "composite_stress_score": 0.5886706628847572,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
     "vix": 19.45,
@@ -340,7 +340,7 @@
   },
   "event_news": {
     "source_date": "2026-10-20",
-    "age_days": 5,
+    "age_days": 6,
     "latest_published_at": "2026-10-20T12:30:00+00:00",
     "latest_title": "New Residential Construction",
     "latest_source": "U.S. Census Bureau",
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 2,
-    "financial_stress_age_days": 2,
-    "event_news_age_days": 5,
+    "economic_age_days": 3,
+    "financial_stress_age_days": 3,
+    "event_news_age_days": 6,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
