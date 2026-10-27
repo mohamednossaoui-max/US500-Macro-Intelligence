@@ -110,7 +110,7 @@
     },
     "earnings_quality_summary_v3.json": {
       "bytes": 672,
-      "sha256": "976e625fe044182e0dea1306f63e82952dc8774232b9a676ed952fec697d9eea"
+      "sha256": "7567b56b41be0ce39a249d6c89138dd9336ea74a074768c95b19a372de52fca1"
     },
     "earnings_reaction_by_eps_class_v3.csv": {
       "bytes": 910,
@@ -130,7 +130,7 @@
     },
     "economic_ingestion_status_v1.json": {
       "bytes": 14389,
-      "sha256": "ed3eeca11ceaf94bbfa98c146c512de87b87c9e2221dfef9da9e5e624777a1ae"
+      "sha256": "f3fc0fda7dd6ceef69db8dc92b0853656f0bfb2c6419a33757fae8667ebba211"
     },
     "economic_regime_events_v1.csv": {
       "bytes": 106374,
@@ -150,19 +150,19 @@
     },
     "event_news_research_summary_v2.json": {
       "bytes": 1004,
-      "sha256": "23995f2dffa54c9db424d636dd8ab6a1ff91832c4ceddf434115d031a21f69f6"
+      "sha256": "f740f3945b6cb1650837cba39db57cdd362c63e6661940b4ce269e0d8c091e50"
     },
     "event_news_research_v2.csv": {
       "bytes": 45853,
       "sha256": "92dd50437ee3e731e49d0809f120b1820a096d664d103d300f6d676a1b1fcfa8"
     },
     "event_news_validation_v2.json": {
-      "bytes": 76489,
-      "sha256": "d18493566dd9260998b0c42d9ffbc04acf2d12b358d7e40918ad4b46399bdcc7"
+      "bytes": 76453,
+      "sha256": "9e34fbd97599a85caeabfe38fafd9c05561372adb79518e5df186ab98c31783b"
     },
     "fed_intelligence_output_v1.json": {
       "bytes": 280816,
-      "sha256": "2af9411dda7b7065cb317aa9fb034fe8d2f05c9e1c45e1a94af6cae98e3dbd83"
+      "sha256": "78274cd28a11eac01c7893d95c077baf7f01fbd1a363c5238615ee069dd28da8"
     },
     "final_end_to_end_validation.json": {
       "bytes": 923,
@@ -186,7 +186,7 @@
     },
     "final_remaining_layers_hardening_v1.json": {
       "bytes": 658,
-      "sha256": "b779362f2bb7d6fecba90e98962ad42e68a0d496bdcf9e7de4d54268525fcfe5"
+      "sha256": "c1893106a6a34a2a8f1ecd790bc150a2dbfaef8b7b05d880790c2a0876e57b5f"
     },
     "financial_stress_records_input_v1.csv": {
       "bytes": 1788840,
@@ -334,7 +334,7 @@
     },
     "pipeline_attempt_v1.json": {
       "bytes": 354,
-      "sha256": "7c474374f9e82909308430be055ef1802b561f70b19516b986ec9cb90726ce7e"
+      "sha256": "daf705a052b1c8fefabb57ce7d7d8f8c695ef28639dc46e51061ee2b4bedea76"
     },
     "remaining_layers_quality_v1.csv": {
       "bytes": 1546,
@@ -358,7 +358,7 @@
     },
     "research_evidence_contract_v1.csv": {
       "bytes": 14856,
-      "sha256": "4d6b76821f06e91a49560e5f6a91e61695e4abb49e4abfd8b3f9ea6c556586b0"
+      "sha256": "ee218003317058d1a2dfda288ecce776ce84b938f494617348d23c89bfd84324"
     },
     "research_evidence_quality_summary_v1.json": {
       "bytes": 411,
@@ -366,7 +366,7 @@
     },
     "research_evidence_quality_v1.csv": {
       "bytes": 3766,
-      "sha256": "030a5be8588fb9d4b1f21495c88fd7bae4b19bd05c907e0d26d383d78a9dc22c"
+      "sha256": "ceef8647f19f4330e57363f3b398b6eac2706bf49076e25bee4e8fd5b29dbd3c"
     },
     "research_evidence_validation_v1.json": {
       "bytes": 532,
@@ -386,11 +386,11 @@
     },
     "system_health_layers_v1.json": {
       "bytes": 22289,
-      "sha256": "eb653c8266fb0870d98fbb9d34ea9239969be82dff7850f024d2be7b18629c57"
+      "sha256": "212ddd3a51347be7c23dd7c28bd09878f899786628d8b380c082b69bba666636"
     },
     "system_health_summary_v1.json": {
       "bytes": 436,
-      "sha256": "fa4fba24c9304d703bccb84fe4ac122bec10c7accc93ce9f130c39be519d441f"
+      "sha256": "4826230f51548e05e4743fd67d77f84b8d7687959ccd9bd6134a93f94c4a9cbe"
     },
     "technical_intelligence_extremes_v1.csv": {
       "bytes": 677094,
@@ -433,11 +433,11 @@
       "sha256": "7b97c0793b62cd1dd88dbd214ecf17b4f312c6c947e63f542e39bb5dd1fa6f45"
     }
   },
-  "generation_id": "a7aed0f792fe706aa30f9000d3ac2d9ca3201a729572834760852b5075ba606f",
+  "generation_id": "f1f34d07e08892468bb9a9aa9c5faf412543184faa95e52eecd4008c21a5f738",
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
-  "source_commit": "be74f98c61526f7abb0c57671b4f36ebd561e9e5",
-  "source_run_id": "40475303890",
+  "source_commit": "6dc0cdc55f27c0ad144c52c312d4b5954ecd9d60",
+  "source_run_id": "40489028456",
   "source_workflow": "us500-full-research-pipeline"
 }
