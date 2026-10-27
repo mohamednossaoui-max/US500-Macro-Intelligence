@@ -339,10 +339,10 @@
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-10-20",
-    "age_days": 7,
-    "latest_published_at": "2026-10-20T12:30:00+00:00",
-    "latest_title": "New Residential Construction",
+    "source_date": "2026-10-27",
+    "age_days": 0,
+    "latest_published_at": "2026-10-27T14:00:00+00:00",
+    "latest_title": "New Home Sales",
     "latest_source": "U.S. Census Bureau",
     "latest_topic": "growth",
     "events_available": 97,
@@ -357,7 +357,7 @@
   "temporal_alignment": {
     "economic_age_days": 4,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 7,
+    "event_news_age_days": 0,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

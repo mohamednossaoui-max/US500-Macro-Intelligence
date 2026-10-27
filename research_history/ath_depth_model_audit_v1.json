@@ -9,9 +9,9 @@
     "technical_intelligence_research_v1.csv": "27936abc947d3a4f8e67025cb3b7d6d8b912cb9b8cf62b838b6f9901bb15571d",
     "financial_stress_research_v1.csv": "e2ccb068abfe31bea4be660c675a8358ecd7d810e0e26217ac6e5d6d18a64a7c",
     "sentiment_engine_research_v1.csv": "71fdc501bbbcbbf4d9ff41d785339bb343760c6876fe2ee3ed5c1ed58269aaf8",
-    "liquidity_intelligence_research_v1.csv": "c243e92636fa3a646bb49f342a4b8fdf5e0e814d0287e98ec873b4e244e6bed4"
+    "liquidity_intelligence_research_v1.csv": "18211f9a91f4bb0cea725ffdc9633033f09febb46f8aaa3a15776d91a70eeea4"
   },
-  "source_snapshot_count": 41,
+  "source_snapshot_count": 42,
   "archive_snapshot_ids": [
     "fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4",
     "cd3c3b10f577e514ef66c7b719862194175170533bd2ca2669b19c6713c6a7ac",
@@ -53,7 +53,8 @@
     "77a36424d118f4c95ad312c68cd7d441f773dd575197426663839e350ffa1b79",
     "7b72ccfbb1cf542e843a2b4954f8429bb998d239a84658e7c35ebe22d542168b",
     "587d1892aafd1343761a5d9bbdcbe317336265e7f1faac4c368bb64a4036c509",
-    "4ba3271b65f681159816984e287b3f9804e61915b4e2c77fbbf2e427a4eff353"
+    "4ba3271b65f681159816984e287b3f9804e61915b4e2c77fbbf2e427a4eff353",
+    "88193c2fb45fcdd95949d0895c8cbed651545fd5c56d0fefce4e7bfd41b6e4ab"
   ],
   "snapshot_first_available_at": "2026-10-04T19:00:18.670929+00:00",
   "analyses": [

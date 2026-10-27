@@ -1,9 +1,9 @@
 {
-  "status": "FAILED",
-  "attempted_at": "2026-10-27T18:30:20.790829+00:00",
-  "run_id": "40558238216",
-  "run_url": "https://github.com/mohamednossaoui-max/US500-Macro-Intelligence/actions/runs/40558238216",
-  "data_source_run_id": "40489028456",
-  "message": "Last verified research data retained; inspect workflow diagnostics.",
+  "status": "SUCCESS",
+  "attempted_at": "2026-10-27T19:36:11.448131+00:00",
+  "run_id": "40568480523",
+  "run_url": "https://github.com/mohamednossaoui-max/US500-Macro-Intelligence/actions/runs/40568480523",
+  "data_source_run_id": "40568480523",
+  "message": "Integrated publication passed its validation gate.",
   "research_scores_changed": false
 }
