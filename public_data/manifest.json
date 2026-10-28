@@ -333,8 +333,8 @@
       "sha256": "43dcfa4ca81dc2ebefaf8b21cce6ecc7eb98f53c49fce1fc8295721604a54e50"
     },
     "pipeline_attempt_v1.json": {
-      "bytes": 354,
-      "sha256": "9594bf8fc333de0201a54779f2a6aaffe90f4289d66b8d7bf83e8bca1686a9b6"
+      "bytes": 370,
+      "sha256": "92f7d0f9e082293f2906c4cabb0e195639c4c701b9fe714d0dfac7a39b6e4dfc"
     },
     "remaining_layers_quality_v1.csv": {
       "bytes": 1546,
@@ -433,7 +433,8 @@
       "sha256": "62687fed1485153e93045908217f0f95d9f8bdd605e24c76ded8eb574bfa39e1"
     }
   },
-  "generation_id": "9f694dff34748f0c99a525db5e0019f4acd1220acd8e0c3f8397f84cd3eb1438",
+  "generation_id": "1cba8e789e4da9740c866bf5068088ffc0270a0df71fb158638110e323f6e944",
+  "operational_update_run_id": "40749936189",
   "publisher": "US500 Macro Intelligence",
   "publisher_version": "V3",
   "research_only": true,
