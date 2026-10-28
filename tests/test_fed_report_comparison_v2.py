@@ -250,3 +250,12 @@ def test_compact_card_uses_text_status_for_one_sided_numeric_facts():
     card = next(x.value for x in app.markdown if "comm-shift-flow" in x.value)
     assert card.count('Text retrieved') == 2
     assert 'Not reported' not in card
+
+
+def test_october_official_pdf_target_rate_wording():
+    raw = text('20261028-opening')
+    facts = reports.policy_facts(reports.opening_remarks(raw))
+    assert facts['policy_action']['value'] == 'HOLD'
+    assert facts['target_range']['value'] == [3.75, 4.0]
+    assert 'vote' not in facts
+    assert 'target rate for the federal funds rate' in facts['target_range']['evidence']
