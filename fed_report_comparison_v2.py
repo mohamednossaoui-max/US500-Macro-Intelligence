@@ -194,21 +194,23 @@ def _numeric_fractions(text):
 def policy_facts(text):
     facts = {}
     for sentence in sentences(text):
-        if not re.search(r"(?:Committee|FOMC) (?:decided|voted)", sentence, re.I):
+        if not re.search(r"(?:Committee|FOMC) (?:has )?(?:decided|voted)", sentence, re.I):
             continue
         numeric = _numeric_fractions(sentence)
-        action = re.search(r"\b(raise|increase|reduce|lower|maintain|keep)\b.{0,100}?target range", numeric, re.I)
-        rate_range = re.search(r"target range.{0,180}?\b(\d+(?:\.\d+)?)\s*(?:to|[-–])\s*(\d+(?:\.\d+)?)\s*percent", numeric, re.I)
+        action = re.search(r"\b(raise|increase|reduce|lower|maintain|keep|leave|hold)\b.{0,100}?target range", numeric, re.I)
+        rate_range = re.search(r"target range.{0,180}?\b(\d+(?:\.\d+)?)\s*(?:to|[-–])\s*(\d+(?:\.\d+)?)\s*(?:percent|%)", numeric, re.I)
+        vote = re.search(r"(\d+)\s*(?:[- ]to[- ]|to)\s*(\d+)\s+vote", sentence, re.I)
+        if vote:
+            facts["vote"] = {"value": f"{vote[1]}–{vote[2]}", "evidence": sentence}
+        if action:
+            # A decision may be explicit even when its numerical range is omitted.
+            # 'Leave' requires explicit unchanged wording, never an inference.
+            if action[1].lower() != "leave" or re.search(r"unchanged", numeric, re.I):
+                facts["policy_action"] = {"value": {"raise":"RAISE", "increase":"RAISE", "reduce":"CUT", "lower":"CUT", "maintain":"HOLD", "keep":"HOLD", "leave":"HOLD", "hold":"HOLD"}[action[1].lower()], "evidence": sentence}
         if action and rate_range:
             low, high = float(rate_range[1]), float(rate_range[2])
-            if not 0 <= low <= high <= 25:
-                continue
-            facts["policy_action"] = {"value": {"raise":"RAISE", "increase":"RAISE", "reduce":"CUT", "lower":"CUT", "maintain":"HOLD", "keep":"HOLD"}[action[1].lower()], "evidence": sentence}
-            facts["target_range"] = {"value": [low, high], "unit": "percent", "evidence": sentence}
-            vote = re.search(r"(\d+)\s*(?:[- ]to[- ]|to)\s*(\d+)\s+vote", sentence, re.I)
-            if vote:
-                facts["vote"] = {"value": f"{vote[1]}–{vote[2]}", "evidence": sentence}
-            break
+            if 0 <= low <= high <= 25:
+                facts["target_range"] = {"value": [low, high], "unit": "percent", "evidence": sentence}
     unanimous = next((s for s in sentences(text) if "unanimous vote" in s.lower()), None)
     if unanimous:
         facts["vote"] = {"value": "UNANIMOUS", "evidence": unanimous}

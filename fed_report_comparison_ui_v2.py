@@ -92,7 +92,8 @@ def coverage(obj):
 def compact_comparison(pair, title, namespace):
     """Restore the original compact cards; keep full evidence collapsed."""
     metrics = pair.get("metrics") or {}
-    row = metrics.get("target_range") or metrics.get("policy_action") or {}
+    row = next((metrics.get(key) for key in ("target_range", "policy_action")
+                if (metrics.get(key) or {}).get("previous") and (metrics.get(key) or {}).get("current")), {})
     ready = bool(pair.get("available"))
     previous, current = pair.get("previous") or {}, pair.get("current") or {}
     event_key = "meeting_date"
