@@ -1,7 +1,7 @@
 {
   "available": true,
   "schema_version": "fed-comparison-3",
-  "generated_at": "2026-10-28T22:18:04.056147+00:00",
+  "generated_at": "2026-10-28T23:05:14.390185+00:00",
   "as_of_date": "2026-10-28",
   "latest_fomc": "2026-10-28",
   "current_date": "2026-10-28",
@@ -42,7 +42,7 @@
     "labor_mentions": 6,
     "growth_mentions": 9,
     "financial_mentions": 2,
-    "text_length": 5617
+    "text_length": 5428
   },
   "chair_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
   "chair_pdf": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
@@ -55,7 +55,7 @@
     "labor_mentions": 6,
     "growth_mentions": 9,
     "financial_mentions": 2,
-    "text_length": 5617
+    "text_length": 5428
   },
   "powell_page": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
   "powell_pdf": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
@@ -76,7 +76,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "source_status": "VERIFIED_TRANSCRIPT",
       "scope": "OPENING_STATEMENT",
-      "retrieved_at": "2026-10-28T22:18:02.276352+00:00"
+      "retrieved_at": "2026-10-28T23:05:12.514406+00:00"
     }
   },
   "communication_comparison": {
@@ -516,7 +516,7 @@
     "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
     "available": true,
     "information_cutoff_date": "2026-10-05",
-    "retrieved_at": "2026-10-28T22:18:03.948250+00:00",
+    "retrieved_at": "2026-10-28T23:05:14.232068+00:00",
     "catalog_verified": true,
     "latest_publication_date": "2026-10-14",
     "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -600,7 +600,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-28T22:18:03.948250+00:00",
+      "retrieved_at": "2026-10-28T23:05:14.232068+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -614,7 +614,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-08-24",
-      "retrieved_at": "2026-10-28T22:18:04.049281+00:00",
+      "retrieved_at": "2026-10-28T23:05:14.386272+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
@@ -722,7 +722,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "meeting_verified": true,
       "latest_meeting_date": "2026-10-28",
-      "retrieved_at": "2026-10-28T22:18:02.276352+00:00",
+      "retrieved_at": "2026-10-28T23:05:12.514406+00:00",
       "pdf_sha256": "7b0b9f5fa79fd8fa5444d381f6f6b4c922b39c3092a8f03b1a36c9cbe646059d",
       "availability_basis": "VERIFIED_PDF_RETRIEVAL"
     },
@@ -743,7 +743,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-28T22:18:03.948250+00:00",
+      "retrieved_at": "2026-10-28T23:05:14.232068+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -757,7 +757,7 @@
         "publication_date": "2026-09-16",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
-        "retrieved_at": "2026-10-28T22:18:04.056147+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.390185+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "fc27d85fa8d02c2afe3ef5e54416802aac2fa1d2b926b26424f0fbf70842367b",
@@ -828,7 +828,7 @@
         "publication_date": "2026-10-28",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
-        "retrieved_at": "2026-10-28T22:18:04.056147+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.390185+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "e22a52d380060ec6baf0af35114f3d5d8ee9f4930ad5f6dcbce0e8af782bfbe2",
@@ -1050,7 +1050,7 @@
         "publication_date": "2026-08-19",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-28T22:18:04.056147+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.390185+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "8f5914c96ce15c0b9a74b22158704d1c9795f0ccf0463fd53d6f552fb5af1335",
@@ -1284,7 +1284,7 @@
         "publication_date": "2026-10-07",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-28T22:18:04.056147+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.390185+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "3547a0f56c6460166e652ad8911ad779b0a5afe9140f4692091ec864f7e51bb3",
@@ -2712,16 +2712,16 @@
       "status": "COMPARISON_READY"
     },
     "chair_press": {
-      "available": false,
+      "available": true,
       "previous": {
         "meeting_date": "2026-09-16",
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-28T22:18:03.095676+00:00",
+        "retrieved_at": "2026-10-28T23:05:13.328813+00:00",
         "available": true,
-        "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-        "content_sha256": "b96650f08db348d43dd5e24d2fa0610fb4192aaeec7b9ad3ea9432705f5f86e1",
+        "scope": "OPENING_STATEMENT",
+        "content_sha256": "9a613fcd8583ff37288cb46f3c09e8b092c0ec845e96816aea5fdf2171c833a5",
         "facts": {
           "policy_action": {
             "value": "RAISE",
@@ -2756,16 +2756,7 @@
               "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored.",
               "Total PCE inflation runs at 3.7 percent this year and falls to 2.3 percent next year.",
               "Inflation risks are to the upside while labor risks are roughly balanced.",
-              "In my meetings these last few weeks—i n Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—i t was evident that most advanced economies are facing price pressures.",
-              "Second, inflation trends— I said in Jackson Hole, trends matter.",
-              "My judgment some weeks ago was, the inflation summer trends weren’t passing the test.",
-              "I was not waiting breathlessly on what any particular data was, whether it was retail sales this morning or a CPI “print” last week.",
-              "In the macroeconomics, we tend to look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.",
-              "And stable prices, an environment where inflation is running consistent with our 2 percent objective, offers good news.",
-              "But we do have responsibility for stable prices— as I’ve said before, inflation is a, is a choice—and today we took a step in delivering it.",
-              "What I heard around the table from most of the advanced economies is they’re suffering from price pressures, too.",
-              "When foreign central banks make decisions, where they’re confronted with higher prices, and they choose, consistent with their remit, to raise rates, then they’re helping to quash inflation in their countries.",
-              "Inflation is the problem."
+              "In my meetings these last few weeks—i n Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—i t was evident that most advanced economies are facing price pressures."
             ]
           },
           "labor": {
@@ -2776,15 +2767,7 @@
               "Unemployment claims, on a four-week moving average, are running at levels consistent with full employment.",
               "The unemployment rate holds steady at about 4.1 percent.",
               "Those who are least well off have the most to gain from a durable expansion, a solid labor market, and stable prices.",
-              "We at the Fed are unwavering in our vital and straightforward purpose: full employment and price stability, and a thriving American economy that sets the standard for the world.",
-              "We made this decision today based on our assessment of the situation, based on our assessment of the trajectory for employment, based on our judgment on the strength of the economy.",
-              "Moreover, I would say, because of the underlying strength of the economy, because we are, as I mentioned, largely acting consistent with full employment, we can be focused on stable prices.",
-              "In the macroeconomics, we tend to look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.",
-              "Ask ourselves, is the country running more or less at full employment?",
-              "That doesn’t mean that individuals aren’t searching for a job, but in aggregate, we’re running more or less at full employment.",
-              "Because that way, when they get their wages, they can put their head above water and deliver real take-home pay increases.",
-              "First, we believe that the unemployment rate is basically running consistent with full employment.",
-              "I don’t believe that the two parts of our mandate, price stability and full employment, are working at cross purposes over the medium term."
+              "We at the Fed are unwavering in our vital and straightforward purpose: full employment and price stability, and a thriving American economy that sets the standard for the world."
             ]
           },
           "growth": {
@@ -2793,12 +2776,7 @@
               "As noted in the policy statement, released just a short while ago, economic activity is expanding at a solid pace.",
               "Productivity growth—strong; and capital investment is robust.",
               "New hiring, private-sector earnings, business capital investment—each of these markers ha s improved in recent months and is pointing in a good direction.",
-              "In the summary’s median projections, real GDP rises at 2.3 percent this year, 2.4 percent next year.",
-              "First, I would say a good majority of my colleagues seven weeks ago thought seven weeks is a good investment.",
-              "In the macroeconomics, we tend to look at aggregates around here, aggregate GDP, overall labor market trends, the state of inflation.",
-              "Price stability is foundational to economic growth, and I think we took an important step today to deliver it.",
-              "So economic growth—that is ensuring continuous, sustainable, durable, economic growth—that ’s the business we’re in.",
-              "And the job we did today, the job we’ll continue to do, is to ensure price stability, which can mean that sustainable, durable, economic growth can go on for longer."
+              "In the summary’s median projections, real GDP rises at 2.3 percent this year, 2.4 percent next year."
             ]
           },
           "risks": {
@@ -2806,9 +2784,7 @@
             "evidence": [
               "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient .",
               "Consider the geopolitical landscape of shocks and uncertainty, and you begin to appreciate the resilience of the U.S. economy.",
-              "Inflation risks are to the upside while labor risks are roughly balanced.",
-              "It’s the risk-free asset upon which every price of virtually every asset in the world is related to.",
-              "But the policy decisions that are made about the risks and rewards, the challenges and opportunities, those are decisions made by other parts of the government."
+              "Inflation risks are to the upside while labor risks are roughly balanced."
             ]
           },
           "policy": {
@@ -2816,11 +2792,7 @@
             "evidence": [
               "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate.",
               "So we removed a dose of accommodation.",
-              "Last month in Wyoming, I expressed my commitment to a monetary policy discipline, not to a decision.",
-              "This won’t surprise you: I’m not in the forward guidance business.",
-              "We removed a dose of accommodation so that financial and credit conditions would be more consistent with our ultimate objectives.",
-              "And we did it in part by removing the dose of accommodation that I—that I mentioned before.",
-              "My business is to not give forward guidance."
+              "Last month in Wyoming, I expressed my commitment to a monetary policy discipline, not to a decision."
             ]
           },
           "liquidity": {
@@ -2834,14 +2806,7 @@
             "evidence": [
               "Credit flows have been robust, particularly for businesses.",
               "And, as I said at the policy symposium in Jackson Hole, I would be hard pressed to describe broad financial conditions as restrictive.",
-              "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored.",
-              "I’ve described previously I found it difficult to describe financial conditions as restrictive.",
-              "We removed a dose of accommodation so that financial and credit conditions would be more consistent with our ultimate objectives.",
-              "But why did yields rise, let’s say, since the last FOMC meeting until this?",
-              "This is a complicated set of things that are affecting the most important asset anywhere in the world, the 10-year Treasury.",
-              "Part of the reason why we’ve seen, over the course of 2026, long-term yields go up is, the economy has strengthened.",
-              "And so the competition for capital is real, and I think it partly explains the increase in yields.",
-              "The situation hot spots around the world are driving long-term yields."
+              "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored."
             ]
           }
         }
@@ -2851,10 +2816,10 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-28T22:18:02.276352+00:00",
+        "retrieved_at": "2026-10-28T23:05:12.514406+00:00",
         "available": true,
         "scope": "OPENING_STATEMENT",
-        "content_sha256": "112aeb1de88bba48039119b41015bc8b58e8fa6d0a53a1b3ee87c7a0c79c5d6f",
+        "content_sha256": "ae64f2b09f266650e854b2ea7b32119be48332d8dea1efe15c51f7a94be9ee0b",
         "facts": {},
         "topics": {
           "inflation": {
@@ -2872,7 +2837,7 @@
             "label": "Labor market",
             "evidence": [
               "Job gains have kept pace with the workforce, and the unemployment rate has changed little.",
-              "October 28, 2026 Chairman Warsh’s Press Conference PRELIMINARY What about the jobless rate?",
+              "What about the jobless rate?",
               "The jobless rate is lower than a year ago, and payroll growth is noticeably above last year’s pace.",
               "The four -week moving average of unemployment insurance claims continues to run at the lowest level in generations.",
               "So on the employment side of the Fed’s dual mandate, conditions are quite positive."
@@ -2918,10 +2883,285 @@
           }
         }
       },
-      "metrics": {},
-      "topics": {},
+      "metrics": {
+        "policy_action": {
+          "previous": {
+            "value": "RAISE",
+            "evidence": "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          },
+          "current": null,
+          "change": null,
+          "status": "NOT_COMPARABLE"
+        },
+        "target_range": {
+          "previous": {
+            "value": [
+              3.75,
+              4.0
+            ],
+            "unit": "percent",
+            "evidence": "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          },
+          "current": null,
+          "change": null,
+          "status": "NOT_COMPARABLE"
+        },
+        "vote": {
+          "previous": {
+            "value": "UNANIMOUS",
+            "evidence": "The Committee’s unanimous vote shows our resolve to achieve price stability on a timelier basis."
+          },
+          "current": null,
+          "change": null,
+          "status": "NOT_COMPARABLE"
+        }
+      },
+      "topics": {
+        "inflation": {
+          "label": "Inflation and prices",
+          "pairs": [
+            {
+              "previous": "But inflation remains elevated.",
+              "current": "But inflation remains elevated.",
+              "status": "SAME_WORDING"
+            },
+            {
+              "previous": "Core PCE and CPI prices are running at about 3.2 and 2.4 percent, respectively.",
+              "current": "T he Committee believes that the accumulation of more information will help it determine the policy stance appropriate to ensure a timely return of inflation to the 2 percent goal.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Yet, for more than five years, inflation has been running above target.",
+              "current": "And yet Americans , of course, are still dealing with inflation that has been running above the Committee’s objective for close to 6 years .",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "The plain fact is that inflation is too high and has been for too long.",
+              "current": "It’s our responsibility to get inflation down.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Inflation risks are to the upside while labor risks are roughly balanced.",
+              "current": "But inflation is too high.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored.",
+              "current": "And our job is to ensure that relative price changes in some sectors do not broade n out across the economy , and that inflation expectations remain as they are anchored .",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "This summer’s inflation readings do not tell me that underlying trends have meaningfully improved.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Based on the most recent CPI and PPI data, the 12-month change in total PCE prices likely was around 3.6 percent in August.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Since my first FOMC meeting as Chairman in June, my colleagues and I have been unequivocal in our commitment to price stability and to our 2 percent PCE inflation objective.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "At our July meeting, we all agreed that inflation remained too high, and we expressed our joint readiness to act as circumstances might require.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "We must be confident that underlying inflation is moving to our objective, clearly and at sufficient speed.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Total PCE inflation runs at 3.7 percent this year and falls to 2.3 percent next year.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "In my meetings these last few weeks—i n Jackson Hole; in Asheville at the G-20 meeting, which the U.S. hosted; and at a central bank conference in Basel—i t was evident that most advanced economies are facing price pressures.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        },
+        "labor": {
+          "label": "Labor market",
+          "pairs": [
+            {
+              "previous": "Job gains have kept pace with the workforce, and the unemployment rate has changed little.",
+              "current": "Job gains have kept pace with the workforce, and the unemployment rate has changed little.",
+              "status": "SAME_WORDING"
+            },
+            {
+              "previous": "The unemployment rate holds steady at about 4.1 percent.",
+              "current": "What about the jobless rate?",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "The jobless—the jobless rate remains low at around 4.1 percent, and both job openings and weekly hours have been increasing.",
+              "current": "The jobless rate is lower than a year ago, and payroll growth is noticeably above last year’s pace.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Unemployment claims, on a four-week moving average, are running at levels consistent with full employment.",
+              "current": "The four -week moving average of unemployment insurance claims continues to run at the lowest level in generations.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "So on the employment side of the Fed’s dual mandate, conditions are quite positive.",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Those who are least well off have the most to gain from a durable expansion, a solid labor market, and stable prices.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "We at the Fed are unwavering in our vital and straightforward purpose: full employment and price stability, and a thriving American economy that sets the standard for the world.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        },
+        "growth": {
+          "label": "Growth and demand",
+          "pairs": [
+            {
+              "previous": "As noted in the policy statement, released just a short while ago, economic activity is expanding at a solid pace.",
+              "current": "Economic activity is expanding at a strong pace.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Productivity growth—strong; and capital investment is robust.",
+              "current": "Productivity growth is strong, and capital investment robust.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "Economic growth has strengthened.",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "In the summary’s median projections, real GDP rises at 2.3 percent this year, 2.4 percent next year.",
+              "current": "The GDP increase in the first half of this year was revised up from an earlier estimate of 1.8 percent up to 2.4 percent.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "And t he third quarter appears to have brought an even more rapid advance, led by healthy consumer spending , likely running a bove 3 percent growth, and business investment , likely rising at about a double -digit pace.",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": null,
+              "current": "Capital expenditures are at a historically high share of GDP.",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "New hiring, private-sector earnings, business capital investment—each of these markers ha s improved in recent months and is pointing in a good direction.",
+              "current": "H igh-tech investment is leading the acceleration .",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "But broadly, t hese developments go in the direction of achieving a longer, more durable period of economic growth and price stability .",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        },
+        "risks": {
+          "label": "Balance of risks",
+          "pairs": [
+            {
+              "previous": "While uncertainty remains elevated—owing, in part, to geopolitical developments—domestic spending has been resilient .",
+              "current": "While uncertainty remains—owing, in part, to geopolitical developments —domestic spending has been resilient.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Consider the geopolitical landscape of shocks and uncertainty, and you begin to appreciate the resilience of the U.S. economy.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Inflation risks are to the upside while labor risks are roughly balanced.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        },
+        "policy": {
+          "label": "Policy and guidance",
+          "pairs": [
+            {
+              "previous": "Last month in Wyoming, I expressed my commitment to a monetary policy discipline, not to a decision.",
+              "current": "And at every turn, good or bad, our job is to get monetary policy right.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate.",
+              "current": "But in 2027, one meeting will focus exclusively on broad monetary policy strategy, with n either a vote on the federal funds rate nor a policy statement anticipated .",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "It’s yet another change to get the conduct of monetary policy on the right track .",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "So we removed a dose of accommodation.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        },
+        "liquidity": {
+          "label": "Balance sheet and liquidity",
+          "pairs": [
+            {
+              "previous": "The Committee is continuing its policy of maintaining ample reserves in the banking system.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "PARTIAL_TOPIC_EVIDENCE"
+        },
+        "credit": {
+          "label": "Credit and financial conditions",
+          "pairs": [
+            {
+              "previous": "And, as I said at the policy symposium in Jackson Hole, I would be hard pressed to describe broad financial conditions as restrictive.",
+              "current": "Since our policy action in September, we have started to see some changes in financial and credit conditions .",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": null,
+              "current": "And while overall financial conditions are tighter, I’m unwilling and unable to call them tight.",
+              "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Credit flows have been robust, particularly for businesses.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "We aim to ensure that credit and financial conditions are consistent over time with our mandate, that relative price changes in some sectors of the economy do not broaden, that inflation compensation in market prices stays low, and that inflation expectations remain well anchored.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            }
+          ],
+          "status": "EVIDENCE_AVAILABLE"
+        }
+      },
       "method": "Official numeric facts and aligned source sentences. Wording changes are not a semantic policy verdict. No keyword coverage score.",
-      "status": "SCOPE_MISMATCH"
+      "status": "COMPARISON_READY"
     },
     "beige_book": {
       "available": true,
@@ -2934,7 +3174,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-08-24",
-        "retrieved_at": "2026-10-28T22:18:04.049281+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.386272+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb",
@@ -2994,7 +3234,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-10-05",
-        "retrieved_at": "2026-10-28T22:18:03.948250+00:00",
+        "retrieved_at": "2026-10-28T23:05:14.232068+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef",
@@ -3206,13 +3446,13 @@
     "source_status": "VERIFIED_TRANSCRIPT",
     "publication_date": null,
     "publication_date_source": null,
-    "retrieved_at": "2026-10-28T22:18:02.276352+00:00",
+    "retrieved_at": "2026-10-28T23:05:12.514406+00:00",
     "scope": "OPENING_STATEMENT",
     "related_release_dates": {
       "statement": "2026-10-28"
     },
     "meeting_date": "2026-10-28",
-    "content_sha256": "112aeb1de88bba48039119b41015bc8b58e8fa6d0a53a1b3ee87c7a0c79c5d6f",
+    "content_sha256": "ae64f2b09f266650e854b2ea7b32119be48332d8dea1efe15c51f7a94be9ee0b",
     "pdf_sha256": "7b0b9f5fa79fd8fa5444d381f6f6b4c922b39c3092a8f03b1a36c9cbe646059d"
   },
   "report_coverage": {
@@ -3229,7 +3469,7 @@
     "chair_press": {
       "current_available": true,
       "previous_available": true,
-      "comparison_available": false
+      "comparison_available": true
     },
     "beige_book": {
       "current_available": true,
@@ -3252,7 +3492,7 @@
     },
     "pit_scope": "Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; its publication date remains unknown. No intraday or archived-vintage guarantee.",
     "availability_bounds": {
-      "chair_press": "2026-10-28T22:18:02.276352+00:00"
+      "chair_press": "2026-10-28T23:05:12.514406+00:00"
     },
     "research_only": true,
     "forecast": false,
