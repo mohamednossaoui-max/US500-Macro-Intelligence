@@ -221,3 +221,32 @@ def test_preliminary_page_headers_are_removed_from_chair_evidence():
     raw = "CHAIR WARSH. Inflation is elevated.\nOctober 28, 2026 Chairman Warsh’s Press Conference PRELIMINARY\nPage 2 of 4\nGrowth is strong."
     assert "PRELIMINARY" not in reports.chair_remarks(raw)
     assert "Growth is strong" in reports.chair_remarks(raw)
+
+
+def test_hold_decision_without_rate_does_not_invent_previous_range():
+    out = reports.policy_facts('The Committee decided to maintain the target range for the federal funds rate. Economic activity is strong.')
+    assert out['policy_action']['value'] == 'HOLD'
+    assert 'target_range' not in out
+
+
+def test_has_decided_and_unchanged_range_are_supported():
+    out = reports.policy_facts('The Committee has decided to leave the target range unchanged at 3¾ to 4 percent.')
+    assert out['policy_action']['value'] == 'HOLD'
+    assert out['target_range']['value'] == [3.75, 4.0]
+
+
+def test_forward_guidance_is_not_a_current_decision():
+    assert not reports.policy_facts('The Committee may decide to lower the target range to 3 to 3.25 percent next year.')
+
+
+def test_compact_card_uses_text_status_for_one_sided_numeric_facts():
+    testing = pytest.importorskip('streamlit.testing.v1')
+    data = pair()
+    data['metrics']['target_range']['current'] = None
+    data['metrics']['policy_action']['current'] = None
+    source = 'import json\nfrom fed_report_comparison_ui_v2 import compact_comparison\ncompact_comparison(json.loads(' + repr(json.dumps(data)) + "),'Press Conference','chair_press')"
+    app = testing.AppTest.from_string(source, default_timeout=30).run()
+    assert not app.exception
+    card = next(x.value for x in app.markdown if "comm-shift-flow" in x.value)
+    assert card.count('Text retrieved') == 2
+    assert 'Not reported' not in card
