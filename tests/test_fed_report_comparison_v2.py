@@ -195,3 +195,29 @@ def test_opening_transcript_is_explicitly_scoped_even_at_canonical_url(monkeypat
     mock_pdf(monkeypatch, opening)
     out = reports.load_press(PAGE, lambda u: SimpleNamespace(text="", content=b"%PDF-test"))
     assert out["scope"] == "OPENING_STATEMENT"
+
+
+def test_mixed_press_scopes_compare_only_verified_opening_turns():
+    raw = text("20260916")
+    opening = reports.opening_remarks(raw)
+    assert opening
+    assert len(opening) < len(reports.chair_remarks(raw))
+    old = {"available": True, "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS", "text": reports.chair_remarks(raw), "opening_text": opening}
+    new = {"available": True, "scope": "OPENING_STATEMENT", "text": opening, "opening_text": opening}
+    a, b = reports.align_press_scope(old, new)
+    assert a["scope"] == b["scope"] == "OPENING_STATEMENT"
+    assert a["text"] == b["text"] == opening
+    assert old["scope"] == "FULL_TRANSCRIPT_CHAIR_REMARKS"
+    assert reports.compare(reports.document(a["text"], {}, a["scope"]), reports.document(b["text"], {}, b["scope"]))["available"]
+
+
+def test_scope_alignment_does_not_invent_missing_opening():
+    old = {"available": True, "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS", "text": "old"}
+    new = {"available": True, "scope": "OPENING_STATEMENT", "text": "new", "opening_text": "new"}
+    assert reports.align_press_scope(old, new) == (old, new)
+
+
+def test_preliminary_page_headers_are_removed_from_chair_evidence():
+    raw = "CHAIR WARSH. Inflation is elevated.\nOctober 28, 2026 Chairman Warsh’s Press Conference PRELIMINARY\nPage 2 of 4\nGrowth is strong."
+    assert "PRELIMINARY" not in reports.chair_remarks(raw)
+    assert "Growth is strong" in reports.chair_remarks(raw)
