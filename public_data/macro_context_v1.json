@@ -17,7 +17,7 @@
   },
   "fed": {
     "as_of_date": "2026-10-28",
-    "latest_fomc": "2026-09-16",
+    "latest_fomc": "2026-10-28",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
     "statement_tone_score": 2,
@@ -29,13 +29,13 @@
       },
       "document_score_eligibility": {
         "statement": true,
-        "minutes": true,
+        "minutes": false,
         "chair": true
       },
       "document_weights": {
-        "statement": 0.35,
-        "minutes": 0.4,
-        "chair": 0.25
+        "statement": 0.583333,
+        "minutes": 0.0,
+        "chair": 0.416667
       },
       "statement": {
         "inflation": {
@@ -113,11 +113,11 @@
       },
       "chair": {
         "inflation": {
-          "score": 4,
-          "classification": "HAWKISH",
-          "hawkish_hits": 4,
+          "score": 1,
+          "classification": "MODERATELY HAWKISH",
+          "hawkish_hits": 1,
           "dovish_hits": 0,
-          "score_100": 70
+          "score_100": 55
         },
         "labor": {
           "score": 1,
@@ -150,7 +150,7 @@
       },
       "combined": {
         "inflation": {
-          "score_100": 66.8,
+          "score_100": 55.0,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -167,15 +167,15 @@
             "score_100": 75
           },
           "chair": {
-            "score": 4,
-            "classification": "HAWKISH",
-            "hawkish_hits": 4,
+            "score": 1,
+            "classification": "MODERATELY HAWKISH",
+            "hawkish_hits": 1,
             "dovish_hits": 0,
-            "score_100": 70
+            "score_100": 55
           }
         },
         "labor": {
-          "score_100": 57.0,
+          "score_100": 55.0,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -250,7 +250,7 @@
           }
         },
         "policy": {
-          "score_100": 54.0,
+          "score_100": 50.0,
           "classification": "NEUTRAL",
           "statement": {
             "score": 0,
@@ -276,22 +276,22 @@
         }
       },
       "fed_score": {
-        "score": 61.6,
-        "base_score": 56.6,
+        "score": 57.0,
+        "base_score": 52.0,
         "sep_adjustment": 5.0,
         "classification": "MODERATELY HAWKISH"
       },
       "reasons": [
-        "- Inflation: None (+4.20)",
-        "- Labor: None (+1.05)",
+        "- Inflation: None (+1.25)",
+        "- Labor: None (+0.75)",
         "- Growth: None (+0.00)",
         "- Financial: None (+0.00)",
-        "- Policy: None (+1.40)",
+        "- Policy: None (+0.00)",
         "- SEP: HAWKISH SHIFT"
       ],
       "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
     },
-    "fed_score": 61.6,
+    "fed_score": 57.0,
     "sep_shift": {
       "classification": "HAWKISH SHIFT",
       "hawkish_points": 5,
@@ -328,27 +328,27 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-10-27",
-    "age_days": 1,
-    "composite_stress_score": 0.4161346722888441,
+    "source_date": "2026-10-28",
+    "age_days": 0,
+    "composite_stress_score": 0.6418070867211215,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
     "vix": 17.52,
-    "treasury_2y": 4.68,
-    "treasury_10y": 5.0,
-    "yield_10y_2y_spread": 0.3200000000000003,
+    "treasury_2y": 4.7,
+    "treasury_10y": 4.99,
+    "yield_10y_2y_spread": 0.29,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-10-27",
-    "age_days": 1,
-    "latest_published_at": "2026-10-27T14:00:00+00:00",
-    "latest_title": "New Home Sales",
-    "latest_source": "U.S. Census Bureau",
-    "latest_topic": "growth",
-    "events_available": 97,
+    "source_date": "2026-10-28",
+    "age_days": 0,
+    "latest_published_at": "2026-10-28T18:00:00+00:00",
+    "latest_title": "Federal Reserve issues FOMC statement",
+    "latest_source": "Federal Reserve",
+    "latest_topic": "fed",
+    "events_available": 96,
     "topic_counts": {
       "growth": 63,
-      "fed": 31,
+      "fed": 30,
       "labor": 2,
       "inflation": 1
     },
@@ -356,8 +356,8 @@
   },
   "temporal_alignment": {
     "economic_age_days": 5,
-    "financial_stress_age_days": 1,
-    "event_news_age_days": 1,
+    "financial_stress_age_days": 0,
+    "event_news_age_days": 0,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
