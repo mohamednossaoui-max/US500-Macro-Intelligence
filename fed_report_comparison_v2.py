@@ -197,8 +197,8 @@ def policy_facts(text):
         if not re.search(r"(?:Committee|FOMC) (?:has )?(?:decided|voted)", sentence, re.I):
             continue
         numeric = _numeric_fractions(sentence)
-        action = re.search(r"\b(raise|increase|reduce|lower|maintain|keep|leave|hold)\b.{0,100}?target range", numeric, re.I)
-        rate_range = re.search(r"target range.{0,180}?\b(\d+(?:\.\d+)?)\s*(?:to|[-–])\s*(\d+(?:\.\d+)?)\s*(?:percent|%)", numeric, re.I)
+        action = re.search(r"\b(raise|increase|reduce|lower|maintain|keep|leave|hold)\b.{0,100}?target (?:range|rate)", numeric, re.I)
+        rate_range = re.search(r"target (?:range|rate).{0,180}?\b(\d+(?:\.\d+)?)\s*(?:to|[-–])\s*(\d+(?:\.\d+)?)\s*(?:percent|%)", numeric, re.I)
         vote = re.search(r"(\d+)\s*(?:[- ]to[- ]|to)\s*(\d+)\s+vote", sentence, re.I)
         if vote:
             facts["vote"] = {"value": f"{vote[1]}–{vote[2]}", "evidence": sentence}
