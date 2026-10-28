@@ -5,7 +5,7 @@
   "core_feature_count": 9,
   "contextual_feature_count": 4,
   "eligible_feature_count": 8,
-  "fingerprint_sha256": "0a8f12547c00e6487c9974a53f08a498da26ca8d20428047bedc3ccbec1b5f3c",
+  "fingerprint_sha256": "a3508758a17cc4287911954d1d1725c0ca10b53624fc0d719eb8d46fe6bf0861",
   "missing_to_neutral": false,
   "double_counting_policy": "Direct canonical layer features only; Macro composite and legacy Fed duplicate are excluded.",
   "research_only": true,
