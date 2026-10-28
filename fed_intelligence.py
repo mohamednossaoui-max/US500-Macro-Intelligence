@@ -13,7 +13,7 @@ import io
 import re
 from datetime import date, datetime, timezone
 from typing import Dict, Optional
-from fed_report_comparison_v2 import load_press, report_body, document as evidence_document, compare as compare_evidence
+from fed_report_comparison_v2 import load_press, align_press_scope, report_body, document as evidence_document, compare as compare_evidence
 
 import pandas as pd
 import requests
@@ -1869,6 +1869,7 @@ def build_fed_intelligence() -> Dict:
                 "retrieved_at": retrieved_at or observed}
     current_statement_pub = result["evidence_dates"]["statement"]["publication_date"]
     previous_statement_pub = previous_press.get("related_release_dates", {}).get("statement")
+    comparison_previous_press, comparison_press = align_press_scope(previous_press, press)
     report_pairs = {
         "statement": (
             evidence_document(previous_statement_text, meta(previous_statement_date, previous_statement_pub,
@@ -1879,10 +1880,10 @@ def build_fed_intelligence() -> Dict:
                               links["minutes"].get(previous_minutes_date), CALENDAR), "OFFICIAL_MINUTES"),
             evidence_document(minutes_text, meta(minutes_meeting_date, result["minutes_publication_date"], minutes_url, CALENDAR), "OFFICIAL_MINUTES")),
         "chair_press": (
-            evidence_document(previous_press.get("text", ""), meta(previous_press_date, previous_press.get("publication_date"),
-                              previous_press.get("pdf_url"), previous_press.get("publication_date_source"), previous_press.get("retrieved_at")), previous_press.get("scope")),
-            evidence_document(press.get("text", ""), meta(meeting, press.get("publication_date"), press.get("pdf_url"),
-                              press.get("publication_date_source"), press.get("retrieved_at")), press.get("scope"))),
+            evidence_document(comparison_previous_press.get("text", ""), meta(previous_press_date, comparison_previous_press.get("publication_date"),
+                              comparison_previous_press.get("pdf_url"), comparison_previous_press.get("publication_date_source"), comparison_previous_press.get("retrieved_at")), comparison_previous_press.get("scope")),
+            evidence_document(comparison_press.get("text", ""), meta(meeting, comparison_press.get("publication_date"), comparison_press.get("pdf_url"),
+                              comparison_press.get("publication_date_source"), comparison_press.get("retrieved_at")), comparison_press.get("scope"))),
         "beige_book": (
             evidence_document(previous_beige.get("text", ""), beige_metadata(previous_beige), "NATIONAL_SUMMARY"),
             evidence_document(beige.get("text", ""), beige_metadata(beige), "NATIONAL_SUMMARY")),
@@ -1895,7 +1896,7 @@ def build_fed_intelligence() -> Dict:
             current_publication_date=pair["current"].get("publication_date"),
             previous_publication_date=pair["previous"].get("publication_date"),
             evidence_comparison_ref=f"report_comparison.{key}")
-    result["press_transcript"] = {k: v for k, v in press.items() if k != "text"}
+    result["press_transcript"] = {k: v for k, v in press.items() if k not in ("text", "opening_text")}
     result["report_coverage"] = {
         key: {"current_available": pair["current"]["available"],
               "previous_available": pair["previous"]["available"], "comparison_available": pair["available"]}

@@ -34,7 +34,7 @@ def normalize(text):
 
 def chair_remarks(text):
     """Exclude journalist questions from attributed Fed evidence."""
-    text = re.sub(r"(?m)^.*?(?:Chairman|Chair) .*?Press Conference\s+FINAL\s*$", "", text)
+    text = re.sub(r"(?m)^.*?(?:Chairman|Chair) .*?Press Conference\s+(?:FINAL|PRELIMINARY)\s*$", "", text)
     text = re.sub(r"(?m)^\s*Page \d+ of \d+\s*$", "", text)
     speakers = list(re.finditer(r"(?m)^\s*([A-Z][A-Z ’'\-]{2,55})\.\s+", text))
     remarks = []
@@ -43,6 +43,25 @@ def chair_remarks(text):
             end = speakers[i+1].start() if i+1 < len(speakers) else len(text)
             remarks.append(normalize(text[m.end():end]))
     return " ".join(remarks)
+
+
+def opening_remarks(text):
+    """Opening chair turn only; stop before the first journalist question."""
+    speakers = list(re.finditer(r"(?m)^\s*([A-Z][A-Z ’'\-]{2,55})\.\s+", text))
+    if not speakers or not re.match(r"CHAIR(?:MAN)?\s+", speakers[0][1]):
+        return ""
+    end = speakers[1].start() if len(speakers) > 1 else len(text)
+    return chair_remarks(text[:end])
+
+
+def align_press_scope(previous, current):
+    """Use verified opening turns on both sides when full scopes differ."""
+    if previous.get("scope") == current.get("scope"):
+        return previous, current
+    if not all(x.get("available") and x.get("opening_text") for x in (previous, current)):
+        return previous, current
+    return tuple({**x, "text": x["opening_text"], "scope": "OPENING_STATEMENT"}
+                 for x in (previous, current))
 
 
 def release_dates(html):
@@ -136,7 +155,7 @@ def load_press(url, get, as_of=None):
             result["source_status"] = "CHAIR_REMARKS_NOT_EXTRACTED"
             continue
         scope = "OPENING_STATEMENT" if re.search(r"opening", candidate, re.I) or "opening statement" in full[:1800].lower() else "FULL_TRANSCRIPT_CHAIR_REMARKS"
-        result.update(available=True, text=remarks, pdf_url=candidate, source_status="VERIFIED_TRANSCRIPT",
+        result.update(available=True, text=remarks, pdf_url=candidate, source_status="VERIFIED_TRANSCRIPT", opening_text=opening_remarks(full),
                       scope=scope, retrieved_at=datetime.now(timezone.utc).isoformat(),
                       content_sha256=digest(remarks), pdf_sha256=hashlib.sha256(response.content).hexdigest())
         return result

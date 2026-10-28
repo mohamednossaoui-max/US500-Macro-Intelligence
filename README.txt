@@ -1,25 +1,28 @@
-US500 Macro Intelligence V6.3 — Patch 3 Safe ZIP
+US500 Press Conference Scope Fix
 
-هذا ZIP لا يستبدل app.py بنسخة مُعاد بناؤها من الذاكرة.
-بدلاً من ذلك، يحتوي على سكربت آمن يغيّر فقط المواضع المتفق عليها في app.py الحالي.
+Cause confirmed in the supplied 2026-10-28 snapshot:
+Both texts are available. Previous scope is FULL_TRANSCRIPT_CHAIR_REMARKS;
+current scope is OPENING_STATEMENT. Comparison status is SCOPE_MISMATCH.
+The compact UI incorrectly rendered both sides as Unavailable.
 
-الاستعمال:
-1) فك ZIP.
-2) انسخ apply_patch3.py إلى جذر المشروع بجانب app.py.
-3) شغّل:
-   python apply_patch3.py
+Apply: copy these files into the repository root, preserving tests/ paths.
+No app.py change is required. No public_data files are included or modified.
+Run:
+python -m pytest tests/test_fed_report_comparison_v2.py tests/test_fed_communication_dates_v1.py tests/test_fed_intelligence.py tests/test_fed_beige_evidence_v1.py -q
+Validated locally: 85 passed.
 
-الحماية:
-- يتحقق السكربت من تطابق جميع المقاطع المستهدفة قبل تعديل الملف.
-- إذا لم يتطابق أي مقطع، يتوقف بدون تعديل app.py.
-- ينشئ نسخة احتياطية: app.py.pre_patch3
-- لا يلمس public_data أو backend أو PIT أو scoring أو governance.
+Then rerun the existing master publication pipeline with Fed included, so it
+rebuilds the Fed artifact, dependent layers and canonical manifest together.
+A test-only run does not publish new data. Do not manually replace the published
+Fed JSON without rebuilding its manifest and dependents.
 
-بعد التطبيق:
-   python -m py_compile app.py
-   python -m pytest -q
+Behavior: full/full comparisons remain full scope. Mixed opening/full scopes
+use only the opening chair turn on BOTH sides, ending at the first journalist
+speaker. If an opening cannot be extracted, comparison stays blocked.
+No invented release dates; unknown publication dates remain unknown.
+The detailed comparison displays its scope; compact cards preserve their layout
+and display per-side availability accurately even for older saved artifacts.
+PRELIMINARY PDF page headers are removed like FINAL headers.
 
-ولفحص الرموز المتبقية اختيارياً:
-   grep -nE '▲|▼|↑|↓|→|✓|✔|⏳' app.py
-
-لا تحذف أي نتيجة متبقية آلياً؛ راجعها أولاً.
+Live retrieval/publication was not executed. Results depend on official PDFs
+being retrievable and on the existing pipeline publishing the rebuilt snapshot.

@@ -53,6 +53,8 @@ def render_comparison(pair, title, namespace, compact=False):
     if not pair.get("available"):
         st.warning("Comparison is not ready: " + str(pair.get("status") or "Rebuild the Fed artifact with the comparison engine."))
         return
+    if namespace == "chair_press":
+        st.caption("Comparison scope: " + str(current.get("scope") or "Unknown"))
     render_metrics(pair)
     for key, topic in (pair.get("topics") or {}).items():
         pairs = topic.get("pairs") or []
@@ -94,9 +96,9 @@ def compact_comparison(pair, title, namespace):
     ready = bool(pair.get("available"))
     previous, current = pair.get("previous") or {}, pair.get("current") or {}
     event_key = "meeting_date"
-    badge = "COMPARISON READY" if ready else "NOT AVAILABLE"
-    prev = _value(row.get("previous")) if ready else "Unavailable"
-    cur = _value(row.get("current")) if ready else "Unavailable"
+    badge = "COMPARISON READY" if ready else "SCOPE MISMATCH" if pair.get("status") == "SCOPE_MISMATCH" else "COMPARISON PENDING"
+    prev = _value(row.get("previous")) if ready else "Text retrieved" if previous.get("available") else "Unavailable"
+    cur = _value(row.get("current")) if ready else "Text retrieved" if current.get("available") else "Unavailable"
     if ready and not row:
         prev, cur = "Text retrieved", "Text retrieved"
     st.markdown(
