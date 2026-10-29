@@ -23,6 +23,9 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import time
 
 import pandas as pd
@@ -487,6 +490,9 @@ def get_fred_observations(
 
     api_key = get_fred_api_key()
 
+    # FRED uses the St. Louis calendar day, which can lag the UTC runner.
+    fred_today = datetime.now(ZoneInfo("America/Chicago")).date()
+    realtime_end = min(END.date(), fred_today).isoformat()
     params = {
 
         "series_id":
@@ -510,7 +516,7 @@ def get_fred_observations(
             START.date().isoformat(),
 
         "realtime_end":
-            END.date().isoformat(),
+            realtime_end,
 
         # Initial Release Only
         "output_type":
@@ -589,6 +595,15 @@ def get_fred_observations(
                     error_message = (
                         r.text[:1000]
                     )
+
+                # Use the server's explicit day if its clock still lags ours.
+                server_day = re.search(r"realtime_end can not be after today's date \((\d{4}-\d{2}-\d{2})\)", str(error_message))
+                if r.status_code == 400 and server_day and server_day[1] < params["realtime_end"]:
+                    if server_day[1] < params["realtime_start"]:
+                        raise RuntimeError("FRED server date precedes requested real-time start")
+                    params["realtime_end"] = server_day[1]
+                    print(f"{series}: capping realtime_end to FRED server day {server_day[1]}")
+                    continue
 
                 raise RuntimeError(
                     f"FRED HTTP "
