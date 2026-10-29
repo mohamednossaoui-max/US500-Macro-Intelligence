@@ -1,3 +1,5 @@
-Replace the collector in the repository root and add the test under tests/. Run: python -m pytest tests/test_financial_stress_fred_day.py -q
-Validated: 3 passed. Then rerun financial-stress-historical-v1. After it succeeds, rerun the master publication pipeline.
-Fix: cap realtime_end to min(requested END, America/Chicago day); if FRED explicitly rejects it with an earlier server day, lower the cap before retry. Initial Release Only output_type=4 is preserved. No public_data changes. No live authenticated FRED request or publication was run.
+Replace liquidity_historical_collector_v1.py in the repository root and add tests/test_liquidity_fred_day.py.
+Run: python -m pytest tests/test_liquidity_fred_day.py -q
+Validated: 4 passed; combined with Financial Stress date regression tests: 7 passed.
+Rerun Liquidity Historical v1 using the updated main branch, then rerun the master publication pipeline after success. Re-running an old job may reuse its old commit; use a new workflow dispatch on updated main.
+The request caps realtime_end to the earlier of the requested cutoff and America/Chicago day; an explicit FRED server-day rejection lowers that cutoff before retry. Historical cutoffs remain bounded. Initial-release observation parameters and vintage dates are unchanged. No public_data files changed. No live authenticated request or deployment performed.

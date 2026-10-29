@@ -54,6 +54,8 @@ Research-only:
 """
 
 import os
+import re
+from zoneinfo import ZoneInfo
 import sys
 import time
 from datetime import datetime
@@ -472,6 +474,12 @@ def fred_get(
     does not modify remote state.
     """
 
+    params = dict(params)
+    if "realtime_end" in params:
+        today = datetime.now(ZoneInfo("America/Chicago")).date().isoformat()
+        params["realtime_end"] = min(params["realtime_end"], today)
+        if params.get("realtime_start", "") > params["realtime_end"]:
+            raise ValueError("FRED real-time start is after the available server day")
     response = None
 
     for attempt in range(
@@ -527,6 +535,13 @@ def fred_get(
 
         if response.status_code == 200:
             break
+
+        if response.status_code == 400 and "realtime_end" in params:
+            match = re.search(r"realtime_end can not be after today's date \((\d{4}-\d{2}-\d{2})\)", response.text)
+            if match and params.get("realtime_start", "") <= match[1] < params["realtime_end"]:
+                params["realtime_end"] = match[1]
+                print(f"[{series_id}] realtime_end capped to FRED server day {match[1]}")
+                continue
 
         # --------------------------------------------------------
         # Retryable transient HTTP error
