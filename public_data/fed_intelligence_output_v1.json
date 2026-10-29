@@ -1,10 +1,10 @@
 {
   "available": true,
   "schema_version": "fed-comparison-3",
-  "generated_at": "2026-10-28T23:42:31.335895+00:00",
-  "as_of_date": "2026-10-28",
+  "generated_at": "2026-10-29T00:30:39.829462+00:00",
+  "as_of_date": "2026-10-29",
   "latest_fomc": "2026-10-28",
-  "current_date": "2026-10-28",
+  "current_date": "2026-10-29",
   "fed_chair": "Kevin Warsh",
   "statement": {
     "name": "FOMC Statement",
@@ -76,7 +76,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "source_status": "VERIFIED_TRANSCRIPT",
       "scope": "OPENING_STATEMENT",
-      "retrieved_at": "2026-10-28T23:42:29.103476+00:00"
+      "retrieved_at": "2026-10-29T00:30:37.787998+00:00"
     }
   },
   "communication_comparison": {
@@ -516,7 +516,7 @@
     "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
     "available": true,
     "information_cutoff_date": "2026-10-05",
-    "retrieved_at": "2026-10-28T23:42:31.159520+00:00",
+    "retrieved_at": "2026-10-29T00:30:39.668343+00:00",
     "catalog_verified": true,
     "latest_publication_date": "2026-10-14",
     "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -600,7 +600,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-28T23:42:31.159520+00:00",
+      "retrieved_at": "2026-10-29T00:30:39.668343+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -614,7 +614,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-08-24",
-      "retrieved_at": "2026-10-28T23:42:31.329379+00:00",
+      "retrieved_at": "2026-10-29T00:30:39.822457+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
@@ -722,7 +722,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "meeting_verified": true,
       "latest_meeting_date": "2026-10-28",
-      "retrieved_at": "2026-10-28T23:42:29.103476+00:00",
+      "retrieved_at": "2026-10-29T00:30:37.787998+00:00",
       "pdf_sha256": "7b0b9f5fa79fd8fa5444d381f6f6b4c922b39c3092a8f03b1a36c9cbe646059d",
       "availability_basis": "VERIFIED_PDF_RETRIEVAL"
     },
@@ -743,7 +743,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-10-28T23:42:31.159520+00:00",
+      "retrieved_at": "2026-10-29T00:30:39.668343+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -757,7 +757,7 @@
         "publication_date": "2026-09-16",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
-        "retrieved_at": "2026-10-28T23:42:31.335895+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.829462+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "fc27d85fa8d02c2afe3ef5e54416802aac2fa1d2b926b26424f0fbf70842367b",
@@ -828,7 +828,7 @@
         "publication_date": "2026-10-28",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
-        "retrieved_at": "2026-10-28T23:42:31.335895+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.829462+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "e22a52d380060ec6baf0af35114f3d5d8ee9f4930ad5f6dcbce0e8af782bfbe2",
@@ -1050,7 +1050,7 @@
         "publication_date": "2026-08-19",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-28T23:42:31.335895+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.829462+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "8f5914c96ce15c0b9a74b22158704d1c9795f0ccf0463fd53d6f552fb5af1335",
@@ -1284,7 +1284,7 @@
         "publication_date": "2026-10-07",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-10-28T23:42:31.335895+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.829462+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "3547a0f56c6460166e652ad8911ad779b0a5afe9140f4692091ec864f7e51bb3",
@@ -2718,7 +2718,7 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-28T23:42:30.109068+00:00",
+        "retrieved_at": "2026-10-29T00:30:38.650916+00:00",
         "available": true,
         "scope": "OPENING_STATEMENT",
         "content_sha256": "9a613fcd8583ff37288cb46f3c09e8b092c0ec845e96816aea5fdf2171c833a5",
@@ -2816,11 +2816,24 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-10-28T23:42:29.103476+00:00",
+        "retrieved_at": "2026-10-29T00:30:37.787998+00:00",
         "available": true,
         "scope": "OPENING_STATEMENT",
         "content_sha256": "ae64f2b09f266650e854b2ea7b32119be48332d8dea1efe15c51f7a94be9ee0b",
-        "facts": {},
+        "facts": {
+          "policy_action": {
+            "value": "HOLD",
+            "evidence": "This morning the FOMC decided to maintain the target rate for the federal funds rate at 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          },
+          "target_range": {
+            "value": [
+              3.75,
+              4.0
+            ],
+            "unit": "percent",
+            "evidence": "This morning the FOMC decided to maintain the target rate for the federal funds rate at 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          }
+        },
         "topics": {
           "inflation": {
             "label": "Inflation and prices",
@@ -2889,9 +2902,12 @@
             "value": "RAISE",
             "evidence": "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
           },
-          "current": null,
+          "current": {
+            "value": "HOLD",
+            "evidence": "This morning the FOMC decided to maintain the target rate for the federal funds rate at 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          },
           "change": null,
-          "status": "NOT_COMPARABLE"
+          "status": "CHANGED"
         },
         "target_range": {
           "previous": {
@@ -2902,9 +2918,20 @@
             "unit": "percent",
             "evidence": "In the meeting just concluded, the FOMC decided to raise the target range for the federal funds rate by a ¼ percentage point to 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
           },
-          "current": null,
-          "change": null,
-          "status": "NOT_COMPARABLE"
+          "current": {
+            "value": [
+              3.75,
+              4.0
+            ],
+            "unit": "percent",
+            "evidence": "This morning the FOMC decided to maintain the target rate for the federal funds rate at 3¾ to 4 percent, in support of the Federal Reserve’s dual mandate."
+          },
+          "change": [
+            0.0,
+            0.0
+          ],
+          "change_unit": "basis points",
+          "status": "UNCHANGED"
         },
         "vote": {
           "previous": {
@@ -3174,7 +3201,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-08-24",
-        "retrieved_at": "2026-10-28T23:42:31.329379+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.822457+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb",
@@ -3234,7 +3261,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-10-05",
-        "retrieved_at": "2026-10-28T23:42:31.159520+00:00",
+        "retrieved_at": "2026-10-29T00:30:39.668343+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef",
@@ -3446,7 +3473,7 @@
     "source_status": "VERIFIED_TRANSCRIPT",
     "publication_date": null,
     "publication_date_source": null,
-    "retrieved_at": "2026-10-28T23:42:29.103476+00:00",
+    "retrieved_at": "2026-10-29T00:30:37.787998+00:00",
     "scope": "OPENING_STATEMENT",
     "related_release_dates": {
       "statement": "2026-10-28"
@@ -3492,12 +3519,12 @@
     },
     "pit_scope": "Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; its publication date remains unknown. No intraday or archived-vintage guarantee.",
     "availability_bounds": {
-      "chair_press": "2026-10-28T23:42:29.103476+00:00"
+      "chair_press": "2026-10-29T00:30:37.787998+00:00"
     },
     "research_only": true,
     "forecast": false,
     "trading_signal": false,
-    "as_of_date": "2026-10-28",
+    "as_of_date": "2026-10-29",
     "communication_documents_available": 3,
     "sep_available": true,
     "beige_book_available": true,
