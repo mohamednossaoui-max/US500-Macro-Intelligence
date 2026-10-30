@@ -1,0 +1,26 @@
+{
+  "synthetic": true,
+  "notice": "Demonstration excerpts; capture times are SYNTHETIC, not verified historical availability. Never use this manifest for a backtest.",
+  "documents": [
+    {
+      "text": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:\nThe Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent.\nEconomic activity is expanding at a solid pace.\nInflation remains elevated.",
+      "sha256": "0c8b58e099a8d246b95ec459e6fd220ac873ccad56567eaf0f3af467b9d986f2",
+      "meeting_date": "2026-09-16",
+      "first_seen_at": "2026-09-16T18:00:00Z",
+      "published_at": null,
+      "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+      "scope": "OFFICIAL_STATEMENT",
+      "version_status": "UNKNOWN"
+    },
+    {
+      "text": "The Federal Open Market Committee approved the following statement for release by a 10 – 2 vote:\nThe Committee decided to maintain the target range for the federal funds rate at 3-3/4 to 4 percent.\nVoting against the monetary policy action were Lisa D. Cook and Beth M. Hammack, who preferred to raise the target range by 1/4 percentage point.\nEconomic activity is expanding at a strong pace.\nInflation remains elevated.",
+      "sha256": "e55ece31551fd8efea331be4a3855b456d23599c9ae78a3fa78ed9e048335ee0",
+      "meeting_date": "2026-10-28",
+      "first_seen_at": "2026-10-28T18:00:00Z",
+      "published_at": null,
+      "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+      "scope": "OFFICIAL_STATEMENT",
+      "version_status": "UNKNOWN"
+    }
+  ]
+}

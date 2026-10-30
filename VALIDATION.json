@@ -1,0 +1,10 @@
+{
+  "tests_passed": 18,
+  "original_archive": "US500-Macro-Intelligence-main(20261028-225433).zip",
+  "original_archive_sha256": "b0a0077aa8cefee24275ad93425b1b411873140cc95bbfb5624acd56f6b40fae",
+  "original_files_changed": [],
+  "production_integration": false,
+  "live_fetch_or_publication": false,
+  "demo_capture_times": "SYNTHETIC - NOT BACKTEST DATA",
+  "scope": "Fed experiment only; GDP/PCE and liquidity experiments not implemented"
+}

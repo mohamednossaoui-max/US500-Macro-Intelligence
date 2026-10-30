@@ -1,0 +1,106 @@
+{
+  "status": "RESEARCH_ONLY",
+  "as_of": "2026-10-30T09:00:00+00:00",
+  "availability_basis": "FIRST_OBSERVED_VERSION_CONSERVATIVE",
+  "synthetic": true,
+  "comparisons": [
+    {
+      "scope": "OFFICIAL_STATEMENT",
+      "status": "READY",
+      "previous": {
+        "sha256": "0c8b58e099a8d246b95ec459e6fd220ac873ccad56567eaf0f3af467b9d986f2",
+        "meeting_date": "2026-09-16",
+        "first_seen_at": "2026-09-16T18:00:00Z",
+        "published_at": null,
+        "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+        "scope": "OFFICIAL_STATEMENT",
+        "version_status": "UNKNOWN",
+        "facts": {
+          "vote": {
+            "value": [
+              12,
+              0
+            ],
+            "evidence": "The Federal Open Market Committee approved the following statement for release by a 12 – 0 vote:"
+          },
+          "policy_action": {
+            "value": "RAISE",
+            "evidence": "The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent."
+          },
+          "target_range_percent": {
+            "value": [
+              3.75,
+              4.0
+            ],
+            "evidence": "The Committee decided to raise the target range for the federal funds rate by 1/4 percentage point to 3-3/4 to 4 percent."
+          },
+          "growth": {
+            "evidence": [
+              "Economic activity is expanding at a solid pace."
+            ]
+          },
+          "inflation": {
+            "evidence": [
+              "Inflation remains elevated."
+            ]
+          }
+        }
+      },
+      "current": {
+        "sha256": "e55ece31551fd8efea331be4a3855b456d23599c9ae78a3fa78ed9e048335ee0",
+        "meeting_date": "2026-10-28",
+        "first_seen_at": "2026-10-28T18:00:00Z",
+        "published_at": null,
+        "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+        "scope": "OFFICIAL_STATEMENT",
+        "version_status": "UNKNOWN",
+        "facts": {
+          "vote": {
+            "value": [
+              10,
+              2
+            ],
+            "evidence": "The Federal Open Market Committee approved the following statement for release by a 10 – 2 vote:"
+          },
+          "policy_action": {
+            "value": "HOLD",
+            "evidence": "The Committee decided to maintain the target range for the federal funds rate at 3-3/4 to 4 percent."
+          },
+          "target_range_percent": {
+            "value": [
+              3.75,
+              4.0
+            ],
+            "evidence": "The Committee decided to maintain the target range for the federal funds rate at 3-3/4 to 4 percent."
+          },
+          "dissent_preference": {
+            "value": "RAISE",
+            "evidence": "Voting against the monetary policy action were Lisa D. Cook and Beth M. Hammack, who preferred to raise the target range by 1/4 percentage point."
+          },
+          "growth": {
+            "evidence": [
+              "Economic activity is expanding at a strong pace."
+            ]
+          },
+          "inflation": {
+            "evidence": [
+              "Inflation remains elevated."
+            ]
+          }
+        }
+      },
+      "changes": {
+        "dissent_preference": "NOT_COMPARABLE",
+        "growth": "CHANGED",
+        "inflation": "UNCHANGED",
+        "policy_action": "CHANGED",
+        "target_range_percent": "UNCHANGED",
+        "vote": "CHANGED"
+      }
+    },
+    {
+      "scope": "OPENING_STATEMENT",
+      "status": "INSUFFICIENT_AVAILABLE_DOCUMENTS"
+    }
+  ]
+}
