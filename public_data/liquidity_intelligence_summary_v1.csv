@@ -1,9 +1,9 @@
 asof_date,indicator,latest_value,latest_observation_date,latest_available_at,age_days,fresh,eligible,research_only,point_in_time_safe,decision_engine_ready,trading_signal_generated,forecast_generated,liquidity_score_generated
-2026-10-29,EFFR,3.88,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,FED_TOTAL_ASSETS,6745635.0,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,MBS,1883522.0,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,ON_RRP,0.353,2026-10-29,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,RESERVE_BALANCES,2893770.0,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,SOFR,3.94,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,TREASURY_GENERAL_ACCOUNT,999727.0,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
-2026-10-29,TREASURY_SECURITIES,4576582.0,2026-10-28,2026-10-29,0,True,True,True,True,False,False,False,False
+2026-10-30,EFFR,3.88,2026-10-29,2026-10-30,0,True,True,True,True,False,False,False,False
+2026-10-30,FED_TOTAL_ASSETS,6745635.0,2026-10-28,2026-10-29,1,True,True,True,True,False,False,False,False
+2026-10-30,MBS,1883522.0,2026-10-28,2026-10-29,1,True,True,True,True,False,False,False,False
+2026-10-30,ON_RRP,4.375,2026-10-30,2026-10-30,0,True,True,True,True,False,False,False,False
+2026-10-30,RESERVE_BALANCES,2893770.0,2026-10-28,2026-10-29,1,True,True,True,True,False,False,False,False
+2026-10-30,SOFR,3.94,2026-10-29,2026-10-30,0,True,True,True,True,False,False,False,False
+2026-10-30,TREASURY_GENERAL_ACCOUNT,999727.0,2026-10-28,2026-10-29,1,True,True,True,True,False,False,False,False
+2026-10-30,TREASURY_SECURITIES,4576582.0,2026-10-28,2026-10-29,1,True,True,True,True,False,False,False,False
