@@ -330,12 +330,12 @@
   "financial_stress": {
     "source_date": "2026-10-29",
     "age_days": 1,
-    "composite_stress_score": 0.3726664741553165,
+    "composite_stress_score": 0.4001012756951705,
     "research_regime": "ELEVATED_RESEARCH_STRESS",
     "vix": 17.2,
-    "treasury_2y": 4.67,
-    "treasury_10y": 5.05,
-    "yield_10y_2y_spread": 0.3799999999999999,
+    "treasury_2y": 4.61,
+    "treasury_10y": 4.98,
+    "yield_10y_2y_spread": 0.3700000000000001,
     "pit_safe": true
   },
   "event_news": {

@@ -18,9 +18,9 @@
   "historical_analogs": {
     "count": 7,
     "closest_date": "2025-07-01",
-    "closest_similarity_pct": 74.8332,
+    "closest_similarity_pct": 74.3676,
     "closest_coverage_pct": 88.89,
-    "summary": "Stage 10 selected 7 independent analog regimes without using outcomes. Closest is 2025-07-01 with 74.83% similarity and 88.89% comparable CORE coverage.",
+    "summary": "Stage 10 selected 7 independent analog regimes without using outcomes. Closest is 2025-07-01 with 74.37% similarity and 88.89% comparable CORE coverage.",
     "key_differences": "economic_labor: hist=0.0099398810616049, current=-0.0213397051714464 | economic_growth: hist=-1.476931068100174, current=-0.0507334623403759 | economic_inflation: hist=0.0659629587261937, current=0.3290131994082034"
   },
   "historical_market_reaction": {
@@ -80,13 +80,13 @@
   },
   "important_differences": "economic_labor: hist=0.0099398810616049, current=-0.0213397051714464 | economic_growth: hist=-1.476931068100174, current=-0.0507334623403759 | economic_inflation: hist=0.0659629587261937, current=0.3290131994082034",
   "risks_and_limitations": [
-    "Closest analog similarity is 74.83%; similarity is not a probability.",
+    "Closest analog similarity is 74.37%; similarity is not a probability.",
     "Historical Fed feature is unavailable under the same PIT-safe USV1.0 definition; analog CORE coverage is reduced accordingly.",
     "Overall evidence PIT status is PIT_LIMITED; CORE PIT remains True.",
     "CONTEXTUAL evidence does not alter the Decision Engine state.",
     "Historical market reactions are descriptive conditional evidence and are not forecasts or trading signals."
   ],
-  "final_research_synthesis": "The current research state is MIXED. Economic regime: MIXED; financial stress: ELEVATED_RESEARCH_STRESS; sentiment: BEARISH; technicals: BULLISH. Stage 10 selected 7 independent analog regimes without using outcomes. Closest is 2025-07-01 with 74.83% similarity and 88.89% comparable CORE coverage. 60D: historical median +5.44% (71.4% positive), range -8.93% to +13.68%. 120D: historical median +7.45% (100.0% positive), range +3.69% to +19.54%. These are conditional historical outcomes, not expected returns or forecasts. This is not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
+  "final_research_synthesis": "The current research state is MIXED. Economic regime: MIXED; financial stress: ELEVATED_RESEARCH_STRESS; sentiment: BEARISH; technicals: BULLISH. Stage 10 selected 7 independent analog regimes without using outcomes. Closest is 2025-07-01 with 74.37% similarity and 88.89% comparable CORE coverage. 60D: historical median +5.44% (71.4% positive), range -8.93% to +13.68%. 120D: historical median +7.45% (100.0% positive), range +3.69% to +19.54%. These are conditional historical outcomes, not expected returns or forecasts. This is not a directional forecast. Evidence quality is MEDIUM and overall PIT status is PIT_LIMITED.",
   "research_only": true,
   "forecast_generated": false,
   "trading_signal_generated": false,
