@@ -91,6 +91,7 @@ def coverage(obj):
 
 def compact_comparison(pair, title, namespace):
     """Restore the original compact cards; keep full evidence collapsed."""
+    pair = pair if isinstance(pair, dict) else {}
     metrics = pair.get("metrics") or {}
     row = next((metrics.get(key) for key in ("target_range", "policy_action")
                 if (metrics.get(key) or {}).get("previous") and (metrics.get(key) or {}).get("current")), {})
@@ -109,5 +110,8 @@ def compact_comparison(pair, title, namespace):
         f"<strong>→</strong><span><small>CURRENT</small>{escape(cur)}</span></div>"
         f"<div class='comm-shift-date'>Meeting dates: {escape(str(previous.get(event_key) or 'Unknown'))} → "
         f"{escape(str(current.get(event_key) or 'Unknown'))}</div></div>", unsafe_allow_html=True)
+    if namespace in ("statement", "chair_press"):
+        from fed_evidence_panel_v1 import render_evidence_panel
+        render_evidence_panel(pair, namespace)
     with st.expander(f"{title} — Detailed report comparison", expanded=False):
         render_comparison(pair, title, namespace, compact=True)
