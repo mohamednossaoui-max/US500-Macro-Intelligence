@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-10-29T11:34:49.369715+00:00",
-  "rows": 96,
+  "generated_at": "2026-10-30T08:29:26.278727+00:00",
+  "rows": 98,
   "source_counts": {
-    "OFFICIAL_RSS": 96
+    "OFFICIAL_RSS": 98
   },
   "topic_counts": {
-    "growth": 63,
-    "fed": 30,
+    "growth": 64,
+    "fed": 31,
     "labor": 2,
     "inflation": 1
   },
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "HTTP 429",
+    "error": "ParseError('syntax error: line 1, column 0')",
     "query_requests": 1,
     "fallback_required": true
   },
@@ -156,6 +156,15 @@
         "description": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
         "published_at": "2026-05-20T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by The Bank of Nova Scotia",
+        "description": "Federal Reserve Board announces approval of application by The Bank of Nova Scotia",
+        "published_at": "2026-10-29T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261029a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -332,12 +341,21 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Federal Reserve Board and Federal Open Market Committee release economic projections from the September 15-16 FOMC meeting",
-        "description": "Federal Reserve Board and Federal Open Market Committee release economic projections from the September 15-16 FOMC meeting",
-        "published_at": "2026-09-16T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916b.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
+        "title": "GDP (Advance Estimate), 3rd Quarter 2026",
+        "description": "<p>Real gross domestic product (GDP) increased at an annual rate of 3.4 percent in the third quarter of 2026 (July, August, and September), according to the advance estimate released today by the U.S. Bureau of Economic Analysis (BEA). In the second quarter, real GDP increased 2.2 percent. The contributors to the increase in real GDP in the third quarter were increases in investment, consumer spending, and government spending that were partly offset by a decrease in exports. Imports, which are a subtraction in the calculation of GDP, increased. </p>",
+        "published_at": "2026-10-29T12:30:00+00:00",
+        "url": "https://www.bea.gov/news/2026/gdp-advance-estimate-3rd-quarter-2026",
+        "topic": "growth",
+        "source": "BEA",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Personal Income and Outlays, September 2026",
+        "description": "<p>Personal income increased $54.5 billion (0.2 percent at a monthly rate) in September, according to estimates released today by the U.S. Bureau of Economic Analysis (BEA). Disposable personal income (DPI)&ndash;personal income less personal current taxes&ndash;increased $52.7 billion (0.2 percent), and personal consumption expenditures (PCE) increased $113.1 billion (0.5 percent). Personal outlays&ndash;the sum of PCE, personal interest payments, and personal current transfer payments&ndash;increased $113.0 billion in September. Personal saving was $911.1 billion, and the personal saving rate&ndash;personal saving as a percentage of DPI&ndash;was 3.8 percent. </p>",
+        "published_at": "2026-10-29T12:30:00+00:00",
+        "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-september-2026",
+        "topic": "growth",
+        "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
       {
@@ -345,15 +363,6 @@
         "description": "<p>The U.S. goods and services trade deficit increased in August 2026 according to the U.S. Bureau of Economic Analysis and the U.S. Census Bureau. The deficit increased from $92.8 billion in July (revised) to $105.6 billion in August, as imports increased more than exports. The goods deficit increased $12.8 billion in August to $136.6 billion. The services surplus increased less than $0.1 billion in August to $31.0 billion.</p>",
         "published_at": "2026-10-06T12:30:00+00:00",
         "url": "https://www.bea.gov/news/2026/us-international-trade-goods-and-services-august-2026",
-        "topic": "growth",
-        "source": "BEA",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "GDP, (Third Estimate), Industries, Corporate Profits, State GDP, and State Personal Income, 2nd Quarter 2026; State PCE, 2025",
-        "description": "<p>Real gross domestic product (GDP) increased at an annual rate of 2.2 percent in the second quarter of 2026 (April, May, and June), according to the third estimate released today by the U.S. Bureau of Economic Analysis (BEA). In the first quarter, real GDP increased 2.5 percent (revised). The contributors to the increase in real GDP in the second quarter were consumer spending, investment, and exports. Imports, which are a subtraction in the calculation of GDP, increased.</p><p>At the state level, real GDP ranged from a 4.0 percent increase in New York to a 2.3 percent decrease in West Virginia.</p>",
-        "published_at": "2026-09-30T12:30:00+00:00",
-        "url": "https://www.bea.gov/news/2026/gdp-third-estimate-industries-corporate-profits-state-gdp-and-state-personal-income-2nd",
         "topic": "growth",
         "source": "BEA",
         "source_type": "OFFICIAL_RSS"
@@ -948,7 +957,7 @@
       },
       "bea_news": {
         "ok": true,
-        "rows": 48,
+        "rows": 49,
         "error": null
       },
       "census_economic_indicators": {
@@ -973,12 +982,12 @@
     {
       "check": "minimum_dataset_rows",
       "pass": true,
-      "detail": "rows=96"
+      "detail": "rows=98"
     },
     {
       "check": "unique_event_ids",
       "pass": true,
-      "detail": "unique_ids=96"
+      "detail": "unique_ids=98"
     },
     {
       "check": "timestamps",

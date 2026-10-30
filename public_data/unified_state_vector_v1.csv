@@ -1,14 +1,14 @@
 state_vector_version,context_date,feature,module,role,value,state,as_of,available_at,age_days,freshness,pit_status,quality,eligible,source,notes
-USV1.0,2026-10-29,economic_inflation,ECONOMIC,CORE,0.3290131994082034,MIXED,2026-10-29,2026-10-29,26,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,economic_labor,ECONOMIC,CORE,-0.0270411763771128,MIXED,2026-10-29,2026-10-29,26,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,economic_growth,ECONOMIC,CORE,-0.0507334623403759,MIXED,2026-10-29,2026-10-29,26,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,economic_regime,ECONOMIC,CORE,,MIXED,2026-10-29,2026-10-29,26,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,fed_stance,FED,CORE,57.0,MODERATELY HAWKISH,2026-10-29,2026-10-29,43,CURRENT,OBSERVATION_CHECKED,LOW,False,fed_intelligence_output_v1.json,Independent Fed feature; legacy Macro Fed field intentionally not duplicated.
-USV1.0,2026-10-29,financial_stress,FINANCIAL_STRESS,CORE,0.6010027275458569,ELEVATED_RESEARCH_STRESS,2026-10-29,2026-10-29,1,CURRENT,PIT_SAFE,HIGH,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,liquidity_coverage,LIQUIDITY,CORE,8.0,8/8_ELIGIBLE,2026-10-28,2026-10-28,7,CURRENT,PIT_SAFE,MEDIUM,True,liquidity_intelligence_summary_v1.csv,No liquidity score generated; coverage only.
-USV1.0,2026-10-29,sentiment,SENTIMENT,CORE,37.33211233211233,BEARISH,2026-10-29,2026-10-29,6,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,technical,TECHNICAL,CORE,,BULLISH,2026-10-29,2026-10-29,0,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
-USV1.0,2026-10-29,market_breadth,MARKET_BREADTH,CONTEXTUAL,,POSITIVE_BREADTH,2026-08-18,2026-08-18,72,STALE,PIT_LIMITED,LOW,False,market_breadth_analysis_summary_v1.json,Research-grade reconstructed membership; not PIT-perfect.
-USV1.0,2026-10-29,cross_asset,CROSS_ASSET,CONTEXTUAL,,AVAILABLE,2026-10-29,2026-10-29,1,CURRENT,PIT_LIMITED,MEDIUM,False,cross_asset_summary_v1.json,PIT_LIMITED; session-aware timestamps unavailable.
-USV1.0,2026-10-29,event_news,EVENT_NEWS,CONTEXTUAL,,CONTEXTUAL,2026-10-28,2026-10-28,1,CURRENT,PIT_SAFE_BY_PUBLICATION_TIME,ELIGIBLE,False,decision_engine_evidence_registry_v2.csv,96 official items; 46 high-relevance; 5 duplicates flagged.
-USV1.0,2026-10-29,earnings,EARNINGS,CONTEXTUAL,,CONTEXTUAL,2026-10-29,2026-10-29,0,CURRENT,PIT_LIMITED,DEGRADED,False,decision_engine_evidence_registry_v2.csv,1209 historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.
+USV1.0,2026-10-30,economic_inflation,ECONOMIC,CORE,0.3290131994082034,MIXED,2026-10-30,2026-10-30,27,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,economic_labor,ECONOMIC,CORE,-0.0213397051714464,MIXED,2026-10-30,2026-10-30,27,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,economic_growth,ECONOMIC,CORE,-0.0507334623403759,MIXED,2026-10-30,2026-10-30,27,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,economic_regime,ECONOMIC,CORE,,MIXED,2026-10-30,2026-10-30,27,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,fed_stance,FED,CORE,57.0,MODERATELY HAWKISH,2026-10-30,2026-10-30,44,CURRENT,OBSERVATION_CHECKED,LOW,False,fed_intelligence_output_v1.json,Independent Fed feature; legacy Macro Fed field intentionally not duplicated.
+USV1.0,2026-10-30,financial_stress,FINANCIAL_STRESS,CORE,0.3726664741553165,ELEVATED_RESEARCH_STRESS,2026-10-30,2026-10-30,1,CURRENT,PIT_SAFE,HIGH,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,liquidity_coverage,LIQUIDITY,CORE,8.0,8/8_ELIGIBLE,2026-10-29,2026-10-29,1,CURRENT,PIT_SAFE,MEDIUM,True,liquidity_intelligence_summary_v1.csv,No liquidity score generated; coverage only.
+USV1.0,2026-10-30,sentiment,SENTIMENT,CORE,38.94993894993895,BEARISH,2026-10-30,2026-10-30,3,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,technical,TECHNICAL,CORE,,BULLISH,2026-10-30,2026-10-30,0,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
+USV1.0,2026-10-30,market_breadth,MARKET_BREADTH,CONTEXTUAL,,POSITIVE_BREADTH,2026-08-18,2026-08-18,73,STALE,PIT_LIMITED,LOW,False,market_breadth_analysis_summary_v1.json,Research-grade reconstructed membership; not PIT-perfect.
+USV1.0,2026-10-30,cross_asset,CROSS_ASSET,CONTEXTUAL,,AVAILABLE,2026-10-30,2026-10-30,0,CURRENT,PIT_LIMITED,MEDIUM,False,cross_asset_summary_v1.json,PIT_LIMITED; session-aware timestamps unavailable.
+USV1.0,2026-10-30,event_news,EVENT_NEWS,CONTEXTUAL,,CONTEXTUAL,2026-10-29,2026-10-29,1,CURRENT,PIT_SAFE_BY_PUBLICATION_TIME,ELIGIBLE,False,decision_engine_evidence_registry_v2.csv,98 official items; 46 high-relevance; 5 duplicates flagged.
+USV1.0,2026-10-30,earnings,EARNINGS,CONTEXTUAL,,CONTEXTUAL,2026-10-29,2026-10-29,1,CURRENT,PIT_LIMITED,DEGRADED,False,decision_engine_evidence_registry_v2.csv,1209 historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.

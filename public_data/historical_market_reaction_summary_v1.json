@@ -1,6 +1,6 @@
 {
   "reaction_engine_version": "HMR1.0",
-  "context_date": "2026-10-29",
+  "context_date": "2026-10-30",
   "analog_engine_version": "HAE1.0",
   "analog_count": 7,
   "analog_selection_locked": true,
@@ -22,50 +22,50 @@
     "5d": {
       "available_analogs": 7,
       "total_analogs": 7,
-      "mean_return_pct": -1.33029,
-      "median_return_pct": 0.540073,
-      "positive_hit_rate_pct": 71.4286,
+      "mean_return_pct": -1.47769,
+      "median_return_pct": 0.204242,
+      "positive_hit_rate_pct": 57.1429,
       "min_return_pct": -11.544324,
       "max_return_pct": 1.067065,
-      "return_std_pct": 4.572868,
+      "return_std_pct": 4.52064,
       "median_max_drawdown_pct": -1.261702,
       "median_realized_volatility_pct": 10.312171
     },
     "20d": {
       "available_analogs": 7,
       "total_analogs": 7,
-      "mean_return_pct": 1.507714,
-      "median_return_pct": 2.660372,
+      "mean_return_pct": 1.19289,
+      "median_return_pct": 1.338559,
       "positive_hit_rate_pct": 57.1429,
       "min_return_pct": -1.921704,
       "max_return_pct": 5.487904,
-      "return_std_pct": 2.682945,
-      "median_max_drawdown_pct": -2.696027,
-      "median_realized_volatility_pct": 13.545671
+      "return_std_pct": 2.553919,
+      "median_max_drawdown_pct": -2.582183,
+      "median_realized_volatility_pct": 12.971659
     },
     "60d": {
       "available_analogs": 7,
       "total_analogs": 7,
-      "mean_return_pct": 3.69085,
-      "median_return_pct": 3.790256,
+      "mean_return_pct": 4.074213,
+      "median_return_pct": 5.438153,
       "positive_hit_rate_pct": 71.4286,
       "min_return_pct": -8.934356,
       "max_return_pct": 13.681309,
-      "return_std_pct": 7.483714,
+      "return_std_pct": 7.508096,
       "median_max_drawdown_pct": -5.110085,
-      "median_realized_volatility_pct": 12.898347
+      "median_realized_volatility_pct": 12.356547
     },
     "120d": {
       "available_analogs": 7,
       "total_analogs": 7,
-      "mean_return_pct": 9.188487,
+      "mean_return_pct": 10.18138,
       "median_return_pct": 7.452457,
-      "positive_hit_rate_pct": 85.7143,
-      "min_return_pct": -1.77763,
+      "positive_hit_rate_pct": 100.0,
+      "min_return_pct": 3.692461,
       "max_return_pct": 19.543761,
-      "return_std_pct": 7.558421,
-      "median_max_drawdown_pct": -6.765255,
-      "median_realized_volatility_pct": 12.624993
+      "return_std_pct": 6.299684,
+      "median_max_drawdown_pct": -5.110085,
+      "median_realized_volatility_pct": 11.746574
     }
   }
 }
