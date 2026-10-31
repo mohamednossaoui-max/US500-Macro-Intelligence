@@ -11,7 +11,7 @@
     "sentiment_engine_research_v1.csv": "bd523852b80561dc3a5366f204eff67296a9f2dcae7ad868f401bf15be684fa3",
     "liquidity_intelligence_research_v1.csv": "74c3ea7265643a947f13dc199d7b7e0aa959035708c81ea3e059b08035367b64"
   },
-  "source_snapshot_count": 57,
+  "source_snapshot_count": 58,
   "archive_snapshot_ids": [
     "fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4",
     "cd3c3b10f577e514ef66c7b719862194175170533bd2ca2669b19c6713c6a7ac",
@@ -69,7 +69,8 @@
     "9cc638eda2ae6f267d53a48e1b009dfb0817c1ae11e1aca52248f2fb998186fe",
     "0f34575f10fa2f0fd5547f3c387133adf47885f27c4916abd2be568e8c396e12",
     "0e51f1afda901bcb2d0a334315c367407c443ff663255e20cab8210bfbaeff37",
-    "9b43a4affc86183423108f18a584d3bd73b1f4b49efdc205deedfe1ea2b6b51b"
+    "9b43a4affc86183423108f18a584d3bd73b1f4b49efdc205deedfe1ea2b6b51b",
+    "aa6791476917cfdfc60a7aaac66e207cd9abe6e183299e20d2d1b4b4a7496490"
   ],
   "snapshot_first_available_at": "2026-10-04T19:00:18.670929+00:00",
   "analyses": [
