@@ -407,9 +407,9 @@ def collect_claims(client):
         if 'published each week on Thursday' not in index.get_text(' ', strip=True):
             raise MetadataError('DOL official publication schedule unverified')
         now = pd.Timestamp.now(tz='America/New_York')
-        regular = now.normalize()-pd.Timedelta(days=(now.weekday()-3)%7)
+        regular = now.normalize()-pd.DateOffset(days=(now.weekday()-3)%7)
         if regular+pd.Timedelta(hours=8,minutes=30)>now:
-            regular -= pd.Timedelta(days=7)
+            regular -= pd.DateOffset(days=7)
         scheduled = regular
         for tr in index.find_all('tr'):
             cells = tr.find_all('td')
@@ -419,10 +419,10 @@ def collect_claims(client):
             if match:
                 exception = pd.Timestamp(' '.join(match.groups())).tz_localize('America/New_York')
                 # A holiday substitution belongs to the same Monday-Sunday week.
-                week_start = exception-pd.Timedelta(days=exception.weekday())
-                thursday = week_start+pd.Timedelta(days=3)
-                if week_start <= now < week_start+pd.Timedelta(days=7):
-                    scheduled = exception if exception+pd.Timedelta(hours=8,minutes=30)<=now else thursday-pd.Timedelta(days=7)
+                week_start = exception-pd.DateOffset(days=exception.weekday())
+                thursday = week_start+pd.DateOffset(days=3)
+                if week_start <= now < week_start+pd.DateOffset(days=7):
+                    scheduled = exception if exception+pd.Timedelta(hours=8,minutes=30)<=now else thursday-pd.DateOffset(days=7)
         candidates = []
         for year in {scheduled.year, now.year}:
             archive_url = 'https://oui.doleta.gov/unemploy/archive.asp'

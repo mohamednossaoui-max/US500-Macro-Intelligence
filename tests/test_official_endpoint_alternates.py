@@ -54,8 +54,8 @@ def test_bls_calendar_schedule_does_not_prove_publication():
 
 
 def test_dol_blocked_current_discovers_archive_and_keeps_revision(monkeypatch):
-    now=pd.Timestamp.now(tz='America/New_York');rd=now.normalize()-pd.Timedelta(days=(now.weekday()-3)%7)
-    if rd+pd.Timedelta(hours=8,minutes=30)>now:rd-=pd.Timedelta(days=7)
+    now=pd.Timestamp.now(tz='America/New_York');rd=now.normalize()-pd.DateOffset(days=(now.weekday()-3)%7)
+    if rd+pd.Timedelta(hours=8,minutes=30)>now:rd-=pd.DateOffset(days=7)
     week=rd-pd.Timedelta(days=5)
     pdf_text=f'EMBARGOED UNTIL 8:30 A.M. (Eastern) {rd.strftime("%A, %B %d, %Y")} In the week ending {week.strftime("%B %d, %Y")}, the advance figure for seasonally adjusted initial claims was 200,000. The previous week\'s level was revised up by 1,000 from 199,000 to 200,000.'
     monkeypatch.setattr(sources,'PdfReader',lambda _:SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda:pdf_text)]))
