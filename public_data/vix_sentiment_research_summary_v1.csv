@@ -6,7 +6,7 @@ rolling_window_observations,252
 minimum_observations,126
 latest_VIX,19.42
 latest_VIX_percentile,77.77777777777779
-latest_VIX_z,0.43319043028241966
+latest_VIX_z,0.4331904302824188
 latest_research_regime,HIGH_FEAR
 point_in_time_safe,True
 research_only,True
