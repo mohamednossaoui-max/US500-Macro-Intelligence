@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-02T13:31:52.756434+00:00",
+  "generated_at": "2026-11-03T08:46:28.182197+00:00",
   "rows": 98,
   "source_counts": {
     "OFFICIAL_RSS": 98
@@ -782,6 +782,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Construction Spending",
+        "description": "Total construction spending for September 2026 ($2,186.1 billion) was 1.9 percent (+/- 0.7 percent) below the revised August 2026 ($2,227.4 billion) estimate.<p><br>September 2026: -1.9 % Change<br>August 2026 (r): 2.0* % Change<br></p>",
+        "published_at": "2026-11-02T15:00:00+00:00",
+        "url": "https://www.census.gov/construction/c30/c30index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Housing Vacancies and Homeownership",
         "description": "The homeownership rate of 65.5 percent was not statistically different from the rate in the third quarter 2025. The homeownership rates in the Northeast, Midwest, South, and West were not statistically different from third quarter 2025 rates.<p><br>3rd Qtr 2026: +0.2* Percentage Points<br>3rd Qtr 2025: -0.3* Percentage Points<br></p>",
         "published_at": "2026-10-28T14:00:00+00:00",
@@ -903,15 +912,6 @@
         "description": "New orders for manufactured goods in August, up two consecutive months, increased $0.7 billion or 0.1 percent to $663.5 billion.<p><br>August 2026: +0.1° % Change<br>July 2026 (r): +0.8° % Change<br></p>",
         "published_at": "2026-10-02T14:00:00+00:00",
         "url": "https://www.census.gov/manufacturing/m3/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Construction Spending",
-        "description": "Total construction spending for August 2026 ($2,203.1 billion) was 0.9 percent (+/- 1.0 percent)* above the revised July 2026 ($2,184.5 billion) estimate.<p><br>August 2026: 0.9* % Change<br>July 2026 (r): -0.1* % Change<br></p>",
-        "published_at": "2026-10-01T14:00:00+00:00",
-        "url": "https://www.census.gov/construction/c30/c30index.html",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"

@@ -1,7 +1,7 @@
 {
   "provider": "official",
-  "as_of_date": "2026-11-02",
-  "retrieved_at": "2026-11-02T13:28:02.011458+00:00",
+  "as_of_date": "2026-11-03",
+  "retrieved_at": "2026-11-03T08:43:00.955939+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -282,12 +282,12 @@
     {
       "indicator": "ISM_MANUFACTURING_PMI",
       "agency": "ISM",
-      "official_latest_reference_period": "September 2026",
-      "official_release_date": "2026-10-01",
-      "official_value": 54.5,
-      "canonical_latest_reference_period": "September 2026",
-      "canonical_release_date": "2026-10-01",
-      "canonical_value": 54.5,
+      "official_latest_reference_period": "October 2026",
+      "official_release_date": "2026-11-02",
+      "official_value": 55.5,
+      "canonical_latest_reference_period": "October 2026",
+      "canonical_release_date": "2026-11-02",
+      "canonical_value": 55.5,
       "status": "CURRENT",
       "revision_detected": false,
       "source_verification": "VERIFIED",
@@ -299,8 +299,8 @@
       "before_merge_canonical_latest_reference_period": "September 2026",
       "before_merge_canonical_release_date": "2026-10-01",
       "before_merge_canonical_value": 54.5,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "ingestion_status": "NEW_RELEASE",
+      "ingestion_reason": "New official release/vintage requires canonical merge"
     },
     {
       "indicator": "ISM_SERVICES_PMI",
