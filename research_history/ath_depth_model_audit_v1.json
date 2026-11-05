@@ -6,12 +6,12 @@
   "sampling": "First eligible record high, then more than three calendar months between anchors",
   "source_pit_status": "PIT_LIMITED_HISTORICAL_RESEARCH_PROXIES",
   "source_hashes": {
-    "technical_intelligence_research_v1.csv": "f60c095473fa4915ea86f757f5d5d90f032d6a8ebc928d54e61a000c4a4bd9aa",
-    "financial_stress_research_v1.csv": "802b650b11bbc171538043392140232bc7a74476626ef31795c5350fee9cb910",
-    "sentiment_engine_research_v1.csv": "98169584687156bd0ef97fe43bb7881168717608be05658b095ecd237df8f749",
-    "liquidity_intelligence_research_v1.csv": "e0a1ef59a3117833eac7390cdc60950fbc2f11b5c470889baa1d438e5300f748"
+    "technical_intelligence_research_v1.csv": "ac6550a78a10e532ba701c48e9d5aa8c76e338abdbb948af3ab6f73e09c279b2",
+    "financial_stress_research_v1.csv": "79ca172a70f162e22de92bf055cb47ab3b4373954aee137265f42bf9eda634a6",
+    "sentiment_engine_research_v1.csv": "c862d68e0bd9bc8dc3dae03f99b15e868687ac5b35bd52f34112e5ad0df0c125",
+    "liquidity_intelligence_research_v1.csv": "91381910905de45b6e810d1c83d9058af9695eeba784a986de389fdbd7a8ba1b"
   },
-  "source_snapshot_count": 65,
+  "source_snapshot_count": 66,
   "archive_snapshot_ids": [
     "fd4307aa01bb9997cb4c28fe34a9d9a6ab76be7936ad2c7fb4ce0bc2340be5d4",
     "cd3c3b10f577e514ef66c7b719862194175170533bd2ca2669b19c6713c6a7ac",
@@ -77,7 +77,8 @@
     "07c04b77a5098e2c7d5778954f1598643e6bb250c555de7ffbc599712174d2f6",
     "9aa8865d5d3e73f1e9c674e0a100edb24393f5b8dc07bc9688d8395b217ffe5e",
     "4ea378e5ad0026c77783fcc14fd961f101b886aca188c7633189e7cf830d1e7f",
-    "63308e458a484b5d7293370afd2515ad5d50eeba39a1fe8def8a2091464e7716"
+    "63308e458a484b5d7293370afd2515ad5d50eeba39a1fe8def8a2091464e7716",
+    "5ac7d3a513c6981ddca29d4dd50a83bc57bc599778cd3e365787749d93c75fa0"
   ],
   "snapshot_first_available_at": "2026-10-04T19:00:18.670929+00:00",
   "analyses": [
@@ -130,31 +131,31 @@
     {
       "horizon": "3M",
       "sample_count": 15,
-      "complete_unambiguous": 14,
+      "complete_unambiguous": 15,
       "partial_feature_complete": 14,
       "full_feature_complete": 0,
       "price_only": {
-        "evaluations": 9,
-        "price_brier": 0.7517146776406036,
-        "context_brier": 0.7517146776406036,
-        "climatology_brier": 0.6810519577363982,
+        "evaluations": 10,
+        "price_brier": 0.7629629629629631,
+        "context_brier": 0.7629629629629631,
+        "climatology_brier": 0.6802307125800422,
         "incremental_brier_improvement": 0.0,
         "test_class_counts": {
           "NO_MEANINGFUL_PULLBACK": 0,
-          "LIMITED": 2,
+          "LIMITED": 3,
           "MEDIUM": 6,
           "CRASH": 1
         }
       },
       "partial_context_common_sample": {
-        "evaluations": 8,
-        "price_brier": 0.6975308641975309,
-        "context_brier": 0.6975308641975309,
-        "climatology_brier": 0.653332125528796,
-        "incremental_brier_improvement": 0.0,
+        "evaluations": 9,
+        "price_brier": 0.7160493827160495,
+        "context_brier": 0.6886145404663924,
+        "climatology_brier": 0.6537884945107945,
+        "incremental_brier_improvement": 0.027434842249657063,
         "test_class_counts": {
           "NO_MEANINGFUL_PULLBACK": 0,
-          "LIMITED": 2,
+          "LIMITED": 3,
           "MEDIUM": 5,
           "CRASH": 1
         }
