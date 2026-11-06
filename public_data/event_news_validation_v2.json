@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-05T13:13:35.261408+00:00",
-  "rows": 98,
+  "generated_at": "2026-11-06T21:36:18.920145+00:00",
+  "rows": 99,
   "source_counts": {
-    "OFFICIAL_RSS": 98
+    "OFFICIAL_RSS": 99
   },
   "topic_counts": {
     "growth": 64,
-    "fed": 31,
+    "fed": 32,
     "labor": 2,
     "inflation": 1
   },
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "ParseError('syntax error: line 1, column 0')",
+    "error": "HTTP 429",
     "query_requests": 1,
     "fallback_required": true
   },
@@ -156,6 +156,15 @@
         "description": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
         "published_at": "2026-05-20T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+        "description": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+        "published_at": "2026-11-05T16:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261105a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -327,15 +336,6 @@
         "description": "Federal Reserve Board announces termination of enforcement action with SNB Bancshares and Bank of Eufaula",
         "published_at": "2026-09-18T15:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20260918b.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Federal Reserve issues FOMC statement",
-        "description": "Federal Reserve issues FOMC statement",
-        "published_at": "2026-09-16T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -982,12 +982,12 @@
     {
       "check": "minimum_dataset_rows",
       "pass": true,
-      "detail": "rows=98"
+      "detail": "rows=99"
     },
     {
       "check": "unique_event_ids",
       "pass": true,
-      "detail": "unique_ids=98"
+      "detail": "unique_ids=99"
     },
     {
       "check": "timestamps",

@@ -1,12 +1,12 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-11-05",
+  "context_date": "2026-11-06",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
-    "source_date": "2026-11-05",
+    "source_date": "2026-11-06",
     "age_days": 0,
     "economic_regime": "MIXED",
     "inflation_score": 0.4665987728004716,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-11-05",
+    "as_of_date": "2026-11-06",
     "latest_fomc": "2026-10-28",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,27 +328,27 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-11-04",
+    "source_date": "2026-11-05",
     "age_days": 1,
-    "composite_stress_score": 0.954704235708153,
-    "research_regime": "ELEVATED_RESEARCH_STRESS",
-    "vix": 16.61,
-    "treasury_2y": 4.61,
-    "treasury_10y": 4.95,
-    "yield_10y_2y_spread": 0.3399999999999998,
+    "composite_stress_score": 1.596526232217001,
+    "research_regime": "HIGH_RESEARCH_STRESS",
+    "vix": 28.18,
+    "treasury_2y": 4.46,
+    "treasury_10y": 4.84,
+    "yield_10y_2y_spread": 0.3799999999999999,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-11-04",
+    "source_date": "2026-11-05",
     "age_days": 1,
-    "latest_published_at": "2026-11-04T13:30:00+00:00",
-    "latest_title": "U.S. International Trade in Goods and Services",
-    "latest_source": "U.S. Census Bureau",
-    "latest_topic": "growth",
-    "events_available": 98,
+    "latest_published_at": "2026-11-05T16:00:00+00:00",
+    "latest_title": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+    "latest_source": "Federal Reserve",
+    "latest_topic": "fed",
+    "events_available": 99,
     "topic_counts": {
       "growth": 64,
-      "fed": 31,
+      "fed": 32,
       "labor": 2,
       "inflation": 1
     },
