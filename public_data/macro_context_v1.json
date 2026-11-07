@@ -328,11 +328,11 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-11-05",
-    "age_days": 2,
-    "composite_stress_score": 1.596526232217001,
+    "source_date": "2026-11-06",
+    "age_days": 1,
+    "composite_stress_score": 1.41477929644834,
     "research_regime": "HIGH_RESEARCH_STRESS",
-    "vix": 28.18,
+    "vix": 25.64,
     "treasury_2y": 4.46,
     "treasury_10y": 4.84,
     "yield_10y_2y_spread": 0.3799999999999999,
@@ -356,7 +356,7 @@
   },
   "temporal_alignment": {
     "economic_age_days": 1,
-    "financial_stress_age_days": 2,
+    "financial_stress_age_days": 1,
     "event_news_age_days": 2,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,

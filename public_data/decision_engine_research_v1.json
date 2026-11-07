@@ -3,11 +3,11 @@
   "engine_version": "decision-engine-v1",
   "as_of_date": "2026-11-07",
   "state": "CONTRADICTORY",
-  "confidence": 0.75,
+  "confidence": 1.0,
   "confidence_type": "evidence_coverage",
-  "evidence_count": 3,
+  "evidence_count": 4,
   "supportive_count": 0,
-  "contradictory_count": 1,
+  "contradictory_count": 2,
   "mixed_count": 2,
   "missing": [],
   "point_in_time_safe": true,
@@ -42,6 +42,13 @@
       "stance": "CONTRADICTORY",
       "reason": "Financial stress regime is HIGH_RESEARCH_STRESS.",
       "value": "HIGH_RESEARCH_STRESS"
+    },
+    {
+      "source": "Sentiment Engine",
+      "category": "sentiment",
+      "stance": "CONTRADICTORY",
+      "reason": "Unified sentiment regime is BEARISH.",
+      "value": "BEARISH"
     },
     {
       "source": "Technical Intelligence",
