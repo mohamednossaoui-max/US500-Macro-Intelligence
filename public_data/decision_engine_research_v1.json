@@ -1,7 +1,7 @@
 {
   "engine": "decision-engine-v1",
   "engine_version": "decision-engine-v1",
-  "as_of_date": "2026-11-06",
+  "as_of_date": "2026-11-07",
   "state": "CONTRADICTORY",
   "confidence": 0.75,
   "confidence_type": "evidence_coverage",

@@ -1,7 +1,7 @@
 {
   "provider": "official",
-  "as_of_date": "2026-11-06",
-  "retrieved_at": "2026-11-06T21:30:48.826777+00:00",
+  "as_of_date": "2026-11-07",
+  "retrieved_at": "2026-11-07T00:09:24.239961+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -13,18 +13,18 @@
       "canonical_release_date": "2026-11-06",
       "canonical_value": 165000.0,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "PAYEMS",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 29000.0,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-06",
+      "before_merge_canonical_value": 165000.0,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "UNEMPLOYMENT_RATE",
@@ -43,11 +43,11 @@
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "UNRATE",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 4.2,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-06",
+      "before_merge_canonical_value": 4.1,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "AVERAGE_HOURLY_EARNINGS",
@@ -59,18 +59,18 @@
       "canonical_release_date": "2026-11-06",
       "canonical_value": 0.4,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "FRED_ALFRED",
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "CES0500000003",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-02",
-      "before_merge_canonical_value": 0.1,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-06",
+      "before_merge_canonical_value": 0.4,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "CPI",
@@ -266,18 +266,18 @@
       "canonical_release_date": "2026-11-05",
       "canonical_value": 189000.0,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "DOL",
       "metadata_verification": null,
       "metadata_source_url": null,
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "Week ending October 24, 2026",
-      "before_merge_canonical_release_date": "2026-10-29",
-      "before_merge_canonical_value": 194000.0,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "Week ending October 31, 2026",
+      "before_merge_canonical_release_date": "2026-11-05",
+      "before_merge_canonical_value": 189000.0,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",
