@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-11-12",
-  "retrieved_at": "2026-11-12T09:45:16.008851+00:00",
+  "retrieved_at": "2026-11-12T13:44:24.305214+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -89,11 +89,11 @@
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "CPIAUCSL",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-14",
-      "before_merge_canonical_value": 0.6,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-10",
+      "before_merge_canonical_value": 0.4,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "CORE_CPI",
@@ -112,11 +112,11 @@
       "metadata_verification": "BLS_VALUE_FRED_RELEASE_VINTAGE_PARITY",
       "metadata_source_url": "https://api.stlouisfed.org/fred/release/dates",
       "metadata_series": "CPILFESL",
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-14",
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-10",
       "before_merge_canonical_value": 0.3,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "PPI_FINAL_DEMAND",
@@ -259,14 +259,14 @@
     {
       "indicator": "INITIAL_JOBLESS_CLAIMS",
       "agency": "DOL",
-      "official_latest_reference_period": "Week ending October 31, 2026",
-      "official_release_date": "2026-11-05",
-      "official_value": 189000.0,
-      "canonical_latest_reference_period": "Week ending October 31, 2026",
-      "canonical_release_date": "2026-11-05",
-      "canonical_value": 189000.0,
+      "official_latest_reference_period": "Week ending November 07, 2026",
+      "official_release_date": "2026-11-12",
+      "official_value": 200000.0,
+      "canonical_latest_reference_period": "Week ending November 07, 2026",
+      "canonical_release_date": "2026-11-12",
+      "canonical_value": 200000.0,
       "status": "CURRENT",
-      "revision_detected": false,
+      "revision_detected": true,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "DOL",
@@ -276,8 +276,8 @@
       "before_merge_canonical_latest_reference_period": "Week ending October 31, 2026",
       "before_merge_canonical_release_date": "2026-11-05",
       "before_merge_canonical_value": 189000.0,
-      "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "ingestion_status": "NEW_RELEASE",
+      "ingestion_reason": "New official release/vintage requires canonical merge"
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",
