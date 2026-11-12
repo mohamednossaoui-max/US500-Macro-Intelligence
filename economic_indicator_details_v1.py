@@ -9,6 +9,21 @@ ANNUAL_BLS={'CPI':'CUUR0000SA0','CORE_CPI':'CUUR0000SA0L1E',
 MONTHLY={'CPI','CORE_CPI','PPI_FINAL_DEMAND','CORE_PPI','PCE_PRICE_INDEX','CORE_PCE','AVERAGE_HOURLY_EARNINGS','RETAIL_SALES'}
 DETAIL_FIELDS=('previous','mom','yoy','level','yoy_source_series','yoy_method','yoy_source_url','yoy_verification_status')
 
+# BLS never published the October 2025 CPI index (federal funding lapse; the API
+# returns "-" with footnote code X). Any 12-month change whose baseline month is
+# that month therefore cannot be computed from official data. The rate stays
+# missing -- it is never interpolated or invented.
+BLS_BASELINE_GAPS={'CPI':{pd.Period('2025-10',freq='M')},
+                   'CORE_CPI':{pd.Period('2025-10',freq='M')}}
+
+
+def annual_baseline_gap(indicator,reference_period):
+    """True when the exact 12-month baseline month is a documented BLS non-publication."""
+    gaps=BLS_BASELINE_GAPS.get(str(indicator))
+    if not gaps:return False
+    try:return (pd.Period(str(reference_period),freq='M')-12) in gaps
+    except (ValueError,TypeError):return False
+
 
 def numeric(value):
     return isinstance(value,Real) and math.isfinite(float(value))
@@ -71,5 +86,7 @@ def card_details(row):
     elif indicator=='GDP':reading='Reading: real GDP annualized quarterly growth'
     annual=''
     if indicator in MONTHLY and not numeric(row.get('yoy')):
-        annual='YoY: unavailable — not source-verified'
+        annual=('YoY: unavailable — BLS published no October 2025 index (2025 funding lapse)'
+                if annual_baseline_gap(indicator,row.get('reference_period'))
+                else 'YoY: unavailable — not source-verified')
     return previous_text,reading,annual
