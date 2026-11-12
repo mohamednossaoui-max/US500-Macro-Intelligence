@@ -1,22 +1,22 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-11-09",
+  "context_date": "2026-11-12",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
-    "source_date": "2026-11-06",
-    "age_days": 3,
+    "source_date": "2026-11-12",
+    "age_days": 0,
     "economic_regime": "MIXED",
     "inflation_score": 0.4665987728004716,
-    "labor_score": -0.0254404488998606,
+    "labor_score": 0.0445128994864257,
     "growth_score": 0.6679100533145277,
     "dimensions_available": 3,
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-11-09",
+    "as_of_date": "2026-11-12",
     "latest_fomc": "2026-10-28",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,21 +328,21 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-11-06",
-    "age_days": 3,
-    "composite_stress_score": 1.41477929644834,
+    "source_date": "2026-11-11",
+    "age_days": 1,
+    "composite_stress_score": 1.0071584896810246,
     "research_regime": "HIGH_RESEARCH_STRESS",
-    "vix": 25.64,
-    "treasury_2y": 4.46,
-    "treasury_10y": 4.84,
-    "yield_10y_2y_spread": 0.3799999999999999,
+    "vix": 17.49,
+    "treasury_2y": 4.56,
+    "treasury_10y": 4.88,
+    "yield_10y_2y_spread": 0.3200000000000003,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-11-05",
-    "age_days": 4,
-    "latest_published_at": "2026-11-05T16:00:00+00:00",
-    "latest_title": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+    "source_date": "2026-11-09",
+    "age_days": 3,
+    "latest_published_at": "2026-11-09T21:00:00+00:00",
+    "latest_title": "Federal Reserve Board announces approval of two applications by Mutual Federal Bancorp, MHC, and MFB Bancorp, Inc.",
     "latest_source": "Federal Reserve",
     "latest_topic": "fed",
     "events_available": 99,
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 3,
-    "financial_stress_age_days": 3,
-    "event_news_age_days": 4,
+    "economic_age_days": 0,
+    "financial_stress_age_days": 1,
+    "event_news_age_days": 3,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

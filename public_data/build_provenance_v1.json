@@ -10,9 +10,9 @@
   "recomputed_from_synchronized_inputs": true,
   "source_files": {
     "aaii_historical_records_input_v1.csv": "ec061d594e24bc8a6c3ce329197a73a024facdfc504aa8010b3661dc48d94330",
-    "cot_historical_records_input_v1.csv": "91180bc1ed9681c1f59b5ba286df91595b6f82b84c9a3b0de9b328bdb083b894",
-    "financial_stress_records_input_v1.csv": "522981423edb79422175a2ed87f30a89a3d312036f1897b44deacc835ce140ef",
-    "liquidity_historical_records_input_v1.csv": "b4b6cd4893e3eaaa1ac9c6625258c63ea37dff1959b26d6028ff1d3a88b17d7a",
-    "vix_historical_records_input_v1.csv": "b6e9cf0d529dab4272845a6cd7d7107c8b8906401f8ca7ba5f7ada902fe2e701"
+    "cot_historical_records_input_v1.csv": "6e6814152cb652cfd97a8533082435c956c4539a8f4f8ac9a7d1c7e38aa89515",
+    "financial_stress_records_input_v1.csv": "9ec4758dc391f722d3a3784f0000c1f315e6048a869f71a1445b9e7d836972a0",
+    "liquidity_historical_records_input_v1.csv": "8cc7e418649a206dae8d5d6232780c1b924ad2d68a004b67a3938f3916c80059",
+    "vix_historical_records_input_v1.csv": "54a03a28839ab04f623fd23a3bc8eb333b625cdfaa2f560bccadf16cdaddb9a7"
   }
 }

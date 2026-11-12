@@ -1,7 +1,7 @@
 {
   "module": "Event / News Intelligence",
   "version": "2.1",
-  "generated_at": "2026-11-09T13:57:08.361019+00:00",
+  "generated_at": "2026-11-12T09:49:54.865443+00:00",
   "rows": 99,
   "source_counts": {
     "OFFICIAL_RSS": 99
@@ -22,10 +22,10 @@
   "hardening_version": "final-remaining-layers-hardening-v1",
   "structured_evidence": true,
   "event_class_counts": {
-    "OTHER_OFFICIAL": 41,
+    "OTHER_OFFICIAL": 42,
     "MACRO_RELEASE": 31,
     "POLICY_EVENT": 15,
-    "ADMINISTRATIVE": 12
+    "ADMINISTRATIVE": 11
   },
   "research_relevance_counts": {
     "MEDIUM": 53,

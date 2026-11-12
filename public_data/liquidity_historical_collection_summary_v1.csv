@@ -1,9 +1,9 @@
 indicator,rows,first_observation,last_observation,latest_actual,unit,source_unit,unit_conversion_factor,frequency,source,vintage,point_in_time_safe,research_only,decision_engine_ready,trading_signal_generated,forecast_generated,liquidity_score_generated
-EFFR,1971,2019-01-02,2026-11-05,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+EFFR,1973,2019-01-02,2026-11-09,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 FED_TOTAL_ASSETS,410,2019-01-02,2026-11-04,6748145.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
 MBS,410,2019-01-02,2026-11-04,1883522.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
-ON_RRP,1957,2019-01-02,2026-11-06,0.15,Billions of U.S. Dollars,Billions of U.S. Dollars,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+ON_RRP,1959,2019-01-02,2026-11-10,0.152,Billions of U.S. Dollars,Billions of U.S. Dollars,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 RESERVE_BALANCES,410,2019-01-02,2026-11-04,2930088.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
-SOFR,1901,2019-03-29,2026-11-06,3.89,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+SOFR,1902,2019-03-29,2026-11-09,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 TREASURY_GENERAL_ACCOUNT,410,2019-01-02,2026-11-04,957175.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
 TREASURY_SECURITIES,410,2019-01-02,2026-11-04,4578777.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
