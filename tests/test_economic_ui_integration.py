@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 from economic_observation_order_v1 import latest as latest_economic_observation
+from economic_indicator_details_v1 import annual_baseline_gap
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "public_data"
@@ -22,7 +23,14 @@ def test_price_series_publish_mom_and_yoy_for_ui():
         latest = latest_economic_observation(df,indicator)
         assert latest is not None
         assert pd.notna(latest["mom"])
-        assert pd.notna(latest["yoy"])
+        if pd.isna(latest["yoy"]):
+            # Only a documented BLS non-publication (Oct 2025 CPI index) may leave
+            # YoY empty, and it must never be marked verified.
+            assert annual_baseline_gap(indicator, latest["reference_period"]), (
+                f"{indicator} {latest['reference_period']}: YoY missing without a documented source gap")
+            assert latest.get("yoy_verification_status") != "VERIFIED"
+        else:
+            assert pd.notna(latest["yoy"])
 
 
 def test_ui_separates_yoy_trend_from_mom_momentum_and_ism_level():

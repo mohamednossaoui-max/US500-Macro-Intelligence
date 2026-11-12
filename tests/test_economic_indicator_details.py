@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime,timezone
 import pandas as pd
 import pytest
-from economic_indicator_details_v1 import annual_bls,card_details,percent_change
+from economic_indicator_details_v1 import annual_baseline_gap,annual_bls,card_details,percent_change
 from economic_official_ingestion_v1 import merge
 from economic_official_sources_v1 import observation
 from economic_pce_historical_backfill_v2 import parse_bea_release
@@ -105,3 +105,14 @@ def test_latest_reference_wins_when_revisions_share_release_date():
     from economic_observation_order_v1 import latest
     rows=pd.DataFrame([dict(indicator='CPI',reference_period='August 2026',release_date='2026-09-11',actual=.4),dict(indicator='CPI',reference_period='July 2026',release_date='2026-09-11',actual=.1)])
     assert latest(rows,'CPI').reference_period=='August 2026'
+
+
+def test_october_2025_bls_cpi_gap_is_documented_and_not_invented():
+    assert annual_baseline_gap('CPI','October 2026') and annual_baseline_gap('CORE_CPI','October 2026')
+    assert not annual_baseline_gap('CPI','September 2026') and not annual_baseline_gap('CPI','November 2026')
+    # PPI has a real October 2025 index, so a missing PPI YoY is still an error.
+    assert not annual_baseline_gap('PPI_FINAL_DEMAND','October 2026')
+    rows=[{'year':'2025','period':'M10','value':'-'},{'year':'2026','period':'M10','value':'330.0'}]
+    with pytest.raises(ValueError):annual_bls(rows,'October 2026')
+    text=card_details({'indicator':'CPI','reference_period':'October 2026','actual':.4,'previous':.6,'yoy':float('nan')})[2]
+    assert 'October 2025' in text
