@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-12T13:48:56.822980+00:00",
-  "rows": 82,
+  "generated_at": "2026-11-14T15:25:20.082833+00:00",
+  "rows": 98,
   "source_counts": {
-    "OFFICIAL_RSS": 82
+    "OFFICIAL_RSS": 98
   },
   "topic_counts": {
     "growth": 64,
-    "fed": 15,
+    "fed": 31,
     "labor": 2,
     "inflation": 1
   },
@@ -25,6 +25,15 @@
   "official_rss": {
     "ok": true,
     "rows": [
+      {
+        "title": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
+        "description": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
+        "published_at": "2026-11-12T17:45:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
       {
         "title": "Federal Reserve issues FOMC statement",
         "description": "Federal Reserve issues FOMC statement",
@@ -152,10 +161,181 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
-        "description": "Minutes of the Federal Open Market Committee, April 28-29, 2026",
-        "published_at": "2026-05-20T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260520a.htm",
+        "title": "Agencies extend comment period for proposed third-party risk management guidance",
+        "description": "Agencies extend comment period for proposed third-party risk management guidance",
+        "published_at": "2026-11-13T21:15:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261113a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces pricing, effective January 1, 2027, for payment services the Federal Reserve Banks provide to banks and credit unions, and changes to streamline and adjust their check services",
+        "description": "Federal Reserve Board announces pricing, effective January 1, 2027, for payment services the Federal Reserve Banks provide to banks and credit unions, and changes to streamline and adjust their check services",
+        "published_at": "2026-11-12T18:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/other20261112a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
+        "description": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
+        "published_at": "2026-11-12T17:45:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261112a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board issues enforcement action with former employee of United Community Bank",
+        "description": "Federal Reserve Board issues enforcement action with former employee of United Community Bank",
+        "published_at": "2026-11-12T16:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261112a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of two applications by Mutual Federal Bancorp, MHC, and MFB Bancorp, Inc.",
+        "description": "Federal Reserve Board announces approval of two applications by Mutual Federal Bancorp, MHC, and MFB Bancorp, Inc.",
+        "published_at": "2026-11-09T21:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261109a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+        "description": "Federal Reserve Board announces termination of enforcement action with Allegiant United Holdings, LLC, Nano Financial Holdings, Inc., and Nano Banc",
+        "published_at": "2026-11-05T16:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261105a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by The Bank of Nova Scotia",
+        "description": "Federal Reserve Board announces approval of application by The Bank of Nova Scotia",
+        "published_at": "2026-10-29T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261029a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve issues FOMC statement",
+        "description": "Federal Reserve issues FOMC statement",
+        "published_at": "2026-10-28T18:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces termination of enforcement actions with Gardner Bancshares, Inc. and Small Business Bank",
+        "description": "Federal Reserve Board announces termination of enforcement actions with Gardner Bancshares, Inc. and Small Business Bank",
+        "published_at": "2026-10-16T15:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261016a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Minutes of the Board's discount rate meetings on August 17, September 9, and September 16, 2026",
+        "description": "Minutes of the Board&#39;s discount rate meetings on August 17, September 9, and September 16, 2026",
+        "published_at": "2026-10-13T18:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261013a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
+        "description": "Federal Reserve Board releases results of the 2025 Survey of Consumer Finances, which provides the public and policymakers with detailed insights into the economic condition of American families",
+        "published_at": "2026-10-09T14:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/other20261009a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+        "description": "Federal Reserve Board announces enforcement action against American Express Company to address, among other things, the firm’s failure to sufficiently detect and report certain suspicious activity related to money laundering",
+        "published_at": "2026-10-08T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261008a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
+        "description": "Minutes of the Federal Open Market Committee, September 15-16, 2026",
+        "published_at": "2026-10-07T18:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261007a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
+        "description": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
+        "published_at": "2026-10-05T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261005a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by Fleur Capital Corporation",
+        "description": "Federal Reserve Board announces approval of application by Fleur Capital Corporation",
+        "published_at": "2026-10-02T20:45:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261002a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces it will extend, until November 4, the comment period on its proposal to modernize Regulation O",
+        "description": "Federal Reserve Board announces it will extend, until November 4, the comment period on its proposal to modernize Regulation O",
+        "published_at": "2026-10-02T20:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261002a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board issues enforcement action with Ontario Bancorporation, Inc.",
+        "description": "Federal Reserve Board issues enforcement action with Ontario Bancorporation, Inc.",
+        "published_at": "2026-10-02T15:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261002a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board finalizes changes to enhance the transparency and public accountability of its stress test and reduce volatility in its stress test-related capital requirements",
+        "description": "Federal Reserve Board finalizes changes to enhance the transparency and public accountability of its stress test and reduce volatility in its stress test-related capital requirements",
+        "published_at": "2026-09-30T13:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260930a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Agencies publish resolution plan feedback letters for 15 banking organizations",
+        "description": "Agencies publish resolution plan feedback letters for 15 banking organizations",
+        "published_at": "2026-09-29T20:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260929a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
+        "description": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
+        "published_at": "2026-09-25T20:30:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260925a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -602,6 +782,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Business Formation Statistics",
+        "description": "Total U.S. Business Applications were 501,609 in October 2026, down 6.0% from September 2026.<p><br>October 2026: -6.0° % Change<br>September 2026 (r): +0.6° % Change<br></p>",
+        "published_at": "2026-11-12T15:00:00+00:00",
+        "url": "https://www.census.gov/econ/bfs/",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Monthly Wholesale Trade: Sales and Inventories",
         "description": "September 2026 sales of merchant wholesalers were $840.1 billion, up 2.8 percent (+/- 0.4 percent) from last month. End-of-month inventories were $1,013.1 billion, up 0.7 percent (+/- 0.2 percent) from last month.<p><br>September 2026: +0.7 % Change in Inventories<br>August 2026 (r): +0.6 % Change in Inventories<br></p>",
         "published_at": "2026-11-09T15:00:00+00:00",
@@ -728,15 +917,6 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Business Formation Statistics",
-        "description": "Total U.S. Business Applications were 534,947 in September 2026, up 0.5% from August 2026.<p><br>September 2026: +0.5° % Change<br>August 2026 (r): -7.7° % Change<br></p>",
-        "published_at": "2026-10-14T14:00:00+00:00",
-        "url": "https://www.census.gov/econ/bfs/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
         "title": "Quarterly Services Survey",
         "description": "U.S. selected services total revenue for the second quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,418.7 billion, an increase of 3.0 percent (+/- 0.4 percent) from the first quarter of 2026 and up 7.6 percent (+/- 0.6 percent) from the second quarter of 2025. The first quarter of 2026 to second quarter of 2026 percentage change was revised from the advance estimate of 3.1 percent (+/- 0.4 percent).<p><br>2nd Qtr 2026: +3.0 % Change<br>1st Qtr 2026 (r): +1.1 % Change<br></p>",
         "published_at": "2026-09-09T14:00:00+00:00",
@@ -771,9 +951,9 @@
         "error": null
       },
       "fed_all_press": {
-        "ok": false,
-        "rows": 0,
-        "error": "HTTP 404"
+        "ok": true,
+        "rows": 20,
+        "error": null
       },
       "bea_news": {
         "ok": true,
@@ -802,12 +982,12 @@
     {
       "check": "minimum_dataset_rows",
       "pass": true,
-      "detail": "rows=82"
+      "detail": "rows=98"
     },
     {
       "check": "unique_event_ids",
       "pass": true,
-      "detail": "unique_ids=82"
+      "detail": "unique_ids=98"
     },
     {
       "check": "timestamps",
@@ -833,10 +1013,6 @@
     {
       "check": "gdelt_collection",
       "detail": "GDELT unavailable; official sources used as fallback."
-    },
-    {
-      "check": "official_rss_partial",
-      "detail": "failed_feeds=['fed_all_press']"
     },
     {
       "check": "sec_collection",

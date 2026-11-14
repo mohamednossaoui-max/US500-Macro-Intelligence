@@ -1,10 +1,10 @@
 {
   "available": true,
   "schema_version": "fed-comparison-3",
-  "generated_at": "2026-11-12T13:48:08.390616+00:00",
-  "as_of_date": "2026-11-12",
+  "generated_at": "2026-11-14T15:24:32.719208+00:00",
+  "as_of_date": "2026-11-14",
   "latest_fomc": "2026-10-28",
-  "current_date": "2026-11-12",
+  "current_date": "2026-11-14",
   "fed_chair": "Kevin Warsh",
   "statement": {
     "name": "FOMC Statement",
@@ -76,7 +76,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "source_status": "VERIFIED_TRANSCRIPT",
       "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-      "retrieved_at": "2026-11-12T13:48:06.912379+00:00"
+      "retrieved_at": "2026-11-14T15:24:30.445197+00:00"
     }
   },
   "communication_comparison": {
@@ -516,7 +516,7 @@
     "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
     "available": true,
     "information_cutoff_date": "2026-10-05",
-    "retrieved_at": "2026-11-12T13:48:08.290125+00:00",
+    "retrieved_at": "2026-11-14T15:24:32.529910+00:00",
     "catalog_verified": true,
     "latest_publication_date": "2026-10-14",
     "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -600,7 +600,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-11-12T13:48:08.290125+00:00",
+      "retrieved_at": "2026-11-14T15:24:32.529910+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -614,7 +614,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-08-24",
-      "retrieved_at": "2026-11-12T13:48:08.383929+00:00",
+      "retrieved_at": "2026-11-14T15:24:32.712380+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
@@ -722,7 +722,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "meeting_verified": true,
       "latest_meeting_date": "2026-10-28",
-      "retrieved_at": "2026-11-12T13:48:06.912379+00:00",
+      "retrieved_at": "2026-11-14T15:24:30.445197+00:00",
       "pdf_sha256": "c3a57e922ff5db0f6ca37c79c6fb34b8a8feb4f5a89fcd8f05eea740d7fc4da0",
       "availability_basis": "VERIFIED_PDF_RETRIEVAL"
     },
@@ -743,7 +743,7 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-11-12T13:48:08.290125+00:00",
+      "retrieved_at": "2026-11-14T15:24:32.529910+00:00",
       "catalog_verified": true,
       "latest_publication_date": "2026-10-14",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
@@ -757,7 +757,7 @@
         "publication_date": "2026-09-16",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
-        "retrieved_at": "2026-11-12T13:48:08.390616+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.719208+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "fc27d85fa8d02c2afe3ef5e54416802aac2fa1d2b926b26424f0fbf70842367b",
@@ -828,7 +828,7 @@
         "publication_date": "2026-10-28",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
-        "retrieved_at": "2026-11-12T13:48:08.390616+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.719208+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "e22a52d380060ec6baf0af35114f3d5d8ee9f4930ad5f6dcbce0e8af782bfbe2",
@@ -1050,7 +1050,7 @@
         "publication_date": "2026-08-19",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260729.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-11-12T13:48:08.390616+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.719208+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "8f5914c96ce15c0b9a74b22158704d1c9795f0ccf0463fd53d6f552fb5af1335",
@@ -1284,7 +1284,7 @@
         "publication_date": "2026-10-07",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-11-12T13:48:08.390616+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.719208+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "4f0b4e408957310dcb4c60fc83d12a4afdd57399be1ae7bb1a8d47db22972407",
@@ -2718,7 +2718,7 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-11-12T13:48:07.554209+00:00",
+        "retrieved_at": "2026-11-14T15:24:31.442173+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
         "content_sha256": "b96650f08db348d43dd5e24d2fa0610fb4192aaeec7b9ad3ea9432705f5f86e1",
@@ -2851,7 +2851,7 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-11-12T13:48:06.912379+00:00",
+        "retrieved_at": "2026-11-14T15:24:30.445197+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
         "content_sha256": "04fc6b1cf796ff93e36c6b7109c881d1ef9337e505f84b882111edb462f90376",
@@ -3506,7 +3506,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-08-24",
-        "retrieved_at": "2026-11-12T13:48:08.383929+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.712380+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb",
@@ -3566,7 +3566,7 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-10-05",
-        "retrieved_at": "2026-11-12T13:48:08.290125+00:00",
+        "retrieved_at": "2026-11-14T15:24:32.529910+00:00",
         "catalog_verified": true,
         "latest_publication_date": "2026-10-14",
         "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef",
@@ -3778,7 +3778,7 @@
     "source_status": "VERIFIED_TRANSCRIPT",
     "publication_date": null,
     "publication_date_source": null,
-    "retrieved_at": "2026-11-12T13:48:06.912379+00:00",
+    "retrieved_at": "2026-11-14T15:24:30.445197+00:00",
     "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
     "related_release_dates": {
       "statement": "2026-10-28"
@@ -3824,12 +3824,12 @@
     },
     "pit_scope": "Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; its publication date remains unknown. No intraday or archived-vintage guarantee.",
     "availability_bounds": {
-      "chair_press": "2026-11-12T13:48:06.912379+00:00"
+      "chair_press": "2026-11-14T15:24:30.445197+00:00"
     },
     "research_only": true,
     "forecast": false,
     "trading_signal": false,
-    "as_of_date": "2026-11-12",
+    "as_of_date": "2026-11-14",
     "communication_documents_available": 3,
     "sep_available": true,
     "beige_book_available": true,
