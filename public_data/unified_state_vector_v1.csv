@@ -5,7 +5,7 @@ USV1.0,2026-11-16,economic_growth,ECONOMIC,CORE,0.6679100533145277,MIXED,2026-11
 USV1.0,2026-11-16,economic_regime,ECONOMIC,CORE,,MIXED,2026-11-16,2026-11-16,32,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
 USV1.0,2026-11-16,fed_stance,FED,CORE,57.0,MODERATELY HAWKISH,2026-11-16,2026-11-16,61,CURRENT,OBSERVATION_CHECKED,LOW,False,fed_intelligence_output_v1.json,Independent Fed feature; legacy Macro Fed field intentionally not duplicated.
 USV1.0,2026-11-16,financial_stress,FINANCIAL_STRESS,CORE,1.1055791521205185,HIGH_RESEARCH_STRESS,2026-11-16,2026-11-16,3,CURRENT,PIT_SAFE,HIGH,True,research_context_summary_v1.csv,
-USV1.0,2026-11-16,liquidity_coverage,LIQUIDITY,CORE,8.0,8/8_ELIGIBLE,2026-11-13,2026-11-13,4,CURRENT,PIT_SAFE,MEDIUM,True,liquidity_intelligence_summary_v1.csv,No liquidity score generated; coverage only.
+USV1.0,2026-11-16,liquidity_coverage,LIQUIDITY,CORE,8.0,8/8_ELIGIBLE,2026-11-16,2026-11-16,4,CURRENT,PIT_SAFE,MEDIUM,True,liquidity_intelligence_summary_v1.csv,No liquidity score generated; coverage only.
 USV1.0,2026-11-16,sentiment,SENTIMENT,CORE,21.962759462759465,BEARISH,2026-11-16,2026-11-16,6,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
 USV1.0,2026-11-16,technical,TECHNICAL,CORE,,NEUTRAL,2026-11-16,2026-11-16,2,CURRENT,PIT_SAFE,MEDIUM,True,research_context_summary_v1.csv,
 USV1.0,2026-11-16,market_breadth,MARKET_BREADTH,CONTEXTUAL,,POSITIVE_BREADTH,2026-08-18,2026-08-18,90,STALE,PIT_LIMITED,LOW,False,market_breadth_analysis_summary_v1.json,Research-grade reconstructed membership; not PIT-perfect.
