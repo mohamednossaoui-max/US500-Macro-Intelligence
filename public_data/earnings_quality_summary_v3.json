@@ -1,18 +1,18 @@
 {
   "module": "Corporate Earnings Intelligence",
   "version": "3.1-hardening",
-  "generated_at": "2026-11-17T08:41:31.001668+00:00",
-  "rows": 1211,
+  "generated_at": "2026-11-17T14:01:15.769012+00:00",
+  "rows": 1212,
   "ticker_count": 10,
   "date_start": "1996-04-16",
-  "date_end": "2026-11-02",
-  "pit_safe_event_rows": 1211,
+  "date_end": "2026-11-17",
+  "pit_safe_event_rows": 1212,
   "reaction_rows": 1211,
   "quality_gate_counts": {
-    "DEGRADED": 1211
+    "DEGRADED": 1212
   },
   "decision_role_counts": {
-    "CONTEXTUAL": 1211
+    "CONTEXTUAL": 1212
   },
   "decision_role": "CONTEXTUAL",
   "included_in_decision_state": false,
