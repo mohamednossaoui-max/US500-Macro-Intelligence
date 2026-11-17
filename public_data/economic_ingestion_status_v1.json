@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-11-17",
-  "retrieved_at": "2026-11-17T13:44:21.599675+00:00",
+  "retrieved_at": "2026-11-17T14:21:16.785737+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -250,11 +250,11 @@
       "metadata_verification": null,
       "metadata_source_url": "https://www.census.gov/retail/marts/www/marts_current.pdf",
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-15",
-      "before_merge_canonical_value": 0.8,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-17",
+      "before_merge_canonical_value": 0.2,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "INITIAL_JOBLESS_CLAIMS",
