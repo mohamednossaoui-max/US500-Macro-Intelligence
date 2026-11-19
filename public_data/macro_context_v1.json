@@ -6,12 +6,12 @@
   "trade_signal": null,
   "forecast": null,
   "economic": {
-    "source_date": "2026-11-17",
-    "age_days": 2,
+    "source_date": "2026-11-19",
+    "age_days": 0,
     "economic_regime": "MIXED",
     "inflation_score": -0.4823843667145924,
     "labor_score": 0.0321611300446956,
-    "growth_score": 0.6679100533145277,
+    "growth_score": 0.1703146422818741,
     "dimensions_available": 3,
     "pit_safe": true
   },
@@ -355,7 +355,7 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 2,
+    "economic_age_days": 0,
     "financial_stress_age_days": 1,
     "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
