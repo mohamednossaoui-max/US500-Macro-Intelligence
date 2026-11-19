@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-11-17",
+  "context_date": "2026-11-19",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-11-17",
-    "age_days": 0,
+    "age_days": 2,
     "economic_regime": "MIXED",
     "inflation_score": -0.4823843667145924,
     "labor_score": 0.0321611300446956,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-11-17",
+    "as_of_date": "2026-11-19",
     "latest_fomc": "2026-10-28",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -29,13 +29,13 @@
       },
       "document_score_eligibility": {
         "statement": true,
-        "minutes": false,
+        "minutes": true,
         "chair": true
       },
       "document_weights": {
-        "statement": 0.583333,
-        "minutes": 0.0,
-        "chair": 0.416667
+        "statement": 0.35,
+        "minutes": 0.4,
+        "chair": 0.25
       },
       "statement": {
         "inflation": {
@@ -76,11 +76,11 @@
       },
       "minutes": {
         "inflation": {
-          "score": 5,
+          "score": 6,
           "classification": "HAWKISH",
-          "hawkish_hits": 5,
+          "hawkish_hits": 6,
           "dovish_hits": 0,
-          "score_100": 75
+          "score_100": 80
         },
         "labor": {
           "score": 2,
@@ -104,11 +104,11 @@
           "score_100": 50
         },
         "policy": {
-          "score": 2,
+          "score": 3,
           "classification": "MODERATELY HAWKISH",
-          "hawkish_hits": 2,
-          "dovish_hits": 0,
-          "score_100": 60
+          "hawkish_hits": 4,
+          "dovish_hits": 1,
+          "score_100": 65
         }
       },
       "chair": {
@@ -150,7 +150,7 @@
       },
       "combined": {
         "inflation": {
-          "score_100": 55.0,
+          "score_100": 65.0,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -160,11 +160,11 @@
             "score_100": 55
           },
           "minutes": {
-            "score": 5,
+            "score": 6,
             "classification": "HAWKISH",
-            "hawkish_hits": 5,
+            "hawkish_hits": 6,
             "dovish_hits": 0,
-            "score_100": 75
+            "score_100": 80
           },
           "chair": {
             "score": 1,
@@ -175,7 +175,7 @@
           }
         },
         "labor": {
-          "score_100": 55.0,
+          "score_100": 57.0,
           "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 1,
@@ -250,8 +250,8 @@
           }
         },
         "policy": {
-          "score_100": 50.0,
-          "classification": "NEUTRAL",
+          "score_100": 56.0,
+          "classification": "MODERATELY HAWKISH",
           "statement": {
             "score": 0,
             "classification": "NEUTRAL",
@@ -260,11 +260,11 @@
             "score_100": 50
           },
           "minutes": {
-            "score": 2,
+            "score": 3,
             "classification": "MODERATELY HAWKISH",
-            "hawkish_hits": 2,
-            "dovish_hits": 0,
-            "score_100": 60
+            "hawkish_hits": 4,
+            "dovish_hits": 1,
+            "score_100": 65
           },
           "chair": {
             "score": 0,
@@ -276,22 +276,22 @@
         }
       },
       "fed_score": {
-        "score": 57.0,
-        "base_score": 52.0,
+        "score": 61.9,
+        "base_score": 56.9,
         "sep_adjustment": 5.0,
         "classification": "MODERATELY HAWKISH"
       },
       "reasons": [
-        "- Inflation: None (+1.25)",
-        "- Labor: None (+0.75)",
+        "- Inflation: None (+3.75)",
+        "- Labor: None (+1.05)",
         "- Growth: None (+0.00)",
         "- Financial: None (+0.00)",
-        "- Policy: None (+0.00)",
+        "- Policy: None (+2.10)",
         "- SEP: HAWKISH SHIFT"
       ],
       "method": "Statement/Minutes/Chair base weights are 35/40/25. Missing documents are excluded and the remaining weights are renormalized. Published Minutes from a prior meeting remain research evidence but receive zero weight in the current-meeting score. SEP is a directional adjustment, not a probability or trading signal."
     },
-    "fed_score": 57.0,
+    "fed_score": 61.9,
     "sep_shift": {
       "classification": "HAWKISH SHIFT",
       "hawkish_points": 5,
@@ -328,36 +328,36 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-11-16",
+    "source_date": "2026-11-18",
     "age_days": 1,
-    "composite_stress_score": 1.2576287245619229,
+    "composite_stress_score": 1.037980272451702,
     "research_regime": "HIGH_RESEARCH_STRESS",
-    "vix": 22.91,
-    "treasury_2y": 4.88,
-    "treasury_10y": 5.15,
-    "yield_10y_2y_spread": 0.2700000000000004,
+    "vix": 24.56,
+    "treasury_2y": 4.8,
+    "treasury_10y": 5.1,
+    "yield_10y_2y_spread": 0.2999999999999998,
     "pit_safe": true
   },
   "event_news": {
-    "source_date": "2026-11-17",
-    "age_days": 0,
-    "latest_published_at": "2026-11-17T13:30:00+00:00",
-    "latest_title": "Advance Monthly Sales for Retail and Food Services",
-    "latest_source": "U.S. Census Bureau",
-    "latest_topic": "growth",
-    "events_available": 98,
+    "source_date": "2026-11-18",
+    "age_days": 1,
+    "latest_published_at": "2026-11-18T19:00:00+00:00",
+    "latest_title": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
+    "latest_source": "Federal Reserve",
+    "latest_topic": "fed",
+    "events_available": 97,
     "topic_counts": {
       "growth": 64,
-      "fed": 31,
+      "fed": 30,
       "labor": 2,
       "inflation": 1
     },
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 0,
+    "economic_age_days": 2,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 0,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."

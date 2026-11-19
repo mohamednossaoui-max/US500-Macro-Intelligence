@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-17T14:25:16.947892+00:00",
-  "rows": 98,
+  "generated_at": "2026-11-19T08:31:44.753084+00:00",
+  "rows": 97,
   "source_counts": {
-    "OFFICIAL_RSS": 98
+    "OFFICIAL_RSS": 97
   },
   "topic_counts": {
     "growth": 64,
-    "fed": 31,
+    "fed": 30,
     "labor": 2,
     "inflation": 1
   },
@@ -25,6 +25,15 @@
   "official_rss": {
     "ok": true,
     "rows": [
+      {
+        "title": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
+        "description": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
+        "published_at": "2026-11-18T19:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261118a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
       {
         "title": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
         "description": "Federal Reserve announces revised tentative schedule of Federal Open Market Committee meetings in 2027",
@@ -152,10 +161,10 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Minutes of the Board's discount rate meeting on April 20 and 29, 2026",
-        "description": "Minutes of the Board&#39;s discount rate meeting on April 20 and 29, 2026",
-        "published_at": "2026-05-26T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260526a.htm",
+        "title": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
+        "description": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
+        "published_at": "2026-11-18T19:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261118a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -332,12 +341,12 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
-        "description": "Federal Reserve Board announces approval of application by Peoples Bancorp Inc.",
-        "published_at": "2026-09-25T20:30:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20260925a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
+        "title": "Outdoor Recreation Economic Statistics, U.S. and States, 2025",
+        "description": "The value added of the outdoor recreation economy accounted for 2.3 percent ($704.2 billion) of current-dollar gross domestic product (GDP) for the nation in 2025. Across states and the District of Columbia, value added for outdoor recreation as a share of state GDP ranged from 6.1 percent in Hawaii to 1.0 percent in the District of Columbia.",
+        "published_at": "2026-11-18T15:00:00+00:00",
+        "url": "https://www.bea.gov/news/2026/outdoor-recreation-economic-statistics-us-and-states-2025",
+        "topic": "growth",
+        "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
       {
@@ -444,15 +453,6 @@
         "description": "Personal income increased $113.8 billion (0.4 percent at a monthly rate) in January, according to estimates released today by the U.S. Bureau of Economic Analysis. Disposable personal income (DPI)-personal income less personal current taxes-increased $219.9 billion (0.9 percent), and personal consumption expenditures (PCE) increased $81.1 billion (0.4 percent). Personal outlays-the sum of PCE, personal interest payments, and personal current transfer payments-increased $85.8 billion in January. Personal saving was $1.05 trillion in January, and the personal saving rate-personal saving as a percentage of disposable personal income-was 4.5 percent. <!--Full Text Link--><a href='https://www.bea.gov/news/2026/personal-income-and-outlays-january-2026'>Full Text</a><!--Full Text Link-->",
         "published_at": "2026-03-13T12:31:00+00:00",
         "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-january-2026",
-        "topic": "growth",
-        "source": "BEA",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Outdoor Recreation Economic Statistics, U.S. and States, 2024",
-        "description": "The value added of the outdoor recreation economy accounted for 2.4 percent ($696.7 billion) of current-dollar gross domestic product (GDP) for the nation in 2024. Across states and the District of Columbia, value added for outdoor recreation as a share of state GDP ranged from 6.1 percent in Hawaii to 1.0 percent in the District of Columbia. <!--Full Text Link--><a href='https://www.bea.gov/news/2026/outdoor-recreation-economic-statistics-us-and-states-2024'>Full Text</a><!--Full Text Link-->",
-        "published_at": "2026-03-05T15:00:00+00:00",
-        "url": "https://www.bea.gov/news/2026/outdoor-recreation-economic-statistics-us-and-states-2024",
         "topic": "growth",
         "source": "BEA",
         "source_type": "OFFICIAL_RSS"
@@ -782,6 +782,24 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "New Residential Construction",
+        "description": "Privately-owned housing starts in October 2026 were at a seasonally adjusted annual rate of 1,309,000. This is 9.9 percent (+/- 16.8%)* above the revised September 2026 estimate of 1,191,000.<p><br>October 2026: +9.9* % Change<br>September 2026 (r): -7.0* % Change<br></p>",
+        "published_at": "2026-11-18T13:30:00+00:00",
+        "url": "https://www.census.gov/construction/nrc/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Manufacturing and Trade Inventories and Sales",
+        "description": "U.S. total business end-of-month inventories for September 2026 were $2,873.4 billion, up 0.5 percent (+/- 0.1 percent) from last month. U.S. total business sales were $2,162.5 billion, up 1.8 percent (+/- 0.2 percent) from last month.<p><br>September 2026: +0.5 % Change in Inventories<br>August 2026 (r): +0.4 % Change in Inventories<br></p>",
+        "published_at": "2026-11-17T15:00:00+00:00",
+        "url": "https://www.census.gov/mtis/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Advance Monthly Sales for Retail and Food Services",
         "description": "U.S. retail and food services sales for October 2026 were $748.2 billion, up 0.2 percent (+/-0.4 percent)* from the previous month.<p><br>October 2026: +0.2* % Change<br>September 2026 (r): +0.8 % Change<br></p>",
         "published_at": "2026-11-17T13:30:00+00:00",
@@ -899,24 +917,6 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "New Residential Construction",
-        "description": "Privately-owned housing starts in September 2026 were at a seasonally adjusted annual rate of 1,221,000. This is 5.2 percent (+/- 11.8%)* below the revised August 2026 estimate of 1,288,000.<p><br>September 2026: -5.2* % Change<br>August 2026 (r): -5.9* % Change<br></p>",
-        "published_at": "2026-10-20T12:30:00+00:00",
-        "url": "https://www.census.gov/construction/nrc/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Manufacturing and Trade Inventories and Sales",
-        "description": "U.S. total business end-of-month inventories for August 2026 were $2,818.8 billion, up 0.4 percent (+/- 0.1 percent) from last month. U.S. total business sales were $2,123.5 billion, up 1.1 percent (+/- 0.1 percent) from last month.<p><br>August 2026: +0.4 % Change in Inventories<br>July 2026 (r): +0.9 % Change in Inventories<br></p>",
-        "published_at": "2026-10-15T14:00:00+00:00",
-        "url": "https://www.census.gov/mtis/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
         "title": "Quarterly Services Survey",
         "description": "U.S. selected services total revenue for the second quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,418.7 billion, an increase of 3.0 percent (+/- 0.4 percent) from the first quarter of 2026 and up 7.6 percent (+/- 0.6 percent) from the second quarter of 2025. The first quarter of 2026 to second quarter of 2026 percentage change was revised from the advance estimate of 3.1 percent (+/- 0.4 percent).<p><br>2nd Qtr 2026: +3.0 % Change<br>1st Qtr 2026 (r): +1.1 % Change<br></p>",
         "published_at": "2026-09-09T14:00:00+00:00",
@@ -982,12 +982,12 @@
     {
       "check": "minimum_dataset_rows",
       "pass": true,
-      "detail": "rows=98"
+      "detail": "rows=97"
     },
     {
       "check": "unique_event_ids",
       "pass": true,
-      "detail": "unique_ids=98"
+      "detail": "unique_ids=97"
     },
     {
       "check": "timestamps",
