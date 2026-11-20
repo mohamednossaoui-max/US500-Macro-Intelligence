@@ -1,13 +1,13 @@
 {
   "module": "Corporate Earnings Intelligence",
   "version": "3.1-hardening",
-  "generated_at": "2026-11-20T14:22:40.856579+00:00",
+  "generated_at": "2026-11-20T15:34:42.969288+00:00",
   "rows": 1213,
   "ticker_count": 10,
   "date_start": "1996-04-16",
   "date_end": "2026-11-19",
   "pit_safe_event_rows": 1213,
-  "reaction_rows": 1212,
+  "reaction_rows": 1213,
   "quality_gate_counts": {
     "DEGRADED": 1213
   },

@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-20T14:04:47.853003+00:00",
+  "generated_at": "2026-11-20T15:23:53.102656+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -18,7 +18,7 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "HTTP 429",
+    "error": "ParseError('syntax error: line 1, column 0')",
     "query_requests": 1,
     "fallback_required": true
   },
@@ -156,6 +156,15 @@
         "description": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
         "published_at": "2026-06-17T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board releases results from survey of senior financial officers at banks about their strategies and practices for managing reserve balances",
+        "description": "Federal Reserve Board releases results from survey of senior financial officers at banks about their strategies and practices for managing reserve balances",
+        "published_at": "2026-11-20T15:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/other20261120a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -327,15 +336,6 @@
         "description": "Federal Reserve Board issues enforcement action with Ontario Bancorporation, Inc.",
         "published_at": "2026-10-02T15:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261002a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Federal Reserve Board finalizes changes to enhance the transparency and public accountability of its stress test and reduce volatility in its stress test-related capital requirements",
-        "description": "Federal Reserve Board finalizes changes to enhance the transparency and public accountability of its stress test and reduce volatility in its stress test-related capital requirements",
-        "published_at": "2026-09-30T13:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260930a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
