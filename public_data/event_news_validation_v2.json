@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-19T14:28:51.187019+00:00",
+  "generated_at": "2026-11-20T14:04:47.853003+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -156,6 +156,15 @@
         "description": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
         "published_at": "2026-06-17T18:00:00+00:00",
         "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Federal Reserve Board issues enforcement action with former employee of First Security Bancorp",
+        "description": "Federal Reserve Board issues enforcement action with former employee of First Security Bancorp",
+        "published_at": "2026-11-19T16:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/enforcement20261119a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -332,12 +341,12 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Agencies publish resolution plan feedback letters for 15 banking organizations",
-        "description": "Agencies publish resolution plan feedback letters for 15 banking organizations",
-        "published_at": "2026-09-29T20:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260929a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
+        "title": "Activities of U.S. Multinational Enterprises, 2024",
+        "description": "Worldwide employment by U.S. multinational enterprises increased 0.9 percent to 44.2 million workers in 2024 (preliminary) from 43.8 million workers in 2023 (revised), according to statistics released today by the U.S. Bureau of Economic Analysis on the operations and finances of U.S. parent companies and their majority-owned foreign affiliates.",
+        "published_at": "2026-11-20T13:30:00+00:00",
+        "url": "https://www.bea.gov/news/2026/activities-us-multinational-enterprises-2024",
+        "topic": "labor",
+        "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
       {
@@ -526,15 +535,6 @@
         "published_at": "2025-09-16T14:00:00+00:00",
         "url": "https://www.bea.gov/news/2025/gross-domestic-product-puerto-rico-2023",
         "topic": "growth",
-        "source": "BEA",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Activities of U.S. Multinational Enterprises, 2023",
-        "description": "Worldwide employment by U.S. multinational enterprises decreased 0.4 percent to 43.9 million workers in 2023 (preliminary) from 44.1 million workers in 2022 (revised), according to statistics released today by the U.S. Bureau of Economic Analysis on the operations and finances of U.S. parent companies and their foreign affiliates. <!--Full Text Link--><a href='https://www.bea.gov/news/2025/activities-us-multinational-enterprises-2023'>Full Text</a><!--Full Text Link-->",
-        "published_at": "2025-08-22T12:30:00+00:00",
-        "url": "https://www.bea.gov/news/2025/activities-us-multinational-enterprises-2023",
-        "topic": "labor",
         "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
@@ -782,6 +782,15 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Quarterly Services Survey",
+        "description": "Advance U.S. selected services total revenue for the third quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,531.3 billion, an increase of 1.0 percent (+/- 0.4 percent) from the second quarter of 2026 and up 6.5 percent (+/- 0.6 percent) from the third quarter of 2025.<p><br>3rd Qtr 2026: +1.0 % Change<br>2nd Qtr 2026 (r): +3.0 % Change<br></p>",
+        "published_at": "2026-11-19T15:00:00+00:00",
+        "url": "https://www.census.gov/services/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "New Residential Construction",
         "description": "Privately-owned housing starts in October 2026 were at a seasonally adjusted annual rate of 1,309,000. This is 9.9 percent (+/- 16.8%)* above the revised September 2026 estimate of 1,191,000.<p><br>October 2026: +9.9* % Change<br>September 2026 (r): -7.0* % Change<br></p>",
         "published_at": "2026-11-18T13:30:00+00:00",
@@ -854,15 +863,6 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Housing Vacancies and Homeownership",
-        "description": "The homeownership rate of 65.5 percent was not statistically different from the rate in the third quarter 2025. The homeownership rates in the Northeast, Midwest, South, and West were not statistically different from third quarter 2025 rates.<p><br>3rd Qtr 2026: +0.2* Percentage Points<br>3rd Qtr 2025: -0.3* Percentage Points<br></p>",
-        "published_at": "2026-10-28T14:00:00+00:00",
-        "url": "https://www.census.gov/housing/hvs/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
         "title": "Rental Vacancy Rate",
         "description": "The rental vacancy rate of 7.6 percent was higher than the rate in the third quarter 2025. Compared to the third quarter 2025, the rental vacancy rates were higher in the Northeast and West, and they were not statistically different in the Midwest and South.<p><br>3rd Qtr 2026: +0.5 Percentage Points<br>3rd Qtr 2025: +0.2* Percentage Points<br></p>",
         "published_at": "2026-10-28T14:00:00+00:00",
@@ -872,10 +872,10 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Advance U.S. International Trade in Goods",
-        "description": "The advance international trade deficit in goods increased to $134.9 billion in September from $132.1 billion in August as imports increased more than exports.<p><br>September 2026: 2.1° % Change<br>August 2026: 11.1° % Change<br></p>",
-        "published_at": "2026-10-28T12:30:00+00:00",
-        "url": "https://www.census.gov/econ/indicators/index.html",
+        "title": "Housing Vacancies and Homeownership",
+        "description": "The homeownership rate of 65.5 percent was not statistically different from the rate in the third quarter 2025. The homeownership rates in the Northeast, Midwest, South, and West were not statistically different from third quarter 2025 rates.<p><br>3rd Qtr 2026: +0.2* Percentage Points<br>3rd Qtr 2025: -0.3* Percentage Points<br></p>",
+        "published_at": "2026-10-28T14:00:00+00:00",
+        "url": "https://www.census.gov/housing/hvs/",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"
@@ -883,6 +883,15 @@
       {
         "title": "Advance Wholesale Inventories",
         "description": "September end-of-month inventories were $1,011.5 billion, up 0.6 percent (+/- 0.2 percent) from last month.<p><br>September 2026: +0.6 % Change in Inventories<br>August 2026 (r): +0.5 % Change in Inventories<br></p>",
+        "published_at": "2026-10-28T12:30:00+00:00",
+        "url": "https://www.census.gov/econ/indicators/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Advance U.S. International Trade in Goods",
+        "description": "The advance international trade deficit in goods increased to $134.9 billion in September from $132.1 billion in August as imports increased more than exports.<p><br>September 2026: 2.1° % Change<br>August 2026: 11.1° % Change<br></p>",
         "published_at": "2026-10-28T12:30:00+00:00",
         "url": "https://www.census.gov/econ/indicators/index.html",
         "topic": "growth",
@@ -912,15 +921,6 @@
         "description": "New orders for manufactured durable goods in September, up six of the last seven months, increased $6.3 billion or 1.8 percent to $345.4 billion.<p><br>September 2026: +1.8° % Change<br>August 2026 (r): +0.1° % Change<br></p>",
         "published_at": "2026-10-27T12:30:00+00:00",
         "url": "https://www.census.gov/manufacturing/m3/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Quarterly Services Survey",
-        "description": "U.S. selected services total revenue for the second quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,418.7 billion, an increase of 3.0 percent (+/- 0.4 percent) from the first quarter of 2026 and up 7.6 percent (+/- 0.6 percent) from the second quarter of 2025. The first quarter of 2026 to second quarter of 2026 percentage change was revised from the advance estimate of 3.1 percent (+/- 0.4 percent).<p><br>2nd Qtr 2026: +3.0 % Change<br>1st Qtr 2026 (r): +1.1 % Change<br></p>",
-        "published_at": "2026-09-09T14:00:00+00:00",
-        "url": "https://www.census.gov/services/index.html",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"
