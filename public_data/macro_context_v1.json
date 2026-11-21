@@ -1,13 +1,13 @@
 {
   "methodology_version": "macro_context_v1",
-  "context_date": "2026-11-20",
+  "context_date": "2026-11-21",
   "research_only": true,
   "decision_engine_ready": false,
   "trade_signal": null,
   "forecast": null,
   "economic": {
     "source_date": "2026-11-19",
-    "age_days": 1,
+    "age_days": 2,
     "economic_regime": "MIXED",
     "inflation_score": -0.4823843667145924,
     "labor_score": 0.0321611300446956,
@@ -16,7 +16,7 @@
     "pit_safe": true
   },
   "fed": {
-    "as_of_date": "2026-11-20",
+    "as_of_date": "2026-11-21",
     "latest_fomc": "2026-10-28",
     "fed_chair": "Kevin Warsh",
     "statement_tone": "NEUTRAL",
@@ -328,21 +328,21 @@
     "pit_safe": true
   },
   "financial_stress": {
-    "source_date": "2026-11-19",
+    "source_date": "2026-11-20",
     "age_days": 1,
-    "composite_stress_score": 1.3839655964289332,
+    "composite_stress_score": 1.822165097257097,
     "research_regime": "HIGH_RESEARCH_STRESS",
-    "vix": 28.44,
-    "treasury_2y": 4.8,
-    "treasury_10y": 5.07,
-    "yield_10y_2y_spread": 0.2700000000000004,
+    "vix": 35.89,
+    "treasury_2y": 4.76,
+    "treasury_10y": 5.04,
+    "yield_10y_2y_spread": 0.2800000000000002,
     "pit_safe": true
   },
   "event_news": {
     "source_date": "2026-11-20",
-    "age_days": 0,
-    "latest_published_at": "2026-11-20T15:00:00+00:00",
-    "latest_title": "Federal Reserve Board releases results from survey of senior financial officers at banks about their strategies and practices for managing reserve balances",
+    "age_days": 1,
+    "latest_published_at": "2026-11-20T21:15:00+00:00",
+    "latest_title": "Federal Reserve announces College Fed Challenge winners",
     "latest_source": "Federal Reserve",
     "latest_topic": "fed",
     "events_available": 97,
@@ -355,9 +355,9 @@
     "pit_safe": true
   },
   "temporal_alignment": {
-    "economic_age_days": 1,
+    "economic_age_days": 2,
     "financial_stress_age_days": 1,
-    "event_news_age_days": 0,
+    "event_news_age_days": 1,
     "fed_is_current_snapshot": true,
     "anti_lookahead": true,
     "note": "Sources are not forced to be same-day. Source age is preserved explicitly. Event / News is filtered by availability_date before entering the Macro Context."
