@@ -4,4 +4,4 @@ Financial Stress,financial_stress,CONTRADICTORY,Financial stress regime is HIGH_
 Technical Intelligence,technical,CONTRADICTORY,Technical research regime is BEARISH.,BEARISH,ELIGIBLE,CORE,True,FROM_RESEARCH_CONTEXT
 Event / News,event_news,CONTEXTUAL,97 official items; 46 high-relevance; 5 duplicates flagged.,FULL,ELIGIBLE,CONTEXTUAL,False,PIT_SAFE_BY_PUBLICATION_TIME
 Corporate Earnings,earnings,CONTEXTUAL,1213 historical earnings events; post-event reactions are horizon-dependent and excluded from contemporaneous state.,2026-11-19,DEGRADED,CONTEXTUAL,False,PIT_LIMITED
-Fed Intelligence (current),fed,CONTEXTUAL,Independent Fed artifact as of 2026-11-21; None. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.,61.9,ELIGIBLE,CONTEXTUAL,False,OBSERVATION_CHECKED
+Fed Intelligence (current),fed,CONTEXTUAL,Independent Fed artifact as of 2026-11-23; None. Excluded from V1 state to prevent double counting legacy Research Context Fed fields.,61.9,ELIGIBLE,CONTEXTUAL,False,OBSERVATION_CHECKED

@@ -9,7 +9,7 @@
     "row_count": 1916,
     "date_start": "2019-01-03",
     "date_end": "2026-08-18",
-    "mean_coverage_pct": 91.812287,
+    "mean_coverage_pct": 91.764581,
     "min_coverage_pct": 82.7723,
     "max_coverage_pct": 99.4036
   },
@@ -18,45 +18,45 @@
       "coverage_threshold_pct": 75.0,
       "rows": 1916,
       "row_share_pct": 100.0,
-      "mean_coverage_pct": 91.8123,
-      "positive_state_share_pct": 70.0418,
-      "negative_state_share_pct": 28.9666,
+      "mean_coverage_pct": 91.7646,
+      "positive_state_share_pct": 69.9374,
+      "negative_state_share_pct": 29.071,
       "balanced_state_share_pct": 0.9916,
-      "mean_net_advances": 19.015658,
-      "mean_net_advances_20d": 372.220875
+      "mean_net_advances": 18.989562,
+      "mean_net_advances_20d": 371.693727
     },
     {
       "coverage_threshold_pct": 80.0,
       "rows": 1916,
       "row_share_pct": 100.0,
-      "mean_coverage_pct": 91.8123,
-      "positive_state_share_pct": 70.0418,
-      "negative_state_share_pct": 28.9666,
+      "mean_coverage_pct": 91.7646,
+      "positive_state_share_pct": 69.9374,
+      "negative_state_share_pct": 29.071,
       "balanced_state_share_pct": 0.9916,
-      "mean_net_advances": 19.015658,
-      "mean_net_advances_20d": 372.220875
+      "mean_net_advances": 18.989562,
+      "mean_net_advances_20d": 371.693727
     },
     {
       "coverage_threshold_pct": 85.0,
       "rows": 1716,
       "row_share_pct": 89.5616,
-      "mean_coverage_pct": 92.7527,
-      "positive_state_share_pct": 69.8718,
-      "negative_state_share_pct": 30.1282,
+      "mean_coverage_pct": 92.6994,
+      "positive_state_share_pct": 69.7552,
+      "negative_state_share_pct": 30.2448,
       "balanced_state_share_pct": 0.0,
-      "mean_net_advances": 16.268065,
-      "mean_net_advances_20d": 330.358392
+      "mean_net_advances": 16.238928,
+      "mean_net_advances_20d": 329.775641
     },
     {
       "coverage_threshold_pct": 90.0,
       "rows": 1155,
       "row_share_pct": 60.2818,
-      "mean_coverage_pct": 95.1061,
-      "positive_state_share_pct": 63.8961,
-      "negative_state_share_pct": 36.1039,
+      "mean_coverage_pct": 95.0269,
+      "positive_state_share_pct": 63.7229,
+      "negative_state_share_pct": 36.2771,
       "balanced_state_share_pct": 0.0,
-      "mean_net_advances": 12.903896,
-      "mean_net_advances_20d": 264.297835
+      "mean_net_advances": 12.860606,
+      "mean_net_advances_20d": 263.432035
     },
     {
       "coverage_threshold_pct": 95.0,
@@ -84,13 +84,13 @@
   "state_distribution": [
     {
       "breadth_research_state": "POSITIVE_BREADTH",
-      "count": 1342,
-      "share_pct": 70.0418
+      "count": 1340,
+      "share_pct": 69.9374
     },
     {
       "breadth_research_state": "NEGATIVE_BREADTH",
-      "count": 555,
-      "share_pct": 28.9666
+      "count": 557,
+      "share_pct": 29.071
     },
     {
       "breadth_research_state": "BALANCED_BREADTH",
@@ -104,8 +104,8 @@
       "z_column": "net_advances_z_252d",
       "recomputed_rows": 1791,
       "compared_rows": 1791,
-      "max_abs_difference": 3.9968028886505635e-15,
-      "mean_abs_difference": 7.115498391114311e-16,
+      "max_abs_difference": 3.552713678800501e-15,
+      "mean_abs_difference": 5.569593172881756e-16,
       "no_lookahead_check": true
     },
     {
@@ -113,8 +113,8 @@
       "z_column": "net_advances_20d_z_252d",
       "recomputed_rows": 1772,
       "compared_rows": 1772,
-      "max_abs_difference": 3.552713678800501e-15,
-      "mean_abs_difference": 3.6450252949676013e-16,
+      "max_abs_difference": 2.3092638912203256e-14,
+      "mean_abs_difference": 1.6749561581810777e-15,
       "no_lookahead_check": true
     },
     {
@@ -122,8 +122,8 @@
       "z_column": "pct_advancing_20d_z_252d",
       "recomputed_rows": 1772,
       "compared_rows": 1772,
-      "max_abs_difference": 2.9753977059954195e-14,
-      "mean_abs_difference": 1.9102531767375703e-15,
+      "max_abs_difference": 4.440892098500626e-14,
+      "mean_abs_difference": 3.8649784665596816e-15,
       "no_lookahead_check": true
     },
     {
@@ -131,8 +131,8 @@
       "z_column": "ad_line_change_20d_z_252d",
       "recomputed_rows": 1771,
       "compared_rows": 1771,
-      "max_abs_difference": 7.549516567451064e-15,
-      "mean_abs_difference": 5.825635602957294e-16,
+      "max_abs_difference": 2.5757174171303632e-14,
+      "mean_abs_difference": 2.1009640312933262e-15,
       "no_lookahead_check": true
     }
   ],

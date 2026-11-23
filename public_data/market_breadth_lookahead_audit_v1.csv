@@ -1,5 +1,5 @@
 raw_column,z_column,recomputed_rows,compared_rows,max_abs_difference,mean_abs_difference,no_lookahead_check
-net_advances,net_advances_z_252d,1791,1791,3.9968028886505635e-15,7.115498391114311e-16,True
-net_advances_20d,net_advances_20d_z_252d,1772,1772,3.552713678800501e-15,3.6450252949676013e-16,True
-pct_advancing_20d_avg,pct_advancing_20d_z_252d,1772,1772,2.9753977059954195e-14,1.9102531767375703e-15,True
-ad_line_change_20d,ad_line_change_20d_z_252d,1771,1771,7.549516567451064e-15,5.825635602957294e-16,True
+net_advances,net_advances_z_252d,1791,1791,3.552713678800501e-15,5.569593172881756e-16,True
+net_advances_20d,net_advances_20d_z_252d,1772,1772,2.3092638912203256e-14,1.6749561581810777e-15,True
+pct_advancing_20d_avg,pct_advancing_20d_z_252d,1772,1772,4.440892098500626e-14,3.8649784665596816e-15,True
+ad_line_change_20d,ad_line_change_20d_z_252d,1771,1771,2.5757174171303632e-14,2.1009640312933262e-15,True
