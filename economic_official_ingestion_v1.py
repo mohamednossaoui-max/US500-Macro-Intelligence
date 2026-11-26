@@ -62,7 +62,11 @@ def validate_batch(rows,reports):
     if len(reports)!=14 or {r['indicator'] for r in reports}!=set(MAPPINGS):
         raise RuntimeError('All 14 indicators must be audited exactly once')
     bad=[r['indicator']+':'+r['status'] for r in reports if r['status'] not in ACCEPT]
-    if bad:raise RuntimeError('Official validation blocked: '+', '.join(bad))
+    if bad:
+        # Name the cause (sanitized, already computed per indicator) so the failing
+        # source/step is visible in the Actions log, not only in audit.json.
+        why='; '.join(str(r['indicator'])+' -> '+str(r.get('reason') or 'no reason recorded')[:300] for r in reports if r['status'] not in ACCEPT)
+        raise RuntimeError('Official validation blocked: '+', '.join(bad)+' | '+why)
     if not rows:raise RuntimeError('No source observations')
     for r in rows:
         if r.get('verification_status')!='VERIFIED' or r['indicator'] not in MAPPINGS or not math.isfinite(float(r['actual'])):

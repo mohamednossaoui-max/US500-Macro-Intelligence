@@ -14,7 +14,7 @@ import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote_plus, urljoin, urlparse
 from email.utils import parsedate_to_datetime
 
 import pandas as pd
@@ -361,17 +361,117 @@ def collect_bls(client, indicator):
     return out
 
 
-def discover_bea(client, kind):
+BEA_HOSTS={'www.bea.gov','bea.gov'}
+BEA_RSS='https://apps.bea.gov/rss/rss.xml'
+# National GDP release slugs published by BEA, newest estimate first.
+ORDINAL_QUARTER={1:'1st',2:'2nd',3:'3rd',4:'4th'}
+
+
+def _bea_target(base,href):
+    target=urljoin(base,href)
+    if urlparse(target).hostname not in BEA_HOSTS:
+        raise MetadataError('BEA link host mismatch')
+    return target
+
+
+def gdp_slug_candidates(now):
+    """Predictable BEA national GDP URLs for the two latest completed quarters.
+
+    Second estimate is listed before the advance estimate so the newest vintage
+    wins. The Third estimate slug is irregular, so it is only found through the
+    listing, the RSS feed or the archive. A stale pick is still rejected by the
+    canonical comparison (STALE), never accepted silently.
+    """
+    now=pd.Timestamp(now)
+    quarter=(now.month-1)//3  # completed quarters this year (0-3)
+    year=now.year
+    out=[]
+    for _ in range(2):
+        if quarter==0:quarter,year=4,year-1
+        label=ORDINAL_QUARTER[quarter]+'-quarter-'+str(year)
+        out+=['https://www.bea.gov/news/'+str(year)+'/gdp-second-estimate-and-corporate-profits-'+label,
+              'https://www.bea.gov/news/'+str(year)+'/gdp-advance-estimate-'+label]
+        quarter-=1
+    return out
+
+
+def discover_bea(client, kind, now=None):
     url='https://www.bea.gov/news/current-releases'
     soup=BeautifulSoup(client.get(url).text,'html.parser')
-    for a in soup.find_all('a',href=True):
-        label=a.get_text(' ',strip=True)
-        if (kind=='pce' and label.startswith('Personal Income and Outlays,')) or (kind=='gdp' and re.match(r'(?:GDP|Gross Domestic Product)\s*\(',label)):
-            target=urljoin(url,a['href'])
-            if urlparse(target).hostname!='www.bea.gov':
-                raise MetadataError('BEA link host mismatch')
-            return target
-    raise MetadataError('Latest national BEA release not found')
+    links=[(a.get_text(' ',strip=True),a['href']) for a in soup.find_all('a',href=True)]
+    strict={'pce':lambda t:t.startswith('Personal Income and Outlays,'),
+            'gdp':lambda t:bool(re.match(r'(?:GDP|Gross Domestic Product)\s*\(',t))}[kind]
+    # Tolerant fallback for headline re-wordings such as "GDP, 3rd Quarter 2026
+    # (Second Estimate)" or "Gross Domestic Product - Second Estimate". Sub-national
+    # and industry-only products are never the national headline release.
+    loose={'pce':lambda t:bool(re.match(r'Personal Income and Outlays\b',t,re.I)),
+           'gdp':lambda t:bool(re.match(r'(?:GDP|Gross Domestic Product)\b',t,re.I))
+                  and not re.match(r'(?:GDP|Gross Domestic Product)\s+by\s+(?:State|County|Metro|Industry)',t,re.I)}[kind]
+    def pick(candidates,base):
+        for match in (strict,loose):
+            for label,href in candidates:
+                if match(label):
+                    return _bea_target(base,href)
+        return None
+    found=pick(links,url)
+    if found:return found
+    if kind!='gdp':
+        raise MetadataError('Latest national BEA release not found')
+    # "Current releases" is a rolling, cached list: on 2026-11-25 it showed Personal
+    # Income and Outlays but not the GDP (Second Estimate) published at the same
+    # minute. Use BEA's other official channels; each result is still verified
+    # against the canonical release (older/changed => STALE/REVISION, no guessing).
+    tried=['current-releases']
+    # 1) Official RSS feed (newest first), advertised on the page itself.
+    feed=next((urljoin(url,a['href']) for a in soup.find_all('a',href=True) if 'RSS' in a.get_text(' ',strip=True)),BEA_RSS)
+    tried.append('rss')
+    try:
+        root=ET.fromstring(client.get(feed).content)
+        items=[(i.findtext('title') or '',i.findtext('link') or '') for i in root.iter('item')]
+        found=pick([(t.strip(),l.strip()) for t,l in items if l.strip()],feed)
+        if found:return found
+    except (requests.RequestException,ET.ParseError,MetadataError,AttributeError,TypeError):
+        pass
+    # 2) Official news archive.
+    archive='https://www.bea.gov/news/archive'
+    tried.append('archive')
+    for term in ('Gross Domestic Product','GDP'):
+        try:
+            page=client.get(archive+'?field_related_product_target_id=All&created_1=All&title='+quote_plus(term)).text
+        except requests.RequestException:
+            continue
+        found=pick([(a.get_text(' ',strip=True),a['href']) for a in BeautifulSoup(page,'html.parser').find_all('a',href=True) if '/news/' in a['href']],archive)
+        if found:return found
+    # 3) Predictable slugs of the national release pages themselves.
+    tried.append('release-url')
+    for candidate in gdp_slug_candidates(now or pd.Timestamp.now(tz='UTC')):
+        try:
+            if parse_gdp_headline(flat(client.get(candidate).text)) is not None:
+                return candidate
+        except requests.RequestException:
+            continue
+    raise MetadataError('Latest national BEA release not found (checked: '+', '.join(tried)+')')
+
+
+ORDINALS={'first':1,'1st':1,'second':2,'2nd':2,'third':3,'3rd':3,'fourth':4,'4th':4}
+
+
+def parse_gdp_headline(text):
+    """Real GDP SA annual rate and reference quarter from the BEA headline sentence.
+
+    Tolerates the wording differences between Advance/Second/Third estimates
+    (ordinals, "Real GDP", "%", words between the verb and the rate). It never
+    guesses: no sentence match means the release stays unverified.
+    """
+    m=re.search(r'Real\s+(?:gross\s+domestic\s+product|GDP)\s*(?:\(GDP\)\s*)?(increased|decreased|rose|fell)\b[^.]{0,80}?'
+                r'(?:annual\s+rate\s+of\s+)(\d+(?:\.\d+)?)\s*(?:percent|%)'
+                r'[^.]{0,80}?\bin\s+the\s+(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter\s+(?:of\s+)?(\d{4})',text,re.I)
+    if not m:
+        m=re.search(r'Real\s+(?:gross\s+domestic\s+product|GDP)\s*(?:\(GDP\)\s*)?(increased|decreased|rose|fell)\s*(?:at\s+an\s+annual\s+rate\s+of\s*)?(\d+(?:\.\d+)?)\s*(?:percent|%)\s*(?:at\s+an\s+annual\s+rate\s*)?in\s+the\s*(first|second|third|fourth|1st|2nd|3rd|4th)\s*quarter\s+(?:of\s+)?(\d{4})',text,re.I)
+    if not m:
+        return None
+    sign=-1 if m.group(1).lower() in ('decreased','fell') else 1
+    return float(m.group(2))*sign,f'Q{ORDINALS[m.group(3).lower()]} {m.group(4)}'
 
 
 def collect_bea(client,indicator):
@@ -388,11 +488,11 @@ def collect_bea(client,indicator):
         return [observation(indicator,row['reference_period'],row['actual'],row['release_date'],row['release_time'],url,**{k:row[k] for k in ('previous','mom','yoy','yoy_method','yoy_verification_status','yoy_source_url') if k in row})]
     text=flat(html)
     rd,rt=release_timestamp(text)
-    m=re.search(r'Real gross domestic product\s*\(GDP\)\s*(increased|decreased)\s*(?:at an annual rate of\s*)?(\d+(?:\.\d+)?)\s*percent\s*(?:at an annual rate\s*)?in the\s*(first|second|third|fourth)\s*quarter of\s*(\d{4})',text,re.I)
-    if not m:
-        raise MetadataError('Real GDP SA annual rate/reference quarter not identified')
-    q=['first','second','third','fourth'].index(m.group(3).lower())+1
-    return [observation(indicator,f'Q{q} {m.group(4)}',float(m.group(2))*(-1 if m.group(1).lower()=='decreased' else 1),rd,rt,url)]
+    parsed=parse_gdp_headline(text)
+    if parsed is None:
+        raise MetadataError('Real GDP SA annual rate/reference quarter not identified (page: '+url+')')
+    value,period=parsed
+    return [observation(indicator,period,value,rd,rt,url)]
 
 
 def collect_claims(client):

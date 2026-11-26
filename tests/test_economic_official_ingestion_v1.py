@@ -235,6 +235,116 @@ def test_bea_discovery_and_release_parsing(indicator,expected):
     r=collect_bea(c,indicator)[0];assert r['actual']==expected and r['release_date']=='2026-09-30'
 
 
+@pytest.mark.parametrize('sentence,value,period',[
+    ('Real gross domestic product (GDP) increased at an annual rate of 2.5 percent in the second quarter of 2026.',2.5,'Q2 2026'),
+    ('Real gross domestic product (GDP) increased at an annual rate of 3.0 percent in the third quarter of 2026 (table 1), according to the "second" estimate released by the Bureau of Economic Analysis.',3.0,'Q3 2026'),
+    ('Real gross domestic product (GDP) decreased at an annual rate of 0.5 percent in the first quarter of 2026 (table 1).',-0.5,'Q1 2026'),
+    ('Real GDP increased at an annual rate of 1.8% in the 3rd quarter 2026.',1.8,'Q3 2026'),
+    ('Real gross domestic product (GDP) increased 4.3 percent at an annual rate in the fourth quarter of 2025.',4.3,'Q4 2025'),
+])
+def test_bea_gdp_headline_wording_variants(sentence,value,period):
+    from economic_official_sources_v1 import parse_gdp_headline
+    assert parse_gdp_headline('EMBARGOED '+sentence+' In the prior quarter real GDP increased 9.9 percent.')==(value,period)
+
+
+def test_bea_gdp_headline_never_guesses():
+    from economic_official_sources_v1 import parse_gdp_headline
+    assert parse_gdp_headline('Corporate profits increased 2.0 percent in the third quarter of 2026.') is None
+
+
+def test_bea_discovery_tolerates_headline_rewording_but_not_subnational():
+    from economic_official_sources_v1 import collect_bea
+    index=('<a href="/news/2026/state">GDP by State, 2nd Quarter 2026</a>'
+           '<a href="/news/2026/gdp">GDP, 3rd Quarter 2026 (Second Estimate)</a>')
+    embargo='EMBARGOED UNTIL RELEASE AT 8:30 a.m. EST, Wednesday, November 25, 2026 '
+    gdp=embargo+'Real gross domestic product (GDP) increased at an annual rate of 3.0 percent in the third quarter of 2026 (table 1), according to the "second" estimate.'
+    c=FakeClient(lambda u,k:Response(text=index if u.endswith('current-releases') else gdp if u.endswith('gdp') else 'WRONG PAGE'))
+    r=collect_bea(c,'GDP')[0]
+    assert r['actual']==3.0 and r['reference_period']=='Q3 2026' and r['release_date']=='2026-11-25'
+
+
+def test_bea_gdp_found_in_archive_when_dropped_from_current_releases():
+    # Real 2026-11-25 shape: current-releases lists Personal Income and Outlays and
+    # other products but no national GDP headline any more.
+    from economic_official_sources_v1 import collect_bea
+    current=('<a href="/news/2026/personal-income-and-outlays-october-2026">Personal Income and Outlays, October 2026</a>'
+             '<a href="/news/2026/gross-domestic-product-county-and-personal-income-county-2024">Gross Domestic Product by County and Personal Income by County, 2024</a>')
+    archive=('<a href="/news/2026/gross-domestic-product-county-and-personal-income-county-2024">Gross Domestic Product by County and Personal Income by County, 2024</a>'
+             '<a href="/news/2026/gdp-advance-estimate-3rd-quarter-2026">GDP (Advance Estimate), 3rd Quarter 2026</a>')
+    gdp=('EMBARGOED UNTIL RELEASE AT 8:30 a.m. EDT, Thursday, October 29, 2026 '
+         'Real gross domestic product (GDP) increased at an annual rate of 3.4 percent in the third quarter of 2026 (table 1), according to the "advance" estimate.')
+    seen=[]
+    def route(u,k):
+        seen.append(u)
+        if u.endswith('current-releases'):return Response(text=current)
+        if '/news/archive' in u:return Response(text=archive)
+        if u.endswith('gdp-advance-estimate-3rd-quarter-2026'):return Response(text=gdp)
+        return Response(text='WRONG PAGE')
+    r=collect_bea(FakeClient(route),'GDP')[0]
+    assert (r['actual'],r['reference_period'],r['release_date'])==(3.4,'Q3 2026','2026-10-29')
+    assert any('/news/archive' in u for u in seen)
+
+
+SECOND_URL='/news/2026/gdp-second-estimate-and-corporate-profits-3rd-quarter-2026'
+SECOND_PAGE=('EMBARGOED UNTIL RELEASE AT 8:30 a.m. EST, Wednesday, November 25, 2026 BEA 26–50 '
+             'GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026 '
+             'Real gross domestic product (GDP) increased at an annual rate of 4.3 percent in the third quarter of 2026 (July, August, and September), '
+             'according to the second estimate released today by the U.S. Bureau of Economic Analysis (BEA). In the second quarter, real GDP increased 2.2 percent.')
+STALE_CURRENT=('<a href="/news/2026/personal-income-and-outlays-october-2026">Personal Income and Outlays, October 2026</a>'
+               '<a href="https://apps.bea.gov/rss/rss.xml">News Release Feed (RSS)</a>')
+
+
+def test_bea_gdp_second_estimate_found_via_rss_when_listing_is_stale():
+    from economic_official_sources_v1 import collect_bea
+    rss=('<rss><channel><item><title>Personal Income and Outlays, October 2026</title><link>https://www.bea.gov/news/2026/personal-income-and-outlays-october-2026</link></item>'
+         '<item><title>GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026</title><link>https://www.bea.gov'+SECOND_URL+'</link></item></channel></rss>')
+    def route(u,k):
+        if u.endswith('current-releases'):return Response(text=STALE_CURRENT)
+        if u.endswith('rss.xml'):return Response(text=rss)
+        if u.endswith(SECOND_URL):return Response(text=SECOND_PAGE)
+        return Response(text='WRONG PAGE')
+    r=collect_bea(FakeClient(route),'GDP')[0]
+    assert (r['actual'],r['reference_period'],r['release_date'])==(4.3,'Q3 2026','2026-11-25')
+
+
+def test_bea_gdp_second_estimate_found_by_release_url_when_feed_and_archive_fail():
+    import requests
+    from economic_official_sources_v1 import discover_bea
+    def route(u,k):
+        if u.endswith('current-releases'):return Response(text=STALE_CURRENT)
+        if u.endswith(SECOND_URL):return Response(text=SECOND_PAGE)
+        raise requests.HTTPError('404')
+    assert discover_bea(FakeClient(route),'gdp',now='2026-11-26').endswith(SECOND_URL)
+
+
+def test_bea_gdp_slug_candidates_prefer_newest_estimate():
+    from economic_official_sources_v1 import gdp_slug_candidates
+    c=gdp_slug_candidates('2026-11-26')
+    assert c[0].endswith('gdp-second-estimate-and-corporate-profits-3rd-quarter-2026')
+    assert c[1].endswith('gdp-advance-estimate-3rd-quarter-2026') and 'gdp-second-estimate-and-corporate-profits-2nd-quarter-2026' in c[2]
+    assert gdp_slug_candidates('2027-01-15')[0].endswith('4th-quarter-2026')
+
+
+def test_bea_gdp_missing_everywhere_stays_unverified():
+    from economic_official_sources_v1 import collect_bea, MetadataError
+    page='<a href="/news/2026/personal-income-and-outlays-october-2026">Personal Income and Outlays, October 2026</a>'
+    import requests
+    def route(u,k):
+        if u.endswith('current-releases'):return Response(text=page)
+        raise requests.HTTPError('404')
+    with pytest.raises(MetadataError,match='not found'):
+        collect_bea(FakeClient(route),'GDP')
+
+
+def test_blocked_validation_names_the_cause():
+    from economic_official_ingestion_v1 import validate_batch, MAPPINGS
+    reports=[dict(indicator=i,status='CURRENT',reason='') for i in MAPPINGS]
+    for r in reports:
+        if r['indicator']=='GDP':r.update(status='METADATA_UNVERIFIED',reason='Real GDP SA annual rate/reference quarter not identified')
+    with pytest.raises(RuntimeError,match='GDP:METADATA_UNVERIFIED.*not identified'):
+        validate_batch([],reports)
+
+
 def test_claims_seasonally_adjusted_and_revision(monkeypatch):
     import economic_official_sources_v1 as sources
     from types import SimpleNamespace
