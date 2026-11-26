@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-11-26",
-  "retrieved_at": "2026-11-26T09:23:10.443538+00:00",
+  "retrieved_at": "2026-11-26T15:08:52.186713+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -174,7 +174,7 @@
       "canonical_release_date": "2026-11-25",
       "canonical_value": 4.3,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "BEA",
@@ -182,10 +182,10 @@
       "metadata_source_url": null,
       "metadata_series": null,
       "before_merge_canonical_latest_reference_period": "Q3 2026",
-      "before_merge_canonical_release_date": "2026-10-29",
-      "before_merge_canonical_value": 3.4,
-      "ingestion_status": "REVISION",
-      "ingestion_reason": "Same reference period has a changed official value"
+      "before_merge_canonical_release_date": "2026-11-25",
+      "before_merge_canonical_value": 4.3,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "PCE_PRICE_INDEX",
@@ -204,11 +204,11 @@
       "metadata_verification": null,
       "metadata_source_url": null,
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-29",
-      "before_merge_canonical_value": 0.5,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-25",
+      "before_merge_canonical_value": 0.3,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "CORE_PCE",
@@ -227,11 +227,11 @@
       "metadata_verification": null,
       "metadata_source_url": null,
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "September 2026",
-      "before_merge_canonical_release_date": "2026-10-29",
+      "before_merge_canonical_latest_reference_period": "October 2026",
+      "before_merge_canonical_release_date": "2026-11-25",
       "before_merge_canonical_value": 0.3,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "RETAIL_SALES",
@@ -266,18 +266,18 @@
       "canonical_release_date": "2026-11-25",
       "canonical_value": 189000.0,
       "status": "CURRENT",
-      "revision_detected": true,
+      "revision_detected": false,
       "source_verification": "VERIFIED",
       "reason": "Official period, release and value match merged canonical",
       "metadata_provider": "DOL",
       "metadata_verification": null,
       "metadata_source_url": null,
       "metadata_series": null,
-      "before_merge_canonical_latest_reference_period": "Week ending November 14, 2026",
-      "before_merge_canonical_release_date": "2026-11-19",
-      "before_merge_canonical_value": 203000.0,
-      "ingestion_status": "NEW_RELEASE",
-      "ingestion_reason": "New official release/vintage requires canonical merge"
+      "before_merge_canonical_latest_reference_period": "Week ending November 21, 2026",
+      "before_merge_canonical_release_date": "2026-11-25",
+      "before_merge_canonical_value": 189000.0,
+      "ingestion_status": "CURRENT",
+      "ingestion_reason": "Official period, release and value match canonical"
     },
     {
       "indicator": "ISM_MANUFACTURING_PMI",
