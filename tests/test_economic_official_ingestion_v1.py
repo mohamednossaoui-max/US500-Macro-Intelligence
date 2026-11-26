@@ -247,6 +247,31 @@ def test_bea_gdp_headline_wording_variants(sentence,value,period):
     assert parse_gdp_headline('EMBARGOED '+sentence+' In the prior quarter real GDP increased 9.9 percent.')==(value,period)
 
 
+@pytest.mark.parametrize('html',[
+    # link/bold split the phrase into separate text nodes
+    '<p><strong>Real gross domestic product</strong> (<a href="/g">GDP</a>) <a href="https://apps.bea.gov/iTable/?x">increased at an annual rate of 4.3 percent</a> in the third quarter of 2026 (July, August, and September), according to the second estimate released today.</p>',
+    # non-breaking spaces and a parenthetical quarterly rate with a footnote marker
+    '<p>Real&nbsp;GDP increased at an annual rate of 4.3&nbsp;percent (1.1 percent at a quarterly rate<sup>1</sup>) in the third&nbsp;quarter of 2026, reflecting investment.</p>',
+    '<div><b>Real gross domestic product</b><b>(GDP)</b> increased at an annual rate of 4.3 percent<sup>1</sup> in the third quarter of 2026.</div>',
+    '<p>Real gross domestic product (GDP) increased at an annual rate of <span>4.3</span> <span>percent</span> in the third quarter of 2026 (July, August, and September).</p>',
+])
+def test_bea_gdp_headline_survives_html_extraction_artefacts(html):
+    from economic_official_sources_v1 import collect_bea
+    page='<p>EMBARGOED UNTIL RELEASE AT 8:30 a.m. EST, Wednesday, November 25, 2026</p><h1>GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026</h1>'+html+'<p>In the second quarter, real GDP increased 2.2 percent.</p>'
+    index='<a href="/news/2026/gdp-second">GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026</a>'
+    c=FakeClient(lambda u,k:Response(text=index if u.endswith('current-releases') else page))
+    r=collect_bea(c,'GDP')[0]
+    assert (r['actual'],r['reference_period'],r['release_date'])==(4.3,'Q3 2026','2026-11-25')
+
+
+def test_bea_gdp_parse_failure_reports_page_excerpt():
+    from economic_official_sources_v1 import collect_bea, MetadataError
+    page='EMBARGOED UNTIL RELEASE AT 8:30 a.m. EST, Wednesday, November 25, 2026 Real GDP was revised, details to follow.'
+    index='<a href="/news/2026/gdp-second">GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026</a>'
+    c=FakeClient(lambda u,k:Response(text=index if u.endswith('current-releases') else page))
+    with pytest.raises(MetadataError,match='excerpt: Real GDP was revised'):collect_bea(c,'GDP')
+
+
 def test_bea_gdp_headline_never_guesses():
     from economic_official_sources_v1 import parse_gdp_headline
     assert parse_gdp_headline('Corporate profits increased 2.0 percent in the third quarter of 2026.') is None

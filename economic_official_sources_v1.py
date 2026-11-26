@@ -456,22 +456,55 @@ def discover_bea(client, kind, now=None):
 ORDINALS={'first':1,'1st':1,'second':2,'2nd':2,'third':3,'3rd':3,'fourth':4,'4th':4}
 
 
+def normalize_release_text(text):
+    """Undo HTML-extraction artefacts: links/bold splitting a phrase into nodes,
+    non-breaking spaces, spaces inside parentheses and footnote markers."""
+    t=str(text).replace('\xa0',' ').replace('\u202f',' ').replace('\u2009',' ')
+    t=re.sub(r'\s+',' ',t)
+    t=re.sub(r'\(\s+','(',t); t=re.sub(r'\s+\)',')',t)
+    t=re.sub(r'\s+([,;:])',r'\1',t)
+    t=re.sub(r'\s*\^\s*\d+\b','',t)           # "rate ^1" style footnote markers
+    return t.strip()
+
+
+_GDP_SUBJECT=r'Real\s+(?:gross\s+domestic\s+product|GDP)'
+_GDP_VERB=r'(increased|decreased|rose|fell)'
+_GDP_QUARTER=r'(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter\s+(?:of\s+)?(\d{4})'
+
+
 def parse_gdp_headline(text):
     """Real GDP SA annual rate and reference quarter from the BEA headline sentence.
 
     Tolerates the wording differences between Advance/Second/Third estimates
-    (ordinals, "Real GDP", "%", words between the verb and the rate). It never
-    guesses: no sentence match means the release stays unverified.
+    (ordinals, "Real GDP", "%", parenthetical quarterly rate, extraction
+    artefacts). It never guesses: no sentence match means the release stays
+    unverified, and an implausible rate is rejected.
     """
-    m=re.search(r'Real\s+(?:gross\s+domestic\s+product|GDP)\s*(?:\(GDP\)\s*)?(increased|decreased|rose|fell)\b[^.]{0,80}?'
-                r'(?:annual\s+rate\s+of\s+)(\d+(?:\.\d+)?)\s*(?:percent|%)'
-                r'[^.]{0,80}?\bin\s+the\s+(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter\s+(?:of\s+)?(\d{4})',text,re.I)
-    if not m:
-        m=re.search(r'Real\s+(?:gross\s+domestic\s+product|GDP)\s*(?:\(GDP\)\s*)?(increased|decreased|rose|fell)\s*(?:at\s+an\s+annual\s+rate\s+of\s*)?(\d+(?:\.\d+)?)\s*(?:percent|%)\s*(?:at\s+an\s+annual\s+rate\s*)?in\s+the\s*(first|second|third|fourth|1st|2nd|3rd|4th)\s*quarter\s+(?:of\s+)?(\d{4})',text,re.I)
-    if not m:
-        return None
-    sign=-1 if m.group(1).lower() in ('decreased','fell') else 1
-    return float(m.group(2))*sign,f'Q{ORDINALS[m.group(3).lower()]} {m.group(4)}'
+    t=normalize_release_text(text)
+    patterns=(
+        # Standard BEA sentence.
+        _GDP_SUBJECT+r'\s*(?:\(GDP\)\s*)?'+_GDP_VERB+r'\b[^.]{0,80}?annual\s+rate\s+of\s+(\d+(?:\.\d+)?)\s*(?:percent|%)[^.]{0,80}?\bin\s+the\s+'+_GDP_QUARTER,
+        r'Real\s+(?:gross\s+domestic\s+product|GDP)\s*(?:\(GDP\)\s*)?'+_GDP_VERB+r'\s*(?:at\s+an\s+annual\s+rate\s+of\s*)?(\d+(?:\.\d+)?)\s*(?:percent|%)\s*(?:at\s+an\s+annual\s+rate\s*)?in\s+the\s*'+_GDP_QUARTER,
+        # Tolerant: bounded window, so a parenthetical such as "(1.1 percent at a
+        # quarterly rate)" or other inserted words cannot break the match. The
+        # first number after the subject/verb is the annual rate.
+        _GDP_SUBJECT+r'\b.{0,60}?'+_GDP_VERB+r'\b.{0,60}?(\d+(?:\.\d+)?)\s*(?:percent|%).{0,200}?\bin\s+the\s+'+_GDP_QUARTER,
+    )
+    for pattern in patterns:
+        m=re.search(pattern,t,re.I)
+        if not m:continue
+        value=float(m.group(2))
+        if value>50:continue
+        return value*(-1 if m.group(1).lower() in ('decreased','fell') else 1),f'Q{ORDINALS[m.group(3).lower()]} {m.group(4)}'
+    return None
+
+
+def gdp_text_diagnostic(text):
+    """Short sanitized excerpt for the error message (no secrets in public pages)."""
+    t=normalize_release_text(text)
+    m=re.search(r'Real\s+(?:gross\s+domestic\s+product|GDP)',t,re.I)
+    if not m:return 'headline subject "Real GDP" absent from the page text (len='+str(len(t))+')'
+    return 'excerpt: '+t[m.start():m.start()+240]
 
 
 def collect_bea(client,indicator):
@@ -490,7 +523,7 @@ def collect_bea(client,indicator):
     rd,rt=release_timestamp(text)
     parsed=parse_gdp_headline(text)
     if parsed is None:
-        raise MetadataError('Real GDP SA annual rate/reference quarter not identified (page: '+url+')')
+        raise MetadataError('Real GDP SA annual rate/reference quarter not identified (page: '+url+'; '+gdp_text_diagnostic(text)+')')
     value,period=parsed
     return [observation(indicator,period,value,rd,rt,url)]
 
