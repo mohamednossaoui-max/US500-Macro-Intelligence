@@ -20,24 +20,24 @@
     "WTI": "2000-08-23"
   },
   "asset_last_dates": {
-    "BITCOIN": "2026-11-24",
-    "DXY": "2026-11-24",
-    "GOLD": "2026-11-24",
-    "NASDAQ": "2026-11-23",
-    "SP500": "2026-11-23",
-    "US10Y": "2026-11-23",
-    "VIX": "2026-11-24",
-    "WTI": "2026-11-24"
+    "BITCOIN": "2026-11-26",
+    "DXY": "2026-11-26",
+    "GOLD": "2026-11-26",
+    "NASDAQ": "2026-11-25",
+    "SP500": "2026-11-25",
+    "US10Y": "2026-11-25",
+    "VIX": "2026-11-26",
+    "WTI": "2026-11-26"
   },
   "asset_observation_counts": {
-    "BITCOIN": 4452,
-    "DXY": 6794,
-    "GOLD": 6585,
-    "NASDAQ": 6764,
-    "SP500": 6764,
-    "US10Y": 6758,
-    "VIX": 6767,
-    "WTI": 6593
+    "BITCOIN": 4454,
+    "DXY": 6796,
+    "GOLD": 6587,
+    "NASDAQ": 6766,
+    "SP500": 6766,
+    "US10Y": 6760,
+    "VIX": 6769,
+    "WTI": 6595
   },
   "available_assets": [
     "SP500",
@@ -51,7 +51,7 @@
   ],
   "columns": 46,
   "correlation_feature_count": 10,
-  "date_end": "2026-11-24",
+  "date_end": "2026-11-26",
   "date_start": "2000-01-03",
   "decision_engine_ready": false,
   "forecast_generated": false,
@@ -60,7 +60,7 @@
   "pit_status": "PIT_LIMITED",
   "point_in_time_safe": false,
   "research_only": true,
-  "rows": 8181,
+  "rows": 8183,
   "session_aware_pit_safe": false,
   "trading_signal_generated": false,
   "unified_decision_generated": false,

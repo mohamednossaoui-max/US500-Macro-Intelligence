@@ -1,10 +1,10 @@
 {
   "available": true,
   "schema_version": "fed-comparison-3",
-  "generated_at": "2026-11-24T15:53:18.168034+00:00",
-  "as_of_date": "2026-11-24",
+  "generated_at": "2026-11-26T09:25:38.210278+00:00",
+  "as_of_date": "2026-11-26",
   "latest_fomc": "2026-10-28",
-  "current_date": "2026-11-24",
+  "current_date": "2026-11-26",
   "fed_chair": "Kevin Warsh",
   "statement": {
     "name": "FOMC Statement",
@@ -76,7 +76,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "source_status": "VERIFIED_TRANSCRIPT",
       "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
-      "retrieved_at": "2026-11-24T15:53:16.120842+00:00"
+      "retrieved_at": "2026-11-26T09:25:36.904072+00:00"
     }
   },
   "communication_comparison": {
@@ -509,31 +509,31 @@
   },
   "beige_book": {
     "issue_date": null,
-    "issue_month": "2026-10",
-    "publication_date": "2026-10-14",
-    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
-    "title": "Beige Book — 2026-10",
+    "issue_month": "2026-11",
+    "publication_date": "2026-11-25",
+    "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202611-summary.htm",
+    "title": "Beige Book — 2026-11",
     "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
     "available": true,
-    "information_cutoff_date": "2026-10-05",
-    "retrieved_at": "2026-11-24T15:53:17.977943+00:00",
+    "information_cutoff_date": "2026-11-16",
+    "retrieved_at": "2026-11-26T09:25:38.129570+00:00",
     "catalog_verified": true,
-    "latest_publication_date": "2026-10-14",
-    "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
+    "latest_publication_date": "2026-11-25",
+    "content_sha256": "1185bdb23a34271dd011ddf6febbe662012d6e5138e621f9c2e5fc7c2bbd88fa"
   },
   "beige_analysis": {
     "available": true,
-    "score": null,
-    "recognized_weight_percent": 25,
-    "recognized_dimensions": 1,
-    "tone": "INSUFFICIENT KEYWORD COVERAGE",
+    "score": 52.3,
+    "recognized_weight_percent": 55,
+    "recognized_dimensions": 3,
+    "tone": "MIXED KEYWORD BALANCE",
     "dimensions": {
       "growth": {
-        "score": 0,
-        "score_100": null,
-        "classification": "UNRECOGNIZED",
-        "positive_hits": 0,
-        "negative_hits": 0
+        "score": 3,
+        "score_100": 65,
+        "classification": "SLIGHTLY POSITIVE",
+        "positive_hits": 4,
+        "negative_hits": 1
       },
       "labor": {
         "score": 0,
@@ -543,18 +543,18 @@
         "negative_hits": 0
       },
       "inflation": {
-        "score": -5,
-        "score_100": 25,
-        "classification": "NEGATIVE",
+        "score": -1,
+        "score_100": 45,
+        "classification": "SLIGHTLY NEGATIVE",
         "positive_hits": 0,
-        "negative_hits": 5
+        "negative_hits": 1
       },
       "consumer_spending": {
-        "score": 0,
-        "score_100": null,
-        "classification": "UNRECOGNIZED",
+        "score": -1,
+        "score_100": 45,
+        "classification": "SLIGHTLY NEGATIVE",
         "positive_hits": 0,
-        "negative_hits": 0
+        "negative_hits": 1
       },
       "manufacturing": {
         "score": 0,
@@ -579,10 +579,10 @@
       }
     },
     "reasons": [
-      "- Growth: UNRECOGNIZED (not scored)",
+      "- Growth: SLIGHTLY POSITIVE (65.0/100)",
       "- Labor: UNRECOGNIZED (not scored)",
-      "- Inflation: NEGATIVE (25.0/100)",
-      "- Consumer spending: UNRECOGNIZED (not scored)",
+      "- Inflation: SLIGHTLY NEGATIVE (45.0/100)",
+      "- Consumer spending: SLIGHTLY NEGATIVE (45.0/100)",
       "- Manufacturing: UNRECOGNIZED (not scored)",
       "- Financial: UNRECOGNIZED (not scored)",
       "- Housing: UNRECOGNIZED (not scored)"
@@ -593,6 +593,20 @@
     "available": true,
     "current": {
       "issue_date": null,
+      "issue_month": "2026-11",
+      "publication_date": "2026-11-25",
+      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202611-summary.htm",
+      "title": "Beige Book — 2026-11",
+      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+      "available": true,
+      "information_cutoff_date": "2026-11-16",
+      "retrieved_at": "2026-11-26T09:25:38.129570+00:00",
+      "catalog_verified": true,
+      "latest_publication_date": "2026-11-25",
+      "content_sha256": "1185bdb23a34271dd011ddf6febbe662012d6e5138e621f9c2e5fc7c2bbd88fa"
+    },
+    "previous": {
+      "issue_date": null,
       "issue_month": "2026-10",
       "publication_date": "2026-10-14",
       "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
@@ -600,26 +614,29 @@
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
       "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-11-24T15:53:17.977943+00:00",
+      "retrieved_at": "2026-11-26T09:25:38.202879+00:00",
       "catalog_verified": true,
-      "latest_publication_date": "2026-10-14",
+      "latest_publication_date": "2026-11-25",
       "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
     },
-    "previous": {
-      "issue_date": null,
-      "issue_month": "2026-08",
-      "publication_date": "2026-09-02",
-      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm",
-      "title": "Beige Book — 2026-08",
-      "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
-      "available": true,
-      "information_cutoff_date": "2026-08-24",
-      "retrieved_at": "2026-11-24T15:53:18.163486+00:00",
-      "catalog_verified": true,
-      "latest_publication_date": "2026-10-14",
-      "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb"
-    },
     "current_facts": {
+      "districts_with_growth": 8,
+      "districts_with_robust_prices": null,
+      "districts_with_accelerating_prices": null,
+      "employment_modest": null,
+      "employment_slight": null,
+      "employment_unchanged": null,
+      "consumer_spending_evidence": [
+        "Consumer spending was little changed, as households remained price sensitive and were increasingly selective in discretionary purchases."
+      ],
+      "credit_evidence": [
+        "Banking conditions were little changed overall, as loan demand remained subdued, while nonfinancial services activity increased slightly."
+      ],
+      "price_evidence": [
+        "Contacts expected both expenses and prices to continue rising in the coming months."
+      ]
+    },
+    "previous_facts": {
       "districts_with_growth": 9,
       "districts_with_robust_prices": 3,
       "districts_with_accelerating_prices": 4,
@@ -639,58 +656,18 @@
         "Firms in several Districts cited persistent uncertainty around energy and tariffs and expect that prices will increase further in the coming months, as existing contracts expire, and firms must renegotiate hedge contracts for their own inputs and/or delivery contracts to their customers."
       ]
     },
-    "previous_facts": {
-      "districts_with_growth": 10,
-      "districts_with_robust_prices": 1,
-      "districts_with_accelerating_prices": 1,
-      "employment_modest": 3,
-      "employment_slight": 4,
-      "employment_unchanged": 5,
-      "consumer_spending_evidence": [
-        "Consumer spending grew slightly on balance; reports reflected both heightened price sensitivity on the one hand and solid high-end purchases on the other."
-      ],
-      "credit_evidence": [
-        "Financial conditions improved slightly as loan volumes remained solid or increased across most Districts."
-      ],
-      "price_evidence": []
-    },
     "changes": {
       "districts_with_growth": {
-        "previous": 10,
-        "current": 9,
-        "change": -1
-      },
-      "districts_with_robust_prices": {
-        "previous": 1,
-        "current": 3,
-        "change": 2
-      },
-      "districts_with_accelerating_prices": {
-        "previous": 1,
-        "current": 4,
-        "change": 3
-      },
-      "employment_modest": {
-        "previous": 3,
-        "current": 3,
-        "change": 0
-      },
-      "employment_slight": {
-        "previous": 4,
-        "current": 5,
-        "change": 1
-      },
-      "employment_unchanged": {
-        "previous": 5,
-        "current": 4,
+        "previous": 9,
+        "current": 8,
         "change": -1
       }
     },
     "dimension_changes": {
       "inflation": {
-        "previous": 30,
-        "current": 25,
-        "change": -5
+        "previous": 25,
+        "current": 45,
+        "change": 20
       }
     },
     "interpretation": "Comparison of reported evidence; no inference of a policy decision."
@@ -722,7 +699,7 @@
       "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
       "meeting_verified": true,
       "latest_meeting_date": "2026-10-28",
-      "retrieved_at": "2026-11-24T15:53:16.120842+00:00",
+      "retrieved_at": "2026-11-26T09:25:36.904072+00:00",
       "pdf_sha256": "c3a57e922ff5db0f6ca37c79c6fb34b8a8feb4f5a89fcd8f05eea740d7fc4da0",
       "availability_basis": "VERIFIED_PDF_RETRIEVAL"
     },
@@ -736,17 +713,17 @@
     },
     "beige_book": {
       "issue_date": null,
-      "issue_month": "2026-10",
-      "publication_date": "2026-10-14",
-      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
-      "title": "Beige Book — 2026-10",
+      "issue_month": "2026-11",
+      "publication_date": "2026-11-25",
+      "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202611-summary.htm",
+      "title": "Beige Book — 2026-11",
       "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
       "available": true,
-      "information_cutoff_date": "2026-10-05",
-      "retrieved_at": "2026-11-24T15:53:17.977943+00:00",
+      "information_cutoff_date": "2026-11-16",
+      "retrieved_at": "2026-11-26T09:25:38.129570+00:00",
       "catalog_verified": true,
-      "latest_publication_date": "2026-10-14",
-      "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef"
+      "latest_publication_date": "2026-11-25",
+      "content_sha256": "1185bdb23a34271dd011ddf6febbe662012d6e5138e621f9c2e5fc7c2bbd88fa"
     }
   },
   "report_comparison": {
@@ -757,7 +734,7 @@
         "publication_date": "2026-09-16",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20260916.htm",
-        "retrieved_at": "2026-11-24T15:53:18.168034+00:00",
+        "retrieved_at": "2026-11-26T09:25:38.210278+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "fc27d85fa8d02c2afe3ef5e54416802aac2fa1d2b926b26424f0fbf70842367b",
@@ -828,7 +805,7 @@
         "publication_date": "2026-10-28",
         "source": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomcpresconf20261028.htm",
-        "retrieved_at": "2026-11-24T15:53:18.168034+00:00",
+        "retrieved_at": "2026-11-26T09:25:38.210278+00:00",
         "available": true,
         "scope": "OFFICIAL_STATEMENT",
         "content_sha256": "e22a52d380060ec6baf0af35114f3d5d8ee9f4930ad5f6dcbce0e8af782bfbe2",
@@ -1050,7 +1027,7 @@
         "publication_date": "2026-10-07",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-11-24T15:53:18.168034+00:00",
+        "retrieved_at": "2026-11-26T09:25:38.210278+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "4f0b4e408957310dcb4c60fc83d12a4afdd57399be1ae7bb1a8d47db22972407",
@@ -1285,7 +1262,7 @@
         "publication_date": "2026-11-18",
         "source": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20261028.htm",
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-        "retrieved_at": "2026-11-24T15:53:18.168034+00:00",
+        "retrieved_at": "2026-11-26T09:25:38.210278+00:00",
         "available": true,
         "scope": "OFFICIAL_MINUTES",
         "content_sha256": "8c6177a4713326f4d0445f92035e18bc40b6fadd98435af54cb7350eb3021381",
@@ -2819,7 +2796,7 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20260916.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-11-24T15:53:16.987658+00:00",
+        "retrieved_at": "2026-11-26T09:25:37.499623+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
         "content_sha256": "b96650f08db348d43dd5e24d2fa0610fb4192aaeec7b9ad3ea9432705f5f86e1",
@@ -2952,7 +2929,7 @@
         "publication_date": null,
         "source": "https://www.federalreserve.gov/mediacenter/files/FOMCpresconf20261028.pdf",
         "publication_date_source": null,
-        "retrieved_at": "2026-11-24T15:53:16.120842+00:00",
+        "retrieved_at": "2026-11-26T09:25:36.904072+00:00",
         "available": true,
         "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
         "content_sha256": "04fc6b1cf796ff93e36c6b7109c881d1ef9337e505f84b882111edb462f90376",
@@ -3600,66 +3577,6 @@
       "available": true,
       "previous": {
         "issue_date": null,
-        "issue_month": "2026-08",
-        "publication_date": "2026-09-02",
-        "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202608-summary.htm",
-        "title": "Beige Book — 2026-08",
-        "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
-        "available": true,
-        "information_cutoff_date": "2026-08-24",
-        "retrieved_at": "2026-11-24T15:53:18.163486+00:00",
-        "catalog_verified": true,
-        "latest_publication_date": "2026-10-14",
-        "content_sha256": "10c077f02a903894c1c88bc9ac7a591f7d1083cdb48bb05483c245bbff80b3fb",
-        "scope": "NATIONAL_SUMMARY",
-        "facts": {},
-        "topics": {
-          "inflation": {
-            "label": "Inflation and prices",
-            "evidence": [
-              "Prices increased moderately in eight Districts, with two Districts reporting modest increases, one slight increases, and one robust increases.",
-              "Compared with the previous reporting period, the pace of price increases was the same in eight Districts, decreased in three, and increased in one.",
-              "Input price pressures were notably elevated in manufacturing and construction across multiple Districts, with widespread reports of price increases for energy, transportation, and raw materials, particularly metals and petrochemicals.",
-              "Consumer-facing contacts in a few Districts noted that heightened price sensitivity among customers was putting a limit on their ability to pass through input price increases."
-            ]
-          },
-          "labor": {
-            "label": "Labor market",
-            "evidence": [
-              "Employment rose very slightly overall, with three Districts showing modest gains in employment, four reporting slight gains, and five Districts experiencing no change."
-            ]
-          },
-          "growth": {
-            "label": "Growth and demand",
-            "evidence": [
-              "Economic activity increased modestly since early July.",
-              "Consumer spending grew slightly on balance; reports reflected both heightened price sensitivity on the one hand and solid high-end purchases on the other."
-            ]
-          },
-          "risks": {
-            "label": "Balance of risks",
-            "evidence": [
-              "The general outlook for the coming months was positive, but sentiment was mixed across sectors, with contacts reporting heightened uncertainty surrounding the effects of higher energy prices, policy, and international conflict."
-            ]
-          },
-          "policy": {
-            "label": "Policy and guidance",
-            "evidence": []
-          },
-          "liquidity": {
-            "label": "Balance sheet and liquidity",
-            "evidence": []
-          },
-          "credit": {
-            "label": "Credit and financial conditions",
-            "evidence": [
-              "Financial conditions improved slightly as loan volumes remained solid or increased across most Districts."
-            ]
-          }
-        }
-      },
-      "current": {
-        "issue_date": null,
         "issue_month": "2026-10",
         "publication_date": "2026-10-14",
         "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202610-summary.htm",
@@ -3667,9 +3584,9 @@
         "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
         "available": true,
         "information_cutoff_date": "2026-10-05",
-        "retrieved_at": "2026-11-24T15:53:17.977943+00:00",
+        "retrieved_at": "2026-11-26T09:25:38.202879+00:00",
         "catalog_verified": true,
-        "latest_publication_date": "2026-10-14",
+        "latest_publication_date": "2026-11-25",
         "content_sha256": "379f3c32a6a6a251fa1acac6b4edd45d2bc865b1ff6533a30e71fa28e79a72ef",
         "scope": "NATIONAL_SUMMARY",
         "facts": {},
@@ -3721,6 +3638,65 @@
           }
         }
       },
+      "current": {
+        "issue_date": null,
+        "issue_month": "2026-11",
+        "publication_date": "2026-11-25",
+        "url": "https://www.federalreserve.gov/monetarypolicy/beigebook202611-summary.htm",
+        "title": "Beige Book — 2026-11",
+        "publication_date_source": "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm",
+        "available": true,
+        "information_cutoff_date": "2026-11-16",
+        "retrieved_at": "2026-11-26T09:25:38.129570+00:00",
+        "catalog_verified": true,
+        "latest_publication_date": "2026-11-25",
+        "content_sha256": "1185bdb23a34271dd011ddf6febbe662012d6e5138e621f9c2e5fc7c2bbd88fa",
+        "scope": "NATIONAL_SUMMARY",
+        "facts": {},
+        "topics": {
+          "inflation": {
+            "label": "Inflation and prices",
+            "evidence": [
+              "Prices increased moderately overall, as in the prior reporting period."
+            ]
+          },
+          "labor": {
+            "label": "Labor market",
+            "evidence": [
+              "Employment levels rose slightly on balance, with many firms reporting stable head counts and hiring primarily to replace for attrition, while only a minority noted meaningful increases.",
+              "Wages and benefits rose moderately, an uptick from modest increases in the previous report, driven by upward pressure concentrated in hard-to-fill positions and influenced by cost-of-living adjustments and increases in benefit costs."
+            ]
+          },
+          "growth": {
+            "label": "Growth and demand",
+            "evidence": [
+              "Consumer spending was little changed, as households remained price sensitive and were increasingly selective in discretionary purchases.",
+              "Energy activity grew modestly but investment in this sector remained restrained by elevated geopolitical, policy, and cost uncertainties.",
+              "Contacts across several sectors cited steady or rising labor demand, though many also described hesitancy to hire amid uncertainty and weakened consumer spending."
+            ]
+          },
+          "risks": {
+            "label": "Balance of risks",
+            "evidence": [
+              "Contacts across several sectors cited steady or rising labor demand, though many also described hesitancy to hire amid uncertainty and weakened consumer spending."
+            ]
+          },
+          "policy": {
+            "label": "Policy and guidance",
+            "evidence": []
+          },
+          "liquidity": {
+            "label": "Balance sheet and liquidity",
+            "evidence": []
+          },
+          "credit": {
+            "label": "Credit and financial conditions",
+            "evidence": [
+              "Banking conditions were little changed overall, as loan demand remained subdued, while nonfinancial services activity increased slightly."
+            ]
+          }
+        }
+      },
       "metrics": {
         "policy_action": {
           "previous": null,
@@ -3746,32 +3722,27 @@
           "label": "Inflation and prices",
           "pairs": [
             {
-              "previous": "Consumer-facing contacts in a few Districts noted that heightened price sensitivity among customers was putting a limit on their ability to pass through input price increases.",
-              "current": "Several Districts noted that inflation has spawned additional wage pressure in the form of higher cost-of-living demands from individuals as well as challenges from rising benefit costs.",
+              "previous": "Moreover, four Districts reported that the pace of price increases picked up since the prior period.",
+              "current": "Prices increased moderately overall, as in the prior reporting period.",
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": "Prices increased moderately in eight Districts, with two Districts reporting modest increases, one slight increases, and one robust increases.",
-              "current": "Staffing contacts in the Boston District noted that workers were motivated to seek new jobs as wage increases lagged inflation.",
-              "status": "WORDING_CHANGED"
+              "previous": "Several Districts noted that inflation has spawned additional wage pressure in the form of higher cost-of-living demands from individuals as well as challenges from rising benefit costs.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": null,
-              "current": "Three Districts characterized overall price growth as robust, while eight noted that growth was moderate—and three of the eight noted that input price pressures were intensifying, if not already growing robustly.",
-              "status": "CURRENT_ONLY_EVIDENCE"
+              "previous": "Staffing contacts in the Boston District noted that workers were motivated to seek new jobs as wage increases lagged inflation.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": null,
-              "current": "One District reported modest price growth.",
-              "status": "CURRENT_ONLY_EVIDENCE"
+              "previous": "Three Districts characterized overall price growth as robust, while eight noted that growth was moderate—and three of the eight noted that input price pressures were intensifying, if not already growing robustly.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
             },
             {
-              "previous": "Compared with the previous reporting period, the pace of price increases was the same in eight Districts, decreased in three, and increased in one.",
-              "current": "Moreover, four Districts reported that the pace of price increases picked up since the prior period.",
-              "status": "WORDING_CHANGED"
-            },
-            {
-              "previous": "Input price pressures were notably elevated in manufacturing and construction across multiple Districts, with widespread reports of price increases for energy, transportation, and raw materials, particularly metals and petrochemicals.",
+              "previous": "One District reported modest price growth.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             }
@@ -3782,19 +3753,24 @@
           "label": "Labor market",
           "pairs": [
             {
-              "previous": null,
-              "current": "Most Districts described little or no net change in overall employment levels.",
-              "status": "CURRENT_ONLY_EVIDENCE"
-            },
-            {
-              "previous": "Employment rose very slightly overall, with three Districts showing modest gains in employment, four reporting slight gains, and five Districts experiencing no change.",
-              "current": "Overall, labor market conditions were little changed.",
+              "previous": "Five Districts described moderate growth in overall wages, four reported modest growth, and two reported slight growth.",
+              "current": "Employment levels rose slightly on balance, with many firms reporting stable head counts and hiring primarily to replace for attrition, while only a minority noted meaningful increases.",
               "status": "WORDING_CHANGED"
             },
             {
               "previous": null,
-              "current": "Five Districts described moderate growth in overall wages, four reported modest growth, and two reported slight growth.",
+              "current": "Wages and benefits rose moderately, an uptick from modest increases in the previous report, driven by upward pressure concentrated in hard-to-fill positions and influenced by cost-of-living adjustments and increases in benefit costs.",
               "status": "CURRENT_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Most Districts described little or no net change in overall employment levels.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
+            },
+            {
+              "previous": "Overall, labor market conditions were little changed.",
+              "current": null,
+              "status": "PREVIOUS_ONLY_EVIDENCE"
             }
           ],
           "status": "EVIDENCE_AVAILABLE"
@@ -3803,27 +3779,22 @@
           "label": "Growth and demand",
           "pairs": [
             {
-              "previous": null,
-              "current": "Since the prior Beige Book, two of the twelve Federal Reserve Districts reported moderate growth in economic activity.",
-              "status": "CURRENT_ONLY_EVIDENCE"
-            },
-            {
-              "previous": null,
-              "current": "Most Districts reported little or no change in overall consumer spending.",
-              "status": "CURRENT_ONLY_EVIDENCE"
-            },
-            {
-              "previous": "Consumer spending grew slightly on balance; reports reflected both heightened price sensitivity on the one hand and solid high-end purchases on the other.",
-              "current": "Over half of the Districts noted that consumer spending was driven by high-income households.",
+              "previous": "Since the prior Beige Book, two of the twelve Federal Reserve Districts reported moderate growth in economic activity.",
+              "current": "Consumer spending was little changed, as households remained price sensitive and were increasingly selective in discretionary purchases.",
               "status": "WORDING_CHANGED"
             },
             {
-              "previous": null,
-              "current": "Five Districts reported that some firms had either reduced staffing levels (through attrition), delayed hiring, or anticipated less job creation after increasing productivity by investing in AI.",
-              "status": "CURRENT_ONLY_EVIDENCE"
+              "previous": "Over half of the Districts noted that consumer spending was driven by high-income households.",
+              "current": "Energy activity grew modestly but investment in this sector remained restrained by elevated geopolitical, policy, and cost uncertainties.",
+              "status": "WORDING_CHANGED"
             },
             {
-              "previous": "Economic activity increased modestly since early July.",
+              "previous": "Most Districts reported little or no change in overall consumer spending.",
+              "current": "Contacts across several sectors cited steady or rising labor demand, though many also described hesitancy to hire amid uncertainty and weakened consumer spending.",
+              "status": "WORDING_CHANGED"
+            },
+            {
+              "previous": "Five Districts reported that some firms had either reduced staffing levels (through attrition), delayed hiring, or anticipated less job creation after increasing productivity by investing in AI.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             }
@@ -3835,11 +3806,11 @@
           "pairs": [
             {
               "previous": null,
-              "current": "Firms in several Districts cited persistent uncertainty around energy and tariffs and expect that prices will increase further in the coming months, as existing contracts expire, and firms must renegotiate hedge contracts for their own inputs and/or delivery contracts to their customers.",
+              "current": "Contacts across several sectors cited steady or rising labor demand, though many also described hesitancy to hire amid uncertainty and weakened consumer spending.",
               "status": "CURRENT_ONLY_EVIDENCE"
             },
             {
-              "previous": "The general outlook for the coming months was positive, but sentiment was mixed across sectors, with contacts reporting heightened uncertainty surrounding the effects of higher energy prices, policy, and international conflict.",
+              "previous": "Firms in several Districts cited persistent uncertainty around energy and tariffs and expect that prices will increase further in the coming months, as existing contracts expire, and firms must renegotiate hedge contracts for their own inputs and/or delivery contracts to their customers.",
               "current": null,
               "status": "PREVIOUS_ONLY_EVIDENCE"
             }
@@ -3860,9 +3831,9 @@
           "label": "Credit and financial conditions",
           "pairs": [
             {
-              "previous": "Financial conditions improved slightly as loan volumes remained solid or increased across most Districts.",
-              "current": null,
-              "status": "PREVIOUS_ONLY_EVIDENCE"
+              "previous": null,
+              "current": "Banking conditions were little changed overall, as loan demand remained subdued, while nonfinancial services activity increased slightly.",
+              "status": "CURRENT_ONLY_EVIDENCE"
             }
           ],
           "status": "PARTIAL_TOPIC_EVIDENCE"
@@ -3879,7 +3850,7 @@
     "source_status": "VERIFIED_TRANSCRIPT",
     "publication_date": null,
     "publication_date_source": null,
-    "retrieved_at": "2026-11-24T15:53:16.120842+00:00",
+    "retrieved_at": "2026-11-26T09:25:36.904072+00:00",
     "scope": "FULL_TRANSCRIPT_CHAIR_REMARKS",
     "related_release_dates": {
       "statement": "2026-10-28",
@@ -3926,12 +3897,12 @@
     },
     "pit_scope": "Date-level publication/observation ordering only. Transcript usable from its UTC retrieval timestamp; its publication date remains unknown. No intraday or archived-vintage guarantee.",
     "availability_bounds": {
-      "chair_press": "2026-11-24T15:53:16.120842+00:00"
+      "chair_press": "2026-11-26T09:25:36.904072+00:00"
     },
     "research_only": true,
     "forecast": false,
     "trading_signal": false,
-    "as_of_date": "2026-11-24",
+    "as_of_date": "2026-11-26",
     "communication_documents_available": 3,
     "sep_available": true,
     "beige_book_available": true,

@@ -3,14 +3,14 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-24T15:55:18.361340+00:00",
+  "generated_at": "2026-11-26T09:26:43.268402+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
   },
   "topic_counts": {
-    "growth": 64,
-    "fed": 30,
+    "growth": 65,
+    "fed": 29,
     "labor": 2,
     "inflation": 1
   },
@@ -18,13 +18,22 @@
   "gdelt": {
     "ok": false,
     "rows": 0,
-    "error": "HTTP 429",
+    "error": "ParseError('syntax error: line 1, column 0')",
     "query_requests": 1,
     "fallback_required": true
   },
   "official_rss": {
     "ok": true,
     "rows": [
+      {
+        "title": "Minutes of the Board's discount rate meetings on October 19 and October 28, 2026",
+        "description": "Minutes of the Board&#39;s discount rate meetings on October 19 and October 28, 2026",
+        "published_at": "2026-11-24T19:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261124a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
       {
         "title": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
         "description": "Minutes of the Federal Open Market Committee, October 27-28, 2026",
@@ -152,10 +161,28 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
-        "description": "Federal Reserve Board and Federal Open Market Committee release economic projections from the June 16-17 FOMC meeting",
-        "published_at": "2026-06-17T18:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617b.htm",
+        "title": "Agencies announce dollar thresholds for applicability of truth in lending and consumer leasing rules for consumer credit and lease transactions",
+        "description": "Agencies announce dollar thresholds for applicability of truth in lending and consumer leasing rules for consumer credit and lease transactions",
+        "published_at": "2026-11-25T20:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261125b.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Agencies announce dollar thresholds for smaller loan exemption from appraisal requirements for higher-priced mortgage loans",
+        "description": "Agencies announce dollar thresholds for smaller loan exemption from appraisal requirements for higher-priced mortgage loans",
+        "published_at": "2026-11-25T20:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261125a.htm",
+        "topic": "fed",
+        "source": "Federal Reserve",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Minutes of the Board's discount rate meetings on October 19 and October 28, 2026",
+        "description": "Minutes of the Board&#39;s discount rate meetings on October 19 and October 28, 2026",
+        "published_at": "2026-11-24T19:00:00+00:00",
+        "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261124a.htm",
         "topic": "fed",
         "source": "Federal Reserve",
         "source_type": "OFFICIAL_RSS"
@@ -314,30 +341,21 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
-        "description": "Federal Reserve Board announces approval of application by Isabella Bank Corporation",
-        "published_at": "2026-10-05T20:30:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261005a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
+        "title": "GDP, (Second Estimate) and Corporate Profits, 3rd Quarter 2026",
+        "description": "<p>Real gross domestic product (GDP) increased at an annual rate of 4.3 percent in the third quarter of 2026 (July, August, and September), according to the second estimate released today by the U.S. Bureau of Economic Analysis (BEA). In the second quarter, real GDP increased 2.2 percent. The contributors to the increase in real GDP in the third quarter were increases in investment, consumer spending, and government spending that were partly offset by a decrease in exports. Imports, which are a subtraction in the calculation of GDP, increased.</p>",
+        "published_at": "2026-11-25T13:30:00+00:00",
+        "url": "https://www.bea.gov/news/2026/gdp-second-estimate-and-corporate-profits-3rd-quarter-2026",
+        "topic": "growth",
+        "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "Federal Reserve Board announces approval of application by Fleur Capital Corporation",
-        "description": "Federal Reserve Board announces approval of application by Fleur Capital Corporation",
-        "published_at": "2026-10-02T20:45:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/orders20261002a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Federal Reserve Board announces it will extend, until November 4, the comment period on its proposal to modernize Regulation O",
-        "description": "Federal Reserve Board announces it will extend, until November 4, the comment period on its proposal to modernize Regulation O",
-        "published_at": "2026-10-02T20:00:00+00:00",
-        "url": "https://www.federalreserve.gov/newsevents/pressreleases/bcreg20261002a.htm",
-        "topic": "fed",
-        "source": "Federal Reserve",
+        "title": "Personal Income and Outlays, October 2026",
+        "description": "<p>Personal income increased $201.8 billion (0.7 percent at a monthly rate) in October, according to estimates released today by the U.S. Bureau of Economic Analysis (BEA). Disposable personal income (DPI)&ndash;personal income less personal current taxes&ndash;increased $200.5 billion (0.8 percent), and personal consumption expenditures (PCE) increased $63.8 billion (0.3 percent). Personal outlays&ndash;the sum of PCE, personal interest payments, and personal current transfer payments&ndash;increased $69.3 billion in October. Personal saving was $1.00 trillion, and the personal saving rate&ndash;personal saving as a percentage of DPI&ndash;was 4.1 percent.</p>",
+        "published_at": "2026-11-25T13:30:00+00:00",
+        "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-october-2026",
+        "topic": "growth",
+        "source": "BEA",
         "source_type": "OFFICIAL_RSS"
       },
       {
@@ -363,15 +381,6 @@
         "description": "<p>The U.S. goods and services trade deficit decreased in September 2026 according to the U.S. Bureau of Economic Analysis and the U.S. Census Bureau. The deficit decreased from $105.7 billion in August (revised) to $105.0 billion in September, as exports increased more than imports. The goods deficit decreased $0.7 billion in September to $135.9 billion. The services surplus decreased less than $0.1 billion in September to $30.9 billion.</p>",
         "published_at": "2026-11-04T13:30:00+00:00",
         "url": "https://www.bea.gov/news/2026/us-international-trade-goods-and-services-september-2026",
-        "topic": "growth",
-        "source": "BEA",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "GDP (Advance Estimate), 3rd Quarter 2026",
-        "description": "<p>Real gross domestic product (GDP) increased at an annual rate of 3.4 percent in the third quarter of 2026 (July, August, and September), according to the advance estimate released today by the U.S. Bureau of Economic Analysis (BEA). In the second quarter, real GDP increased 2.2 percent. The contributors to the increase in real GDP in the third quarter were increases in investment, consumer spending, and government spending that were partly offset by a decrease in exports. Imports, which are a subtraction in the calculation of GDP, increased. </p>",
-        "published_at": "2026-10-29T12:30:00+00:00",
-        "url": "https://www.bea.gov/news/2026/gdp-advance-estimate-3rd-quarter-2026",
         "topic": "growth",
         "source": "BEA",
         "source_type": "OFFICIAL_RSS"
@@ -782,6 +791,24 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "New Home Sales",
+        "description": "Sales of new single-family houses in October 2026 were at a seasonally adjusted annual rate of 701,000. This is 14.2 percent (+/- 22.6%)* above the revised September 2026 estimate of 614,000.<p><br>October 2026: +14.2* % Change<br>September 2026 (r): -9.7* % Change<br></p>",
+        "published_at": "2026-11-25T15:00:00+00:00",
+        "url": "https://www.census.gov/construction/nrs/",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Advance Monthly Manufacturers' Shipments, Inventories, and Orders",
+        "description": "New orders for manufactured durable goods in October, up seven of the last eight months, increased $0.8 billion or 0.2 percent to $346.7 billion.<p><br>October 2026: +0.2° % Change<br>September 2026 (r): +2.0° % Change<br></p>",
+        "published_at": "2026-11-25T13:30:00+00:00",
+        "url": "https://www.census.gov/manufacturing/m3/",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "Quarterly Services Survey",
         "description": "Advance U.S. selected services total revenue for the third quarter of 2026, adjusted for seasonal variation but not for price changes, was $6,531.3 billion, an increase of 1.0 percent (+/- 0.4 percent) from the second quarter of 2026 and up 6.5 percent (+/- 0.6 percent) from the third quarter of 2025.<p><br>3rd Qtr 2026: +1.0 % Change<br>2nd Qtr 2026 (r): +3.0 % Change<br></p>",
         "published_at": "2026-11-19T15:00:00+00:00",
@@ -908,24 +935,6 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
-        "title": "New Home Sales",
-        "description": "Sales of new single-family houses in September 2026 were at a seasonally adjusted annual rate of 676,000. This is 0.6 percent (+/- 13.8%)* below the revised August 2026 estimate of 680,000.<p><br>September 2026: -0.6* % Change<br>August 2026 (r): +5.1* % Change<br></p>",
-        "published_at": "2026-10-27T14:00:00+00:00",
-        "url": "https://www.census.gov/construction/nrs/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance Monthly Manufacturers' Shipments, Inventories, and Orders",
-        "description": "New orders for manufactured durable goods in September, up six of the last seven months, increased $6.3 billion or 1.8 percent to $345.4 billion.<p><br>September 2026: +1.8° % Change<br>August 2026 (r): +0.1° % Change<br></p>",
-        "published_at": "2026-10-27T12:30:00+00:00",
-        "url": "https://www.census.gov/manufacturing/m3/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
         "title": "Quarterly Financial Report - Retail",
         "description": "Not seasonally adjusted after-tax profits for retail corporations with assets of $50 million and over were $112.3 billion for the second quarter 2026 (the 3 months ending July 31, 2026), up $47.2 (+/- 0.5) billion from first quarter 2026 (the 3 months ending April 30, 2026).<p><br>2nd Qtr 2026: +47.2 Billions of Dollars<br>1st Qtr 2026 (r): +1.7 Billions of Dollars<br></p>",
         "published_at": "2026-09-08T14:00:00+00:00",
@@ -957,7 +966,7 @@
       },
       "bea_news": {
         "ok": true,
-        "rows": 49,
+        "rows": 50,
         "error": null
       },
       "census_economic_indicators": {
