@@ -3,7 +3,7 @@
   "version": "2.1",
   "status": "PASS",
   "validation_pass": true,
-  "generated_at": "2026-11-27T11:07:55.948662+00:00",
+  "generated_at": "2026-11-27T15:05:15.561617+00:00",
   "rows": 97,
   "source_counts": {
     "OFFICIAL_RSS": 97
@@ -791,6 +791,33 @@
         "source_type": "OFFICIAL_RSS"
       },
       {
+        "title": "Advance Retail Inventories",
+        "description": "October 2026 end-of-month inventories were $893.2 billion, up 0.8 percent (+/-0.2 percent) from last month.<p><br>October 2026: +0.8 % Change in Inventories<br>September 2026 (r): +0.7 % Change in Inventories<br></p>",
+        "published_at": "2026-11-27T13:30:00+00:00",
+        "url": "https://www.census.gov/econ/indicators/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Advance U.S. International Trade in Goods",
+        "description": "The advance international trade deficit in goods increased to $149.5 billion in October from $135.1 billion in September as imports increased more than exports.<p><br>October 2026: 10.7° % Change<br>September 2026: 2.2° % Change<br></p>",
+        "published_at": "2026-11-27T13:30:00+00:00",
+        "url": "https://www.census.gov/econ/indicators/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
+        "title": "Advance Wholesale Inventories",
+        "description": "October end-of-month inventories were $1,023.4 billion, up 0.9 percent (+/- 0.4 percent) from last month.<p><br>October 2026: +0.9 % Change in Inventories<br>September 2026 (r): +0.8 % Change in Inventories<br></p>",
+        "published_at": "2026-11-27T13:30:00+00:00",
+        "url": "https://www.census.gov/econ/indicators/index.html",
+        "topic": "growth",
+        "source": "U.S. Census Bureau",
+        "source_type": "OFFICIAL_RSS"
+      },
+      {
         "title": "New Home Sales",
         "description": "Sales of new single-family houses in October 2026 were at a seasonally adjusted annual rate of 701,000. This is 14.2 percent (+/- 22.6%)* above the revised September 2026 estimate of 614,000.<p><br>October 2026: +14.2* % Change<br>September 2026 (r): -9.7* % Change<br></p>",
         "published_at": "2026-11-25T15:00:00+00:00",
@@ -903,33 +930,6 @@
         "description": "The homeownership rate of 65.5 percent was not statistically different from the rate in the third quarter 2025. The homeownership rates in the Northeast, Midwest, South, and West were not statistically different from third quarter 2025 rates.<p><br>3rd Qtr 2026: +0.2* Percentage Points<br>3rd Qtr 2025: -0.3* Percentage Points<br></p>",
         "published_at": "2026-10-28T14:00:00+00:00",
         "url": "https://www.census.gov/housing/hvs/",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance Wholesale Inventories",
-        "description": "September end-of-month inventories were $1,011.5 billion, up 0.6 percent (+/- 0.2 percent) from last month.<p><br>September 2026: +0.6 % Change in Inventories<br>August 2026 (r): +0.5 % Change in Inventories<br></p>",
-        "published_at": "2026-10-28T12:30:00+00:00",
-        "url": "https://www.census.gov/econ/indicators/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance U.S. International Trade in Goods",
-        "description": "The advance international trade deficit in goods increased to $134.9 billion in September from $132.1 billion in August as imports increased more than exports.<p><br>September 2026: 2.1° % Change<br>August 2026: 11.1° % Change<br></p>",
-        "published_at": "2026-10-28T12:30:00+00:00",
-        "url": "https://www.census.gov/econ/indicators/index.html",
-        "topic": "growth",
-        "source": "U.S. Census Bureau",
-        "source_type": "OFFICIAL_RSS"
-      },
-      {
-        "title": "Advance Retail Inventories",
-        "description": "September 2026 end-of-month inventories were $885.3 billion, up 0.3 percent (+/-0.2 percent) from last month.<p><br>September 2026: +0.3 % Change in Inventories<br>August 2026 (r): +0.3 % Change in Inventories<br></p>",
-        "published_at": "2026-10-28T12:30:00+00:00",
-        "url": "https://www.census.gov/econ/indicators/index.html",
         "topic": "growth",
         "source": "U.S. Census Bureau",
         "source_type": "OFFICIAL_RSS"

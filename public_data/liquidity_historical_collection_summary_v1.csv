@@ -1,9 +1,9 @@
 indicator,rows,first_observation,last_observation,latest_actual,unit,source_unit,unit_conversion_factor,frequency,source,vintage,point_in_time_safe,research_only,decision_engine_ready,trading_signal_generated,forecast_generated,liquidity_score_generated
-EFFR,1983,2019-01-02,2026-11-24,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+EFFR,1984,2019-01-02,2026-11-25,3.88,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 FED_TOTAL_ASSETS,412,2019-01-02,2026-11-18,6741452.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
 MBS,412,2019-01-02,2026-11-18,1883465.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
 ON_RRP,1969,2019-01-02,2026-11-25,0.3,Billions of U.S. Dollars,Billions of U.S. Dollars,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 RESERVE_BALANCES,412,2019-01-02,2026-11-18,2979656.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
-SOFR,1912,2019-03-29,2026-11-24,3.94,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
+SOFR,1913,2019-03-29,2026-11-25,3.95,Percent,Percent,1.0,Daily,Federal Reserve Bank of New York via FRED,initial_release,True,True,False,False,False,False
 TREASURY_GENERAL_ACCOUNT,412,2019-01-02,2026-11-18,916613.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
 TREASURY_SECURITIES,412,2019-01-02,2026-11-18,4587132.0,Millions of U.S. Dollars,Millions of U.S. Dollars,1.0,Weekly,Federal Reserve H.4.1 via FRED,initial_release,True,True,False,False,False,False
