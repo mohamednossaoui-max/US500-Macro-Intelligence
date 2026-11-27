@@ -1,7 +1,7 @@
 {
   "provider": "official",
   "as_of_date": "2026-11-27",
-  "retrieved_at": "2026-11-27T15:00:33.555245+00:00",
+  "retrieved_at": "2026-11-27T20:58:02.888174+00:00",
   "indicators": [
     {
       "indicator": "NFP",
@@ -290,17 +290,15 @@
       "canonical_value": 55.5,
       "status": "CURRENT",
       "revision_detected": false,
-      "source_verification": "VERIFIED",
-      "reason": "Official period, release and value match merged canonical",
+      "source_verification": "CANONICAL_NO_NEWER_RELEASE_POSSIBLE",
+      "evidence_basis": "CANONICAL_MONTHLY_CALENDAR_INVARIANT",
       "metadata_provider": "ISM",
-      "metadata_verification": null,
-      "metadata_source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/",
-      "metadata_series": null,
+      "reason": "Official period, release and value match merged canonical",
       "before_merge_canonical_latest_reference_period": "October 2026",
       "before_merge_canonical_release_date": "2026-11-02",
       "before_merge_canonical_value": 55.5,
       "ingestion_status": "CURRENT",
-      "ingestion_reason": "Official period, release and value match canonical"
+      "ingestion_reason": "Source unreachable but canonical already holds this month's release; no newer release can exist before next month. Source failure: ISM direct source failed: ISM official current report redirects to authenticated/licensed access | ISM distributor failed: HTTPError status=403 method=GET endpoint=https://www.prnewswire.com/news/institute-for-supply-management/"
     },
     {
       "indicator": "ISM_SERVICES_PMI",

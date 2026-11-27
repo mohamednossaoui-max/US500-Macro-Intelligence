@@ -1,13 +1,13 @@
 [
   {
     "affects_system_health": true,
-    "age_days": 1.25,
+    "age_days": 1.49,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:00:00.766957+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.428721+00:00",
     "freshness_sla_days": 45.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "economic",
@@ -27,13 +27,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 1.64,
+    "age_days": 1.89,
     "criticality": "critical",
     "downstream_impact": [
       "stress"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:17:24.918291+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.435721+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "stress_historical",
@@ -53,13 +53,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 1.64,
+    "age_days": 1.89,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:22.021418+00:00",
+    "file_modified_at": "2026-11-27T21:15:00.935406+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "stress",
@@ -79,13 +79,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:17:24.911564+00:00",
+    "file_modified_at": "2026-11-27T21:11:26.807567+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "fed",
@@ -105,13 +105,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.08,
+    "age_days": 0.32,
     "criticality": "contextual",
     "downstream_impact": [
       "macro_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:51.458337+00:00",
+    "file_modified_at": "2026-11-27T21:15:25.720856+00:00",
     "freshness_sla_days": 14.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "event_news",
@@ -131,13 +131,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 3.64,
+    "age_days": 3.89,
     "criticality": "important",
     "downstream_impact": [
       "cot"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:00:00.729957+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.399722+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "cot_historical",
@@ -157,13 +157,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 3.64,
+    "age_days": 3.89,
     "criticality": "important",
     "downstream_impact": [
       "sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:22.627387+00:00",
+    "file_modified_at": "2026-11-27T21:15:01.453402+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "cot",
@@ -183,13 +183,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "important",
     "downstream_impact": [
       "vix_sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:17:25.092792+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.504721+00:00",
     "freshness_sla_days": 5.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "vix_historical",
@@ -209,13 +209,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "important",
     "downstream_impact": [
       "sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:24.085311+00:00",
+    "file_modified_at": "2026-11-27T21:15:02.564394+00:00",
     "freshness_sla_days": 5.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "vix_sentiment",
@@ -235,13 +235,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 7.64,
+    "age_days": 7.89,
     "criticality": "important",
     "downstream_impact": [
       "aaii_sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:00:00.723312+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.393722+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "aaii_historical",
@@ -261,13 +261,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 7.64,
+    "age_days": 7.89,
     "criticality": "important",
     "downstream_impact": [
       "sentiment"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:24.576286+00:00",
+    "file_modified_at": "2026-11-27T21:15:03.031391+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "aaii_sentiment",
@@ -287,13 +287,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": -0.36,
+    "age_days": -0.11,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:17:25.083315+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.501721+00:00",
     "freshness_sla_days": 5.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "technical",
@@ -313,13 +313,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "liquidity"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:17:24.936800+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.441721+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "liquidity_historical",
@@ -339,13 +339,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:47.374144+00:00",
+    "file_modified_at": "2026-11-27T21:15:21.673260+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "liquidity",
@@ -365,13 +365,13 @@
   },
   {
     "affects_system_health": false,
-    "age_days": 101.64,
+    "age_days": 101.89,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:00:00.794957+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.452722+00:00",
     "freshness_sla_days": 5.0,
     "health_scope_reason": "User-selected contextual monitoring only; excluded from overall System Health. Data-quality and PIT gates unchanged.",
     "id": "breadth",
@@ -391,13 +391,13 @@
   },
   {
     "affects_system_health": false,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:00:00.760957+00:00",
+    "file_modified_at": "2026-11-27T20:57:32.423722+00:00",
     "freshness_sla_days": 5.0,
     "health_scope_reason": "User-selected contextual monitoring only; excluded from overall System Health. Data-quality and PIT gates unchanged.",
     "id": "cross_asset",
@@ -417,13 +417,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 8.64,
+    "age_days": 8.89,
     "criticality": "contextual",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:51.106921+00:00",
+    "file_modified_at": "2026-11-27T21:15:25.388234+00:00",
     "freshness_sla_days": 30.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "earnings",
@@ -443,13 +443,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:25.171255+00:00",
+    "file_modified_at": "2026-11-27T21:15:03.573387+00:00",
     "freshness_sla_days": 10.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "sentiment",
@@ -469,13 +469,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "research_context"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:48.230061+00:00",
+    "file_modified_at": "2026-11-27T21:15:22.804682+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "macro_context",
@@ -495,13 +495,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "evidence_quality"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:50.317976+00:00",
+    "file_modified_at": "2026-11-27T21:15:24.628239+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "research_context",
@@ -521,13 +521,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "decision_engine"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:49.918597+00:00",
+    "file_modified_at": "2026-11-27T21:15:24.281690+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "evidence_quality",
@@ -547,13 +547,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "usv"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:51.480776+00:00",
+    "file_modified_at": "2026-11-27T21:15:25.741571+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "decision_engine",
@@ -573,13 +573,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [
       "analogs"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:51.840947+00:00",
+    "file_modified_at": "2026-11-27T21:15:26.084324+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "usv",
@@ -599,13 +599,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "important",
     "downstream_impact": [
       "market_reaction"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:52.434505+00:00",
+    "file_modified_at": "2026-11-27T21:15:26.623922+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "analogs",
@@ -625,13 +625,13 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "important",
     "downstream_impact": [
       "decision_intelligence"
     ],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:52.820421+00:00",
+    "file_modified_at": "2026-11-27T21:15:26.971953+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "market_reaction",
@@ -651,11 +651,11 @@
   },
   {
     "affects_system_health": true,
-    "age_days": 0.64,
+    "age_days": 0.89,
     "criticality": "critical",
     "downstream_impact": [],
     "failure_reason": "",
-    "file_modified_at": "2026-11-27T15:21:53.150291+00:00",
+    "file_modified_at": "2026-11-27T21:15:27.280061+00:00",
     "freshness_sla_days": 2.0,
     "health_scope_reason": "Included in overall operational health",
     "id": "decision_intelligence",
