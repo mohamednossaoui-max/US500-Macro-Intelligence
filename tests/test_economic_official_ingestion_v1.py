@@ -172,6 +172,56 @@ def test_failed_indicator_blocks_all_14_merge(tmp_path):
     assert not (tmp_path/EVENTS).exists()
 
 
+def _ism_canonical(tmp_path,release):
+    (tmp_path/'public_data').mkdir()
+    pd.DataFrame([row('ISM_MANUFACTURING_PMI',55.5,period='October 2026',release=release)]).to_csv(tmp_path/'public_data'/EVENTS,index=False)
+    quality().to_csv(tmp_path/'public_data'/QUALITY,index=False)
+
+
+def _ism_blocked_collector(c,i):
+    import requests
+    if i=='ISM_MANUFACTURING_PMI':raise requests.HTTPError('403')
+    return verified_fixture(c,i)
+
+
+def test_ism_source_403_does_not_block_when_no_newer_release_can_exist(tmp_path):
+    # Canonical already holds November's ISM release (2026-11-02); today is 2026-11-26.
+    _ism_canonical(tmp_path,'2026-11-02')
+    out=run(tmp_path,tmp_path/'stage',collector=_ism_blocked_collector,now=datetime(2026,11,26,15,tzinfo=timezone.utc))
+    ism=[r for r in out['reports'] if r['indicator']=='ISM_MANUFACTURING_PMI'][0]
+    assert ism['status']=='CURRENT' and ism['evidence_basis']=='CANONICAL_MONTHLY_CALENDAR_INVARIANT'
+    assert 'Source failure' in ism['reason'] and ism['official_value']==55.5
+    assert out['passed']
+
+
+def test_ism_source_failure_still_blocks_when_a_new_release_may_exist(tmp_path):
+    # Canonical latest ISM release is from a previous month: a newer one may exist.
+    _ism_canonical(tmp_path,'2026-11-02')
+    out=run(tmp_path,tmp_path/'stage',collector=_ism_blocked_collector,now=datetime(2026,12,1,16,tzinfo=timezone.utc))
+    ism=[r for r in out['reports'] if r['indicator']=='ISM_MANUFACTURING_PMI'][0]
+    assert ism['status']=='SOURCE_ERROR' and not out['passed']
+
+
+def test_ism_non_monthly_indicators_never_get_the_exemption(tmp_path):
+    from economic_official_ingestion_v1 import no_newer_release_possible
+    _ism_canonical(tmp_path,'2026-11-02')
+    canonical=pd.read_csv(tmp_path/'public_data'/EVENTS)
+    now=datetime(2026,11,26,15,tzinfo=timezone.utc)
+    assert no_newer_release_possible('GDP',canonical,now) is None
+    assert no_newer_release_possible('ISM_MANUFACTURING_PMI',canonical,now) is not None
+    assert no_newer_release_possible('ISM_MANUFACTURING_PMI',canonical,datetime(2026,10,20,tzinfo=timezone.utc)) is None  # release in the future
+
+
+def test_ism_failure_message_keeps_primary_and_distributor_causes():
+    import requests
+    from economic_official_sources_v1 import collect
+    class Boom:
+        def get(self,url,**k):
+            raise requests.ConnectionError('network down '+url.split('/')[2])
+    with pytest.raises(RuntimeError,match='ISM direct source failed.*ISM distributor failed'):
+        collect(Boom(),'ISM_MANUFACTURING_PMI')
+
+
 def test_workflow_order_and_audit_readonly():
     text=(ROOT/'.github/workflows/economic_intelligence_full_pipeline_v2.3_refresh.yml').read_text()
     assert text.index('--mode merge')<text.index('python economic_surprise_engine_v1.1.py')<text.index('python economic_regime_classifier_v1.5.py')<text.index('--mode gate')

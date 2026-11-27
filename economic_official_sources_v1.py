@@ -780,8 +780,13 @@ def collect(client,indicator):
     if agency=='Census':return collect_retail(client)
     try:
         return collect_ism(client,indicator)
-    except (requests.HTTPError,RuntimeError,MetadataError) as exc:
+    except (requests.RequestException,RuntimeError,MetadataError) as exc:
         if indicator not in ('ISM_MANUFACTURING_PMI','ISM_SERVICES_PMI'):
             raise
-        reason=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else str(exc)
-        return collect_ism_distributed_release(client,indicator,reason)
+        reason=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else (type(exc).__name__+': '+str(exc) if isinstance(exc,requests.RequestException) else str(exc))
+        try:
+            return collect_ism_distributed_release(client,indicator,reason)
+        except (requests.RequestException,RuntimeError,MetadataError) as fallback:
+            # Keep both causes: the primary failure used to be hidden by the fallback's.
+            second=http_error_diagnostic(fallback) if isinstance(fallback,requests.HTTPError) else str(fallback)
+            raise RuntimeError('ISM direct source failed: '+reason[:240]+' | ISM distributor failed: '+second[:240]) from fallback

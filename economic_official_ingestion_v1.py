@@ -23,6 +23,28 @@ from economic_indicator_details_v1 import DETAIL_FIELDS, detail_changed
 EVENTS='economic_historical_events_v1.csv'
 QUALITY='economic_historical_quality_v1.csv'
 ACCEPT={'CURRENT','NEW_RELEASE','REVISION'}
+# ISM publishes exactly one release per calendar month for each sector
+# (business day 1 for Manufacturing, business day 3 for Services), so a new
+# release can never fall in the same month as the previous one.
+MONTHLY_ONE_RELEASE={'ISM_MANUFACTURING_PMI','ISM_SERVICES_PMI'}
+
+
+def no_newer_release_possible(indicator,canonical,now):
+    """Report for a monthly indicator whose source is unreachable, but only when
+    the canonical already holds this month's release (nothing newer can exist).
+    Returns None when that cannot be proven, so the failure still blocks."""
+    if indicator not in MONTHLY_ONE_RELEASE:return None
+    old=latest(canonical,indicator)
+    if old is None:return None
+    released=pd.Timestamp(old.release_date)
+    today=pd.Timestamp(now).tz_convert('America/New_York').tz_localize(None).normalize() if pd.Timestamp(now).tzinfo else pd.Timestamp(now).normalize()
+    if released>today or (released.year,released.month)!=(today.year,today.month):return None
+    return dict(indicator=indicator,agency=MAPPINGS[indicator]['agency'],official_latest_reference_period=old.reference_period,
+                official_release_date=str(old.release_date),official_value=float(old.actual),
+                canonical_latest_reference_period=old.reference_period,canonical_release_date=str(old.release_date),canonical_value=float(old.actual),
+                status='CURRENT',revision_detected=False,source_verification='CANONICAL_NO_NEWER_RELEASE_POSSIBLE',
+                evidence_basis='CANONICAL_MONTHLY_CALENDAR_INVARIANT',metadata_provider=MAPPINGS[indicator]['agency'])
+
 
 
 from economic_observation_order_v1 import latest, period_key
@@ -161,6 +183,11 @@ def run(root,staging,mode='audit',collector=collect,now=None):
             # sanitized endpoint, method and status for HTTP diagnostics.
             status='METADATA_UNVERIFIED' if isinstance(exc,MetadataError) else 'SOURCE_ERROR'
             diagnostic=http_error_diagnostic(exc) if isinstance(exc,requests.HTTPError) else str(exc) if isinstance(exc,(MetadataError,RuntimeError)) else type(exc).__name__
+            skipped=no_newer_release_possible(indicator,canonical,now)
+            if skipped is not None:
+                skipped['reason']=('Source unreachable but canonical already holds this month\'s release; no newer release can exist before next month. '
+                                   'Source failure: '+diagnostic)[:900]
+                reports.append(skipped);continue
             row=dict(indicator=indicator,verification_status=status,reason=diagnostic)
             reports.append(compare(row,canonical))
     pd.DataFrame(rows).to_csv(staging/'observations.csv',index=False)
